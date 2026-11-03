@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never cancel a running deploy; later runs queue behind it.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # https://github.com/superfly/flyctl-actions (README: pin flyctl with the version input)
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        with:
+          # TODO: pin an exact flyctl release (the README recommends it); the current tag was not verified.
+          version: latest
+
+      # Delivery goes first: its release_command applies pending migrations.
+      - name: Deploy delivery
+        run: flyctl deploy --remote-only --config fly/delivery.toml
+
+      - name: Deploy web
+        run: flyctl deploy --remote-only --config fly/web.toml
+
+      - name: Deploy indexer
+        run: flyctl deploy --remote-only --config fly/indexer.toml
+
+      # Tap is deployed by hand (docs/deploy.md): a restart interrupts the firehose
+      # and a bad upgrade can force a re-backfill, so a person should watch it.

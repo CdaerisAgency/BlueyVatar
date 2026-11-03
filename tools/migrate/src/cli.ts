@@ -1,9 +1,13 @@
 import pg from 'pg'
 import { migrate } from './index.js'
 
-const url = process.env.DATABASE_URL
+// Migrations take a session-level advisory lock, so they need a direct Postgres connection.
+// Neon's pooled endpoint (PgBouncer in transaction mode) does not support session-level
+// advisory locks reliably, so prefer the direct endpoint when one is configured:
+// https://neon.com/docs/connect/connection-pooling
+const url = process.env.MIGRATE_DATABASE_URL || process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL
 if (!url) {
-  console.error('DATABASE_URL is not set')
+  console.error('Set MIGRATE_DATABASE_URL, DATABASE_URL_DIRECT, or DATABASE_URL')
   process.exit(1)
 }
 // dist/cli.js and src/cli.ts both sit two levels below tools/, so the repo root is three levels up.

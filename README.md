@@ -16,7 +16,7 @@ This code follows the product spec at [docs/spec/blueyvatar-product-spec-v6.md](
 | `lexicons/vendor` | Lexicons installed with `lex install` and pinned by CID in `lexicons.json`. |
 | `db/migrations` | Postgres schema, applied in file order by `tools/migrate`. |
 | `tools/migrate` | Migration runner (`pnpm db:migrate`). |
-| `Dockerfile`, `railway/` | One image and per-service Railway config. See [docs/deploy.md](docs/deploy.md). |
+| `Dockerfile`, `fly/` | One image and per-app Fly.io config. See [docs/deploy.md](docs/deploy.md). |
 
 ## Local development
 
@@ -45,7 +45,9 @@ Without `DATABASE_URL`, the delivery API uses in-memory stores and the indexer l
 DATABASE_URL=postgres://... pnpm db:migrate
 ```
 
-Migrations use a small in-repo runner (`tools/migrate`, built on `pg`). It applies `db/migrations/*.sql` in filename order, one transaction per file, records them in `schema_migrations`, and skips files already applied. Deploys are covered in [docs/deploy.md](docs/deploy.md).
+Production runs on Fly.io with Neon Postgres. Apps connect through Neon's pooled endpoint (`DATABASE_URL`). Migrations prefer `MIGRATE_DATABASE_URL`, then `DATABASE_URL_DIRECT` (the direct endpoint), then `DATABASE_URL`, because the pooled endpoint does not hold session-level advisory locks reliably.
+
+Migrations use a small in-repo runner (`tools/migrate`, built on `pg`). It applies `db/migrations/*.sql` in filename order, one transaction per file, records them in `schema_migrations`, and skips files already applied. Deploys run from `.github/workflows/deploy.yml` and are covered in [docs/deploy.md](docs/deploy.md).
 
 The Postgres integration tests run when `TEST_DATABASE_URL` is set. Each run creates and drops its own schema, so a shared scratch database is fine. The delivery test script builds `dist` first, because the sandboxed resizer test runs the compiled worker.
 
@@ -72,7 +74,7 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Web: account and license dashboard: issue, label, rotate, and revoke `sk_` and `pk_` keys (store only the SHA256 and a display prefix), plus domain lists for publishable keys.
 - [ ] Web: visibility rule settings, with the plain-language notice that repo data stays public (spec section 10.2).
 - [x] Claims: GitHub and Mastodon OAuth, rel="me" for websites, Instagram and X, attestations (Postgres, plus the service repo when `SERVICE_REPO_DID` and `SERVICE_APP_PASSWORD` are set). Follow-up: scheduled re-verification, TikTok and Threads.
-- [ ] Indexer: deploy Tap on Railway with the service profile as the signal collection and the four collections as filters; implement the `onPurge` hook for cache warming.
+- [ ] Indexer: deploy Tap on Fly.io with the service profile as the signal collection and the four collections as filters; implement the `onPurge` hook for cache warming.
 - [ ] Delivery: count the `transform` meter when a new variant is generated, and add usage alerts at 80 and 100 percent of included volume.
 - [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
 - [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.

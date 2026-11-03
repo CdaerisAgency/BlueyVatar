@@ -1,0 +1,47 @@
+# Tap sync service. Config reference: https://docs.fly.io/reference/configuration
+# Deploy manually: fly deploy --config fly/tap.toml (see docs/deploy.md for why).
+#
+# No [http_service] and no [[services]] section, so the app has no public address. The indexer
+# reaches it at blueyvatar-tap.internal:2480 over private networking
+# (https://docs.fly.io/networking/private-networking).
+# Do not run `fly ips allocate-v4` or `fly ips allocate-v6` for this app.
+app = "blueyvatar-tap"
+primary_region = "iad"
+
+[build]
+  # TODO: pin a real tag or digest from the indigo package registry before the first deploy.
+  # Do not deploy with :latest. https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
+  image = "ghcr.io/bluesky-social/indigo/tap:PIN_REAL_TAG"
+
+# Env names come from the Tap README:
+# https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
+# TAP_ADMIN_PASSWORD is a secret: fly secrets set --config fly/tap.toml TAP_ADMIN_PASSWORD=...
+[env]
+  TAP_BIND = ":2480"
+  TAP_SIGNAL_COLLECTION = "com.blueyvatar.profile"
+  TAP_COLLECTION_FILTERS = "com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile"
+  TAP_LOG_LEVEL = "error"
+  # UNCONFIRMED: the README default is sqlite://./tap.db and does not say where that lands in the
+  # container. This path keeps the database on the /data volume; verify the URL form in staging.
+  TAP_DATABASE_URL = "sqlite:///data/tap.db"
+
+# One volume means one machine; run Tap as a single machine.
+# https://docs.fly.io/reference/configuration, [mounts] section
+[mounts]
+  source = "tap_data"
+  destination = "/data"
+
+# Health check on the documented /health endpoint (https://docs.fly.io/reference/configuration, [checks] section).
+[checks]
+  [checks.tap_health]
+    type = "http"
+    port = 2480
+    path = "/health"
+    method = "GET"
+    grace_period = "30s"
+    interval = "30s"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

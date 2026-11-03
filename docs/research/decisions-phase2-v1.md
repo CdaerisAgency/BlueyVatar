@@ -6,7 +6,7 @@ Checked: November 3, 2026. Scope: spec sections 8, 11 and 14.1 of `/home/user/bl
 
 1. **Verified accounts (#51, #28):** choose a verification method. Recommendation: hybrid (OAuth where the platform offers a free or known-cost read, and a public proof on the account or a website everywhere else). See Decision 1.
 2. **Custom profile domains (#38):** choose a hosting path. Recommendation: Cloudflare for SaaS custom hostnames for subdomains, free up to 100 hostnames. Apex domains need an Enterprise add-on. See Decision 2.
-3. **Railway plan:** the owner must confirm the plan. Railway's docs and pricing page give different custom domain limits (see Decision 2).
+3. **Hosting:** the owner chose Fly.io with Neon (see docs/deploy.md).
 4. **X API:** the cost of reading the signed-in user is not explicitly published. Do not ship X OAuth until the owner accepts a per-read fee.
 5. **Instagram:** the Instagram API covers only Business and Creator accounts. Personal accounts have no published verification path.
 
@@ -88,31 +88,27 @@ Certificates: by default Cloudflare issues an ECDSA P-256 primary certificate an
 
 **Apex domains.** The Cloudflare overview says apex domains need Apex Proxying, which it lists as an Enterprise add-on ([Cloudflare for SaaS overview](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/)). On Free, only subdomains are supported as published.
 
-**Origin requirement.** The fallback origin is a blueyvatar hostname that Cloudflare proxies to Railway. Railway needs a custom domain for that hostname. Railway's docs say Cloudflare-proxied domains must use SSL mode Full, and that Full (Strict) will not work as intended ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)).
+**Origin requirement.** The fallback origin is a blueyvatar hostname that Cloudflare proxies to the Fly web app. Fly needs a certificate for that hostname (`fly certs add`). For a Cloudflare-proxied hostname, Fly's docs say to add the `_fly-ownership` TXT record, use SSL mode Full or Full (strict), and that certificate issuance can still fail through the proxy ([Fly custom domains](https://docs.fly.io/networking/custom-domain)).
 
 **Effort.** Medium to high. Automate hostname creation, validation polling, and status checks through the Cloudflare API. Test the origin's SSL mode before launch.
 
 **Risks.**
-- Railway's docs say proxied domains "may not always be able to issue a certificate" ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)). Certificate failure would break a customer's domain.
+- Fly's docs say certificate issuance through the Cloudflare proxy may still fail depending on configuration ([Fly custom domains](https://docs.fly.io/networking/custom-domain)). Certificate failure would break a customer's domain.
 - The 100 included hostnames are an allowance. Each hostname beyond 100 costs $0.10 on the plans page, which does not state a billing period in the text I read. At 1,000 hostnames the extra charge would be $90 (my arithmetic: 900 times $0.10).
 - Downtime during automatic HTTP validation (above).
 
-### Option 2B: Railway custom domain per user, TLS through Railway
+### Option 2B: Fly certificate per user, TLS through Fly
 
-**How it works.** The user creates a CNAME to the Railway target shown in the dashboard, plus the TXT record Railway requests. Railway issues a Let's Encrypt certificate (ECDSA, valid 90 days, renewed at 30 days remaining) ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)).
+**How it works.** The user creates a CNAME to the app's `.fly.dev` hostname, and the service adds each hostname with `fly certs add`. Fly issues the certificate ([Fly custom domains](https://docs.fly.io/networking/custom-domain)).
 
-**Cost and limits (checked November 3, 2026).**
-- Railway pricing page: Free is $0 with 0 custom domains. Hobby is $5 per month with 2 custom domains. Pro is $20 per month with 20 custom domains. Enterprise is set per agreement ([Railway pricing](https://railway.com/pricing)).
-- Railway docs: Trial is limited to 1 custom domain. Hobby is limited to 2 custom domains per service. Pro is limited to 20 domains per service by default, which can be raised on request ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)).
-- **Discrepancy:** the pricing page counts custom domains per plan, and the docs count them per service. The owner should confirm with Railway before relying on either number.
+**Cost and limits.** Not checked. Fly's per-app certificate limits and pricing were not researched here, so confirm them before considering this option.
 
-**Effort.** Low per domain. Each customer domain is a Railway custom domain entry, which the limits above count, so this does not scale past them.
+**Effort.** Low per domain, but every customer domain is a Fly certificate entry that someone must create and monitor.
 
 **Risks.**
-- Limits: 20 domains is the default ceiling on Pro. Beyond that, an increase must be requested.
-- Apex domains: Railway supports them only through CNAME flattening or dynamic ALIAS records. Some DNS providers do not support either, and Railway suggests moving nameservers to Cloudflare in that case ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)).
-- DNS changes can take up to 72 hours to propagate ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)).
-- Subdomains deeper than first level need Cloudflare's Advanced Certificate Manager, which Railway's docs say is required ([Railway custom domains](https://docs.railway.com/networking/domains/working-with-domains)).
+- Unverified certificate limits may cap how far this scales.
+- Fly advises against CNAMEs at the apex unless the DNS provider supports CNAME flattening ([Fly custom domains](https://docs.fly.io/networking/custom-domain)).
+- DNS changes take time to propagate before certificate issuance succeeds.
 
 ### Option 2C: Domain as the atproto handle (no hosting)
 
@@ -139,8 +135,8 @@ Certificates: by default Cloudflare issues an ECDSA P-256 primary certificate an
 
 **Recommendation: Option 2A, Cloudflare for SaaS, for subdomains.**
 
-1. It stays free for the first 100 custom hostnames on the Free plan, and it does not require a Railway entry per user.
-2. Confirm the Railway plan before building. The fallback origin needs a Railway custom domain, and the Free plan allows 0. Hobby at $5 per month is the lowest paid tier that allows one (pricing page).
+1. It stays free for the first 100 custom hostnames on the Free plan, and it does not require a Fly certificate per user.
+2. The fallback origin needs one Fly certificate for the profiles hostname on the web app. Confirm Fly's certificate allowance before building.
 3. Limit the launch to subdomains. Apex domains need Enterprise, so offer Option 2C (domain as handle) for apex-domain owners as a free complement.
-4. Test SSL Full mode on the Railway origin, and monitor certificate status for every hostname, since Railway's docs say issuance can fail behind a proxy.
-5. Do not use Option 2B at scale. Its published limits (20 per service on Pro) are too low for a Plus feature.
+4. Test SSL Full (strict) on the Fly origin, and monitor certificate status for every hostname, since issuance can fail behind a proxy.
+5. Do not use Option 2B at scale. Its per-certificate effort and unchecked limits make it a poor fit for a Plus feature.

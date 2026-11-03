@@ -1,0 +1,43 @@
+# Delivery API. Config reference: https://docs.fly.io/reference/configuration
+# Deploy: fly deploy --config fly/delivery.toml
+app = "blueyvatar-delivery"
+primary_region = "iad"
+
+[build]
+  # build.dockerfile is relative to this file (https://docs.fly.io/reference/configuration, [build] section).
+  # One Dockerfile serves web, delivery, and indexer; the command is set below.
+  dockerfile = "../Dockerfile"
+
+[env]
+  PORT = "3001"
+  TRUST_CLOUDFLARE = "true"
+
+[deploy]
+  # Runs in a temporary machine before the new version starts; a failure aborts the deploy
+  # (https://docs.fly.io/reference/configuration, [deploy] section).
+  # The runner prefers MIGRATE_DATABASE_URL, then DATABASE_URL_DIRECT, then DATABASE_URL.
+  release_command = "node tools/migrate/dist/cli.js"
+  strategy = "rolling"
+
+[experimental]
+  # Per-app command override (https://docs.fly.io/reference/configuration, [experimental] section).
+  cmd = ["node", "apps/delivery/dist/server.js"]
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Health check (https://docs.fly.io/reference/configuration, [[http_service.checks]] section).
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "15s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

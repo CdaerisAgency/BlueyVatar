@@ -6,7 +6,7 @@ import { handleRecord, type IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
 
 /**
- * Tap runs as its own Railway service, configured with the service profile
+ * Tap runs as its own Fly app, configured with the service profile
  * record as its signal collection and the four collections in handlers.ts as
  * its collection filters (spec section 4). Tap is in beta; Jetstream is the
  * documented fallback.
