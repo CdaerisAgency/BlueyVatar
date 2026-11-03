@@ -1,0 +1,21 @@
+{
+  "lexicon": 1,
+  "id": "com.blueyvatar.claim",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A claim that the repo owner controls an outside account or URL. Shown only once the service attests it.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["platform", "uri", "createdAt"],
+        "properties": {
+          "platform": { "type": "string", "maxLength": 64, "knownValues": ["github", "instagram", "tiktok", "threads", "x", "mastodon", "website"] },
+          "uri": { "type": "string", "format": "uri" },
+          "hidden": { "type": "boolean", "description": "Omit from hovercards." },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

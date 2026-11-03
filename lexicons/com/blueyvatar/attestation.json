@@ -1,0 +1,21 @@
+{
+  "lexicon": 1,
+  "id": "com.blueyvatar.attestation",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Written to the service repo. The service's result for one com.blueyvatar.claim.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["subject", "result", "createdAt"],
+        "properties": {
+          "subject": { "type": "ref", "ref": "com.atproto.repo.strongRef" },
+          "result": { "type": "string", "knownValues": ["verified", "failed", "revoked"] },
+          "method": { "type": "string", "maxLength": 64, "description": "Verification method. Per-platform methods are an open item (spec section 13)." },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}
