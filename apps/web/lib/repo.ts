@@ -39,7 +39,7 @@ export async function repoSession(did: string): Promise<OAuthSession> {
   }
 }
 
-async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsid: string, opts: { params?: Record<string, string>; body?: unknown } = {}): Promise<T> {
+export async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsid: string, opts: { params?: Record<string, string>; body?: unknown } = {}): Promise<T> {
   const qs = opts.params ? `?${new URLSearchParams(opts.params)}` : ''
   const res = await session.fetchHandler(`/xrpc/${nsid}${qs}`, {
     method,

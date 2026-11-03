@@ -22,6 +22,14 @@ export interface IndexedImage {
   createdAt: string
 }
 
+/** A claim the service has attested (spec section 8). Hidden ones stay in profile JSON and are skipped by hovercards. */
+export interface VerifiedAccount {
+  platform: string
+  uri: string
+  verifiedAt: string
+  hidden: boolean
+}
+
 /** What the indexer maintains in Postgres. */
 export interface IndexStore {
   didForEmailHash(hash: string): Promise<string | null>
@@ -31,6 +39,8 @@ export interface IndexStore {
   isRepoActive(did: string): Promise<boolean>
   /** Images removed from delivery after a report, keyed by blob CID. */
   isBlocked(did: string, cid: string): Promise<boolean>
+  /** Claims whose latest attestation is verified and still matches the claim's uri, oldest first. */
+  verifiedAccounts(did: string): Promise<VerifiedAccount[]>
 }
 
 export class MemoryIndexStore implements IndexStore {
@@ -39,6 +49,7 @@ export class MemoryIndexStore implements IndexStore {
   rules = new Map<string, Visibility>()
   inactive = new Set<string>()
   blocked = new Set<string>()
+  accounts = new Map<string, VerifiedAccount[]>()
   async didForEmailHash(hash: string) {
     const did = this.emails.get(hash) ?? null
     if (did && (await this.visibility(did)).emailLookupOptOut) return null
@@ -48,4 +59,5 @@ export class MemoryIndexStore implements IndexStore {
   async visibility(did: string) { return this.rules.get(did) ?? PUBLIC_VISIBILITY }
   async isRepoActive(did: string) { return !this.inactive.has(did) }
   async isBlocked(did: string, cid: string) { return this.blocked.has(`${did}/${cid}`) }
+  async verifiedAccounts(did: string) { return this.accounts.get(did) ?? [] }
 }

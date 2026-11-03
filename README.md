@@ -71,7 +71,7 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Web: email linking (spec section 6): read `email` and `emailConfirmed` from `getSession`, the trusted PDS host list, the one-time code fallback, and unlinking.
 - [ ] Web: account and license dashboard: issue, label, rotate, and revoke `sk_` and `pk_` keys (store only the SHA256 and a display prefix), plus domain lists for publishable keys.
 - [ ] Web: visibility rule settings, with the plain-language notice that repo data stays public (spec section 10.2).
-- [ ] Claims: per-platform verification and writing `com.blueyvatar.attestation` records to the service repo.
+- [x] Claims: GitHub and Mastodon OAuth, rel="me" for websites, Instagram and X, attestations (Postgres, plus the service repo when `SERVICE_REPO_DID` and `SERVICE_APP_PASSWORD` are set). Follow-up: scheduled re-verification, TikTok and Threads.
 - [ ] Indexer: deploy Tap on Railway with the service profile as the signal collection and the four collections as filters; implement the `onPurge` hook for cache warming.
 - [ ] Delivery: count the `transform` meter when a new variant is generated, and add usage alerts at 80 and 100 percent of included volume.
 - [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
