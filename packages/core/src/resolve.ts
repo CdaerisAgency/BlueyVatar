@@ -36,3 +36,17 @@ export function imagePath(did: string, cid: string, size: number, ext: 'png' | '
 }
 
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+
+/** Sizes the service treats as common (spec section 4). Used to purge and warm `/img` URLs. */
+export const IMAGE_SIZE_LADDER = [16, 24, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 512, 1024, 2048] as const
+/** Subset of the ladder worth warming after an avatar change. */
+export const WARM_SIZES = [48, 80, 128, 256, 512] as const
+export const IMAGE_FORMATS = ['png', 'jpeg', 'webp'] as const
+
+/**
+ * `/img` paths for the size ladder at the default quality. Callers that request a
+ * size off the ladder or a `-q` quality override are not covered.
+ */
+export function ladderPaths(did: string, cid: string, sizes: readonly number[] = IMAGE_SIZE_LADDER, formats: readonly ('png' | 'jpeg' | 'webp')[] = IMAGE_FORMATS): string[] {
+  return sizes.flatMap((s) => formats.map((f) => imagePath(did, cid, s, f)))
+}

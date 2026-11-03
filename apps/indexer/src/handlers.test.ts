@@ -25,6 +25,6 @@ describe('indexer handlers', () => {
     const db = fakeDb()
     await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: '3k', action: 'delete' }, db)
     expect(db.deleteImage).toHaveBeenCalledWith('did:plc:a', '3k')
-    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a')
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined)
   })
 })

@@ -1,15 +1,17 @@
 import { serve } from '@hono/node-server'
+import type pg from 'pg'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
 import { ConsoleAlertSink, MemoryAlertLedger, UsageAlerts, type AlertLedger } from './alerts.js'
 import { createApp } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
+import { scheduleRateWindowCleanup } from './rate-cleanup.js'
 import { createPool, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
 import { sandboxedResizer } from './resize.js'
 import { AtprotoResolver } from './resolver.js'
 import { MemoryIndexStore, type IndexStore } from './store.js'
 import { MemoryUsageMeter, type UsageMeter } from './usage.js'
 
-interface Stores { index: IndexStore; licenses: LicenseStore; limiter: RateLimiter; usage: UsageMeter; ledger: AlertLedger }
+interface Stores { pool?: pg.Pool; index: IndexStore; licenses: LicenseStore; limiter: RateLimiter; usage: UsageMeter; ledger: AlertLedger }
 
 // Postgres when DATABASE_URL is set (schema in db/migrations); memory stores for local dev.
 function stores(): Stores {
@@ -20,10 +22,11 @@ function stores(): Stores {
   }
   const pool = createPool(url)
   pool.on('error', (err) => console.error('postgres pool error', err))
-  return { index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: new PgRateLimiter(pool), usage: new PgUsageMeter(pool), ledger: new PgAlertLedger(pool) }
+  return { pool, index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: new PgRateLimiter(pool), usage: new PgUsageMeter(pool), ledger: new PgAlertLedger(pool) }
 }
 
-const { index, licenses, limiter, usage, ledger } = stores()
+const { pool, index, licenses, limiter, usage, ledger } = stores()
+if (pool) scheduleRateWindowCleanup(pool)
 const app = createApp({
   index,
   resolver: new AtprotoResolver({ index, adapters: DEFAULT_ADAPTERS, log: (m, meta) => console.warn(m, meta) }),

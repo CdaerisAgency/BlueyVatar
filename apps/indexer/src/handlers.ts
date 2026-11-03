@@ -10,15 +10,16 @@ export const COLLECTIONS = {
 
 export interface IndexWrites {
   upsertImage(row: { did: string; rkey: string; cid: string; mimeType: string; rating: string; isDefault: boolean; license: string | null; createdAt: string }): Promise<void>
-  deleteImage(did: string, rkey: string): Promise<void>
+  /** Returns the blob CID of the deleted record, when known, so its cached URLs can be purged. */
+  deleteImage(did: string, rkey: string): Promise<string | undefined | void>
   upsertProfile(did: string, record: Record<string, unknown>): Promise<void>
   deleteProfile(did: string): Promise<void>
   upsertClaim(did: string, rkey: string, record: Record<string, unknown>): Promise<void>
   deleteClaim(did: string, rkey: string): Promise<void>
   /** `status` is Tap's account status (active, deactivated, deleted, suspended, takendown). */
   setRepoStatus(did: string, handle: string | null, active: boolean, status?: string): Promise<void>
-  /** Purge cached copies after a change (spec section 9). */
-  purgeImages(did: string): Promise<void>
+  /** Purge cached copies after a change (spec section 9). Without `cids`, purges the repo's indexed images. */
+  purgeImages(did: string, cids?: string[]): Promise<void>
 }
 
 export interface RecordEvt {
@@ -34,8 +35,8 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
   switch (evt.collection) {
     case COLLECTIONS.image: {
       if (del || !evt.record) {
-        await db.deleteImage(evt.did, evt.rkey)
-        await db.purgeImages(evt.did)
+        const cid = await db.deleteImage(evt.did, evt.rkey)
+        await db.purgeImages(evt.did, cid ? [cid] : undefined)
         return
       }
       const blob = readBlobRef(getPath(evt.record, 'image'))

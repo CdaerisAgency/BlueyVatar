@@ -7,7 +7,9 @@ export interface PgWritesOptions {
    * avatar gets a new URL and the uncached redirect picks it up. This hook is
    * for CDN purges or cache warming (spec sections 4 and 9).
    */
-  onPurge?: (did: string) => Promise<void>
+  onPurge?: (did: string, cids: string[]) => Promise<void>
+  /** Called after an image upsert, for cache warming. Best-effort: not awaited, errors are logged. */
+  onImageUpserted?: (did: string, cid: string) => Promise<void>
 }
 
 /** Postgres implementation of IndexWrites against db/migrations/0001_init.sql. */
@@ -24,10 +26,12 @@ export class PgIndexWrites implements IndexWrites {
             created_at = EXCLUDED.created_at, indexed_at = now()`,
       [r.did, r.rkey, r.cid, r.mimeType, r.rating, r.isDefault, r.license, r.createdAt],
     )
+    this.opts.onImageUpserted?.(r.did, r.cid).catch((err) => console.warn('image upsert hook failed', err))
   }
 
-  async deleteImage(did: string, rkey: string): Promise<void> {
-    await this.pool.query('DELETE FROM images WHERE did = $1 AND rkey = $2', [did, rkey])
+  async deleteImage(did: string, rkey: string): Promise<string | undefined> {
+    const res = await this.pool.query<{ cid: string }>('DELETE FROM images WHERE did = $1 AND rkey = $2 RETURNING cid', [did, rkey])
+    return res.rows[0]?.cid
   }
 
   async upsertProfile(did: string, record: Record<string, unknown>): Promise<void> {
@@ -64,9 +68,12 @@ export class PgIndexWrites implements IndexWrites {
             handle = EXCLUDED.handle, active = EXCLUDED.active, status = EXCLUDED.status, updated_at = now()`,
       [did, handle, active, status ?? (active ? 'active' : null)],
     )
+    if (!active) await this.purgeImages(did)
   }
 
-  async purgeImages(did: string): Promise<void> {
-    await this.opts.onPurge?.(did)
+  async purgeImages(did: string, cids?: string[]): Promise<void> {
+    if (!this.opts.onPurge) return
+    const list = cids ?? (await this.pool.query<{ cid: string }>('SELECT DISTINCT cid FROM images WHERE did = $1', [did])).rows.map((r) => r.cid)
+    if (list.length) await this.opts.onPurge(did, list)
   }
 }

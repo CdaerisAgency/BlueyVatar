@@ -14,7 +14,9 @@ This code follows the product spec at [docs/spec/blueyvatar-product-spec-v6.md](
 | `apps/web` | Next.js app: sign-in with atproto OAuth (confidential client), profile pages, and the OAuth client metadata document. |
 | `lexicons/com/blueyvatar` | The service's own lexicons: `image`, `profile`, `claim`, `attestation`. |
 | `lexicons/vendor` | Lexicons installed with `lex install` and pinned by CID in `lexicons.json`. |
-| `db/migrations` | Postgres schema, applied in file order. |
+| `db/migrations` | Postgres schema, applied in file order by `tools/migrate`. |
+| `tools/migrate` | Migration runner (`pnpm db:migrate`). |
+| `Dockerfile`, `railway/` | One image and per-service Railway config. See [docs/deploy.md](docs/deploy.md). |
 
 ## Local development
 
@@ -40,8 +42,10 @@ pnpm --filter @blueyvatar/web dev                                               
 Without `DATABASE_URL`, the delivery API uses in-memory stores and the indexer logs its writes to the console. To use Postgres, create a database, apply the migrations, and set `DATABASE_URL`:
 
 ```sh
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/0001_init.sql
+DATABASE_URL=postgres://... pnpm db:migrate
 ```
+
+Migrations use a small in-repo runner (`tools/migrate`, built on `pg`). It applies `db/migrations/*.sql` in filename order, one transaction per file, records them in `schema_migrations`, and skips files already applied. Deploys are covered in [docs/deploy.md](docs/deploy.md).
 
 The Postgres integration tests run when `TEST_DATABASE_URL` is set. Each run creates and drops its own schema, so a shared scratch database is fine. The delivery test script builds `dist` first, because the sandboxed resizer test runs the compiled worker.
 
@@ -70,7 +74,7 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Claims: per-platform verification and writing `com.blueyvatar.attestation` records to the service repo.
 - [ ] Indexer: deploy Tap on Railway with the service profile as the signal collection and the four collections as filters; implement the `onPurge` hook for cache warming.
 - [ ] Delivery: count the `transform` meter when a new variant is generated, and add usage alerts at 80 and 100 percent of included volume.
-- [ ] Database: pick a migration runner and add a periodic cleanup of expired `rate_windows` rows.
+- [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
 - [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.
 - [ ] Lexicons: clear the `com.blueyvatar` namespace and publish the schemas under `_lexicon.blueyvatar.com`.
 - [ ] Billing: choose the payment processor, tax handling, and invoicing (open item in spec section 13).
