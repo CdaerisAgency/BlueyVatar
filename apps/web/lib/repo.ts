@@ -1,6 +1,7 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import { oauthClient } from './auth'
-import { IMAGE_COLLECTION, PROFILE_COLLECTION, labelValues, type ImageMime } from './records'
+import { bskyAvatarBlob, readCapped } from './import'
+import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, planFor, validateImageBytes, type ImageMime, type NewImageFields } from './records'
 
 /** Shapes of the XRPC responses used here (com.atproto.repo.*). */
 export type StrongRef = { uri: string; cid: string }
@@ -138,3 +139,38 @@ export const blobUrl = (pds: string, did: string, cid: string): string =>
   `${pds.replace(/\/$/, '')}/xrpc/com.atproto.sync.getBlob?${new URLSearchParams({ did, cid })}`
 
 export const imageLabels = (img: StoredImage): string[] => labelValues(img.value.labels)
+
+/**
+ * Upload the blob, create a com.blueyvatar.image record, and make it the default when asked or
+ * when it is the first image. Enforces the plan image limit (spec section 11.2).
+ */
+export async function saveNewImage(session: OAuthSession, bytes: Uint8Array, mime: ImageMime, fields: NewImageFields): Promise<void> {
+  const existing = await listImages(session)
+  const plan = planFor(session.did)
+  if (!canAddImage(existing.length, plan)) throw new RepoError(limitMessage(plan))
+  const blob = await uploadBlob(session, bytes, mime)
+  const { alt, labels, license } = fields
+  const isDefault = fields.isDefault || existing.length === 0
+  const value: ImageRecord = { image: blob, ...(alt ? { alt } : {}), ...(labels ? { labels } : {}), license, isDefault, createdAt: new Date().toISOString() }
+  const ref = await createImage(session, value)
+  if (isDefault) await setDefaultImage(session, { ...ref, rkey: rkeyOf(ref.uri), value })
+}
+
+/**
+ * Read the user's app.bsky.actor.profile avatar from their own PDS. The blob comes from
+ * com.atproto.sync.getBlob on that same PDS, so no other host is contacted.
+ */
+export async function fetchBlueskyAvatar(session: OAuthSession): Promise<{ bytes: Uint8Array; mime: ImageMime; labels: unknown }> {
+  const rec = await session.fetchHandler(`/xrpc/com.atproto.repo.getRecord?${new URLSearchParams({ repo: session.did, collection: 'app.bsky.actor.profile', rkey: 'self' })}`)
+  if (!rec.ok) throw new RepoError('Your Bluesky profile could not be read.')
+  const value = ((await rec.json()) as { value?: { labels?: unknown } }).value
+  const meta = bskyAvatarBlob(value)
+  if (!meta.ok) throw new RepoError(meta.error)
+  const res = await session.fetchHandler(`/xrpc/com.atproto.sync.getBlob?${new URLSearchParams({ did: session.did, cid: meta.value.cid })}`, { signal: AbortSignal.timeout(8000) })
+  if (!res.ok) throw new RepoError('Your PDS did not return the Bluesky avatar.')
+  const bytes = await readCapped(res, MAX_BLOB_BYTES)
+  if (!bytes) throw new RepoError('Your Bluesky avatar is larger than 1,000,000 bytes. Resize or compress it and upload it directly instead.')
+  const v = validateImageBytes(bytes)
+  if (!v.ok) throw new RepoError(v.error)
+  return { bytes, mime: v.value.mime, labels: value?.labels }
+}
