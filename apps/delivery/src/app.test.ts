@@ -104,6 +104,13 @@ describe('delivery API', () => {
     expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')).status).toBe(404)
   })
 
+  it('allows cross-origin reads of profile JSON', async () => {
+    const { app } = setup()
+    const res = await app.request('/profile/alice.test', { headers: { origin: 'https://site.test' } })
+    expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    expect(res.headers.get('access-control-allow-credentials')).toBeNull()
+  })
+
   it('returns profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()

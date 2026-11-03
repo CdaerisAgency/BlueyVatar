@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono'
+import { cors } from 'hono/cors'
 import {
   DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isSha256Hex, parseAvatarParams,
   parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
@@ -178,6 +179,14 @@ export function createApp(deps: AppDeps) {
     return serveAvatar(c, () => deps.resolver.resolveIdentity(id as { kind: 'did' | 'handle'; value: string }), id.value,
       id.kind === 'handle' ? cleanInitials(id.value) : '')
   })
+
+  // Hovercards on other sites read profile JSON from the browser. No cookies are
+  // used, so any origin may read it; publishable keys still enforce their domains.
+  app.use('/profile/*', cors({
+    origin: '*',
+    allowMethods: ['GET'],
+    exposeHeaders: ['x-rate-limit-limit', 'x-rate-limit-remaining', 'x-rate-limit-reset', 'x-tier'],
+  }))
 
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
