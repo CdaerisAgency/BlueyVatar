@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     services:
       postgres:
@@ -23,16 +23,17 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: blueyvatar_test
         ports:
-          - 5432:5432
+          - 5432
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/blueyvatar_test
     steps:
       - uses: actions/checkout@v4
+
+      - name: Point tests at the service port
+        run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -67,10 +68,13 @@ jobs:
         run: pnpm --filter @blueyvatar/web build
 
   docker:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - name: Point tests at the service port
+        run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
       - name: Build image
         run: docker build -t blueyvatar:ci .
