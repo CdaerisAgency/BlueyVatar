@@ -1,0 +1,27 @@
+{
+  "lexicon": 1,
+  "id": "com.blueyvatar.image",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "One avatar image. The blob limits match app.bsky.actor.profile#avatar so one file works in both places.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": ["image", "createdAt"],
+        "properties": {
+          "image": { "type": "blob", "accept": ["image/png", "image/jpeg"], "maxSize": 1000000 },
+          "alt": { "type": "string", "maxGraphemes": 300, "maxLength": 3000 },
+          "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
+          "license": {
+            "type": "string",
+            "description": "User-declared usage license. Values are placeholders until legal review.",
+            "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"]
+          },
+          "isDefault": { "type": "boolean" },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

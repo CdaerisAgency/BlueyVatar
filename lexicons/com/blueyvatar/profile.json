@@ -1,0 +1,27 @@
+{
+  "lexicon": 1,
+  "id": "com.blueyvatar.profile",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "Extended profile fields. Display name, description, avatar, and links stay in app.bsky.actor.profile.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": ["createdAt"],
+        "properties": {
+          "defaultImage": { "type": "ref", "ref": "com.atproto.repo.strongRef", "description": "The chosen default com.blueyvatar.image record." },
+          "jobTitle": { "type": "string", "maxGraphemes": 100, "maxLength": 1000 },
+          "company": { "type": "string", "maxGraphemes": 100, "maxLength": 1000 },
+          "location": { "type": "string", "maxGraphemes": 100, "maxLength": 1000 },
+          "pronouns": { "type": "string", "maxGraphemes": 40, "maxLength": 400 },
+          "pronunciation": { "type": "string", "maxGraphemes": 100, "maxLength": 1000 },
+          "timezone": { "type": "string", "maxLength": 64, "description": "IANA time zone name." },
+          "interests": { "type": "array", "maxLength": 20, "items": { "type": "string", "maxGraphemes": 50, "maxLength": 500 } },
+          "backgroundColor": { "type": "string", "maxLength": 7, "description": "Hex color, phase v2." },
+          "createdAt": { "type": "string", "format": "datetime" }
+        }
+      }
+    }
+  }
+}

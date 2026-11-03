@@ -1,0 +1,93 @@
+import { readFileSync } from 'node:fs'
+import pg from 'pg'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { hashApiKey, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
+
+// Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
+const url = process.env.TEST_DATABASE_URL
+const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
+const schema = `t_delivery_${process.pid}_${Date.now()}`
+const DID = 'did:plc:alice'
+const HASH = 'a'.repeat(64)
+
+describe.skipIf(!url)('postgres stores', () => {
+  let pool: pg.Pool
+
+  beforeAll(async () => {
+    const admin = new pg.Client({ connectionString: url })
+    await admin.connect()
+    await admin.query(`CREATE SCHEMA ${schema}`)
+    await admin.end()
+    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
+    await pool.query(migration)
+  })
+
+  afterAll(async () => {
+    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
+    await pool?.end()
+  })
+
+  it('looks up email hashes and honors the opt-out', async () => {
+    const index = new PgIndexStore(pool)
+    await pool.query(`INSERT INTO email_links (email_hash, did, method) VALUES ($1, $2, 'code')`, [HASH, DID])
+    expect(await index.didForEmailHash(HASH)).toBe(DID)
+    expect(await index.visibility(DID)).toEqual({ keyedOnly: false, domainAllowlist: [], hiddenProfile: false, emailLookupOptOut: false })
+    await pool.query(`INSERT INTO visibility_rules (did, domain_allowlist, email_lookup_opt_out) VALUES ($1, '{example.com}', true)`, [DID])
+    expect(await index.didForEmailHash(HASH)).toBeNull()
+    expect((await index.visibility(DID)).domainAllowlist).toEqual(['example.com'])
+  })
+
+  it('reads images, repo status, and blocks', async () => {
+    const index = new PgIndexStore(pool)
+    await pool.query(
+      `INSERT INTO images (did, rkey, cid, mime_type, rating, is_default, created_at)
+            VALUES ($1, 'r1', 'bafyone', 'image/png', 'pg', true, '2026-01-01T00:00:00Z')`,
+      [DID],
+    )
+    expect(await index.serviceImages(DID)).toEqual([
+      { rkey: 'r1', cid: 'bafyone', mimeType: 'image/png', rating: 'pg', isDefault: true, createdAt: '2026-01-01T00:00:00.000Z' },
+    ])
+    expect(await index.isRepoActive(DID)).toBe(true)
+    await pool.query(`INSERT INTO repos (did, active, status) VALUES ($1, false, 'takendown')`, [DID])
+    expect(await index.isRepoActive(DID)).toBe(false)
+    expect(await index.isBlocked(DID, 'bafyone')).toBe(false)
+    await pool.query(`INSERT INTO blocked_images (did, cid) VALUES ($1, 'bafyone')`, [DID])
+    expect(await index.isBlocked(DID, 'bafyone')).toBe(true)
+  })
+
+  it('finds keys by SHA256 and ignores revoked keys', async () => {
+    const licenses = new PgLicenseStore(pool)
+    const raw = 'pk_test_123456'
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('lic1', $1, 'pro')`, [DID])
+    await pool.query(
+      `INSERT INTO api_keys (key_hash, prefix, license_id, kind, domains) VALUES ($1, 'pk_test', 'lic1', 'publishable', '{*.example.com}')`,
+      [hashApiKey(raw)],
+    )
+    const found = await licenses.findKey(raw)
+    expect(found?.license).toEqual({ licenseId: 'lic1', owner: DID, tier: 'pro', status: 'active' })
+    expect(found?.key).toEqual({ key: raw, kind: 'publishable', licenseId: 'lic1', domains: ['*.example.com'] })
+    expect(await licenses.findKey('pk_other')).toBeNull()
+    await pool.query(`UPDATE api_keys SET revoked_at = now()`)
+    expect(await licenses.findKey(raw)).toBeNull()
+  })
+
+  it('counts rate windows and resets expired ones', async () => {
+    const limiter = new PgRateLimiter(pool)
+    const a = await limiter.hit('ip:1', 2, 60)
+    const b = await limiter.hit('ip:1', 2, 60)
+    const c = await limiter.hit('ip:1', 2, 60)
+    expect([a.remaining, b.remaining, c.remaining]).toEqual([1, 0, 0])
+    expect([a.exceeded, b.exceeded, c.exceeded]).toEqual([false, false, true])
+    expect(a.reset).toBeGreaterThan(Date.now() / 1000)
+    await pool.query(`UPDATE rate_windows SET reset_at = now() - interval '1 second'`)
+    expect((await limiter.hit('ip:1', 2, 60)).remaining).toBe(1)
+  })
+
+  it('adds to monthly usage counters', async () => {
+    const usage = new PgUsageMeter(pool)
+    await usage.add('lic1', 'origin_resolution')
+    await usage.add('lic1', 'origin_resolution', 4)
+    const { rows } = await pool.query(`SELECT count FROM usage_counters WHERE license_id = 'lic1' AND meter = 'origin_resolution'`)
+    expect(rows.map((r) => Number(r.count))).toEqual([5])
+  })
+})
