@@ -1,93 +1,126 @@
 # Deploy runbook
 
-Covers staging and production on Railway behind Cloudflare's free plan (spec sections 14 and 14.1). Nothing here has been deployed yet. Items marked **unconfirmed** were not verified against a source.
+Covers staging and production on Fly.io with Neon Postgres, behind Cloudflare's free plan (spec sections 14 and 14.1). Primary region is `iad`. Nothing here has been deployed yet. Items marked **unconfirmed** were not verified against a source.
 
-## Services
+## Apps
 
-| Service | Source | Start command | Config file | Health check |
-| --- | --- | --- | --- | --- |
-| `web` | this repo | `cd apps/web && node_modules/.bin/next start` | `/railway/web.json` | `/` |
-| `delivery` | this repo | `node apps/delivery/dist/server.js` | `/railway/delivery.json` | `/healthz` |
-| `indexer` | this repo | `node apps/indexer/dist/index.js` | `/railway/indexer.json` | none (no HTTP server) |
-| `tap` | Docker image | image default | none | `/health` on port 2480 |
-| `postgres` | Railway Postgres (or Neon) | | | |
+| App | Fly app name | Config | Command | Public | Health check |
+| --- | --- | --- | --- | --- | --- |
+| web | `blueyvatar-web` | `fly/web.toml` | `cd apps/web && node_modules/.bin/next start -H 0.0.0.0 -p 3000` | yes, via Cloudflare | `/` |
+| delivery | `blueyvatar-delivery` | `fly/delivery.toml` | `node apps/delivery/dist/server.js` | yes, via Cloudflare | `/healthz` |
+| indexer | `blueyvatar-indexer` | `fly/indexer.toml` | `node apps/indexer/dist/index.js` | no | none (no HTTP server) |
+| tap | `blueyvatar-tap` | `fly/tap.toml` | image default | no | `/health` on 2480 |
 
-All three repo services build from the root `Dockerfile`, a single image holding every app and the migration runner. Each service leaves Root Directory unset (shared monorepo) and sets **Railway Config File** to the absolute path above. Per Railway's monorepo guide the config file path does not follow Root Directory, so use the absolute form: <https://docs.railway.com/deployments/monorepo>.
+web, delivery, and indexer build from the root `Dockerfile`, one image holding every app and the migration runner. Each config sets its command with `[experimental] cmd`. References: <https://docs.fly.io/reference/configuration> (build, deploy, http_service, checks, mounts, experimental).
 
-**Config as Code is deprecated.** Railway's page says existing `railway.json` files keep working for legacy services until 2026-12-01, and that Infrastructure as Code (`.railway/railway.ts`) replaces it: <https://docs.railway.com/reference/config-as-code> and <https://docs.railway.com/infrastructure-as-code>. New services cannot opt into Config as Code. The files in `railway/` use the documented keys (`build.builder`, `build.dockerfilePath`, `build.watchPatterns`, `deploy.startCommand`, `deploy.preDeployCommand`, `deploy.healthcheckPath`, `deploy.restartPolicyType`), so if they are not read, enter the same values in each service's Settings page. Porting to Infrastructure as Code is a follow-up. I could not confirm which build and deploy fields that format supports.
+All deploy commands run from the repository root and pass `--dockerfile Dockerfile`, so the build context is the repo root regardless of how flyctl resolves `build.dockerfile`.
 
-Create environments `staging` and `production`, each with its own set of services and its own Infisical environment.
+## Neon
 
-## Postgres and migrations
+1. Create one Neon project with two branches: `production` (the default branch) and `staging`. Branch from production for staging, or keep staging empty and migrate it.
+2. Each branch has two connection strings on the same database:
+   - **Pooled** (hostname contains `-pooler`): `DATABASE_URL`, used by delivery, indexer, and web.
+   - **Direct** (no `-pooler`): `DATABASE_URL_DIRECT`, used only by migrations.
+3. Why: the pooled endpoint is PgBouncer in transaction mode, which does not support session-level advisory locks, and Neon recommends the direct connection for migrations: <https://neon.com/docs/connect/connection-pooling>. The migration runner holds an advisory lock to serialize runs.
+4. The runner uses `MIGRATE_DATABASE_URL`, then `DATABASE_URL_DIRECT`, then `DATABASE_URL`. Set `DATABASE_URL_DIRECT` on delivery, since delivery's release command runs the migrations.
 
-1. Add the Railway Postgres plugin (or a Neon project) per environment. Give `delivery` and `indexer` its connection string as `DATABASE_URL`.
-2. Migrations run through the in-repo runner in `tools/migrate`. It applies `db/migrations/*.sql` in filename order, one transaction per file, and records each file in `schema_migrations`. Rerunning applies nothing. A Postgres advisory lock serializes concurrent runs. The runner removes standalone `BEGIN;` and `COMMIT;` lines from each file because it supplies the transaction.
-3. The `delivery` service runs the runner as its `preDeployCommand`, so pending migrations apply before the new version starts. `indexer` and `web` do not run migrations. Deploy `delivery` first when a release adds a migration.
-4. To run by hand: `DATABASE_URL=... pnpm db:migrate` from a checkout (it builds the runner first).
-5. `delivery` deletes expired `rate_windows` rows hourly from a timer in the process.
+## Migrations
+
+The runner in `tools/migrate` applies `db/migrations/*.sql` in filename order, one transaction per file, and records each file in `schema_migrations`. Rerunning applies nothing. The runner removes standalone `BEGIN;` and `COMMIT;` lines from each file because it supplies the transaction.
+
+- `fly/delivery.toml` sets `release_command = "node tools/migrate/dist/cli.js"`. Fly runs it in a temporary machine before the new version starts, and a failure aborts the deploy so the previous version keeps running. Deploy delivery first when a release adds a migration. The CI workflow does.
+- To run by hand: `DATABASE_URL_DIRECT=... pnpm db:migrate` from a checkout.
+- delivery deletes expired `rate_windows` rows hourly from a timer in the process.
+
+## First-time setup
+
+```sh
+# Apps (once per environment)
+fly apps create blueyvatar-web
+fly apps create blueyvatar-delivery
+fly apps create blueyvatar-indexer
+fly apps create blueyvatar-tap
+
+# Tap volume, single machine in iad
+fly volumes create tap_data --app blueyvatar-tap --region iad --size 10
+
+# Secrets (see the per-app list below; values come from Infisical)
+fly secrets set --app blueyvatar-delivery DATABASE_URL=... DATABASE_URL_DIRECT=... ORIGIN_SECRET=...
+fly secrets set --app blueyvatar-tap TAP_ADMIN_PASSWORD=...
+
+# Deploy. Tap first, delivery before web and indexer.
+fly deploy --config fly/tap.toml --dockerfile Dockerfile
+fly deploy --config fly/delivery.toml --dockerfile Dockerfile
+fly deploy --config fly/web.toml --dockerfile Dockerfile
+fly deploy --config fly/indexer.toml --dockerfile Dockerfile
+```
+
+Create a deploy token for CI: `fly tokens create deploy --app blueyvatar-delivery` (repeat per app, or use an organization token) and store it as the GitHub secret `FLY_API_TOKEN`. **Unconfirmed:** a single app-scoped deploy token only covers one app, so the workflow needs an org-scoped token (`fly tokens create org`) to deploy all three.
+
+## CI deploys
+
+`.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch, but only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
+
+**Tap is deployed by hand.** Restarting Tap interrupts the firehose connection, and an image upgrade can force a re-backfill, so someone should watch each Tap deploy. It also changes rarely.
 
 ## Tap
 
-Tap is a separate service that the indexer connects to (`TAP_URL`).
+Tap is a separate app that the indexer connects to (`TAP_URL`).
 
-- Quick start for Railway, linked from the atproto self-hosting guide (<https://atproto.com/guides/self-hosting>): <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/RAILWAY_DEPLOY.md>. It uses the image `ghcr.io/bluesky-social/indigo/tap:latest`, a volume at `/data`, port `2480`, and the variables `TAP_LOG_LEVEL` and `TAP_ADMIN_PASSWORD`.
-- Environment names come from Tap's README: <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>.
-
-| Variable | Value for blueyvatar | Source |
-| --- | --- | --- |
-| `TAP_SIGNAL_COLLECTION` | `com.blueyvatar.profile` | Tap README |
-| `TAP_COLLECTION_FILTERS` | `com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile` | Tap README (comma separated) |
-| `TAP_ADMIN_PASSWORD` | from Infisical; clients use Basic auth with user `admin` | Tap README and quick start |
-| `TAP_DATABASE_URL` | the Railway Postgres connection string, or the default SQLite file on the `/data` volume | Tap README |
-| `TAP_LOG_LEVEL` | `error` | quick start |
-
-- **Pin the version.** The quick start uses `:latest`. Pin a tag or digest instead (the tag list was not checked, so look in the indigo package registry). Upgrade by changing the pin in staging, watching for a clean backfill, then promoting.
-- **Postgres storage.** The README says `TAP_DATABASE_URL` accepts a PostgreSQL connection string but gives no Postgres example or setup. Test it in staging. The volume plus SQLite default is the documented fallback.
-- **Private access.** Do not generate a public domain for Tap (the quick start does so only for testing). Reach it from `indexer` over Railway private networking, `TAP_URL=http://tap.railway.internal:2480`. Railway's private network hostname format was not verified against its docs, so confirm it in the dashboard.
+- Env names come from Tap's README: <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>. `fly/tap.toml` sets `TAP_BIND`, `TAP_SIGNAL_COLLECTION` (`com.blueyvatar.profile`), `TAP_COLLECTION_FILTERS` (the four collections, comma separated), `TAP_LOG_LEVEL`, and `TAP_DATABASE_URL`. The secret `TAP_ADMIN_PASSWORD` is set with `fly secrets set`. Clients use Basic auth with user `admin`.
+- **Pin the image.** `fly/tap.toml` has the placeholder tag `PIN_REAL_TAG`. Replace it with a real tag or digest from the indigo package registry before the first deploy (the tag list was not checked). Upgrade by changing the pin in staging, watching for a clean backfill, then promoting.
+- **Storage.** The volume `tap_data` mounts at `/data`, so Tap runs as one machine. **Unconfirmed:** the README default is `sqlite://./tap.db` and does not say where that lands in the container, so the config sets `sqlite:///data/tap.db`. Verify the URL form in staging. The README says `TAP_DATABASE_URL` also accepts a PostgreSQL connection string but gives no example. A Neon database for Tap is an option to test in staging.
+- **Private access.** `fly/tap.toml` has no `http_service` and no `services`, so Tap has no public address (<https://docs.fly.io/reference/configuration>). Do not allocate IPs for it. The indexer reaches it over Fly private networking at `http://blueyvatar-tap.internal:2480` (`<app>.internal` resolves to the app's 6PN addresses, <https://docs.fly.io/networking/private-networking>). Flycast (`<app>.flycast`) is the alternative when you want Fly Proxy features such as autostart for internal traffic (<https://docs.fly.io/networking/flycast>), which Tap does not need.
 - **Jetstream fallback.** Tap is in beta. If it fails, switch the indexer to Jetstream (<https://atproto.com/guides/streaming-data>). That needs an indexer change to filter the same collections and does not exist yet.
 
 ## Cloudflare
 
 DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing else from Cloudflare is used.
 
-1. Add the zone. Point `blueyvatar.com` (web) and the delivery hostname at their Railway domains with CNAME records, proxied (orange cloud). Set SSL/TLS mode to Full (strict). Exact record names depend on how web and delivery are split across hostnames and are not decided.
-2. Caching: `/img/*` responses end in `.png`, `.jpeg`, or `.webp` and send `Cache-Control: public, max-age=31536000, immutable`, so the default cache rules cache them. The `/avatar` and `/u` redirects send `private`, so they are not cached. Confirm after deploy with `curl -sI https://<host>/img/...` and check `CF-Cache-Status` goes from `MISS` to `HIT`, and that redirects show no `HIT`. Do not add a Cache Everything rule.
-3. `delivery` sets `TRUST_CLOUDFLARE=true` so rate limits read `CF-Connecting-IP`.
-4. Origin lockdown (acceptance item in issue 53): `TRUST_CLOUDFLARE=true` makes `CF-Connecting-IP` spoofable by anyone who reaches the Railway domain directly, so the origin rejects requests that skip Cloudflare using a shared secret header. Set `ORIGIN_SECRET` on `delivery` (generate with `openssl rand -hex 32`, store in Infisical). When it is set, every request except `GET /healthz` must carry `x-origin-auth` with that value, or delivery answers 403 with error code `origin_forbidden`. When it is unset, delivery accepts all requests and logs a startup warning if `TRUST_CLOUDFLARE=true`. Add the header at the edge:
+1. Add the zone. Point the web hostname and the delivery hostname at their Fly apps with proxied (orange cloud) CNAME records: `blueyvatar-web.fly.dev` and `blueyvatar-delivery.fly.dev`. Set SSL/TLS mode to Full (strict). Exact record names depend on how web and delivery are split across hostnames and are not decided.
+2. Fly certificates. Add each hostname to its app: `fly certs add <hostname> --app <app>`, then `fly certs show` to read the records Fly needs. For a Cloudflare-proxied hostname, Fly's docs say to add the `_fly-ownership` TXT record, after which Fly can issue the certificate through the proxy with the HTTP-01 challenge (this can still fail, depending on configuration). If the HTTP-01 challenge is blocked, add the `_acme-challenge` CNAME shown by `fly certs setup` for DNS-01, or import a Cloudflare Origin Certificate. Use Full or Full (strict); Flexible can cause redirect loops. Source: <https://docs.fly.io/networking/custom-domain>.
+3. Caching: `/img/*` responses end in `.png`, `.jpeg`, or `.webp` and send `Cache-Control: public, max-age=31536000, immutable`, so the default cache rules cache them. The `/avatar` and `/u` redirects send `private`, so they are not cached. Confirm after deploy with `curl -sI https://<host>/img/...` and check `CF-Cache-Status` goes from `MISS` to `HIT`, and that redirects show no `HIT`. Do not add a Cache Everything rule.
+4. delivery sets `TRUST_CLOUDFLARE=true` (in `fly/delivery.toml`) so rate limits read `CF-Connecting-IP`.
+5. Origin lockdown (acceptance item in issue 53): `TRUST_CLOUDFLARE=true` makes `CF-Connecting-IP` spoofable by anyone who reaches `blueyvatar-delivery.fly.dev` directly, so the origin rejects requests that skip Cloudflare using a shared secret header. Set `ORIGIN_SECRET` on delivery (generate with `openssl rand -hex 32`, store in Infisical). When it is set, every request except `GET /healthz` must carry `x-origin-auth` with that value, or delivery answers 403 with error code `origin_forbidden`. When it is unset, delivery accepts all requests and logs a startup warning if `TRUST_CLOUDFLARE=true`. Fly's own health checks reach `/healthz` directly, which the exemption allows. Add the header at the edge:
    1. In the Cloudflare dashboard, select the zone and open Rules, Overview.
    2. Click Create rule, then Request Header Transform Rule (Rules, Transform Rules, Modify Request Header).
    3. Rule name: `Origin auth`. Under When incoming requests match, use a custom filter: Hostname equals the delivery hostname.
    4. Under Modify request header, choose Set static. Header name `x-origin-auth`, Value the same string as `ORIGIN_SECRET`.
-   5. Click Deploy. Verify: `curl -s -o /dev/null -w '%{http_code}' https://<railway-domain>/u/x` returns 403, while the same path through the proxied hostname returns normal responses.
-   6. To rotate, deploy the new value in the rule and the Railway variable together; requests fail in between, so do it in a quiet window.
+   5. Click Deploy. Verify: `curl -s -o /dev/null -w '%{http_code}' https://blueyvatar-delivery.fly.dev/u/x` returns 403, while the same path through the proxied hostname returns normal responses.
+   6. To rotate, deploy the new value in the rule and the Fly secret together (`fly secrets set --app blueyvatar-delivery ORIGIN_SECRET=...`); requests fail in between, so do it in a quiet window.
 
-   Findings (checked 2026-11-03): Transform Rules, including request header rules, are available to all plans, with 10 active rules and no regex on Free (<https://developers.cloudflare.com/rules/transform/>). A rule can set a static header; names starting with `cf-` or `x-cf-` are reserved (<https://developers.cloudflare.com/rules/transform/request-header-modification/>). Dashboard steps: <https://developers.cloudflare.com/rules/transform/request-header-modification/create-dashboard/>. Authenticated Origin Pulls is listed as available on Free (<https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/>), but Railway's networking docs describe only server-side TLS and publish nothing on verifying client certificates (<https://docs.railway.com/networking/public-networking/specs-and-limits>), so it was not used. The header-rule page itself does not state plan limits, so the Free numbers come from the Transform Rules overview.
-5. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
+   Findings (checked 2026-11-03): Transform Rules, including request header rules, are available to all plans, with 10 active rules and no regex on Free (<https://developers.cloudflare.com/rules/transform/>). A rule can set a static header; names starting with `cf-` or `x-cf-` are reserved (<https://developers.cloudflare.com/rules/transform/request-header-modification/>). Dashboard steps: <https://developers.cloudflare.com/rules/transform/request-header-modification/create-dashboard/>. Authenticated Origin Pulls is listed as available on Free (<https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/>), but it was not evaluated against Fly's proxy, so the header is used.
+6. Cloudflare for SaaS (custom profile domains, Plus plan). Set the fallback origin to the web app's hostname, for example `profiles.blueyvatar.com`, proxied to `blueyvatar-web.fly.dev`, and give it a Fly certificate (step 2). Set `CF_SAAS_FALLBACK_ORIGIN` to that hostname. See `docs/research/decisions-phase2-v1.md` (Decision 2).
+7. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
 
 ## Infisical secrets
 
-Set per environment and sync them to Railway service variables. Names match `.env.example`.
+Infisical stays the secret store, one environment per Fly environment (`staging`, `production`). Push values to Fly with `fly secrets set --app <app>` (or an Infisical sync, steps not verified here). Names match `.env.example`. Non-secret settings live in `fly/*.toml` `[env]`.
 
-| Secret | Used by |
+| App | Secrets (Fly secrets) |
 | --- | --- |
-| `DATABASE_URL` | delivery, indexer, web (if it reads the database) |
-| `TAP_ADMIN_PASSWORD` | tap, indexer |
-| `TAP_URL` | indexer |
-| `CF_ZONE_ID`, `CF_API_TOKEN` | indexer |
-| `PUBLIC_DELIVERY_URL` | indexer (cache warming and purge URLs) |
-| `CF_PURGE_MODE` (optional) | indexer |
-| `PUBLIC_URL`, `DELIVERY_URL` | web |
-| `DEFAULT_URL_ALLOWLIST`, `TRUST_CLOUDFLARE`, `ORIGIN_SECRET`, `PORT`, `PG_POOL_MAX` | delivery (and indexer for `PG_POOL_MAX`) |
-| OAuth client signing key | web (name not defined in `.env.example` yet; add it there when the web agent defines it) |
+| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`; optional `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
+| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`; optional `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
+| web | `SESSION_SECRET`, `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; `DATABASE_URL` (pooled) if web reads the database |
+| tap | `TAP_ADMIN_PASSWORD` |
 
-Infisical's Railway integration steps were not verified here.
+`TAP_ADMIN_PASSWORD` is the same value for tap and indexer. Which web variables are required in production was not audited against the code beyond `.env.example`.
 
 ## Logging
 
-Railway keeps service logs for a plan-dependent period. The spec requires a short, published retention period for request logs (section 9). Which period to publish, and whether Railway's retention is short enough, is open.
+Fly keeps recent logs for `fly logs` only, and any longer retention needs a log shipper (**unconfirmed**, not researched here). The spec requires a short, published retention period for request logs (section 9). Which period to publish is open.
 
 ## Release checklist
 
-1. Merge to the branch the environment tracks. Railway builds the Dockerfile for each service whose watch patterns changed.
-2. `delivery` runs pending migrations, then starts. A failing migration aborts the deploy and leaves the previous version running.
-3. Check `/healthz` on delivery, the web home page, and the indexer logs for a Tap connection.
+1. Merge to `main`. The deploy workflow builds and deploys delivery, web, and indexer.
+2. delivery runs pending migrations in the release command, then starts. A failing migration aborts the deploy and leaves the previous version running.
+3. Check `/healthz` on delivery, the web home page, and the indexer logs for a Tap connection (`fly logs --app blueyvatar-indexer`).
+4. Deploy Tap by hand only when its pin changes.
+
+## Provisioned resources
+
+- Neon project `blueyvatar` (ID `rough-heart-79040132`), region `aws-us-east-1` (N. Virginia, near Fly `iad`), Postgres 16, created November 3, 2026.
+  - Branch `production` (default; compute does not suspend), database `blueyvatar`, role `blueyvatar_app`.
+  - Branch `staging` (0.25 to 1 CU, suspends after 5 minutes idle).
+  - Connection strings come from the Neon console or API and go into Infisical; they are never committed. The pooled host contains `-pooler`; the direct host (for migrations) is the same host without it.
+

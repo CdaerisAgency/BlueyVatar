@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import pg from 'pg'
 
-/** Arbitrary constant so concurrent runners (for example two Railway deploys) take turns. */
+/** Arbitrary constant so concurrent runners (for example two deploys) take turns. */
 const LOCK_KEY = 727_274_001
 
 /** Drop the transaction statements a file carries, because the runner supplies one per file. */

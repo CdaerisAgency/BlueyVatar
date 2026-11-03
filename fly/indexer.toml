@@ -1,0 +1,24 @@
+# Indexer. Config reference: https://docs.fly.io/reference/configuration
+# Deploy: fly deploy --config fly/indexer.toml --dockerfile Dockerfile
+#
+# No [http_service] and no [[services]] section: per the configuration reference an app
+# without services cannot be reached from the public internet. It reaches Tap over Fly
+# private networking (6PN) at <app>.internal, see https://docs.fly.io/networking/private-networking
+# (Flycast, <app>.flycast, is for apps that need Fly Proxy features, see https://docs.fly.io/networking/flycast).
+app = "blueyvatar-indexer"
+primary_region = "iad"
+
+[build]
+  # Relative to this file (https://docs.fly.io/reference/configuration, [build] section).
+  dockerfile = "../Dockerfile"
+
+[env]
+  TAP_URL = "http://blueyvatar-tap.internal:2480"
+
+[experimental]
+  # Per-app command override (https://docs.fly.io/reference/configuration, [experimental] section).
+  cmd = ["node", "apps/indexer/dist/index.js"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
