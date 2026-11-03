@@ -143,12 +143,18 @@ function pgStore(pool: pg.Pool): Store {
   }
 }
 
-const g = globalThis as { __bvStore?: Store }
+const g = globalThis as { __bvStore?: Store; __bvPool?: pg.Pool }
+
+/** The shared Postgres pool, or null when DATABASE_URL is unset (in-memory dev mode). */
+export function getPool(): pg.Pool | null {
+  if (!process.env.DATABASE_URL) return null
+  g.__bvPool ??= new pg.Pool({ connectionString: process.env.DATABASE_URL, max: Number(process.env.PG_POOL_MAX) || 5 })
+  return g.__bvPool
+}
 
 /** Postgres when DATABASE_URL is set, otherwise in-memory (dev only, lost on restart). */
 export function getStore(): Store {
-  g.__bvStore ??= process.env.DATABASE_URL
-    ? pgStore(new pg.Pool({ connectionString: process.env.DATABASE_URL, max: Number(process.env.PG_POOL_MAX) || 5 }))
-    : memoryStore()
+  const pool = getPool()
+  g.__bvStore ??= pool ? pgStore(pool) : memoryStore()
   return g.__bvStore
 }
