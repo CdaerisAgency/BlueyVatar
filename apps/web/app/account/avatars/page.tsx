@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, blobUrl, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
 import { LICENSES, canAddImage, imageLimit, planFor } from '../../../lib/records'
+import { getStore } from '../../../lib/store'
 import AccountNav from '../AccountNav'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
@@ -22,6 +23,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
   }
+  const links = await getStore().links.list(did).catch(() => [])
   const canAdd = !loadError && canAddImage(images.length, plan)
 
   return (
@@ -66,6 +68,27 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           )
         })}
       </ul>
+
+      <h2>Import an image</h2>
+      {canAdd ? (
+        <>
+          <p>Copy an avatar you already use into your repository. You preview the image and confirm its rating and license before anything is saved. The image must be PNG or JPEG and at most 1,000,000 bytes.</p>
+          <ul>
+            <li>
+              <a href="/account/avatars/import?source=bluesky">Import my Bluesky profile avatar</a>
+            </li>
+            {links.map((l) => (
+              <li key={l.emailHash}>
+                Linked email {l.emailHash.slice(0, 8)}: <a href={`/account/avatars/import?source=gravatar:${l.emailHash}`}>Gravatar</a>,{' '}
+                <a href={`/account/avatars/import?source=libravatar:${l.emailHash}`}>Libravatar</a>
+              </li>
+            ))}
+          </ul>
+          {links.length === 0 && <p>Link an email address on the Account page to import from Gravatar or Libravatar.</p>}
+        </>
+      ) : (
+        !loadError && <p>Importing needs a free image slot.</p>
+      )}
 
       <h2>Upload an image</h2>
       <p>

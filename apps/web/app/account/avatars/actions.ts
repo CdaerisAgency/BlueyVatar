@@ -2,8 +2,8 @@
 
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
-import { RepoError, createImage, deleteImage, listImages, repoSession, setDefaultImage, uploadBlob } from '../../../lib/repo'
-import { canAddImage, limitMessage, planFor, validateImageBytes, validateNewImage } from '../../../lib/records'
+import { RepoError, deleteImage, listImages, repoSession, saveNewImage, setDefaultImage } from '../../../lib/repo'
+import { validateImageBytes, validateNewImage } from '../../../lib/records'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -36,16 +36,7 @@ export async function uploadImage(form: FormData): Promise<void> {
   if (!fields.ok) return back('error', fields.error)
 
   try {
-    const session = await repoSession(did)
-    const existing = await listImages(session)
-    const plan = planFor(did)
-    if (!canAddImage(existing.length, plan)) return back('error', limitMessage(plan))
-    const blob = await uploadBlob(session, bytes, img.value.mime)
-    const { alt, labels, license } = fields.value
-    const isDefault = fields.value.isDefault || existing.length === 0
-    const value = { image: blob, ...(alt ? { alt } : {}), ...(labels ? { labels } : {}), license, isDefault, createdAt: new Date().toISOString() }
-    const ref = await createImage(session, value)
-    if (isDefault) await setDefaultImage(session, { ...ref, rkey: ref.uri.slice(ref.uri.lastIndexOf('/') + 1), value })
+    await saveNewImage(await repoSession(did), bytes, img.value.mime, fields.value)
   } catch (err) {
     return fail(err)
   }

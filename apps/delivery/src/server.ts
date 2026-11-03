@@ -36,6 +36,7 @@ const app = createApp({
   alerts: new UsageAlerts(new ConsoleAlertSink(), ledger),
   resize: sandboxedResizer(),
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
+  profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,
   trustCloudflare: process.env.TRUST_CLOUDFLARE === 'true',
   remoteAddress: (c) => (c.env as { incoming?: { socket?: { remoteAddress?: string } } })?.incoming?.socket?.remoteAddress,
 })
