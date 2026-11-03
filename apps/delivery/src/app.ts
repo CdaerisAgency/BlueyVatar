@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono'
 import {
-  DEFAULT_STYLES, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isSha256Hex, parseAvatarParams,
+  DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isSha256Hex, parseAvatarParams,
   parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
@@ -8,6 +8,7 @@ import { errorBody, type ErrorCode } from './errors.js'
 import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
+import { qrSvg } from './qr.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore } from './store.js'
@@ -23,6 +24,8 @@ export interface AppDeps {
   alerts?: UsageAlerts
   resize: Resizer
   defaultUrlAllowlist: readonly string[]
+  /** Origin of the profile pages the QR code points to. Defaults to https://blueyvatar.com. */
+  profileBaseUrl?: string
   /** Read the client IP from CF-Connecting-IP. Only set when Cloudflare fronts the origin. */
   trustCloudflare: boolean
   remoteAddress?: (c: Context) => string | undefined
@@ -58,6 +61,9 @@ function originHost(c: Context): string | null {
   }
   return null
 }
+
+const QR_DEFAULT_SIZE = 256
+const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
 
 const IMG_FILE = /^(\d{1,4})(?:-q(\d{1,3}))?\.(png|jpeg|webp)$/
 
@@ -134,6 +140,7 @@ export function createApp(deps: AppDeps) {
 
     const picked = pickCandidate(await deps.resolver.candidates(identity), p.rating, p.forceDefault)
     if (p.json) {
+      c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
       return c.json({
         did: identity.did,
         handle: identity.handle,
@@ -212,6 +219,60 @@ export function createApp(deps: AppDeps) {
       verifiedAccounts: [], // phase v2 (spec section 8)
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
     })
+  })
+
+  // QR code for the profile URL. Business and Enterprise only (spec sections 8 and 11.1).
+  // The response needs a key check, so it is private to the browser, like the redirects.
+  app.get('/qr/:file', async (c) => {
+    const e = await entitle(c)
+    if (!e.ok) return fail(c, e.status, e.code, e.message)
+    if (!ENTITLEMENTS[e.tier].hovercards) {
+      return fail(c, 403, 'tier_required', 'QR codes require a Business or Enterprise key')
+    }
+    const file = c.req.param('file')
+    const dot = file.lastIndexOf('.')
+    const ext = dot > 0 ? file.slice(dot + 1).toLowerCase() : ''
+    if (ext !== 'svg' && ext !== 'png') return fail(c, 404, 'not_found', 'Use a .svg or .png path')
+    const id = parseIdentifier(file.slice(0, dot))
+    if (!id) return fail(c, 400, 'invalid_identifier', 'Expected a hash, handle, or DID')
+
+    let p: AvatarParams
+    try {
+      const sp = new URL(c.req.url).searchParams
+      p = parseAvatarParams(sp, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist })
+      if (sp.get('s') === null && sp.get('size') === null) p.size = QR_DEFAULT_SIZE
+    } catch (err) {
+      if (err instanceof ParamError) return fail(c, 400, err.code as ErrorCode, err.message)
+      throw err
+    }
+    if (p.adjusted.includes('s')) c.header('x-adjusted-params', 's')
+
+    let identity: Identity | null
+    if (id.kind === 'hash') {
+      const did = await deps.index.didForEmailHash(id.value)
+      identity = did ? await deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
+    } else {
+      identity = await deps.resolver.resolveIdentity(id)
+    }
+    if (e.licenseId) await deps.usage.add(e.licenseId, 'origin_resolution')
+    // The profile page lives at /p/{handle}, so an identity without a handle has no QR target.
+    if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
+    if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
+    if (!(await visibilityAllows(c, identity.did, e))) return fail(c, 403, 'access_denied', 'Profile not available to this caller')
+
+    const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
+    const svg = qrSvg(`${base}/p/${identity.handle}`, p.size)
+    let body: Uint8Array | string = svg
+    if (ext === 'png') {
+      try {
+        body = await deps.resize({ input: new TextEncoder().encode(svg), size: p.size, format: 'png', quality: 85 })
+      } catch {
+        return fail(c, 502, 'upstream_error', 'Could not render the QR code')
+      }
+    }
+    c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
+    c.header('content-type', ext === 'png' ? 'image/png' : 'image/svg+xml')
+    return c.body(body as string & Uint8Array<ArrayBuffer>, 200)
   })
 
   // Immutable resized image. Cached by Cloudflare by file extension (spec section 14.1).

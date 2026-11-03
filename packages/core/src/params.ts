@@ -37,6 +37,11 @@ function parseIntStrict(v: string): number | null {
   return /^\d+$/.test(v) ? Number.parseInt(v, 10) : null
 }
 
+/**
+ * Parses `ttl` as `<n>h` or `<n>d`. The accepted range is 1h to 28d (enforced in
+ * parseAvatarParams). Trade-off: a browser keeps the redirect for the whole ttl, so an
+ * avatar change reaches it only after up to one ttl. Free tier is fixed at 24h.
+ */
 export function parseTtl(v: string): number | null {
   const m = /^(\d+)([hd])$/.exec(v)
   if (!m) return null

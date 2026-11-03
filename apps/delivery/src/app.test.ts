@@ -25,10 +25,12 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     licenses: new MemoryLicenseStore([
       { key: { key: 'pk_test', kind: 'publishable', licenseId: 'L1', domains: ['*.example.com'] }, license: { licenseId: 'L1', owner: DID, tier: 'pro', status: 'active' } },
       { key: { key: 'sk_test', kind: 'secret', licenseId: 'L1', domains: [] }, license: { licenseId: 'L1', owner: DID, tier: 'pro', status: 'active' } },
+      { key: { key: 'sk_biz', kind: 'secret', licenseId: 'L3', domains: [] }, license: { licenseId: 'L3', owner: DID, tier: 'business', status: 'active' } },
       { key: { key: 'sk_dead', kind: 'secret', licenseId: 'L2', domains: [] }, license: { licenseId: 'L2', owner: DID, tier: 'pro', status: 'suspended' } },
     ]),
     limiter: new MemoryRateLimiter(),
     resize: async () => new Uint8Array([9, 9]),
+    profileBaseUrl: 'https://bv.test/',
     defaultUrlAllowlist: ['example.com'],
     trustCloudflare: true,
   }
@@ -140,5 +142,129 @@ describe('delivery API', () => {
     expect(byHash.headers.get('location')).not.toContain('initials=')
     const img = await app.request('/default/initials/80.png?seed=alice.test&initials=AL')
     expect(img.status).toBe(200)
+  })
+
+  describe('format and quality (F13)', () => {
+    it('gives the free tier PNG only and reports ignored fmt and q', async () => {
+      const { app } = setup()
+      const res = await app.request('/u/alice.test?fmt=webp&q=70')
+      expect(res.headers.get('location')).toBe('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')
+      expect(res.headers.get('x-adjusted-params')).toBe('fmt,q')
+    })
+
+    it('encodes jpeg and quality in the path, and omits quality for png', async () => {
+      const { app } = setup()
+      const h = { 'x-api-key': 'sk_test' }
+      expect((await app.request('/u/alice.test?fmt=jpeg', { headers: h })).headers.get('location')).toMatch(/\/80-q85\.jpeg$/)
+      expect((await app.request('/u/alice.test?fmt=png&q=40', { headers: h })).headers.get('location')).toMatch(/\/80\.png$/)
+    })
+
+    it('rejects unknown formats and out-of-range quality', async () => {
+      const { app } = setup()
+      const h = { 'x-api-key': 'sk_test' }
+      expect((await (await app.request('/u/alice.test?fmt=avif', { headers: h })).json()).error.code).toBe('invalid_format')
+      expect((await (await app.request('/u/alice.test?fmt=webp&q=0', { headers: h })).json()).error.code).toBe('invalid_quality')
+      expect((await (await app.request('/u/alice.test?fmt=webp&q=101', { headers: h })).json()).error.code).toBe('invalid_quality')
+    })
+
+    it('serves each variant path as its own object with the matching content type', async () => {
+      const { app } = setup()
+      const res = await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128-q60.webp')
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toBe('image/webp')
+      expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128-q101.webp')).status).toBe(404)
+      expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128.avif')).status).toBe(404)
+    })
+  })
+
+  describe('cache ttl (F16)', () => {
+    const ttlOf = (res: Response) => res.headers.get('cache-control')
+
+    it('fixes the free tier at 24h and reports ttl as adjusted', async () => {
+      const { app } = setup()
+      const res = await app.request('/u/alice.test?ttl=7d')
+      expect(ttlOf(res)).toBe('private, max-age=86400')
+      expect(res.headers.get('x-adjusted-params')).toBe('ttl')
+    })
+
+    it('applies ttl from 1h to 28d on paid tiers to the redirect', async () => {
+      const { app } = setup()
+      const h = { 'x-api-key': 'sk_test' }
+      expect(ttlOf(await app.request('/u/alice.test?ttl=1h', { headers: h }))).toBe('private, max-age=3600')
+      expect(ttlOf(await app.request('/u/alice.test?ttl=28d', { headers: h }))).toBe('private, max-age=2419200')
+      expect(ttlOf(await app.request('/u/alice.test?ttl=6h', { headers: h }))).toBe('private, max-age=21600')
+      const res = await app.request('/u/alice.test?ttl=6h', { headers: h })
+      expect(res.headers.get('x-adjusted-params')).toBeNull()
+    })
+
+    it('rejects ttl outside the range or without a unit', async () => {
+      const { app } = setup()
+      const h = { 'x-api-key': 'sk_test' }
+      for (const bad of ['30m', '29d', '0h', '3600', '1w']) {
+        const res = await app.request(`/u/alice.test?ttl=${bad}`, { headers: h })
+        expect(res.status).toBe(400)
+        expect((await res.json()).error.code).toBe('invalid_ttl')
+      }
+    })
+
+    it('applies the same ttl to JSON responses and the default redirect', async () => {
+      const { app } = setup()
+      const h = { 'x-api-key': 'sk_test' }
+      const json = await app.request('/u/alice.test?json=true&ttl=2d', { headers: h })
+      expect(ttlOf(json)).toBe('private, max-age=172800')
+      expect((await json.json()).found).toBe(true)
+      const { app: empty } = setup([])
+      expect(ttlOf(await empty.request('/u/alice.test?ttl=2d', { headers: h }))).toBe('private, max-age=172800')
+    })
+  })
+
+  describe('QR code (F23)', () => {
+    const biz = { 'x-api-key': 'sk_biz' }
+
+    it('requires a Business or Enterprise key', async () => {
+      const { app } = setup()
+      const anon = await app.request('/qr/alice.test.svg')
+      expect(anon.status).toBe(403)
+      expect((await anon.json()).error.code).toBe('tier_required')
+      expect((await app.request('/qr/alice.test.svg', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(403)
+    })
+
+    it('returns an SVG for a handle with the requested size and private caching', async () => {
+      const { app, usage } = setup()
+      const res = await app.request('/qr/alice.test.svg?s=300', { headers: biz })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('content-type')).toBe('image/svg+xml')
+      expect(res.headers.get('cache-control')).toBe('private, max-age=86400')
+      const svg = await res.text()
+      expect(svg).toContain('width="300" height="300"')
+      expect(svg.startsWith('<svg')).toBe(true)
+      expect(usage.counts.get('L3:origin_resolution')).toBe(1)
+    })
+
+    it('defaults the size, clamps to the tier cap, and honors ttl', async () => {
+      const { app } = setup()
+      expect(await (await app.request('/qr/alice.test.svg', { headers: biz })).text()).toContain('width="256"')
+      const big = await app.request('/qr/alice.test.svg?s=4000&ttl=2d', { headers: biz })
+      expect(await big.text()).toContain('width="2048"')
+      expect(big.headers.get('cache-control')).toBe('private, max-age=172800')
+    })
+
+    it('accepts a DID and an email hash, and rasterizes PNG through the resizer', async () => {
+      const { app } = setup()
+      expect((await app.request(`/qr/${DID}.svg`, { headers: biz })).status).toBe(200)
+      expect((await app.request(`/qr/${emailHash('alice@example.com')}.svg`, { headers: biz })).status).toBe(200)
+      const png = await app.request('/qr/alice.test.png?s=200', { headers: biz })
+      expect(png.headers.get('content-type')).toBe('image/png')
+      expect([...new Uint8Array(await png.arrayBuffer())]).toEqual([9, 9])
+    })
+
+    it('returns 404 for hidden profiles, unknown identities, and bad extensions', async () => {
+      const { app, index } = setup()
+      expect((await app.request('/qr/nobody.test.svg', { headers: biz })).status).toBe(404)
+      expect((await app.request('/qr/alice.test.gif', { headers: biz })).status).toBe(404)
+      expect((await app.request('/qr/alice.test', { headers: biz })).status).toBe(404)
+      index.rules.set(DID, { ...PUBLIC_VISIBILITY, hiddenProfile: true })
+      expect((await app.request('/qr/alice.test.svg', { headers: biz })).status).toBe(404)
+    })
   })
 })
