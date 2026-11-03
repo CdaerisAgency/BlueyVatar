@@ -3,7 +3,8 @@ import { isRating, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type Visibility } from './store.js'
-import type { Meter, UsageMeter } from './usage.js'
+import type { AlertLedger, AlertThreshold } from './alerts.js'
+import type { Meter, ServiceMeter, UsageMeter } from './usage.js'
 
 /** Postgres implementations of the delivery stores, against db/migrations/0001_init.sql. */
 
@@ -123,12 +124,37 @@ export class PgRateLimiter implements RateLimiter {
 export class PgUsageMeter implements UsageMeter {
   constructor(private pool: pg.Pool) {}
 
-  async add(licenseId: string, meter: Meter, n = 1): Promise<void> {
-    await this.pool.query(
+  async add(licenseId: string, meter: Meter, n = 1): Promise<number> {
+    const { rows } = await this.pool.query<{ count: string }>(
       `INSERT INTO usage_counters (license_id, meter, period_start, count)
             VALUES ($1, $2, date_trunc('month', now() AT TIME ZONE 'UTC')::date, $3)
-       ON CONFLICT (license_id, meter, period_start) DO UPDATE SET count = usage_counters.count + EXCLUDED.count`,
+       ON CONFLICT (license_id, meter, period_start) DO UPDATE SET count = usage_counters.count + EXCLUDED.count
+       RETURNING count`,
       [licenseId, meter, n],
     )
+    return Number(rows[0]!.count)
+  }
+
+  async addService(did: string, meter: ServiceMeter, n = 1): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO service_usage_counters (did, meter, period_start, count)
+            VALUES ($1, $2, date_trunc('month', now() AT TIME ZONE 'UTC')::date, $3)
+       ON CONFLICT (did, meter, period_start) DO UPDATE SET count = service_usage_counters.count + EXCLUDED.count`,
+      [did, meter, n],
+    )
+  }
+}
+
+/** Against db/migrations/0003_usage_alerts.sql. */
+export class PgAlertLedger implements AlertLedger {
+  constructor(private pool: pg.Pool) {}
+
+  async claim(licenseId: string, period: string, threshold: AlertThreshold): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      `INSERT INTO usage_alerts (license_id, period_start, threshold) VALUES ($1, $2, $3)
+       ON CONFLICT DO NOTHING`,
+      [licenseId, period, threshold],
+    )
+    return (rowCount ?? 0) > 0
   }
 }

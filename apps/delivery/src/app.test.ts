@@ -4,6 +4,7 @@ import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import { MemoryIndexStore, PUBLIC_VISIBILITY } from './store.js'
+import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from './alerts.js'
 import { MemoryUsageMeter } from './usage.js'
 
 const DID = 'did:plc:abc123'
@@ -31,7 +32,9 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     defaultUrlAllowlist: ['example.com'],
     trustCloudflare: true,
   }
-  return { app: createApp(deps), index, usage }
+  const sent: UsageAlert[] = []
+  deps.alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger())
+  return { app: createApp(deps), index, usage, sent }
 }
 
 describe('delivery API', () => {
@@ -111,5 +114,31 @@ describe('delivery API', () => {
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect(res.headers.get('content-type')).toBe('image/png')
+  })
+
+  it('meters transforms and bytes against the DID, not a license', async () => {
+    const { app, usage } = setup()
+    await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')
+    expect(usage.service.get(`${DID}:transform`)).toBe(1)
+    expect(usage.service.get(`${DID}:bytes_delivered`)).toBe(2)
+    expect(usage.counts.size).toBe(0)
+  })
+
+  it('sends a usage alert when a keyed request reaches 80 percent', async () => {
+    const { app, usage, sent } = setup()
+    usage.counts.set('L1:origin_resolution', 39_999)
+    await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_test' } })
+    await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_test' } })
+    expect(sent.map((a) => a.threshold)).toEqual([80])
+  })
+
+  it('passes handle initials to the initials default, and none for hashes', async () => {
+    const { app } = setup([])
+    const byHandle = await app.request('/u/alice.test?d=initials')
+    expect(byHandle.headers.get('location')).toBe('/default/initials/80.png?seed=alice.test&initials=AL')
+    const byHash = await app.request(`/avatar/${emailHash('nobody@example.com')}?d=initials`)
+    expect(byHash.headers.get('location')).not.toContain('initials=')
+    const img = await app.request('/default/initials/80.png?seed=alice.test&initials=AL')
+    expect(img.status).toBe(200)
   })
 })

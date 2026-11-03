@@ -1,34 +1,36 @@
 import { serve } from '@hono/node-server'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
+import { ConsoleAlertSink, MemoryAlertLedger, UsageAlerts, type AlertLedger } from './alerts.js'
 import { createApp } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
-import { createPool, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
+import { createPool, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
 import { sandboxedResizer } from './resize.js'
 import { AtprotoResolver } from './resolver.js'
 import { MemoryIndexStore, type IndexStore } from './store.js'
 import { MemoryUsageMeter, type UsageMeter } from './usage.js'
 
-interface Stores { index: IndexStore; licenses: LicenseStore; limiter: RateLimiter; usage: UsageMeter }
+interface Stores { index: IndexStore; licenses: LicenseStore; limiter: RateLimiter; usage: UsageMeter; ledger: AlertLedger }
 
 // Postgres when DATABASE_URL is set (schema in db/migrations); memory stores for local dev.
 function stores(): Stores {
   const url = process.env.DATABASE_URL
   if (!url) {
     console.warn('DATABASE_URL is not set; using in-memory stores')
-    return { index: new MemoryIndexStore(), licenses: new MemoryLicenseStore(), limiter: new MemoryRateLimiter(), usage: new MemoryUsageMeter() }
+    return { index: new MemoryIndexStore(), licenses: new MemoryLicenseStore(), limiter: new MemoryRateLimiter(), usage: new MemoryUsageMeter(), ledger: new MemoryAlertLedger() }
   }
   const pool = createPool(url)
   pool.on('error', (err) => console.error('postgres pool error', err))
-  return { index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: new PgRateLimiter(pool), usage: new PgUsageMeter(pool) }
+  return { index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: new PgRateLimiter(pool), usage: new PgUsageMeter(pool), ledger: new PgAlertLedger(pool) }
 }
 
-const { index, licenses, limiter, usage } = stores()
+const { index, licenses, limiter, usage, ledger } = stores()
 const app = createApp({
   index,
   resolver: new AtprotoResolver({ index, adapters: DEFAULT_ADAPTERS, log: (m, meta) => console.warn(m, meta) }),
   licenses,
   limiter,
   usage,
+  alerts: new UsageAlerts(new ConsoleAlertSink(), ledger),
   resize: sandboxedResizer(),
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
   trustCloudflare: process.env.TRUST_CLOUDFLARE === 'true',

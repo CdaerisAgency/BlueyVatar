@@ -5,7 +5,8 @@ import {
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
 import { errorBody, type ErrorCode } from './errors.js'
-import { defaultSvg } from './defaults.js'
+import type { UsageAlerts } from './alerts.js'
+import { cleanInitials, defaultSvg } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -18,6 +19,8 @@ export interface AppDeps {
   licenses: LicenseStore
   limiter: RateLimiter
   usage: UsageMeter
+  /** Fires usage alerts at 80 and 100 percent of included volume. */
+  alerts?: UsageAlerts
   resize: Resizer
   defaultUrlAllowlist: readonly string[]
   /** Read the client IP from CF-Connecting-IP. Only set when Cloudflare fronts the origin. */
@@ -88,14 +91,14 @@ export function createApp(deps: AppDeps) {
     return e
   }
 
-  function respondDefault(c: Context, p: AvatarParams, seed: string) {
+  function respondDefault(c: Context, p: AvatarParams, seed: string, initials: string) {
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     if (p.default.kind === 'style' && p.default.style === '404') {
       return fail(c, 404, 'not_found', 'No avatar for this identity')
     }
     if (p.default.kind === 'url') return c.redirect(p.default.url, 302)
     const style = p.default.kind === 'style' ? p.default.style : 'mp'
-    return c.redirect(`/default/${style}/${p.size}.${p.format}?seed=${encodeURIComponent(seed)}`, 302)
+    return c.redirect(`/default/${style}/${p.size}.${p.format}?seed=${encodeURIComponent(seed)}${initials ? `&initials=${initials}` : ''}`, 302)
   }
 
   async function visibilityAllows(c: Context, did: string, e: Ok) {
@@ -108,7 +111,7 @@ export function createApp(deps: AppDeps) {
     return true
   }
 
-  async function serveAvatar(c: Context, lookup: () => Promise<Identity | null>, seed: string) {
+  async function serveAvatar(c: Context, lookup: () => Promise<Identity | null>, seed: string, initials = '') {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
 
@@ -122,9 +125,12 @@ export function createApp(deps: AppDeps) {
     if (p.adjusted.length) c.header('x-adjusted-params', p.adjusted.join(','))
 
     const identity = await lookup()
-    if (e.licenseId) await deps.usage.add(e.licenseId, 'origin_resolution')
-    if (!identity || !(await deps.index.isRepoActive(identity.did))) return respondDefault(c, p, seed)
-    if (!(await visibilityAllows(c, identity.did, e))) return respondDefault(c, p, seed)
+    if (e.licenseId) {
+      const used = await deps.usage.add(e.licenseId, 'origin_resolution')
+      await deps.alerts?.check(e.licenseId, e.tier, used)
+    }
+    if (!identity || !(await deps.index.isRepoActive(identity.did))) return respondDefault(c, p, seed, initials)
+    if (!(await visibilityAllows(c, identity.did, e))) return respondDefault(c, p, seed, initials)
 
     const picked = pickCandidate(await deps.resolver.candidates(identity), p.rating, p.forceDefault)
     if (p.json) {
@@ -139,7 +145,7 @@ export function createApp(deps: AppDeps) {
           : null,
       })
     }
-    if (picked.kind === 'default') return respondDefault(c, p, seed)
+    if (picked.kind === 'default') return respondDefault(c, p, seed, initials)
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     return c.redirect(
       imagePath(identity.did, picked.candidate.blob.cid, p.size, p.format, p.format === 'png' ? undefined : p.quality),
@@ -162,7 +168,8 @@ export function createApp(deps: AppDeps) {
   app.get('/u/:id', async (c) => {
     const id = parseIdentifier(c.req.param('id'))
     if (!id || id.kind === 'hash') return fail(c, 400, 'invalid_identifier', 'Expected a handle or DID')
-    return serveAvatar(c, () => deps.resolver.resolveIdentity(id as { kind: 'did' | 'handle'; value: string }), id.value)
+    return serveAvatar(c, () => deps.resolver.resolveIdentity(id as { kind: 'did' | 'handle'; value: string }), id.value,
+      id.kind === 'handle' ? cleanInitials(id.value) : '')
   })
 
   app.get('/profile/:id', async (c) => {
@@ -229,6 +236,9 @@ export function createApp(deps: AppDeps) {
     } catch {
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
     }
+    // /img has no key: a resize on a CDN miss is a service cost against the DID, not a license charge.
+    await deps.usage.addService(did, 'transform')
+    await deps.usage.addService(did, 'bytes_delivered', bytes.byteLength)
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${format}`,
       'cache-control': IMMUTABLE_CACHE_CONTROL,
@@ -244,7 +254,7 @@ export function createApp(deps: AppDeps) {
     }
     const size = Math.min(Number(m[1]), 2048)
     const seed = c.req.query('seed') ?? ''
-    const svg = defaultSvg(style as DefaultStyle, seed, seed.slice(0, 2))
+    const svg = defaultSvg(style as DefaultStyle, seed, cleanInitials(c.req.query('initials')))
     const bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${m[3]}`,

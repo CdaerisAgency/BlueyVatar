@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { hashApiKey, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
+import { hashApiKey, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
 
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
+const migration3 = readFileSync(new URL('../../../db/migrations/0003_usage_alerts.sql', import.meta.url), 'utf8')
 const schema = `t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 const HASH = 'a'.repeat(64)
@@ -20,6 +21,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
+    await pool.query(migration3)
   })
 
   afterAll(async () => {
@@ -85,9 +87,22 @@ describe.skipIf(!url)('postgres stores', () => {
 
   it('adds to monthly usage counters', async () => {
     const usage = new PgUsageMeter(pool)
-    await usage.add('lic1', 'origin_resolution')
-    await usage.add('lic1', 'origin_resolution', 4)
+    expect(await usage.add('lic1', 'origin_resolution')).toBe(1)
+    expect(await usage.add('lic1', 'origin_resolution', 4)).toBe(5)
     const { rows } = await pool.query(`SELECT count FROM usage_counters WHERE license_id = 'lic1' AND meter = 'origin_resolution'`)
     expect(rows.map((r) => Number(r.count))).toEqual([5])
+  })
+
+  it('tracks service costs per DID and claims each alert once', async () => {
+    const usage = new PgUsageMeter(pool)
+    await usage.addService(DID, 'transform')
+    await usage.addService(DID, 'bytes_delivered', 10)
+    await usage.addService(DID, 'bytes_delivered', 5)
+    const { rows } = await pool.query(`SELECT meter, count FROM service_usage_counters WHERE did = $1 ORDER BY meter`, [DID])
+    expect(rows.map((r) => [r.meter, Number(r.count)])).toEqual([['bytes_delivered', 15], ['transform', 1]])
+    const ledger = new PgAlertLedger(pool)
+    expect(await ledger.claim('lic1', '2026-11-01', 80)).toBe(true)
+    expect(await ledger.claim('lic1', '2026-11-01', 80)).toBe(false)
+    expect(await ledger.claim('lic1', '2026-11-01', 100)).toBe(true)
   })
 })
