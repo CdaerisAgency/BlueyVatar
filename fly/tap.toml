@@ -1,5 +1,5 @@
 # Tap sync service. Config reference: https://docs.fly.io/reference/configuration
-# Deploy manually: fly deploy --config fly/tap.toml (see docs/deploy.md for why).
+# Deploy manually: fly deploy --config fly/tap.toml --dockerfile Dockerfile (see docs/deploy.md for why).
 #
 # No [http_service] and no [[services]] section, so the app has no public address. The indexer
 # reaches it at blueyvatar-tap.internal:2480 over private networking

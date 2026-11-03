@@ -13,7 +13,7 @@ Covers staging and production on Fly.io with Neon Postgres, behind Cloudflare's 
 
 web, delivery, and indexer build from the root `Dockerfile`, one image holding every app and the migration runner. Each config sets its command with `[experimental] cmd`. References: <https://docs.fly.io/reference/configuration> (build, deploy, http_service, checks, mounts, experimental).
 
-Staging uses the same configs with different app names. Copy the files to `fly/staging-*.toml` or pass `--app blueyvatar-<name>-staging` to each command. **Unconfirmed:** `build.dockerfile = "../Dockerfile"` assumes flyctl resolves the path relative to the config file and uses the repository root as build context. If `fly deploy --config fly/web.toml` cannot find the Dockerfile, run it from the repo root with `--dockerfile Dockerfile`.
+All deploy commands run from the repository root and pass `--dockerfile Dockerfile`, so the build context is the repo root regardless of how flyctl resolves `build.dockerfile`.
 
 ## Neon
 
@@ -49,17 +49,17 @@ fly secrets set --app blueyvatar-delivery DATABASE_URL=... DATABASE_URL_DIRECT=.
 fly secrets set --app blueyvatar-tap TAP_ADMIN_PASSWORD=...
 
 # Deploy. Tap first, delivery before web and indexer.
-fly deploy --config fly/tap.toml
-fly deploy --config fly/delivery.toml
-fly deploy --config fly/web.toml
-fly deploy --config fly/indexer.toml
+fly deploy --config fly/tap.toml --dockerfile Dockerfile
+fly deploy --config fly/delivery.toml --dockerfile Dockerfile
+fly deploy --config fly/web.toml --dockerfile Dockerfile
+fly deploy --config fly/indexer.toml --dockerfile Dockerfile
 ```
 
 Create a deploy token for CI: `fly tokens create deploy --app blueyvatar-delivery` (repeat per app, or use an organization token) and store it as the GitHub secret `FLY_API_TOKEN`. **Unconfirmed:** a single app-scoped deploy token only covers one app, so the workflow needs an org-scoped token (`fly tokens create org`) to deploy all three.
 
 ## CI deploys
 
-`.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
+`.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch, but only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
 
 **Tap is deployed by hand.** Restarting Tap interrupts the firehose connection, and an image upgrade can force a re-backfill, so someone should watch each Tap deploy. It also changes rarely.
 
@@ -116,3 +116,11 @@ Fly keeps recent logs for `fly logs` only, and any longer retention needs a log 
 2. delivery runs pending migrations in the release command, then starts. A failing migration aborts the deploy and leaves the previous version running.
 3. Check `/healthz` on delivery, the web home page, and the indexer logs for a Tap connection (`fly logs --app blueyvatar-indexer`).
 4. Deploy Tap by hand only when its pin changes.
+
+## Provisioned resources
+
+- Neon project `blueyvatar` (ID `rough-heart-79040132`), region `aws-us-east-1` (N. Virginia, near Fly `iad`), Postgres 16, created November 3, 2026.
+  - Branch `production` (default; compute does not suspend), database `blueyvatar`, role `blueyvatar_app`.
+  - Branch `staging` (0.25 to 1 CU, suspends after 5 minutes idle).
+  - Connection strings come from the Neon console or API and go into Infisical; they are never committed. The pooled host contains `-pooler`; the direct host (for migrations) is the same host without it.
+

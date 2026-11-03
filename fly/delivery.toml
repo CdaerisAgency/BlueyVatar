@@ -1,5 +1,5 @@
 # Delivery API. Config reference: https://docs.fly.io/reference/configuration
-# Deploy: fly deploy --config fly/delivery.toml
+# Deploy: fly deploy --config fly/delivery.toml --dockerfile Dockerfile
 app = "blueyvatar-delivery"
 primary_region = "iad"
 

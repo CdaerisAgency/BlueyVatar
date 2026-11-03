@@ -15,6 +15,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Opt-in: set the repository variable FLY_DEPLOY_ENABLED=true after the
+    # first manual deploy creates the Fly apps (docs/deploy.md).
+    if: vars.FLY_DEPLOY_ENABLED == 'true'
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
@@ -30,13 +33,13 @@ jobs:
 
       # Delivery goes first: its release_command applies pending migrations.
       - name: Deploy delivery
-        run: flyctl deploy --remote-only --config fly/delivery.toml
+        run: flyctl deploy --remote-only --config fly/delivery.toml --dockerfile Dockerfile
 
       - name: Deploy web
-        run: flyctl deploy --remote-only --config fly/web.toml
+        run: flyctl deploy --remote-only --config fly/web.toml --dockerfile Dockerfile
 
       - name: Deploy indexer
-        run: flyctl deploy --remote-only --config fly/indexer.toml
+        run: flyctl deploy --remote-only --config fly/indexer.toml --dockerfile Dockerfile
 
       # Tap is deployed by hand (docs/deploy.md): a restart interrupts the firehose
       # and a bad upgrade can force a re-backfill, so a person should watch it.

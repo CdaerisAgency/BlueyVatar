@@ -1,5 +1,5 @@
 # Indexer. Config reference: https://docs.fly.io/reference/configuration
-# Deploy: fly deploy --config fly/indexer.toml
+# Deploy: fly deploy --config fly/indexer.toml --dockerfile Dockerfile
 #
 # No [http_service] and no [[services]] section: per the configuration reference an app
 # without services cannot be reached from the public internet. It reaches Tap over Fly

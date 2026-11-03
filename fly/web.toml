@@ -1,5 +1,5 @@
 # Web app (Next.js). Config reference: https://docs.fly.io/reference/configuration
-# Deploy: fly deploy --config fly/web.toml
+# Deploy: fly deploy --config fly/web.toml --dockerfile Dockerfile
 app = "blueyvatar-web"
 primary_region = "iad"
 
