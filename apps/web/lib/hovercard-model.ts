@@ -10,7 +10,7 @@ export type CardProfile = {
   company?: string | null
   location?: string | null
   avatar?: { url?: string | null } | null
-  verifiedAccounts?: { service?: unknown; label?: unknown; url?: unknown; hidden?: unknown }[] | null
+  verifiedAccounts?: { platform?: unknown; service?: unknown; label?: unknown; uri?: unknown; url?: unknown; hidden?: unknown }[] | null
 }
 
 export type Card = {
@@ -38,7 +38,7 @@ export function buildCard(p: CardProfile, api: string, web: string): Card {
   const accounts = (p.verifiedAccounts ?? [])
     // Accounts the user chose to hide are omitted from the card (spec section 8).
     .filter((a) => a && a.hidden !== true)
-    .map((a) => str(a.label) || str(a.service))
+    .map((a) => str(a.label) || str(a.platform) || str(a.service))
     .filter(Boolean)
     .slice(0, 4)
   return {

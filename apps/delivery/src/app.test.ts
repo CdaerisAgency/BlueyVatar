@@ -36,8 +36,10 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   }
   const sent: UsageAlert[] = []
   deps.alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger())
-  return { app: createApp(deps), index, usage, sent }
+  return { app: createApp(deps), index, usage, sent, deps }
 }
+
+function setupDeps() { const { deps } = setup(); return { deps } }
 
 describe('delivery API', () => {
   it('redirects an email hash to an immutable image path', async () => {
@@ -115,6 +117,17 @@ describe('delivery API', () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [] })
+  })
+
+  it('returns attested accounts only, with hidden ones flagged and the Free cap applied', async () => {
+    const { app, index } = setup()
+    const acct = (n: number, hidden = false) => ({ platform: 'github', uri: `https://github.com/u${n}`, verifiedAt: `2026-01-0${n}T00:00:00.000Z`, hidden })
+    index.accounts.set(DID, [acct(1), acct(2, true), acct(3), acct(4), acct(5)])
+    const free = await (await app.request('/profile/alice.test')).json()
+    expect(free.verifiedAccounts).toHaveLength(4)
+    expect(free.verifiedAccounts[1]).toEqual({ platform: 'github', uri: 'https://github.com/u2', verifiedAt: '2026-01-02T00:00:00.000Z', hidden: true })
+    const pro = await (await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_test' } })).json()
+    expect(pro.verifiedAccounts).toHaveLength(5)
   })
 
   it('serves resized images with immutable caching', async () => {
@@ -273,5 +286,15 @@ describe('delivery API', () => {
       index.rules.set(DID, { ...PUBLIC_VISIBILITY, hiddenProfile: true })
       expect((await app.request('/qr/alice.test.svg', { headers: biz })).status).toBe(404)
     })
+  })
+})
+
+describe('origin lockdown wiring', () => {
+  it('createApp enforces originSecret and leaves /healthz open', async () => {
+    const { deps } = setupDeps()
+    const app = createApp({ ...deps, originSecret: 'k' })
+    expect((await app.request('/healthz')).status).toBe(200)
+    expect((await app.request(`/avatar/${emailHash('alice@example.com')}`)).status).toBe(403)
+    expect((await app.request(`/avatar/${emailHash('alice@example.com')}`, { headers: { 'x-origin-auth': 'k' } })).status).toBe(302)
   })
 })

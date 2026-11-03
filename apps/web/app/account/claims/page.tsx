@@ -1,0 +1,129 @@
+import { redirect } from 'next/navigation'
+import AccountNav from '../AccountNav'
+import { currentDid } from '../../../lib/auth'
+import { getClaimStore } from '../../../lib/claim-store'
+import { COMING_LATER, METHOD_FOR, PLATFORMS, PLATFORM_LABELS, isPlatform, profileLinkFor } from '../../../lib/claims'
+import { listClaims, repoHandle, type StoredClaim } from '../../../lib/claims-repo'
+import { PUBLIC_URL } from '../../../lib/oauth'
+import { RepoError, repoSession } from '../../../lib/repo'
+import { addClaim, deleteClaimAction, setHidden, verifyClaim } from './actions'
+
+export const dynamic = 'force-dynamic'
+
+const HELP: Record<string, string> = {
+  github: 'GitHub asks you to sign in once. blueyvatar reads only your username.',
+  mastodon: 'Your Mastodon instance asks you to sign in once. blueyvatar reads only your account address.',
+  website: 'Add a link to your blueyvatar profile on that page with rel="me".',
+  instagram: 'Add a link to your blueyvatar profile on that page with rel="me". Instagram may not show bio links to crawlers, so this can fail.',
+  x: 'Add a link to your blueyvatar profile on that page with rel="me". X may not show bio links to crawlers, so this can fail.',
+}
+
+export default async function ClaimsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
+  const did = await currentDid()
+  if (!did) redirect('/login')
+  const { error, done } = await searchParams
+  let claims: StoredClaim[] = []
+  let handle: string | null = null
+  let loadError: string | null = null
+  try {
+    const session = await repoSession(did)
+    ;[claims, handle] = await Promise.all([listClaims(session), repoHandle(session).catch(() => null)])
+  } catch (err) {
+    loadError = err instanceof RepoError ? err.message : 'Your claims could not be loaded.'
+  }
+  const status = new Map((await getClaimStore().latestAttestations(did)).map((a) => [a.claimRkey, a]))
+  const link = handle ? profileLinkFor(PUBLIC_URL, handle) : null
+
+  return (
+    <main>
+      <h1>Verified accounts</h1>
+      <AccountNav />
+      {error && <p role="alert">{error}</p>}
+      {done && <p role="status">{done}</p>}
+      {loadError && <p role="alert">{loadError}</p>}
+      <p>
+        Claims live in your repo. Your profile shows a claim only after blueyvatar verifies it. Hidden accounts are omitted from hovercards.
+      </p>
+
+      <h2>Your claims</h2>
+      {claims.length === 0 ? (
+        <p>No claims yet.</p>
+      ) : (
+        <ul>
+          {claims.map((c) => {
+            const a = status.get(c.rkey)
+            const verified = a?.result === 'verified' && a.claimUri === c.value.uri
+            const label = PLATFORM_LABELS[c.value.platform] ?? c.value.platform
+            return (
+              <li key={c.rkey} style={{ marginBottom: 12 }}>
+                <strong>{label}</strong> <code>{c.value.uri}</code>{' '}
+                {verified ? <span>Verified ({a!.method}){c.value.hidden ? ', hidden from hovercards' : ''}</span> : <span>Not verified</span>}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  {isPlatform(c.value.platform) ? (
+                    <form action={verifyClaim}>
+                      <input type="hidden" name="rkey" value={c.rkey} />
+                      <button type="submit">{verified ? 'Verify again' : METHOD_FOR[c.value.platform] === 'rel-me' ? 'Check my page' : `Verify with ${label}`}</button>
+                    </form>
+                  ) : (
+                    <span>Verification is coming later.</span>
+                  )}
+                  <form action={setHidden}>
+                    <input type="hidden" name="rkey" value={c.rkey} />
+                    <input type="hidden" name="hidden" value={String(!c.value.hidden)} />
+                    <button type="submit">{c.value.hidden ? 'Show in hovercards' : 'Hide from hovercards'}</button>
+                  </form>
+                  <form action={deleteClaimAction}>
+                    <input type="hidden" name="rkey" value={c.rkey} />
+                    <button type="submit">Delete</button>
+                  </form>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <h2>Add a claim</h2>
+      <form action={addClaim}>
+        <label>
+          Platform{' '}
+          <select name="platform" defaultValue="github">
+            {PLATFORMS.map((p) => (
+              <option key={p} value={p}>
+                {PLATFORM_LABELS[p]}
+              </option>
+            ))}
+            {COMING_LATER.map((p) => (
+              <option key={p} value={p} disabled>
+                {PLATFORM_LABELS[p]} (coming later)
+              </option>
+            ))}
+          </select>
+        </label>{' '}
+        <label>
+          Account or address <input name="account" required maxLength={300} placeholder="username, @name@instance, or https://..." />
+        </label>{' '}
+        <button type="submit">Add</button>
+      </form>
+
+      <h2>How each platform is checked</h2>
+      <ul>
+        {PLATFORMS.map((p) => (
+          <li key={p}>
+            <strong>{PLATFORM_LABELS[p]}.</strong> {HELP[p]}
+          </li>
+        ))}
+        {COMING_LATER.map((p) => (
+          <li key={p}>
+            <strong>{PLATFORM_LABELS[p]}.</strong> Coming later.
+          </li>
+        ))}
+      </ul>
+      {link && (
+        <p>
+          Your profile link for rel=&quot;me&quot; checks: <code>{link}</code>
+        </p>
+      )}
+    </main>
+  )
+}
