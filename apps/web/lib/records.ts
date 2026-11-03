@@ -16,10 +16,19 @@ export const DEFAULT_LICENSE: License = 'personal'
 export const R_LABELS = ['sexual', 'graphic-media'] as const
 export type RLabel = (typeof R_LABELS)[number]
 
-/** User plans from spec section 11.2. Plan storage does not exist yet, so everyone is Free. */
+/**
+ * User plans from spec section 11.2. Plan storage does not exist yet, so everyone is Free,
+ * except DIDs listed in the PLUS_DIDS env var (comma list, for testing).
+ */
 export const PLAN_IMAGE_LIMITS = { free: 3, plus: 20 } as const
 export type Plan = keyof typeof PLAN_IMAGE_LIMITS
-export const planFor = (_did: string): Plan => 'free'
+export const planFor = (did: string): Plan =>
+  (process.env.PLUS_DIDS ?? '')
+    .split(',')
+    .map((d) => d.trim())
+    .includes(did)
+    ? 'plus'
+    : 'free'
 
 export type Check<T> = { ok: true; value: T } | { ok: false; error: string }
 const ok = <T>(value: T): Check<T> => ({ ok: true, value })
