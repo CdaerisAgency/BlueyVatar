@@ -38,7 +38,7 @@ describe.skipIf(!url)('migration runner', () => {
     writeFileSync(join(dir, '0001_a.sql'), 'CREATE TABLE t_a (id int);')
     writeFileSync(join(dir, '0003_bad.sql'), 'CREATE TABLE t_c (id int); SELECT nope();')
     await expect(migrate(pool, dir)).rejects.toThrow(/0003_bad.sql/)
-    const names = (await pool.query("SELECT name FROM schema_migrations WHERE name LIKE '000_%' AND name <> '0001_init.sql' ORDER BY applied_at, name")).rows.map((r) => r.name)
+    const names = (await pool.query('SELECT name FROM schema_migrations WHERE name = ANY($1) ORDER BY applied_at, name', [['0001_a.sql', '0002_b.sql', '0003_bad.sql']])).rows.map((r) => r.name)
     expect(names).toEqual(['0001_a.sql', '0002_b.sql'])
     expect((await pool.query("SELECT to_regclass('t_c') AS t")).rows[0].t).toBeNull()
   })
