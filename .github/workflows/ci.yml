@@ -73,8 +73,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Point tests at the service port
-        run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
-
       - name: Build image
         run: docker build -t blueyvatar:ci .
