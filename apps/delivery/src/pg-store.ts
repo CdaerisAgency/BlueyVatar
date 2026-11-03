@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { isRating, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
-import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type Visibility } from './store.js'
+import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
 import type { AlertLedger, AlertThreshold } from './alerts.js'
 import type { Meter, ServiceMeter, UsageMeter } from './usage.js'
 
@@ -76,6 +76,26 @@ export class PgIndexStore implements IndexStore {
   async isBlocked(did: string, cid: string): Promise<boolean> {
     const { rowCount } = await this.pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND cid = $2', [did, cid])
     return (rowCount ?? 0) > 0
+  }
+
+  async verifiedAccounts(did: string): Promise<VerifiedAccount[]> {
+    // Latest attestation per claim. It counts only while it is verified and was issued for the
+    // claim's current uri (claim_uri is null for rows written before migration 0004).
+    const { rows } = await this.pool.query<{ platform: string; uri: string; verified_at: Date; hidden: boolean }>(
+      `SELECT c.platform, c.uri, a.created_at AS verified_at, coalesce((c.record->>'hidden')::boolean, false) AS hidden
+         FROM claims c
+         JOIN LATERAL (
+           SELECT result, claim_uri, created_at FROM attestations
+            WHERE claim_did = c.did AND claim_rkey = c.rkey
+            ORDER BY created_at DESC LIMIT 1
+         ) a ON true
+        WHERE c.did = $1 AND a.result = 'verified'
+          AND (a.claim_uri IS NULL OR a.claim_uri = c.uri)
+          AND c.platform IS NOT NULL AND c.uri IS NOT NULL
+        ORDER BY a.created_at, c.rkey`,
+      [did],
+    )
+    return rows.map((r) => ({ platform: r.platform, uri: r.uri, verifiedAt: r.verified_at.toISOString(), hidden: r.hidden }))
   }
 }
 

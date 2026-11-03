@@ -117,6 +117,17 @@ describe('delivery API', () => {
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [] })
   })
 
+  it('returns attested accounts only, with hidden ones flagged and the Free cap applied', async () => {
+    const { app, index } = setup()
+    const acct = (n: number, hidden = false) => ({ platform: 'github', uri: `https://github.com/u${n}`, verifiedAt: `2026-01-0${n}T00:00:00.000Z`, hidden })
+    index.accounts.set(DID, [acct(1), acct(2, true), acct(3), acct(4), acct(5)])
+    const free = await (await app.request('/profile/alice.test')).json()
+    expect(free.verifiedAccounts).toHaveLength(4)
+    expect(free.verifiedAccounts[1]).toEqual({ platform: 'github', uri: 'https://github.com/u2', verifiedAt: '2026-01-02T00:00:00.000Z', hidden: true })
+    const pro = await (await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_test' } })).json()
+    expect(pro.verifiedAccounts).toHaveLength(5)
+  })
+
   it('serves resized images with immutable caching', async () => {
     const { app } = setup()
     const res = await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')

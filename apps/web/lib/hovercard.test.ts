@@ -15,6 +15,10 @@ describe('hovercard model', () => {
     const c = buildCard({ handle: 'a.example.com', verifiedAccounts: [{ service: 'github', label: 'gh/a' }, { service: 'tiktok', hidden: true }, { service: 'threads' }] }, API, WEB)
     expect(c.accounts).toEqual(['gh/a', 'threads'])
   })
+  it('reads the platform field of delivery profile JSON', () => {
+    const c = buildCard({ handle: 'a.example.com', verifiedAccounts: [{ platform: 'github', uri: 'https://github.com/a', hidden: false }, { platform: 'x', uri: 'https://x.com/a', hidden: true }] }, API, WEB)
+    expect(c.accounts).toEqual(['github'])
+  })
   it('never passes through attacker-controlled urls', () => {
     const c = buildCard({ handle: 'x"><script>', avatar: { url: 'javascript:alert(1)' } }, API, WEB)
     expect(c.avatarUrl).toBeNull()
