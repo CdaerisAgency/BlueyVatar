@@ -9,6 +9,7 @@ import { errorBody, type ErrorCode } from './errors.js'
 import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
+import { originLock } from './origin.js'
 import { qrSvg } from './qr.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -30,6 +31,8 @@ export interface AppDeps {
   /** Read the client IP from CF-Connecting-IP. Only set when Cloudflare fronts the origin. */
   trustCloudflare: boolean
   remoteAddress?: (c: Context) => string | undefined
+  /** When set, every request except GET /healthz must carry a matching x-origin-auth header. */
+  originSecret?: string
 }
 
 type Ok = Extract<EntitlementResult, { ok: true }>
@@ -76,6 +79,8 @@ export function createApp(deps: AppDeps) {
     await next()
     c.header('x-content-type-options', 'nosniff')
   })
+
+  if (deps.originSecret) app.use('*', originLock(deps.originSecret))
 
   const clientIp = (c: Context) =>
     (deps.trustCloudflare ? c.req.header('cf-connecting-ip') : undefined)

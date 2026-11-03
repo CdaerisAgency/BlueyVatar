@@ -3,6 +3,7 @@ import type pg from 'pg'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
 import { ConsoleAlertSink, MemoryAlertLedger, UsageAlerts, type AlertLedger } from './alerts.js'
 import { createApp } from './app.js'
+import { originLockWarning } from './origin.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
 import { scheduleRateWindowCleanup } from './rate-cleanup.js'
 import { createPool, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
@@ -27,6 +28,8 @@ function stores(): Stores {
 
 const { pool, index, licenses, limiter, usage, ledger } = stores()
 if (pool) scheduleRateWindowCleanup(pool)
+const originWarning = originLockWarning(process.env)
+if (originWarning) console.warn(originWarning)
 const app = createApp({
   index,
   resolver: new AtprotoResolver({ index, adapters: DEFAULT_ADAPTERS, log: (m, meta) => console.warn(m, meta) }),
@@ -37,6 +40,7 @@ const app = createApp({
   resize: sandboxedResizer(),
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
   profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,
+  originSecret: process.env.ORIGIN_SECRET || undefined,
   trustCloudflare: process.env.TRUST_CLOUDFLARE === 'true',
   remoteAddress: (c) => (c.env as { incoming?: { socket?: { remoteAddress?: string } } })?.incoming?.socket?.remoteAddress,
 })

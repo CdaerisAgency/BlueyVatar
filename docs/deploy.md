@@ -53,7 +53,15 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing
 1. Add the zone. Point `blueyvatar.com` (web) and the delivery hostname at their Railway domains with CNAME records, proxied (orange cloud). Set SSL/TLS mode to Full (strict). Exact record names depend on how web and delivery are split across hostnames and are not decided.
 2. Caching: `/img/*` responses end in `.png`, `.jpeg`, or `.webp` and send `Cache-Control: public, max-age=31536000, immutable`, so the default cache rules cache them. The `/avatar` and `/u` redirects send `private`, so they are not cached. Confirm after deploy with `curl -sI https://<host>/img/...` and check `CF-Cache-Status` goes from `MISS` to `HIT`, and that redirects show no `HIT`. Do not add a Cache Everything rule.
 3. `delivery` sets `TRUST_CLOUDFLARE=true` so rate limits read `CF-Connecting-IP`.
-4. Origin lockdown (acceptance item in issue 53): the origin must reject traffic that skips Cloudflare, since `TRUST_CLOUDFLARE=true` makes the client IP header spoofable. **Unconfirmed and not implemented.** Candidates are a secret header added at the edge and checked in delivery, or Cloudflare's authenticated origin pulls. Neither was checked against Railway or Cloudflare docs.
+4. Origin lockdown (acceptance item in issue 53): `TRUST_CLOUDFLARE=true` makes `CF-Connecting-IP` spoofable by anyone who reaches the Railway domain directly, so the origin rejects requests that skip Cloudflare using a shared secret header. Set `ORIGIN_SECRET` on `delivery` (generate with `openssl rand -hex 32`, store in Infisical). When it is set, every request except `GET /healthz` must carry `x-origin-auth` with that value, or delivery answers 403 with error code `origin_forbidden`. When it is unset, delivery accepts all requests and logs a startup warning if `TRUST_CLOUDFLARE=true`. Add the header at the edge:
+   1. In the Cloudflare dashboard, select the zone and open Rules, Overview.
+   2. Click Create rule, then Request Header Transform Rule (Rules, Transform Rules, Modify Request Header).
+   3. Rule name: `Origin auth`. Under When incoming requests match, use a custom filter: Hostname equals the delivery hostname.
+   4. Under Modify request header, choose Set static. Header name `x-origin-auth`, Value the same string as `ORIGIN_SECRET`.
+   5. Click Deploy. Verify: `curl -s -o /dev/null -w '%{http_code}' https://<railway-domain>/u/x` returns 403, while the same path through the proxied hostname returns normal responses.
+   6. To rotate, deploy the new value in the rule and the Railway variable together; requests fail in between, so do it in a quiet window.
+
+   Findings (checked 2026-11-03): Transform Rules, including request header rules, are available to all plans, with 10 active rules and no regex on Free (<https://developers.cloudflare.com/rules/transform/>). A rule can set a static header; names starting with `cf-` or `x-cf-` are reserved (<https://developers.cloudflare.com/rules/transform/request-header-modification/>). Dashboard steps: <https://developers.cloudflare.com/rules/transform/request-header-modification/create-dashboard/>. Authenticated Origin Pulls is listed as available on Free (<https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/>), but Railway's networking docs describe only server-side TLS and publish nothing on verifying client certificates (<https://docs.railway.com/networking/public-networking/specs-and-limits>), so it was not used. The header-rule page itself does not state plan limits, so the Free numbers come from the Transform Rules overview.
 5. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
 
 ## Infisical secrets
@@ -69,7 +77,7 @@ Set per environment and sync them to Railway service variables. Names match `.en
 | `PUBLIC_DELIVERY_URL` | indexer (cache warming and purge URLs) |
 | `CF_PURGE_MODE` (optional) | indexer |
 | `PUBLIC_URL`, `DELIVERY_URL` | web |
-| `DEFAULT_URL_ALLOWLIST`, `TRUST_CLOUDFLARE`, `PORT`, `PG_POOL_MAX` | delivery (and indexer for `PG_POOL_MAX`) |
+| `DEFAULT_URL_ALLOWLIST`, `TRUST_CLOUDFLARE`, `ORIGIN_SECRET`, `PORT`, `PG_POOL_MAX` | delivery (and indexer for `PG_POOL_MAX`) |
 | OAuth client signing key | web (name not defined in `.env.example` yet; add it there when the web agent defines it) |
 
 Infisical's Railway integration steps were not verified here.

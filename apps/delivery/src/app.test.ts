@@ -36,8 +36,10 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   }
   const sent: UsageAlert[] = []
   deps.alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger())
-  return { app: createApp(deps), index, usage, sent }
+  return { app: createApp(deps), index, usage, sent, deps }
 }
+
+function setupDeps() { const { deps } = setup(); return { deps } }
 
 describe('delivery API', () => {
   it('redirects an email hash to an immutable image path', async () => {
@@ -273,5 +275,15 @@ describe('delivery API', () => {
       index.rules.set(DID, { ...PUBLIC_VISIBILITY, hiddenProfile: true })
       expect((await app.request('/qr/alice.test.svg', { headers: biz })).status).toBe(404)
     })
+  })
+})
+
+describe('origin lockdown wiring', () => {
+  it('createApp enforces originSecret and leaves /healthz open', async () => {
+    const { deps } = setupDeps()
+    const app = createApp({ ...deps, originSecret: 'k' })
+    expect((await app.request('/healthz')).status).toBe(200)
+    expect((await app.request(`/avatar/${emailHash('alice@example.com')}`)).status).toBe(403)
+    expect((await app.request(`/avatar/${emailHash('alice@example.com')}`, { headers: { 'x-origin-auth': 'k' } })).status).toBe(302)
   })
 })
