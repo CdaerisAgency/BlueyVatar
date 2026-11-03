@@ -6,6 +6,7 @@ const LINKS = [
   ['/account/profile', 'Profile'],
   ['/account/keys', 'Keys'],
   ['/account/visibility', 'Visibility'],
+  ['/account/domain', 'Domain'],
 ] as const
 
 export default function AccountNav() {
