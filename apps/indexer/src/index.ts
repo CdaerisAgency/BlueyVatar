@@ -1,5 +1,7 @@
 import { SimpleIndexer, Tap } from '@atproto/tap'
 import pg from 'pg'
+import { purgerFromEnv } from './cloudflare.js'
+import { warmerFromEnv } from './warm.js'
 import { handleRecord, type IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
 
@@ -18,7 +20,7 @@ function writes(): IndexWrites {
   if (url) {
     const pool = new pg.Pool({ connectionString: url, max: Number(process.env.PG_POOL_MAX ?? 5) })
     pool.on('error', (err) => console.error('postgres pool error', err))
-    return new PgIndexWrites(pool)
+    return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warmerFromEnv() })
   }
   console.warn('DATABASE_URL is not set; logging index writes to the console')
   return {
@@ -29,7 +31,7 @@ function writes(): IndexWrites {
     upsertClaim: async (did, rkey) => console.log('upsertClaim', did, rkey),
     deleteClaim: async (did, rkey) => console.log('deleteClaim', did, rkey),
     setRepoStatus: async (did, handle, active, status) => console.log('setRepoStatus', did, handle, active, status),
-    purgeImages: async (did) => console.log('purgeImages', did),
+    purgeImages: async (did, cids) => console.log('purgeImages', did, cids),
   }
 }
 const db = writes()

@@ -28,8 +28,8 @@ describe.skipIf(!url)('postgres index writes', () => {
   })
 
   it('upserts and deletes image records from Tap events', async () => {
-    const purged: string[] = []
-    const db = new PgIndexWrites(pool, { onPurge: async (did) => void purged.push(did) })
+    const purged: string[][] = []
+    const db = new PgIndexWrites(pool, { onPurge: async (did, cids) => void purged.push([did, ...cids]) })
     const record = {
       image: { $type: 'blob', ref: { $link: 'bafyimg' }, mimeType: 'image/png', size: 10 },
       labels: { $type: 'com.atproto.label.defs#selfLabels', values: [{ val: 'nudity' }] },
@@ -43,7 +43,7 @@ describe.skipIf(!url)('postgres index writes', () => {
     expect(rows).toEqual([{ cid: 'bafyimg', mime_type: 'image/png', rating: 'pg', is_default: false, license: 'cc-by' }])
     await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'r1', action: 'delete' }, db)
     expect((await pool.query('SELECT 1 FROM images')).rowCount).toBe(0)
-    expect(purged).toEqual([DID])
+    expect(purged).toEqual([[DID, 'bafyimg']])
   })
 
   it('stores profiles, claims, and repo status', async () => {

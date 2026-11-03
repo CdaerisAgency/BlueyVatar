@@ -92,6 +92,16 @@ importers:
 
   packages/core: {}
 
+  tools/migrate:
+    dependencies:
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
+    devDependencies:
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+
 packages:
 
   '@atproto-labs/did-resolver@0.3.11':
