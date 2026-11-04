@@ -9,9 +9,9 @@ app = "blueyvatar-tap"
 primary_region = "iad"
 
 [build]
-  # TODO: pin a real tag or digest from the indigo package registry before the first deploy.
+  # Pinned to tag 0.1.10 (latest semver tag in the ghcr.io registry, checked 2026-11-04) plus its digest.
   # Do not deploy with :latest. https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
-  image = "ghcr.io/bluesky-social/indigo/tap:PIN_REAL_TAG"
+  image = "ghcr.io/bluesky-social/indigo/tap:0.1.10@sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb"
 
 # Env names come from the Tap README:
 # https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
