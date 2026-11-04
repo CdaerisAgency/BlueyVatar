@@ -21,8 +21,8 @@ primary_region = "iad"
   TAP_SIGNAL_COLLECTION = "com.blueyvatar.profile"
   TAP_COLLECTION_FILTERS = "com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile"
   TAP_LOG_LEVEL = "error"
-  # UNCONFIRMED: the README default is sqlite://./tap.db and does not say where that lands in the
-  # container. This path keeps the database on the /data volume; verify the URL form in staging.
+  # The README default is sqlite://./tap.db and does not say where that lands in the container.
+  # This path keeps the database on the /data volume (confirmed in staging on 2026-11-04).
   TAP_DATABASE_URL = "sqlite:///data/tap.db"
 
 # One volume means one machine; run Tap as a single machine.
