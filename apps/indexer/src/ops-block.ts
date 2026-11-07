@@ -19,6 +19,22 @@ export async function blockImage(pool: pg.Pool, purge: Purge, did: string, cid: 
   await purge(did, [cid])
 }
 
+/**
+ * Takedown for a reported account: blocks every indexed image of the DID (block and purge reuse
+ * blockImage), then marks the report, or all open reports for that DID, actioned with who and why.
+ * Returns the blocked CIDs.
+ */
+export async function blockDid(pool: pg.Pool, purge: Purge, did: string, reason: string, by: string, reportId?: number): Promise<string[]> {
+  const { rows } = await pool.query<{ cid: string }>('SELECT DISTINCT cid FROM images WHERE did = $1', [did])
+  for (const { cid } of rows) await blockImage(pool, purge, did, cid, reason, by)
+  await pool.query(
+    `UPDATE reports SET status = 'actioned', actioned_by = $2, action_reason = $3, actioned_at = now()
+     WHERE target_did = $1 AND status = 'open' AND ($4::bigint IS NULL OR id = $4)`,
+    [did, by, reason, reportId ?? null],
+  )
+  return rows.map((r) => r.cid)
+}
+
 /** Lifts a block, then purges so any cached 404 for the image is dropped. Returns false when no active block existed. */
 export async function unblockImage(pool: pg.Pool, purge: Purge, did: string, cid: string): Promise<boolean> {
   const { rowCount } = await pool.query(
@@ -35,10 +51,25 @@ async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: rest.filter((a) => a !== '--'),
     allowPositionals: true,
-    options: { reason: { type: 'string' }, by: { type: 'string' } },
+    options: { reason: { type: 'string' }, by: { type: 'string' }, report: { type: 'string' } },
   })
   const [did, cid] = positionals
   const url = process.env.DATABASE_URL
+  if (cmd === 'block-did') {
+    if (!did || !url || !values.reason) {
+      console.error('usage: DATABASE_URL=... pnpm ops:block-did -- <did> --reason "..." [--report id] [--by name]')
+      return 2
+    }
+    const pool = new pg.Pool({ connectionString: url, max: 1 })
+    try {
+      const purge = purgerFromEnv({ ...process.env, CF_PURGE_MODE: 'prefix' })
+      const cids = await blockDid(pool, purge, did, values.reason, values.by ?? process.env.USER ?? 'operator', values.report ? Number(values.report) : undefined)
+      console.log(`blocked ${cids.length} image(s) for ${did}`)
+      return 0
+    } finally {
+      await pool.end()
+    }
+  }
   if ((cmd !== 'block' && cmd !== 'unblock') || !did || !cid || !url || (cmd === 'block' && !values.reason)) {
     console.error('usage: DATABASE_URL=... pnpm ops:block -- <did> <cid> --reason "..." [--by name]\n       DATABASE_URL=... pnpm ops:unblock -- <did> <cid>')
     return 2
