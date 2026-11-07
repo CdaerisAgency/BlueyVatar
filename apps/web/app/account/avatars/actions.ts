@@ -8,6 +8,7 @@ import { validateNewImage } from '../../../lib/records'
 import { prepareUpload } from '../../../lib/server-resize'
 import { reportError } from '../../../lib/obs'
 import { checkUploadForm } from '../../../lib/upload-caps'
+import { screenUpload } from '../../../lib/upload-screen'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -32,6 +33,8 @@ export async function uploadImage(form: FormData): Promise<void> {
   const bytes = new Uint8Array(await file.arrayBuffer())
   const img = await prepareUpload(bytes) // downscales above 4096 px; rejects only above the byte cap
   if (!img.ok) return back('error', img.error)
+  const screened = await screenUpload(did, img.value.bytes, img.value.mime) // after downscaling, before the PDS write
+  if (!screened.ok) return back('error', screened.error)
   const fields = validateNewImage({
     alt: String(form.get('alt') ?? ''),
     rating: String(form.get('rating') ?? ''),

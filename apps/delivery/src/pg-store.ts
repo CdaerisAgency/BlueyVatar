@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { DAILY_METERS, effectiveTier, isRating, parseCrop, plusEntitled, type CropParams, type IndexedLinkRecord, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
+import { DAILY_METERS, effectiveTier, isRating, parseCrop, plusEntitled, type CropParams, type IndexedLinkRecord, type SubjectLabel, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
@@ -119,6 +119,14 @@ export class PgIndexStore implements IndexStore {
   async isBlocked(did: string, cid: string): Promise<boolean> {
     const { rowCount } = await this.pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND cid = $2 AND unblocked_at IS NULL', [did, cid])
     return (rowCount ?? 0) > 0
+  }
+
+  async labelsFor(did: string): Promise<SubjectLabel[]> {
+    const { rows } = await this.pool.query<SubjectLabel>(
+      'SELECT subject, val FROM moderation_labels WHERE subject_did = $1 AND (exp IS NULL OR exp > now())',
+      [did],
+    )
+    return rows
   }
 
   async verifiedAccounts(did: string): Promise<VerifiedAccount[]> {

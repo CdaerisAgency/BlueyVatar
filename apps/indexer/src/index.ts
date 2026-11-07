@@ -10,6 +10,8 @@ import { reverifyFromEnv } from './reverify-wiring.js'
 import { IndexerHealth, probeTap, startHealthServer } from './health.js'
 import { errors, log, metrics } from './obs.js'
 import { createIndexer } from './wiring.js'
+import { PgLabelStore, labelerDidsFromEnv, runLabeler } from './labels.js'
+import { wsLabelSource } from './label-stream.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
@@ -37,7 +39,13 @@ function writes(): IndexWrites {
     // Deletes Stripe billing rows 7 years after their owner deleted their data.
     scheduleBillingPurge(pool)
     const warm = warmerFromEnv()
-    return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warm, onWarm: warm })
+    const purge = purgerFromEnv()
+    // Moderation labels (issue #207): one subscription per DID in LABELER_DIDS. Off when the list is empty.
+    const labelers = labelerDidsFromEnv()
+    if (labelers.length === 0) log.info('LABELER_DIDS is not set; label enforcement is off')
+    const labelStore = new PgLabelStore(pool, { onRemoved: purge })
+    for (const did of labelers) void runLabeler(did, wsLabelSource(did), labelStore)
+    return new PgIndexWrites(pool, { onPurge: purge, onImageUpserted: warm, onWarm: warm })
   }
   log.warn('DATABASE_URL is not set; logging index writes only')
   const dev = (op: string) => async (...args: unknown[]) => log.info('index write (dev, not stored)', { op, args })
