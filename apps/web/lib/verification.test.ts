@@ -133,7 +133,7 @@ describe('rel="me" verification', () => {
     const boom: Fetcher = async () => {
       throw new Error('socket detail that must not leak')
     }
-    expect(await verifyRelMe('https://site.example/', ME, boom)).toEqual({ ok: false, reason: 'The page could not be checked.' })
+    expect(await verifyRelMe('https://site.example/', ME, boom)).toEqual({ ok: false, reason: 'The page could not be checked.', transient: true })
   })
 })
 

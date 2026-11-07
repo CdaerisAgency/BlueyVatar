@@ -122,7 +122,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | App | Secrets (Fly secrets) |
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`; optional `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
-| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`; optional `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
+| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`; re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`); optional `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
 | web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; `DATABASE_URL` (pooled) if web reads the database |
 | tap | `TAP_ADMIN_PASSWORD` |
 
