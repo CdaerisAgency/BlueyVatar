@@ -232,6 +232,16 @@ describe('delivery API', () => {
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
   })
 
+  it('counts keyed profile JSON calls per DID per UTC day and nothing else', async () => {
+    const { app, usage } = setup()
+    expect((await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_biz' } })).status).toBe(200)
+    expect((await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_biz' } })).status).toBe(200)
+    expect((await app.request('/profile/alice.test')).status).toBe(200)
+    expect((await app.request('/profile/nobody.test', { headers: { 'x-api-key': 'sk_biz' } })).status).toBe(404)
+    expect([...usage.profileCalls.values()]).toEqual([2])
+    expect([...usage.profileCalls.keys()][0]).toMatch(/^did:plc:[^:]+:\d{4}-\d{2}-\d{2}$/)
+  })
+
   it('treats a profile with no candidates, as a labeled one yields, like any default response', async () => {
     const withAvatar = setup()
     const labeled = setup([])

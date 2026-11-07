@@ -67,6 +67,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     await q('INSERT INTO visibility_rules (did, hidden_profile) VALUES ($1, true)', [did])
     await q("INSERT INTO verification_state (state, did, rkey, provider) VALUES ($1, $2, 'r1', 'github')", [`vs-${tag}`, did])
     await q("INSERT INTO custom_domains (did, hostname, cf_id) VALUES ($1, $2, 'cf1')", [did, `${tag}.example.com`])
+    await q("INSERT INTO profile_view_counters (did, day, views, json_calls) VALUES ($1, '2026-11-06', 5, 2)", [did])
     await q("INSERT INTO images (did, rkey, cid, mime_type, rating, created_at) VALUES ($1, 'i1', $2, 'image/png', 'g', now()), ($1, 'i2', $3, 'image/png', 'g', now())", [did, `bafy1${tag}`, `bafy2${tag}`])
     await q("INSERT INTO profiles (did, record) VALUES ($1, '{}')", [did])
     await q("INSERT INTO claims (did, rkey, record) VALUES ($1, 'c1', '{}')", [did])
@@ -98,6 +99,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(out.billing.customers).toHaveLength(1)
     expect(out.billing.subscriptions).toHaveLength(1)
     expect(out.indexed.images).toHaveLength(2)
+    expect(out.profileViews).toEqual([{ day: '2026-11-06', views: 5, jsonCalls: 2 }])
     const text = JSON.stringify(out)
     expect(text).not.toContain('jane@example.com')
     expect(text).not.toContain('key_hash')
@@ -126,7 +128,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     for (const [t, col] of [
       ['email_links', 'did'], ['email_codes', 'did'], ['notice_emails', 'did'], ['oauth_session', 'sub'], ['web_session', 'did'], ['session_floor', 'did'], ['profile_links', 'did'],
       ['visibility_rules', 'did'], ['verification_state', 'did'], ['custom_domains', 'did'], ['images', 'did'], ['profiles', 'did'],
-      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'],
+      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'],
     ] as const) expect(await count(t, col, A), t).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM api_keys WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM usage_counters WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
