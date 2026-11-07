@@ -1,5 +1,6 @@
 import { PageMain } from '../../components/Page'
-export const metadata = { title: 'Content policy' }
+import { pageMetadata } from '../../lib/site'
+export const metadata = pageMetadata('/policy', 'Content policy | blueyvatar', 'What blueyvatar does not allow, how to report content, and what we can and cannot remove.')
 
 export default function PolicyPage() {
   return (
@@ -19,6 +20,8 @@ export default function PolicyPage() {
       <p>Nudity is allowed when the image is rated correctly. See the ratings in the product documentation.</p>
       <h2>Reporting</h2>
       <p>Use the report link on any profile or avatar page. You do not need an account. Do not send identity documents or images of them. We aim to review reports within a few days. A report may lead to the image being removed from delivery and caches.</p>
+      <h2>Usage limits</h2>
+      <p>To keep the service available, some actions are limited. Examples: a few email codes per hour, a limited number of avatar imports, uploads, claim checks, and key changes per hour, and short lockouts after repeated failed sign-ins or wrong codes. If you hit a limit, the page tells you how long to wait. Each account also has caps on stored items, such as 3 avatar images on Free and 20 on Plus, up to 10 linked emails, and up to 10 profile links.</p>
       <h2>Appeals</h2>
       <p>If we blocked your image and you think that was a mistake, write to the operator contact listed on the home page and include your handle and the image. Someone other than the original reviewer will look at it, and we will reply with the outcome. An image that is unblocked is served again after caches refresh.</p>
     </PageMain>

@@ -140,6 +140,33 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1), plus Em
 6. Cloudflare for SaaS (custom profile domains, Plus plan). Set the fallback origin to the web app's hostname, `profiles.blueyvatar.com`, proxied to `blueyvatar-web.fly.dev`, and give it a Fly certificate (step 2). Set `CF_SAAS_FALLBACK_ORIGIN` to that hostname. See `docs/research/decisions-phase2-v1.md` (Decision 2).
 7. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
 
+## Web rate limits
+
+The web app limits its expensive or abusable actions with fixed windows stored in the `rate_windows` table (the same table delivery uses, keys prefixed `web:`). Counts are shared by every web instance. Keys hold a salted SHA-256 of the IP or DID, never the raw value; the salt is `REPORT_IP_SECRET`, falling back to `SESSION_SECRET`. Expired rows are removed by the delivery cleanup job. Limits live in `BUCKETS` in `apps/web/lib/rate-limit.ts`.
+
+Client IP: the web app reads `CF-Connecting-IP` only when the request carries `x-origin-auth` equal to `ORIGIN_SECRET`. Set `ORIGIN_SECRET` on the web app (the same value the Cloudflare transform rule sends) and add that rule for the web hostname too, in step 5 of the Cloudflare section. Without it the app falls back to `Fly-Client-IP`, which behind Cloudflare is an edge address, so many users would share one IP bucket. `X-Forwarded-For` is never trusted.
+
+When a limit is hit, server actions show "Too many requests. Try again in N minutes." and route handlers answer 429 with `Retry-After` in seconds. If the database check itself fails, the request is allowed and the error is logged.
+
+| Bucket | Counted by | Limit | Window |
+| --- | --- | --- | --- |
+| `login.ip` (login start) | IP | 20 | 10 min |
+| `login.did` (email link OAuth start) | DID | 10 | 10 min |
+| `loginFail.ip` (bad handle or failed sign-in start, then lockout) | IP | 10 failures | 15 min |
+| `callback.ip` (OAuth and claim callbacks) | IP | 60 | 10 min |
+| `import.did`, `import.ip` (avatar import preview and confirm) | DID, IP | 20, 60 | 10 min |
+| `claimAdd.did` | DID | 30 | 1 hour |
+| `claimVerify.did`, `claimVerify.ip` (verify and re-verify) | DID, IP | 30, 60 | 1 hour |
+| `domain.did`, `domain.ip` (add and remove) | DID, IP | 20, 40 | 1 hour |
+| `domainRefresh.did` (Cloudflare status poll on the domain page) | DID | 60 | 10 min |
+| `upload.did`, `upload.ip` (avatar and gallery uploads) | DID, IP | 30, 90 | 1 hour |
+| `key.did`, `key.ip` (create and rotate) | DID, IP | 20, 60 | 1 hour |
+| `addEmail.did`, `addEmail.ip` (new codes) | DID, IP | 5, 20 | 1 hour |
+| `codeFail.did` (wrong codes across all codes, then lockout) | DID | 10 failures | 1 hour |
+
+The per-code cap of 5 attempts and the 60 second resend gap still apply. Report submissions keep their own limit of 5 per IP per hour.
+
+Per-account caps, enforced on the server: images by plan (Free 3, Plus 20), gallery images (`GALLERY_MAX`), 10 linked emails, 10 profile links, claims (`MAX_CLAIMS`, checked against both the repo and the database), one custom domain, and active keys by tier. Uploads must carry exactly one file of at most 1,000,000 bytes, checked before the file is read, whatever the browser resized. Server actions accept bodies up to 2 MB.
 ## Email routing
 
 Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It receives and forwards only; it does not send mail.

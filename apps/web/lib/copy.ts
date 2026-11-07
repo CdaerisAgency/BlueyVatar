@@ -52,7 +52,7 @@ export const COPY = {
     tagline: 'blueyvatar. Built on atproto.',
     links: [
       { label: 'Developers', href: '/#dev' },
-      { label: 'Pricing', href: '/#pricing' },
+      { label: 'Pricing', href: '/pricing' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Sign in', href: '/login' },
     ],
