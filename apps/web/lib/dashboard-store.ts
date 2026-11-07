@@ -159,8 +159,8 @@ function postgres(pool: pg.Pool): DashboardStore {
         if (again) return again
         const id = newLicenseId()
         await c.query(
-          `INSERT INTO licenses (license_id, owner, tier, status, term, attribution_required, entitlements)
-           VALUES ($1, $2, 'free', 'active', 'monthly', true, $3)`,
+          `INSERT INTO licenses (license_id, owner, tier, status, term, entitlements)
+           VALUES ($1, $2, 'free', 'active', 'monthly', $3)`,
           [id, did, JSON.stringify(ENTITLEMENTS.free)],
         )
         return { licenseId: id, owner: did, tier: 'free' as const, status: 'active' as const, term: 'monthly' as const }

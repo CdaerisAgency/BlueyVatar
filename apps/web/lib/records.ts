@@ -2,7 +2,7 @@
  * Pure validation and mapping for the record editor (spec sections 5, 9, 11.2).
  * Limits mirror lexicons/com/blueyvatar/*.json.
  */
-import { RATINGS, isPlusDid, type Rating } from '@blueyvatar/core'
+import { RATINGS, isPlusDid, normalizeBackgroundColor, type Rating } from '@blueyvatar/core'
 
 export const IMAGE_COLLECTION = 'com.blueyvatar.image'
 export const PROFILE_COLLECTION = 'com.blueyvatar.profile'
@@ -209,6 +209,8 @@ export type ProfileInput = {
   pronunciation: string
   timezone: string
   interests: string
+  /** `#rrggbb`, or blank to clear. */
+  backgroundColor?: string
 }
 
 export type ProfileFields = {
@@ -219,6 +221,7 @@ export type ProfileFields = {
   pronunciation?: string
   timezone?: string
   interests?: string[]
+  backgroundColor?: string
 }
 
 /** IANA zone check. Uses Intl.supportedValuesOf when available; UTC is always allowed. */
@@ -280,5 +283,12 @@ export function validateProfile(input: ProfileInput): Check<ProfileFields> {
   const interests = parseInterests(input.interests)
   if (!interests.ok) return interests
   if (interests.value.length) out.interests = interests.value
+  const color = (input.backgroundColor ?? '').trim()
+  if (color) {
+    // Strict #rrggbb only. Names, short hex, and rgb() are refused.
+    const normalized = normalizeBackgroundColor(color)
+    if (!normalized) return fail('Enter a background color as #rrggbb, such as #1f4e9b.')
+    out.backgroundColor = normalized
+  }
   return ok(out)
 }

@@ -7,6 +7,7 @@ import type { AvatarResolver, Identity } from './resolver.js'
 import { MemoryIndexStore, PUBLIC_VISIBILITY } from './store.js'
 import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from './alerts.js'
 import { MemoryUsageMeter } from './usage.js'
+import { ResizeBusyError } from './resize.js'
 
 const DID = 'did:plc:abc123'
 const CID = 'bafyreiabc123'
@@ -232,6 +233,16 @@ describe('delivery API', () => {
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
   })
 
+  it('counts keyed profile JSON calls per DID per UTC day and nothing else', async () => {
+    const { app, usage } = setup()
+    expect((await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_biz' } })).status).toBe(200)
+    expect((await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_biz' } })).status).toBe(200)
+    expect((await app.request('/profile/alice.test')).status).toBe(200)
+    expect((await app.request('/profile/nobody.test', { headers: { 'x-api-key': 'sk_biz' } })).status).toBe(404)
+    expect([...usage.profileCalls.values()]).toEqual([2])
+    expect([...usage.profileCalls.keys()][0]).toMatch(/^did:plc:[^:]+:\d{4}-\d{2}-\d{2}$/)
+  })
+
   it('treats a profile with no candidates, as a labeled one yields, like any default response', async () => {
     const withAvatar = setup()
     const labeled = setup([])
@@ -276,6 +287,21 @@ describe('delivery API', () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
+  })
+
+  it('returns backgroundColor in the profile JSON, null when unset or malformed', async () => {
+    const { app, deps } = setup()
+    expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBeNull()
+    const record = (own: Record<string, unknown>) => {
+      const base = deps.resolver.getRecord
+      deps.resolver.getRecord = async (i, collection, rkey) => (collection === 'com.blueyvatar.profile' ? own : base(i, collection, rkey))
+    }
+    record({ backgroundColor: '#1F4E9B' })
+    expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBe('#1f4e9b')
+    for (const bad of ['red', '#fff', 'url(javascript:1)', 7]) {
+      record({ backgroundColor: bad })
+      expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBeNull()
+    }
   })
 
   it('lists detected atproto apps in the profile JSON', async () => {
@@ -434,6 +460,27 @@ describe('delivery API', () => {
       expect(res.headers.get('content-type')).toBe('image/webp')
       expect((await app.request(raw('128-q101.webp'))).status).toBe(404)
       expect((await app.request(img(128).replace(/\.png$/, '.avif'))).status).toBe(404)
+    })
+  })
+
+  describe('resize capacity (issue #198)', () => {
+    it('answers 503 with Retry-After and no-store when the resize queue is full, and meters nothing', async () => {
+      const { deps, usage } = setup()
+      const app = createApp({ ...deps, resize: async () => { throw new ResizeBusyError(4) } })
+      const res = await app.request(img(128))
+      expect(res.status).toBe(503)
+      expect(res.headers.get('retry-after')).toBe('4')
+      expect(res.headers.get('cache-control')).toBe('no-store')
+      expect((await res.json()).error.code).toBe('overloaded')
+      expect(usage.service.size).toBe(0)
+    })
+
+    it('sheds default avatars the same way', async () => {
+      const { deps } = setup()
+      const app = createApp({ ...deps, resize: async () => { throw new ResizeBusyError(2) } })
+      const res = await app.request('/default/mp/128.png?seed=x')
+      expect(res.status).toBe(503)
+      expect(res.headers.get('retry-after')).toBe('2')
     })
   })
 

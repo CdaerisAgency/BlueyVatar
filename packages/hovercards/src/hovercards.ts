@@ -59,6 +59,11 @@ export function init(opts: HovercardOptions): () => void {
     hide()
     owner = target
     card = el('div', 'position:fixed;z-index:2147483647;max-width:280px;box-sizing:border-box;padding:12px;display:flex;gap:10px;align-items:flex-start;background:#ffffff;color:#1a1a1a;border:1.5px solid #e6dfd3;border-radius:16px;box-shadow:0 4px 16px rgba(26,26,26,.18);font:14px/1.4 system-ui,sans-serif')
+    if (c.colors) {
+      // Hex values only (checked in model.ts). The link and the account line take the text color so contrast holds.
+      card.style.background = c.colors.background
+      card.style.color = c.colors.text
+    }
     card.id = 'bv-card-' + ++seq
     card.setAttribute('role', 'group')
     card.setAttribute('aria-label', c.name)
@@ -72,9 +77,9 @@ export function init(opts: HovercardOptions): () => void {
     const body = el('div', 'min-width:0;overflow-wrap:anywhere')
     body.append(el('strong', 'display:block', c.name))
     for (const l of c.lines) body.append(el('div', '', l))
-    if (c.accounts.length) body.append(el('div', 'font-size:12px;color:#6b6660', c.accounts.join(', ')))
+    if (c.accounts.length) body.append(el('div', 'font-size:12px;' + (c.colors ? '' : 'color:#6b6660'), c.accounts.join(', ')))
     if (c.profileUrl) {
-      const a = el('a', 'display:inline-block;margin-top:4px;color:#b4400e;font-weight:600', 'View profile')
+      const a = el('a', 'display:inline-block;margin-top:4px;font-weight:600;color:' + (c.colors ? 'inherit' : '#b4400e'), 'View profile')
       a.href = c.profileUrl
       a.rel = 'noopener'
       body.append(a)

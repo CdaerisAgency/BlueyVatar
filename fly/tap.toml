@@ -8,6 +8,8 @@
 app = "blueyvatar-tap"
 primary_region = "iad"
 
+# Low-resource mode (docs/deploy.md): one always-on machine, 1 GB volume. Tap consumes the live firehose.
+
 [build]
   # Pinned to tag 0.1.10 (latest semver tag in the ghcr.io registry, checked 2026-11-04) plus its digest.
   # Do not deploy with :latest. https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
@@ -39,9 +41,9 @@ primary_region = "iad"
     type = "tcp"
     port = 2480
     grace_period = "30s"
-    interval = "30s"
+    interval = "60s"
     timeout = "5s"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  memory = "512mb"

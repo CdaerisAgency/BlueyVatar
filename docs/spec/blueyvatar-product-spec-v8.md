@@ -1,4 +1,4 @@
-# blueyvatar - Product Spec v7
+# blueyvatar - Product Spec v8
 
 Nov 3, 2026 by @Chris Duncan
 
@@ -162,7 +162,7 @@ Gallery rules follow the avatar rules. The gallery is a Plus user feature (secti
 
 **Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
 
-- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified. A crop box in the web editor is a later addition.
+- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified by delivery. The web editor adds a square crop box for non-square images (drag, zoom, and keyboard operable, default is this same center crop). The chosen region is rendered in the browser and uploaded as the image, so for a cropped upload the stored file is the cropped square. A square image, an image the browser cannot decode, and any upload through the API are stored as given and cropped at delivery.
 - **Minimum size.** Sources must be at least 80 pixels on both sides. The web editor rejects smaller images with a clear message, and delivery treats a smaller source as an invalid image rather than upscaling it.
 - **Client resize.** Before upload, the web editor downscales images in the browser with a canvas to at most 2048 pixels on the long side, then re-encodes toward the 1,000,000 byte cap: JPEG at quality 0.92, 0.85, then 0.75, with a PNG kept as PNG if it fits. This is best effort, so phone photos usually pass but the result is not guaranteed. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
 
@@ -385,9 +385,6 @@ Each license holds these fields:
 | `keys` | Secret and publishable keys with labels and domain lists |
 | `term`, `status` | Monthly or annual term; active, past due, suspended, canceled |
 | `usage` | Metered counters (section 12) |
-| `attribution` | Whether an attribution link is required |
-
-Unavatar requires an [attribution link on its free plan and removes the requirement on paid plans](https://github.com/microlinkhq/unavatar). The same rule is proposed here for the Free tier.
 
 ### 10.4 Image license declaration
 
@@ -412,7 +409,6 @@ The proposal has four developer tiers and two user plans, with privacy and safet
 | Overage | Blocked | Metered | Metered | Contract |
 | API keys | 1 publishable | 5 | 25 | Unlimited |
 | Domain restrictions on keys | No | Yes | Yes | Yes |
-| Attribution link required | Yes | No | No | No |
 | Max size (`s`) | 512 | 1024 | 2048 | 2048 |
 | Output format and quality | PNG only | PNG, JPEG, WebP | PNG, JPEG, WebP | PNG, JPEG, WebP |
 | Cache TTL (`ttl`) | Fixed 24h | 1h to 28d | 1h to 28d | 1h to 28d |
@@ -481,7 +477,6 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 
 - Plans bill monthly or annually. Overage on Pro and Business is metered at a published per-unit rate (to be set).
 - A past-due license gets a grace period, then drops to Free limits. A downgrade changes limits only and never deletes user data, user avatars, or profiles.
-- Free-tier attribution is checked on the developer's production site. Unavatar requires the link to be [public, followable, and on a production site](https://github.com/microlinkhq/unavatar), and reserves the right to revoke free access when it is missing.
 - Keys can be rotated and revoked at any time, with usage alerts at 80 and 100 percent of included volume.
 - The payment processor is Stripe, decided by the owner on 2026-11-07 (issue #67). Tax is computed by Stripe Tax, and invoices come from Stripe Billing. Both are configured in the Stripe dashboard at deploy (docs/deploy.md, Stripe billing). The overage rate stays open until per-miss cost is measured.
 

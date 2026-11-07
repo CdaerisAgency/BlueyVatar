@@ -40,6 +40,8 @@ export default async function KeysPage() {
       <h1>License and API keys</h1>
       <p>Signed in as {did}</p>
 
+      <p>New to the API? Read the <Link href="/docs">API docs</Link> for parameters, error codes, rate-limit headers, and copy-paste examples, or fetch the <a href="https://img.blueyvatar.com/openapi.json">OpenAPI description</a>.</p>
+
       <h2>License</h2>
       <ul>
         <li>Tier: {license.tier}</li>
@@ -146,7 +148,6 @@ export default async function KeysPage() {
               ['Overage', (e) => e.overage],
               ['Max size', (e) => String(e.maxSize)],
               ['Formats', (e) => e.formats.join(', ')],
-              ['Attribution required', (e) => (e.attributionRequired ? 'Yes' : 'No')],
               ['Hovercards', (e) => (e.hovercards ? 'Yes' : 'No')],
             ] as [string, (e: (typeof ENTITLEMENTS)[Tier]) => string][]
           ).map(([label, f]) => (

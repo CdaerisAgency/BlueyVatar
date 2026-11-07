@@ -480,9 +480,9 @@ describe.skipIf(!url)('postgres billing store', () => {
     const results = await Promise.all([send(created), send(created), send(created)])
     expect(results.map((r) => r.status)).toEqual([200, 200, 200])
     expect(results.filter((r) => r.body.result?.startsWith('duplicate')).length).toBe(2)
-    const lic = await pool.query('SELECT tier, status, grace_ends_at, attribution_required, term FROM licenses WHERE owner = $1', [DID])
+    const lic = await pool.query('SELECT tier, status, grace_ends_at, term FROM licenses WHERE owner = $1', [DID])
     expect(lic.rows).toHaveLength(1)
-    expect(lic.rows[0]).toMatchObject({ tier: 'pro', status: 'active', grace_ends_at: null, attribution_required: false, term: 'monthly' })
+    expect(lic.rows[0]).toMatchObject({ tier: 'pro', status: 'active', grace_ends_at: null, term: 'monthly' })
     expect((await pool.query('SELECT count(*)::int AS c FROM stripe_events')).rows[0].c).toBe(1)
 
     await send(ev('invoice.payment_failed', { subscription: 'sub_1' }, T0 + DAY), T0 + DAY)

@@ -3,6 +3,8 @@
 app = "blueyvatar-delivery"
 primary_region = "iad"
 
+# Low-resource mode (docs/deploy.md): scale to zero, 512 MB because each resize forks a sharp worker.
+
 [build]
   # build.dockerfile is relative to this file (https://docs.fly.io/reference/configuration, [build] section).
   # One Dockerfile serves web, delivery, and indexer; the command is set below.
@@ -28,25 +30,19 @@ primary_region = "iad"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
   # Health check (https://docs.fly.io/reference/configuration, [[http_service.checks]] section).
   [[http_service.checks]]
     grace_period = "20s"
-    interval = "15s"
+    interval = "60s"
     method = "GET"
     path = "/healthz"
     timeout = "5s"
 
-  # Readiness: runs SELECT 1 against Postgres (3 second budget, READY_TIMEOUT_MS). The 5 second check
-  # timeout leaves room for a Neon wake-up. /readyz is exempt from the origin lock like /healthz.
-  [[http_service.checks]]
-    grace_period = "30s"
-    interval = "30s"
-    method = "GET"
-    path = "/readyz"
-    timeout = "5s"
+  # Readiness (/readyz runs SELECT 1 against Postgres) is left out of the Fly checks so a running machine
+  # does not touch Neon every interval and keep the compute awake. Call /readyz by hand or from an uptime monitor.
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  memory = "512mb"

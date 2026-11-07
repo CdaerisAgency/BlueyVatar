@@ -28,6 +28,7 @@ export const BUCKETS = {
   'claimVerify.ip': { limit: 60, windowSec: HOUR },
   'domain.did': { limit: 20, windowSec: HOUR },
   'domain.ip': { limit: 40, windowSec: HOUR },
+  'stats.did': { limit: 60, windowSec: 10 * MIN },
   'domainRefresh.did': { limit: 60, windowSec: 10 * MIN },
   'upload.did': { limit: 30, windowSec: HOUR },
   'upload.ip': { limit: 90, windowSec: HOUR },
@@ -45,6 +46,7 @@ export const BUCKETS = {
   'adminAction.ip': { limit: 240, windowSec: 10 * MIN },
   'export.did': { limit: 5, windowSec: HOUR },
   'export.ip': { limit: 20, windowSec: HOUR },
+  'profileSave.did': { limit: 60, windowSec: HOUR },
   'deleteData.did': { limit: 5, windowSec: HOUR },
   'deleteData.ip': { limit: 20, windowSec: HOUR },
 } as const satisfies Record<string, BucketConfig>

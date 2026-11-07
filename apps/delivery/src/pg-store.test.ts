@@ -15,6 +15,7 @@ const migration15 = readFileSync(new URL('../../../db/migrations/0015_billing.sq
 const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_domain.sql', import.meta.url), 'utf8')
 const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
 const migration24 = readFileSync(new URL('../../../db/migrations/0024_usage_daily.sql', import.meta.url), 'utf8')
+const migration25 = readFileSync(new URL('../../../db/migrations/0025_profile_view_counters.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -39,6 +40,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration16)
     await pool.query(migration17)
     await pool.query(migration24)
+    await pool.query(migration25)
   }, 60_000)
 
   afterAll(async () => {
@@ -186,6 +188,14 @@ describe.skipIf(!url)('postgres stores', () => {
     expect((await limiter.hit('ip:1', 2, 60)).remaining).toBe(1)
   })
 
+  it('adds a batched increment to a rate window in one write', async () => {
+    const limiter = new PgRateLimiter(pool)
+    expect((await limiter.hit('ip:batch', 10, 60, 4)).remaining).toBe(6)
+    expect((await limiter.hit('ip:batch', 10, 60, 7)).exceeded).toBe(true)
+    await pool.query(`UPDATE rate_windows SET reset_at = now() - interval '1 second'`)
+    expect((await limiter.hit('ip:batch', 10, 60, 3)).remaining).toBe(7)
+  })
+
   it('adds to monthly usage counters', async () => {
     const usage = new PgUsageMeter(pool)
     expect(await usage.add('lic1', 'origin_resolution')).toBe(1)
@@ -209,6 +219,13 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await usage.read('licd', [], [])).toEqual({ monthly: new Map(), daily: new Map() })
     await pool.query(`DELETE FROM licenses WHERE license_id = 'licd'`)
     expect((await pool.query(`SELECT count(*)::int AS c FROM usage_daily WHERE license_id = 'licd'`)).rows[0].c).toBe(0)
+  })
+
+  it('upserts keyed profile JSON calls into one daily row per DID', async () => {
+    const usage = new PgUsageMeter(pool)
+    await Promise.all([usage.addProfileCall(DID), usage.addProfileCall(DID), usage.addProfileCall(DID)])
+    const { rows } = await pool.query(`SELECT views, json_calls FROM profile_view_counters WHERE did = $1`, [DID])
+    expect(rows.map((r) => [Number(r.views), Number(r.json_calls)])).toEqual([[0, 3]])
   })
 
   it('tracks service costs per DID and claims each alert once', async () => {

@@ -19,6 +19,8 @@ export interface UsageMeter {
   add(licenseId: string, meter: Meter, n?: number): Promise<number>
   /** Adds to the service-side cost counter for a DID (not billed to any license). */
   addService(did: string, meter: ServiceMeter, n?: number): Promise<void>
+  /** Adds one keyed profile JSON call to the DID's daily counter for UTC today (profile view statistics, issue #173). Aggregate only: no IP or user agent. */
+  addProfileCall(did: string, n?: number): Promise<void>
 }
 
 /** First day of the UTC month containing `now`, as YYYY-MM-DD. */
@@ -33,6 +35,8 @@ export class MemoryUsageMeter implements UsageMeter {
   byPeriod = new Map<string, number>()
   byDay = new Map<string, number>()
   constructor(private now: () => Date = () => new Date()) {}
+  /** `${did}:${YYYY-MM-DD}` to keyed profile JSON calls. */
+  profileCalls = new Map<string, number>()
   async add(licenseId: string, meter: Meter, n = 1) {
     const k = `${licenseId}:${meter}`
     const total = (this.counts.get(k) ?? 0) + n
@@ -56,6 +60,10 @@ export class MemoryUsageMeter implements UsageMeter {
       return out
     }
     return { monthly: pick(this.byPeriod, periods, ['origin_resolution', 'transform', 'profile_json']), daily: pick(this.byDay, days, DAILY_METERS) }
+  }
+  async addProfileCall(did: string, n = 1) {
+    const k = `${did}:${new Date().toISOString().slice(0, 10)}`
+    this.profileCalls.set(k, (this.profileCalls.get(k) ?? 0) + n)
   }
   async addService(did: string, meter: ServiceMeter, n = 1) {
     const k = `${did}:${meter}`

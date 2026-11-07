@@ -16,7 +16,8 @@ interface Job {
 const MIN_SOURCE_PX = 80
 
 sharp.cache(false)
-sharp.concurrency(1)
+// Threads per worker. The parent caps concurrent workers (IMG_MAX_CONCURRENT), so total threads = cap x this.
+sharp.concurrency(Math.max(1, Number(process.env.BV_SHARP_THREADS) || 1))
 
 process.once('message', async (job: Job) => {
   try {

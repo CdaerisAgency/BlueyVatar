@@ -144,6 +144,14 @@ describe('validateProfile', () => {
     const r = validateProfile({ ...blank, jobTitle: 'Dev', timezone: 'Asia/Tokyo', interests: 'a,b', pronouns: 'they/them' })
     expect(r).toEqual({ ok: true, value: { jobTitle: 'Dev', pronouns: 'they/them', timezone: 'Asia/Tokyo', interests: ['a', 'b'] } })
   })
+  it('accepts only #rrggbb for the background color and stores it lowercase', () => {
+    expect(validateProfile({ ...blank, backgroundColor: '#1F4E9B' })).toEqual({ ok: true, value: { backgroundColor: '#1f4e9b' } })
+    expect(validateProfile({ ...blank, backgroundColor: ' #ffffff ' })).toEqual({ ok: true, value: { backgroundColor: '#ffffff' } })
+    expect(validateProfile({ ...blank, backgroundColor: '' })).toEqual({ ok: true, value: {} })
+    for (const bad of ['red', '#fff', '#ffffffff', 'ffffff', '#gggggg', 'rgb(0,0,0)', 'url(x)', '#ffffff;x']) {
+      expect(validateProfile({ ...blank, backgroundColor: bad }).ok, bad).toBe(false)
+    }
+  })
   it('enforces lexicon limits', () => {
     expect(validateProfile({ ...blank, pronouns: 'x'.repeat(41) }).ok).toBe(false)
     expect(validateProfile({ ...blank, company: 'x'.repeat(101) }).ok).toBe(false)

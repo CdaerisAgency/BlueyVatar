@@ -1,4 +1,4 @@
-import { createLogger, Metrics } from '@blueyvatar/core'
+import { createLogger, Metrics, normalizeBackgroundColor } from '@blueyvatar/core'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
@@ -13,8 +13,9 @@ import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock, secretsEqual } from './origin.js'
+import { openApiDocument } from './openapi.js'
 import { BlobError } from './blob.js'
-import type { Resizer } from './resize.js'
+import { ResizeBusyError, type Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore, Visibility } from './store.js'
 import type { UsageMeter } from './usage.js'
@@ -68,6 +69,13 @@ function fail(c: Context, status: number, code: ErrorCode, message: string) {
   // Server errors carry the request id in the body so a user can quote it. Client errors do not:
   // hash lookups must answer byte for byte the same whether or not a link exists (issue 59).
   return c.json(errorBody(code, message, status >= 500 ? (c.get('requestId' as never) as string | undefined) : undefined), status as 400)
+}
+
+/** Shed response when the resize queue is full: 503 with Retry-After, never cached. */
+function overloaded(c: Context, err: ResizeBusyError) {
+  c.header('retry-after', String(err.retryAfterSeconds))
+  c.header('cache-control', 'no-store')
+  return fail(c, 503, 'overloaded', 'Image processing is busy; retry shortly')
 }
 
 function rateHeaders(c: Context, e: EntitlementResult, metered = true) {
@@ -285,6 +293,12 @@ export function createApp(deps: AppDeps) {
   // Liveness: the process answers. Readiness: Postgres answers within the time budget.
   app.get('/healthz', (c) => c.text('ok'))
 
+  // Machine-readable API description (issue #142). Public, no key, no metering.
+  app.get('/openapi.json', (c) => {
+    c.header('cache-control', 'public, max-age=3600')
+    return c.json(openApiDocument)
+  })
+
   app.get('/readyz', async (c) => {
     if (deps.ready) {
       let timer: NodeJS.Timeout | undefined
@@ -404,6 +418,8 @@ export function createApp(deps: AppDeps) {
       // A hash lookup must not tell a restricted profile apart from an unlinked hash.
       return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
     }
+    // Same condition as the profile_json meter, so the keyed-call count has one source of truth. Never blocks the response.
+    if (e.licenseId) await deps.usage.addProfileCall(identity.did).catch(() => undefined)
 
     const [bsky, own] = await Promise.all([
       deps.resolver.getRecord(identity, 'app.bsky.actor.profile', 'self').catch(() => null),
@@ -439,6 +455,8 @@ export function createApp(deps: AppDeps) {
       pronunciation: own?.pronunciation ?? null,
       timezone: own?.timezone ?? null,
       interests: own?.interests ?? [],
+      // #rrggbb or null. A stored value that is not exactly that shape is treated as unset.
+      backgroundColor: normalizeBackgroundColor(own?.backgroundColor),
       gallery,
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
       atprotoApps,
@@ -496,7 +514,8 @@ export function createApp(deps: AppDeps) {
     if (ext === 'png') {
       try {
         body = await deps.resize({ input: new TextEncoder().encode(svg), size: p.size, format: 'png', quality: 85 })
-      } catch {
+      } catch (err) {
+        if (err instanceof ResizeBusyError) return overloaded(c, err)
         return fail(c, 502, 'upstream_error', 'Could not render the QR code')
       }
     }
@@ -583,6 +602,7 @@ export function createApp(deps: AppDeps) {
       const original = await deps.resolver.getBlob(identity, cid)
       bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
     } catch (err) {
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
       logger.warn('image fetch or resize failed', { requestId: c.get('requestId' as never), did, kind: err instanceof BlobError ? err.kind : 'resize', err })
       if (err instanceof BlobError && err.kind === 'not_found') return fail(c, 404, 'not_found', 'Original image not found')
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
@@ -617,7 +637,13 @@ export function createApp(deps: AppDeps) {
     const size = Math.min(Number(m[1]), 2048)
     const seed = c.req.query('seed') ?? ''
     const svg = defaultSvg(style as DefaultStyle, seed, cleanInitials(c.req.query('initials')))
-    const bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
+    let bytes: Uint8Array
+    try {
+      bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
+    } catch (err) {
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
+      throw err
+    }
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${m[3]}`,
       'cache-control': 'public, max-age=86400',
