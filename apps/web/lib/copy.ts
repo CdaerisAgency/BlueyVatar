@@ -5,7 +5,7 @@
  */
 export const COPY = {
   brand: 'blueyvatar',
-  nav: { how: 'How it works', developers: 'Developers', pricing: 'Pricing', signIn: 'Sign in with Bluesky' },
+  nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', pricing: 'Pricing', signIn: 'Sign in with Bluesky' },
   hero: {
     eyebrow: 'One avatar. Every app.',
     title: 'Your face, carried by your own account.',
@@ -54,6 +54,7 @@ export const COPY = {
       { label: 'Developers', href: '/#dev' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'Privacy', href: '/privacy' },
+      { label: 'Accessibility', href: '/accessibility' },
       { label: 'Sign in', href: '/login' },
     ],
   },

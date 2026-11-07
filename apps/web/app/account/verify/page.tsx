@@ -17,10 +17,10 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
     <PageMain narrow>
       <h1>Enter your code</h1>
       <p>We sent a 6-digit code to {pending.masked}. It expires in 15 minutes.</p>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" id="verify-error">{error}</p>}
       <form action={verifyCode}>
         <label>
-          6-digit code <input name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="one-time-code" />
+          6-digit code <input name="code" aria-invalid={error ? true : undefined} aria-describedby={error ? 'verify-error' : undefined} inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="one-time-code" />
         </label>
         <Button type="submit" variant="primary">Verify</Button>
       </form>

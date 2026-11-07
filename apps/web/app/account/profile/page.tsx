@@ -30,10 +30,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       <AccountNav />
       <h1>Profile</h1>
       <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your Bluesky profile.</p>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" id="profile-error">{error}</p>}
       {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
-      <form action={saveProfile}>
+      {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
+      <form action={saveProfile} aria-describedby={[error && 'profile-error', loadError && 'profile-load-error'].filter(Boolean).join(' ') || undefined}>
         {field('jobTitle', 'Job title', p.jobTitle, 1000)}
         {field('company', 'Company', p.company, 1000)}
         {field('location', 'Location', p.location, 1000)}

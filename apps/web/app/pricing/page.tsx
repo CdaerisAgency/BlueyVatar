@@ -5,7 +5,7 @@ export const metadata = pageMetadata('/pricing', 'Pricing | blueyvatar', pricing
 
 export default function PricingPage() {
   return (
-    <main>
+    <main id="main" tabIndex={-1} className="focus:outline-none">
       <PricingSection headingAs="h1" />
     </main>
   )

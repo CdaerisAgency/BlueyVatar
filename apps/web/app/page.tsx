@@ -12,7 +12,7 @@ export const metadata = pageMetadata('/', 'blueyvatar | Avatars and profiles in 
 
 export default function Home() {
   return (
-    <main>
+    <main id="main" tabIndex={-1} className="focus:outline-none">
       <PricingHashRedirect />
       <div className={`${inner} grid grid-cols-1 items-center gap-12 pt-8 pb-12 md:grid-cols-[1.2fr_1fr] md:pt-14`}>
         <div className="flex flex-col items-start gap-[22px]">
