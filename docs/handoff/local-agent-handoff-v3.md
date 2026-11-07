@@ -49,7 +49,7 @@ If any of these is missing, stop and tell the owner which one. Don't work around
 Follow `docs/deploy.md`, and do staging before production.
 
 1. **Hostnames are approved and the owner owns `blueyvatar.com` with DNS in Cloudflare.** Web is `blueyvatar.com`, delivery is `img.blueyvatar.com`, and the Cloudflare for SaaS fallback origin is `profiles.blueyvatar.com`. Create DNS records and Fly certificates for these. The OAuth client ID is `https://blueyvatar.com/oauth-client-metadata.json`, so web needs the apex domain.
-2. **Pin the Tap image.** `fly/tap.toml` uses the placeholder tag `PIN_REAL_TAG`. Find a real tag or digest for `ghcr.io/bluesky-social/indigo/tap` in the indigo package registry, open a PR with the pin, and merge it once CI passes.
+2. **Pin the Tap image.** Done: `fly/tap.toml` pins `ghcr.io/bluesky-social/indigo/tap:0.1.10` with its digest (highest semver tag in the registry, image built 2026-03-11). Re-check the registry before an upgrade.
 3. **Create the secrets in Infisical** for each environment, using the per-app table in `docs/deploy.md` under "Infisical secrets".
    - Get `DATABASE_URL` (pooled; the host contains `-pooler`) and `DATABASE_URL_DIRECT` from Neon.
    - Generate `ORIGIN_SECRET`, `SESSION_SECRET`, and `TAP_ADMIN_PASSWORD` as random hex strings. Tap and indexer use the same `TAP_ADMIN_PASSWORD`.

@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js",
     "test": "vitest run --passWithNoTests",
+    "test:tap-live": "vitest run src/tap-live.test.ts",
     "ops:block": "tsc -p tsconfig.json && node dist/ops-block.js block",
     "ops:block-did": "tsc -p tsconfig.json && node dist/ops-block.js block-did",
     "ops:unblock": "tsc -p tsconfig.json && node dist/ops-block.js unblock"
