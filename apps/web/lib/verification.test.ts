@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { AtprotoAttestationWriter, LocalAttestationWriter, attestationWriterFromEnv } from './attestation'
 import { memoryClaimStore } from './claim-store'
 import { claimLabel, normalizeClaim, parseMastodonUri, profileLinkFor } from './claims'
+import { methodFor, platformAvailable } from './claim-providers'
+import { OAUTH_PROVIDERS, dnsProofName, providerAuthorizeUrl, providerClaimMatches, providerConfig, providerIdentities, verifyBluesky, verifyDnsTxt, type OAuthProvider, type TxtResolver } from './claims'
 import { githubAuthorizeUrl, githubClaimMatches, githubLogin } from './github-oauth'
 import { accountUrl, authorizeUrl, mastodonClaimMatches, registerApp, type MastodonApp } from './mastodon-oauth'
 import { extractRelMe, hasRelMeLink, sameUrl } from './relme'
@@ -47,10 +49,35 @@ describe('claim normalization', () => {
     expect(norm('website', 'https://example.com:8443/')).toMatch(/^error:/)
     expect(norm('website', 'javascript:alert(1)')).toMatch(/^error:/)
   })
-  it('says coming later for TikTok and Threads and rejects unknown platforms', () => {
-    expect(norm('tiktok', 'x')).toBe('error:TikTok verification is coming later.')
-    expect(norm('threads', 'x')).toBe('error:Threads verification is coming later.')
+  it('rejects unknown platforms', () => {
     expect(norm('myspace', 'x')).toMatch(/^error:/)
+  })
+  it('canonicalizes TikTok, Threads, and Twitch', () => {
+    expect(norm('tiktok', '@Some.User')).toBe('https://www.tiktok.com/@some.user')
+    expect(norm('tiktok', 'some.user')).toBe('https://www.tiktok.com/@some.user')
+    expect(norm('tiktok', 'https://www.tiktok.com/@Some.User?lang=en')).toBe('https://www.tiktok.com/@some.user')
+    expect(norm('tiktok', 'a')).toMatch(/^error:/)
+    expect(norm('threads', 'https://www.threads.net/@Zuck')).toBe('https://www.threads.com/@zuck')
+    expect(norm('threads', 'zuck')).toBe('https://www.threads.com/@zuck')
+    expect(norm('twitch', 'https://twitch.tv/Ninja')).toBe('https://www.twitch.tv/ninja')
+    expect(norm('twitch', 'abc')).toMatch(/^error:/)
+  })
+  it('canonicalizes YouTube channel ids and rejects handles', () => {
+    const id = 'UC' + 'a'.repeat(22)
+    expect(norm('youtube', `https://www.youtube.com/channel/${id}`)).toBe(`https://www.youtube.com/channel/${id}`)
+    expect(norm('youtube', id)).toBe(`https://www.youtube.com/channel/${id}`)
+    expect(norm('youtube', '@somebody')).toMatch(/^error:/)
+    expect(norm('youtube', 'https://evil.example/channel/' + id)).toMatch(/^error:/)
+  })
+  it('canonicalizes Bluesky handles and domains', () => {
+    expect(norm('bluesky', '@Alice.Bsky.Social')).toBe('https://bsky.app/profile/alice.bsky.social')
+    expect(norm('bluesky', 'https://bsky.app/profile/alice.test')).toBe('https://bsky.app/profile/alice.test')
+    expect(norm('bluesky', 'did:plc:' + 'a'.repeat(24))).toBe('https://bsky.app/profile/did:plc:' + 'a'.repeat(24))
+    expect(norm('bluesky', 'not a handle')).toMatch(/^error:/)
+    expect(norm('domain', 'Example.com')).toBe('https://example.com')
+    expect(norm('domain', 'https://www.example.com/page')).toBe('https://www.example.com')
+    expect(norm('domain', 'localhost')).toMatch(/^error:/)
+    expect(norm('domain', '10.0.0.1')).toMatch(/^error:/)
   })
   it('builds profile links and labels', () => {
     expect(profileLinkFor('https://blueyvatar.com/', 'a.example.com')).toBe('https://blueyvatar.com/p/a.example.com')
@@ -193,6 +220,121 @@ describe('Mastodon OAuth', () => {
     expect(mastodonClaimMatches('https://mastodon.social/users/alice', 'https://mastodon.social/@alice')).toBe(true)
     expect(mastodonClaimMatches('https://mastodon.social/@bob', 'https://mastodon.social/@alice')).toBe(false)
     expect(mastodonClaimMatches('https://evil.example/@alice', 'https://mastodon.social/@alice')).toBe(false)
+  })
+})
+
+describe('DNS TXT proof', () => {
+  const did = 'did:plc:alice'
+  it('names the record and accepts the exact proof, including split TXT strings', async () => {
+    expect(dnsProofName('https://example.com')).toBe('_blueyvatar.example.com')
+    let asked = ''
+    const ok: TxtResolver = async (n) => ((asked = n), [['v=spf1'], ['blueyvatar-verify=did:plc:', 'alice']])
+    expect(await verifyDnsTxt('https://example.com', did, ok)).toEqual({ ok: true })
+    expect(asked).toBe('_blueyvatar.example.com')
+  })
+  it('fails for another DID, a missing record, and is inconclusive on resolver errors', async () => {
+    expect(await verifyDnsTxt('https://example.com', did, async () => [['blueyvatar-verify=did:plc:bob']])).toMatchObject({ ok: false })
+    const none: TxtResolver = async () => { throw Object.assign(new Error('x'), { code: 'ENOTFOUND' }) }
+    const r = await verifyDnsTxt('https://example.com', did, none)
+    expect(r).toMatchObject({ ok: false })
+    expect((r as { transient?: boolean }).transient).toBeUndefined()
+    const down: TxtResolver = async () => { throw Object.assign(new Error('x'), { code: 'ESERVFAIL' }) }
+    expect(await verifyDnsTxt('https://example.com', did, down)).toMatchObject({ ok: false, transient: true })
+  })
+})
+
+describe('Bluesky proof', () => {
+  const did = 'did:plc:alice'
+  const prof = (status: number, body: unknown): Fetcher => async (url) => ({ status, url, text: JSON.stringify(body), headers: {} })
+  const uri = 'https://bsky.app/profile/other.test'
+  it('passes for the signed-in account itself, without a bio proof', async () => {
+    expect(await verifyBluesky(uri, did, prof(200, { did, description: '' }))).toEqual({ ok: true, via: 'identity' })
+  })
+  it('passes when the bio holds the proof for this DID only', async () => {
+    expect(await verifyBluesky(uri, did, prof(200, { did: 'did:plc:other', description: `hi blueyvatar-verify=${did}` }))).toEqual({ ok: true, via: 'bio' })
+    expect(await verifyBluesky(uri, did, prof(200, { did: 'did:plc:other', description: 'blueyvatar-verify=did:plc:bob' }))).toMatchObject({ ok: false })
+  })
+  it('reads the public endpoint and separates missing from unavailable', async () => {
+    let seen = ''
+    await verifyBluesky(uri, did, async (u) => ((seen = u), { status: 200, url: u, text: '{}', headers: {} }))
+    expect(seen).toBe('https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=other.test')
+    expect(await verifyBluesky(uri, did, prof(400, {}))).toMatchObject({ ok: false })
+    expect(await verifyBluesky(uri, did, prof(502, {}))).toMatchObject({ ok: false, transient: true })
+  })
+})
+
+describe('OAuth providers', () => {
+  const on = { VERIFY_TIKTOK_ENABLED: 'true', TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's' }
+  it('stay off unless the flag is true and both credentials are set', () => {
+    expect(providerConfig('tiktok', {})).toBeNull()
+    expect(providerConfig('tiktok', { TIKTOK_CLIENT_KEY: 'k', TIKTOK_CLIENT_SECRET: 's' })).toBeNull()
+    expect(providerConfig('tiktok', { ...on, VERIFY_TIKTOK_ENABLED: '1' })).toBeNull()
+    expect(providerConfig('tiktok', { ...on, TIKTOK_CLIENT_SECRET: '' })).toBeNull()
+    expect(providerConfig('tiktok', on)).toEqual({ clientId: 'k', clientSecret: 's' })
+    for (const p of OAUTH_PROVIDERS) expect(providerConfig(p, {})).toBeNull()
+  })
+  it('platform availability and instagram fallback follow the flags', () => {
+    expect(platformAvailable('tiktok', {})).toBe(false)
+    expect(platformAvailable('tiktok', on)).toBe(true)
+    expect(platformAvailable('github', {})).toBe(true)
+    expect(platformAvailable('instagram', {})).toBe(true)
+    expect(methodFor('instagram', {})).toBe('rel-me')
+    expect(methodFor('instagram', { VERIFY_INSTAGRAM_ENABLED: 'true', INSTAGRAM_APP_ID: 'a', INSTAGRAM_APP_SECRET: 'b' })).toBe('instagram-oauth')
+    expect(methodFor('tiktok', {})).toBe('tiktok-oauth')
+  })
+  it('builds authorize URLs with the documented hosts and minimal scopes', () => {
+    const c = { clientId: 'cid', clientSecret: 'sec' }
+    const u = (p: OAuthProvider) => new URL(providerAuthorizeUrl(p, c, 'https://b.test/cb', 'st'))
+    expect(u('tiktok').origin + u('tiktok').pathname).toBe('https://www.tiktok.com/v2/auth/authorize/')
+    expect(u('tiktok').searchParams.get('client_key')).toBe('cid')
+    expect(u('tiktok').searchParams.get('scope')).toBe('user.info.profile')
+    expect(u('threads').origin + u('threads').pathname).toBe('https://threads.com/oauth/authorize')
+    expect(u('threads').searchParams.get('scope')).toBe('threads_basic')
+    expect(u('instagram').origin + u('instagram').pathname).toBe('https://www.instagram.com/oauth/authorize')
+    expect(u('instagram').searchParams.get('scope')).toBe('instagram_business_basic')
+    expect(u('youtube').searchParams.get('scope')).toBe('https://www.googleapis.com/auth/youtube.readonly')
+    expect(u('twitch').origin + u('twitch').pathname).toBe('https://id.twitch.tv/oauth2/authorize')
+    for (const p of OAUTH_PROVIDERS) expect(u(p).searchParams.get('state')).toBe('st')
+  })
+  const c = { clientId: 'cid', clientSecret: 'sec' }
+  const routes = (map: Record<string, unknown>) =>
+    (async (url: string) => {
+      const hit = Object.keys(map).find((k) => String(url).startsWith(k))
+      return hit ? Response.json(map[hit]) : new Response('{}', { status: 404 })
+    }) as unknown as typeof fetch
+  it('reads the account from each provider and keeps no token', async () => {
+    expect(await providerIdentities('tiktok', c, 'code', 'https://b/cb', routes({
+      'https://open.tiktokapis.com/v2/oauth/token/': { access_token: 't', open_id: 'o' },
+      'https://open.tiktokapis.com/v2/user/info/': { data: { user: { username: 'Alice' } } },
+    }))).toEqual(['Alice'])
+    expect(await providerIdentities('threads', c, 'code', 'https://b/cb', routes({
+      'https://graph.threads.com/oauth/access_token': { access_token: 't' },
+      'https://graph.threads.com/v1.0/me': { id: '1', username: 'alice' },
+    }))).toEqual(['alice'])
+    expect(await providerIdentities('instagram', c, 'code', 'https://b/cb', routes({
+      'https://api.instagram.com/oauth/access_token': { access_token: 't', user_id: 1 },
+      'https://graph.instagram.com/v27.0/me': { data: [{ user_id: '1', username: 'alice' }] },
+    }))).toEqual(['alice'])
+    expect(await providerIdentities('youtube', c, 'code', 'https://b/cb', routes({
+      'https://oauth2.googleapis.com/token': { access_token: 't' },
+      'https://www.googleapis.com/youtube/v3/channels': { items: [{ id: 'UC1' }, { id: 'UC2' }] },
+    }))).toEqual(['UC1', 'UC2'])
+    expect(await providerIdentities('twitch', c, 'code', 'https://b/cb', routes({
+      'https://id.twitch.tv/oauth2/token': { access_token: 't' },
+      'https://api.twitch.tv/helix/users': { data: [{ login: 'alice' }] },
+    }))).toEqual(['alice'])
+  })
+  it('returns nothing when the exchange or lookup fails or throws', async () => {
+    expect(await providerIdentities('tiktok', c, 'code', 'https://b/cb', routes({}))).toEqual([])
+    expect(await providerIdentities('twitch', c, 'code', 'https://b/cb', (async () => { throw new Error('net') }) as unknown as typeof fetch)).toEqual([])
+  })
+  it('matches names case-insensitively and YouTube channel ids exactly', () => {
+    expect(providerClaimMatches('tiktok', ['Alice'], 'https://www.tiktok.com/@alice')).toBe(true)
+    expect(providerClaimMatches('tiktok', ['bob'], 'https://www.tiktok.com/@alice')).toBe(false)
+    expect(providerClaimMatches('threads', [], 'https://www.threads.com/@alice')).toBe(false)
+    const id = 'UC' + 'a'.repeat(22)
+    expect(providerClaimMatches('youtube', ['x', id], `https://www.youtube.com/channel/${id}`)).toBe(true)
+    expect(providerClaimMatches('youtube', [id.toLowerCase()], `https://www.youtube.com/channel/${id}`)).toBe(false)
   })
 })
 
