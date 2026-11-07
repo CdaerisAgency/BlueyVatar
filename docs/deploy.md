@@ -122,7 +122,7 @@ Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message 
 
 ## Cloudflare
 
-DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing else from Cloudflare is used.
+DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1), plus Email Routing (see Email routing below).
 
 1. Add the zone. Point the web hostname and the delivery hostname at their Fly apps with proxied (orange cloud) CNAME records: `blueyvatar-web.fly.dev` and `blueyvatar-delivery.fly.dev`. Set SSL/TLS mode to Full (strict). Approved hostnames: `blueyvatar.com` (web), `img.blueyvatar.com` (delivery), `profiles.blueyvatar.com` (SaaS fallback origin).
 2. Fly certificates. Add each hostname to its app: `fly certs add <hostname> --app <app>`, then `fly certs show` to read the records Fly needs. For a Cloudflare-proxied hostname, Fly's docs say to add the `_fly-ownership` TXT record, after which Fly can issue the certificate through the proxy with the HTTP-01 challenge (this can still fail, depending on configuration). If the HTTP-01 challenge is blocked, add the `_acme-challenge` CNAME shown by `fly certs setup` for DNS-01, or import a Cloudflare Origin Certificate. Use Full or Full (strict); Flexible can cause redirect loops. Source: <https://docs.fly.io/networking/custom-domain>.
@@ -139,6 +139,16 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing
    Findings (checked 2026-11-03): Transform Rules, including request header rules, are available to all plans, with 10 active rules and no regex on Free (<https://developers.cloudflare.com/rules/transform/>). A rule can set a static header; names starting with `cf-` or `x-cf-` are reserved (<https://developers.cloudflare.com/rules/transform/request-header-modification/>). Dashboard steps: <https://developers.cloudflare.com/rules/transform/request-header-modification/create-dashboard/>. Authenticated Origin Pulls is listed as available on Free (<https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/>), but it was not evaluated against Fly's proxy, so the header is used.
 6. Cloudflare for SaaS (custom profile domains, Plus plan). Set the fallback origin to the web app's hostname, `profiles.blueyvatar.com`, proxied to `blueyvatar-web.fly.dev`, and give it a Fly certificate (step 2). Set `CF_SAAS_FALLBACK_ORIGIN` to that hostname. See `docs/research/decisions-phase2-v1.md` (Decision 2).
 7. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
+
+## Email routing
+
+Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It receives and forwards only; it does not send mail.
+
+- Addresses: `security@blueyvatar.com` (the vulnerability contact in `SECURITY.md`) and `alerts@blueyvatar.com`. Each has its own routing rule.
+- Destination: `chris@cdaeris.com`. Cloudflare sends a verification email to a new destination address, and rules cannot forward to it until that link is clicked.
+- DNS: Email Routing adds the MX records (`route1`, `route2`, `route3.mx.cloudflare.net`), the SPF TXT record `v=spf1 include:_spf.mx.cloudflare.net ~all`, and a DKIM record at `cf2024-1._domainkey`. Do not add other MX records or a second SPF record for the apex; a domain can publish only one SPF record.
+- Token: the API token used for setup is in Infisical project `blueyvatar`, environment `dev`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
+- To add an address: `POST /zones/{zone_id}/email/routing/rules` with a `literal` matcher on `to` and a `forward` action. To add a destination: `POST /accounts/{account_id}/email/routing/addresses`. Docs: <https://developers.cloudflare.com/email-routing/>.
 
 ## CDN cache warming
 
@@ -192,6 +202,22 @@ Keep them in Infisical and push them with `fly secrets set --app <web app>`. The
 - **Plus.** Plus is $9.99 per month, approved by the owner. A DID has Plus while it holds a Plus subscription that is `active`, `trialing`, or `past_due` inside the same 7 day grace period, or while it is listed in `PLUS_DIDS`. `PLUS_DIDS` stays as a manual grant for testing and gifts and needs no subscription. The web app and delivery both read the subscription, so the gallery, extra avatar slots, and custom domain follow a purchase within a webhook delivery. A person can hold one Plus subscription and one developer subscription at the same time.
 - **Overage.** Metered overage is not billed yet. It needs the per-miss cost measured after deploy, then a metered price and usage reporting.
 
+## Verified account providers
+
+Issue #58. Research and per-platform status: `docs/research/verified-accounts-v1.md`. Set these on the **web** app only (the indexer's re-check needs no provider keys). Every provider is off until its flag is exactly `true` and both credentials are set, so a platform whose app review is not finished stays hidden on the claims page. The redirect (callback) URL to register with every provider is `https://<PUBLIC_URL host>/account/claims/callback`. Values live in Infisical and are pushed with `fly secrets set --app blueyvatar-web`; never commit them.
+
+| Platform | Flag | App id | App secret | Review step before you switch it on |
+| --- | --- | --- | --- | --- |
+| Instagram (Business and Creator accounts) | `VERIFY_INSTAGRAM_ENABLED` | `INSTAGRAM_APP_ID` | `INSTAGRAM_APP_SECRET` | Meta Advanced Access (App Review and Business Verification) for `instagram_business_basic` |
+| Threads | `VERIFY_THREADS_ENABLED` | `THREADS_APP_ID` | `THREADS_APP_SECRET` | Meta App Review for `threads_basic`, and the app must be published |
+| TikTok | `VERIFY_TIKTOK_ENABLED` | `TIKTOK_CLIENT_KEY` | `TIKTOK_CLIENT_SECRET` | Submit the app for review in the TikTok developer portal (scope `user.info.profile`) |
+| YouTube | `VERIFY_YOUTUBE_ENABLED` | `GOOGLE_CLIENT_ID` | `GOOGLE_CLIENT_SECRET` | Google OAuth verification for the `youtube.readonly` scope; until then Google caps the number of accounts that can grant access |
+| Twitch | `VERIFY_TWITCH_ENABLED` | `TWITCH_CLIENT_ID` | `TWITCH_CLIENT_SECRET` | None found. Register the app with a Twitch account that has two-factor authentication on |
+
+GitHub keeps `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`. Mastodon needs no keys (the app registers itself per instance). A claim on **Domain** (TXT record `_blueyvatar.<domain>` with the value `blueyvatar-verify=<DID>`) or **Bluesky** (own account, or the same proof text in the other account's bio) needs no keys either. With the Instagram flag off, Instagram claims use the rel="me" page check.
+
+Migration `0018_verified_accounts_providers.sql` widens the `verification_state.provider` check. Run it before switching any provider on. The re-verification job runs the DNS and Bluesky proofs again. For provider claims the token is not kept, so it re-checks only that the account page still exists (404 or 410 fails; other statuses are inconclusive).
+
 ## Infisical secrets
 
 Infisical stays the secret store. The team uses only the `prod` environment, so staging values sit there with a `STAGING_` prefix (for example `STAGING_DATABASE_URL`) and production values use the plain names from the table below. Staging and production never share a database URL, session secret, origin secret, Tap password, or OAuth key. Push values to Fly with `fly secrets set --app <app>` (or an Infisical sync, steps not verified here). Names match `.env.example`. Non-secret settings live in `fly/*.toml` `[env]`.
@@ -200,7 +226,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `SENTRY_DSN`, `METRICS_TOKEN` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; optional `SENTRY_DSN`, `METRICS_TOKEN` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; optional `SENTRY_DSN`, `METRICS_TOKEN` |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `SENTRY_DSN` and `METRICS_TOKEN` are new secrets (see Observability). `SENTRY_DSN` can be the same project DSN on all three apps, since events are tagged with `app`. `METRICS_TOKEN` should differ per app. Staging uses `STAGING_SENTRY_DSN` and `STAGING_METRICS_TOKEN`, ideally pointing at a separate Sentry project or environment. Non-secret tuning values (`LOG_LEVEL`, `READY_TIMEOUT_MS`, `INDEXER_STALL_SECONDS`, `TAP_PROBE_INTERVAL_SECONDS`, `HEALTH_PORT`) are listed in `.env.example` and can go in `fly/*.toml` `[env]`.

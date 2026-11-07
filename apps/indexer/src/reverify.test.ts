@@ -195,6 +195,29 @@ describe('makeVerifier', () => {
   })
 })
 
+describe('makeVerifier, proofs and provider claims', () => {
+  const pub = 'https://blueyvatar.test'
+  it('dns-txt re-runs the TXT check for the claim owner', async () => {
+    const c = claim({ method: 'dns-txt', claimUri: 'https://example.com', did: 'did:plc:u1' })
+    expect(await makeVerifier(pub, fetcher(200), async () => [['blueyvatar-verify=did:plc:u1']])(c)).toEqual({ ok: true })
+    expect(await makeVerifier(pub, fetcher(200), async () => [])(c)).toMatchObject({ ok: false })
+  })
+  it('bsky-proof re-reads the public profile', async () => {
+    const c = claim({ method: 'bsky-proof', claimUri: 'https://bsky.app/profile/x.test', did: 'did:plc:u1' })
+    expect(await makeVerifier(pub, fetcher(200, JSON.stringify({ did: 'did:plc:z', description: 'blueyvatar-verify=did:plc:u1' })))(c)).toEqual({ ok: true })
+    expect(await makeVerifier(pub, fetcher(200, JSON.stringify({ did: 'did:plc:z', description: '' })))(c)).toMatchObject({ ok: false })
+    expect(await makeVerifier(pub, fetcher(500))(c)).toMatchObject({ transient: true })
+  })
+  it('provider claims check the public page: only gone fails', async () => {
+    for (const m of ['instagram-oauth', 'threads-oauth', 'tiktok-oauth', 'youtube-oauth', 'twitch-oauth']) {
+      const c = claim({ method: m, claimUri: 'https://www.twitch.tv/alice' })
+      expect(await makeVerifier(pub, fetcher(200))(c)).toEqual({ ok: true })
+      expect(await makeVerifier(pub, fetcher(404))(c)).toMatchObject({ ok: false })
+      expect((await makeVerifier(pub, fetcher(403))(c)) as { transient?: boolean }).toMatchObject({ transient: true })
+    }
+  })
+})
+
 describe('emailNotice', () => {
   it('sends one message when an address exists, and nothing when it does not', async () => {
     const sent: { to: string; subject: string; text: string }[] = []

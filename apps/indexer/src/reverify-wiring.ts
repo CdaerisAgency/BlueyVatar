@@ -1,20 +1,22 @@
 import {
-  attestationWriterFromEnv, decryptJson, emailSender, mastodonClaimMatches, parseMastodonUri, profileLinkFor, safeFetch, verifyRelMe,
-  type EmailSender, type Fetcher, type VerifyOutcome,
+  attestationWriterFromEnv, decryptJson, emailSender, mastodonClaimMatches, parseMastodonUri, profileLinkFor, safeFetch, verifyBluesky, verifyDnsTxt, verifyRelMe,
+  type EmailSender, type Fetcher, type TxtResolver, type VerifyOutcome,
 } from '@blueyvatar/core/verification'
 import type pg from 'pg'
 import type { DueClaim, OnRevoked, Verifier } from './reverify.js'
 import { errors, log } from './obs.js'
 
 const GITHUB_LOGIN = /^https:\/\/github\.com\/([A-Za-z\d-]{1,39})$/
+const OAUTH_METHODS = new Set(['instagram-oauth', 'threads-oauth', 'tiktok-oauth', 'youtube-oauth', 'twitch-oauth'])
 const transient = (reason: string): VerifyOutcome => ({ ok: false, reason, transient: true })
 
 /**
  * The same checks as the claims page, as far as they can run without the user present.
  * rel="me" claims re-run the identical reciprocal-link check. OAuth claims cannot be re-run
  * (the token is not kept), so they re-check that the account still exists at the claimed address.
+ * dns-txt and bsky-proof claims re-run the same proof check as the claims page.
  */
-export function makeVerifier(publicUrl: string, f: Fetcher = safeFetch): Verifier {
+export function makeVerifier(publicUrl: string, f: Fetcher = safeFetch, txt?: TxtResolver): Verifier {
   return async (c: DueClaim): Promise<VerifyOutcome> => {
     try {
       if (c.method === 'rel-me') {
@@ -37,6 +39,17 @@ export function makeVerifier(publicUrl: string, f: Fetcher = safeFetch): Verifie
         let url: unknown
         try { url = (JSON.parse(r.text) as { url?: unknown }).url } catch { return transient('The instance returned an unreadable answer.') }
         return typeof url === 'string' && mastodonClaimMatches(url, c.claimUri) ? { ok: true } : { ok: false, reason: 'The Mastodon account moved or no longer matches.' }
+      }
+      if (c.method === 'dns-txt') return await verifyDnsTxt(c.claimUri, c.did, txt)
+      if (c.method === 'bsky-proof') {
+        const r = await verifyBluesky(c.claimUri, c.did, f)
+        return r.ok ? { ok: true } : r
+      }
+      if (OAUTH_METHODS.has(c.method)) {
+        // The token is not kept, so only the account's public page can be re-checked. Only "gone" (404 or 410) fails.
+        const r = await f(c.claimUri, { maxBytes: 200_000 })
+        if (r.status >= 200 && r.status < 300) return { ok: true }
+        return r.status === 404 || r.status === 410 ? { ok: false, reason: 'The account no longer exists at that address.' } : transient(`The platform answered with status ${r.status}.`)
       }
       return transient(`Unknown verification method "${c.method}".`)
     } catch {
