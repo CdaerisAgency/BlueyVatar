@@ -7,7 +7,7 @@ import { PLATFORM_LABELS } from '../../../lib/claims'
 import { resolvePlan } from '../../../lib/plan'
 import { getDomainStore } from '../../../lib/domain-store'
 import { jsonLdString, personJsonLd, profileCanonical } from '../../../lib/seo'
-import { pageAtprotoApps, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
+import { pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
@@ -48,13 +48,17 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const links = pageLinks(p)
   const apps = pageAtprotoApps(p)
   const interests = pageInterests(p)
+  const colors = pageColors(p)
   const gallery = pageGallery(p, (await resolvePlan(p.did)) === 'plus')
   const jsonLd = jsonLdString(personJsonLd(p, await canonicalFor(p, handle), PUBLIC_DELIVERY_URL))
   const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
   return (
     <PageMain narrow>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <div className="flex flex-col items-center text-center [&_p]:mb-2">
+      <div
+        className={`flex flex-col items-center text-center [&_p]:mb-2${colors ? ' rounded-bv-card border-[1.5px] border-solid border-bv-line px-4 py-8 [&_a]:text-inherit [&_a:hover]:text-inherit [&_p]:text-inherit' : ''}`}
+        {...(colors ? { style: { backgroundColor: colors.background, color: colors.text } } : {})}
+      >
         {p.avatar && <AvatarRing src={`${DELIVERY_URL}${p.avatar.url}`} alt="" size={380} referrerPolicy="no-referrer" />}
         <h1 className="mt-5 mb-2">{p.displayName ?? p.handle}</h1>
         {p.pronouns && <p>{p.pronouns}</p>}

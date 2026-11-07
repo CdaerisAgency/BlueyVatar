@@ -278,6 +278,21 @@ describe('delivery API', () => {
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
   })
 
+  it('returns backgroundColor in the profile JSON, null when unset or malformed', async () => {
+    const { app, deps } = setup()
+    expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBeNull()
+    const record = (own: Record<string, unknown>) => {
+      const base = deps.resolver.getRecord
+      deps.resolver.getRecord = async (i, collection, rkey) => (collection === 'com.blueyvatar.profile' ? own : base(i, collection, rkey))
+    }
+    record({ backgroundColor: '#1F4E9B' })
+    expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBe('#1f4e9b')
+    for (const bad of ['red', '#fff', 'url(javascript:1)', 7]) {
+      record({ backgroundColor: bad })
+      expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBeNull()
+    }
+  })
+
   it('lists detected atproto apps in the profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
