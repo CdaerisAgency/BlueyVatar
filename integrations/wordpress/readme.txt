@@ -1,5 +1,4 @@
 === BlueyVatar Avatars ===
-Contributors: cdaerisagency
 Tags: avatar, gravatar, privacy, avatars, comments
 Requires at least: 5.8
 Tested up to: 6.8

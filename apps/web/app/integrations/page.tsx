@@ -21,7 +21,7 @@ export default function IntegrationsPage() {
       <p>Guides for putting avatars on a site you run. Each uses the SHA-256 hash route, a default image with <code>d=</code>, and a no-referrer policy.</p>
       <ul aria-label="Integration guides">
         <li><a href="/docs/integrations-html">Plain HTML</a></li>
-        <li><a href="/docs/integrations-wordpress">WordPress</a> (plugin source in the repository, not yet in the wordpress.org directory)</li>
+        <li><a href="/docs/integrations-wordpress">WordPress</a> (plugin source in the repository, distributed as a GitHub release)</li>
         <li><a href="/docs/integrations-ghost">Ghost</a></li>
         <li><a href="/docs/integrations-discourse">Discourse</a></li>
       </ul>

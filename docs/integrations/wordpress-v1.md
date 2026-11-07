@@ -1,6 +1,6 @@
 # WordPress (v1)
 
-The plugin in `integrations/wordpress/` points WordPress avatars at a BlueyVatar delivery host. This page covers install, settings, how it works, the license, and the steps to submit it to the wordpress.org directory later. The plugin has not been submitted.
+The plugin in `integrations/wordpress/` points WordPress avatars at a BlueyVatar delivery host. This page covers install, settings, how it works, the license, and distribution. The plugin is not in the wordpress.org directory.
 
 ## Install
 
@@ -36,18 +36,11 @@ The plugin is licensed Apache-2.0, an owner decision. Checked against the offici
 
 - The wordpress.org [Detailed Plugin Guidelines](https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/), guideline 1, says any GPL-compatible license is acceptable and strongly recommends GPLv2 or later. It does not name Apache-2.0.
 - The FSF [license list](https://www.gnu.org/licenses/license-list.html) says Apache-2.0 is compatible with version 3 of the GNU GPL and is not compatible with GPL version 2.
-- WordPress itself is GPLv2 or later, which includes GPLv3, so Apache-2.0 code can be combined with it under GPLv3. That is the reasoning for acceptance. Whether the Plugin Review Team accepts Apache-2.0 is not confirmed by any page. Before submitting, ask plugins@wordpress.org.
+- WordPress itself is GPLv2 or later, which includes GPLv3, so Apache-2.0 code can be combined with it under GPLv3. That is the reasoning for acceptance. Whether the Plugin Review Team accepts Apache-2.0 is not confirmed by any page. Before any directory submission, ask plugins@wordpress.org.
 - If the directory requires GPLv2 or later, the plugin header and `readme.txt` would change to `GPL-2.0-or-later`. Until the owner decides otherwise, they say `Apache-2.0`.
 
-## Submit to wordpress.org later
+## Distribution
 
-Do these only after the owner approves a submission and settles the license question above. Nothing here has been done. Steps come from the [Planning, submitting, and maintaining plugins](https://developer.wordpress.org/plugins/wordpress-org/planning-submitting-and-maintaining-plugins/) page and the [SVN guide](https://developer.wordpress.org/plugins/wordpress-org/how-to-use-subversion/).
-
-1. Create a WordPress.org account with an address the owner reads, and allow mail from plugins@wordpress.org.
-2. Confirm the `Contributors:` line in `readme.txt` names the owner's wordpress.org username. It holds a placeholder today.
-3. Zip the plugin folder, ready to install. Submit it with a short description through the developer submission form linked from the planning page.
-4. The review team reviews the code within 14 business days and emails about any issue. Fix and reply.
-5. After approval, an email gives access to an SVN repository. Check it out, copy the plugin files into `trunk/` with the main file directly in `trunk/`, and commit. Put screenshots and icons in `/assets`.
-6. Tag each release with `svn cp trunk tags/0.1.0`, commit, and set `Stable tag` in `trunk/readme.txt` to match.
+For now the plugin is distributed as a GitHub release only. Zip the `integrations/wordpress` folder as `blueyvatar-avatars.zip`, attach it to a release, and install it with Plugins, Add New, Upload Plugin. Publishing to the wordpress.org directory is tracked in a separate issue and has not been started. When it is, start from the [plugin submission guide](https://developer.wordpress.org/plugins/wordpress-org/planning-submitting-and-maintaining-plugins/) and settle the license question above first.
 
 Spec reference: section 1 (assumption 4) and section 3 row 8.
