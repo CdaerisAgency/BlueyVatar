@@ -28,16 +28,20 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `invalid_format` | 400 | `fmt` is not `png`, `jpeg`, or `webp`. |
 | `invalid_quality` | 400 (404 on `/img`) | `q` is not an integer from 1 to 100. On `/img`, a `-q` value outside 1 to 100 returns this code with status 404. |
 | `invalid_ttl` | 400 | `ttl` is not `<n>h` or `<n>d` within 1h to 28d. |
+| `invalid_platform` | 400 | `to` on `/qr` is not a lowercase platform name such as `github`. |
 | `invalid_key` | 401 | Unknown API key, or a secret key sent outside the `x-api-key` header. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
 | `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |
+| `invalid_signature` | 403 | An `/img` path is unsigned, or its signature does not match the file name. Fetch the avatar again through `/avatar` or `/u`. |
+| `signature_expired` | 403 | A signed `/img` path for a restricted avatar is past its day bucket. Fetch the avatar again. |
 | `not_found` | 404 | No such image, profile, or route target. Also returned for `d=404` with no avatar, for hidden profiles, and on `/img` when the user's PDS answers 404 for the original blob. |
 | `rate_limited` | 429 | Anonymous daily limit (100 per IP) or Free keyed daily limit (1,000) reached. |
 | `upstream_error` | 502 | The image could not be fetched or processed. On `/img` this covers PDS 5xx responses, timeouts, network errors, an unusable PDS endpoint, and bytes that do not match the CID. |
 | `internal` | 500 | An unhandled server fault. |
+| `not_ready` | 503 | `GET /readyz` only: a dependency check (Postgres) failed or timed out. Not returned by avatar or profile routes. |
 
 Unhandled server faults return `500` with code `internal` in the same JSON shape. Treat 5xx as transient and retry with backoff. Hidden profiles return `not_found`, the same as an unknown profile, so a lookup cannot reveal that a profile exists.
 

@@ -27,6 +27,9 @@ export function SiteNav() {
           <Link href="/#dev" className={link}>
             {COPY.nav.developers}
           </Link>
+          <Link href="/docs" className={link}>
+            {COPY.nav.docs}
+          </Link>
           <Link href="/pricing" className={link}>
             {COPY.nav.pricing}
           </Link>

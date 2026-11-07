@@ -1,0 +1,21 @@
+{
+  "name": "@blueyvatar/loadtest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "node --check src/guard.mjs && node --check src/stats.mjs && node --check src/sampler.mjs && node --check src/seed.mjs && node --check src/local-server.mjs && node --check src/run.mjs && node --check src/bench-rate.mjs",
+    "test": "node --test src/guard.test.mjs src/stats.test.mjs",
+    "seed": "node src/seed.mjs",
+    "local-server": "node src/local-server.mjs",
+    "run": "node src/run.mjs",
+    "bench-rate": "node src/bench-rate.mjs"
+  },
+  "dependencies": {
+    "@blueyvatar/core": "workspace:*",
+    "@blueyvatar/delivery": "workspace:*",
+    "@hono/node-server": "2.1.6",
+    "pg": "8.23.1",
+    "sharp": "0.35.5"
+  }
+}
