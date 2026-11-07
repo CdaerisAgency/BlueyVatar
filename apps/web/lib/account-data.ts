@@ -28,7 +28,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q('SELECT rkey, platform, uri, record, indexed_at FROM claims WHERE did = $1 ORDER BY rkey'),
     q('SELECT uri, claim_rkey, result, method, created_at FROM attestations WHERE claim_did = $1 ORDER BY created_at'),
     q('SELECT keyed_only, domain_allowlist, hidden_profile, email_lookup_opt_out, updated_at FROM visibility_rules WHERE did = $1'),
-    q('SELECT license_id, tier, status, term, attribution_required, entitlements, grace_ends_at, created_at FROM licenses WHERE owner = $1 ORDER BY created_at'),
+    q('SELECT license_id, tier, status, term, entitlements, grace_ends_at, created_at FROM licenses WHERE owner = $1 ORDER BY created_at'),
     q('SELECT k.prefix, k.kind, k.label, k.domains, k.created_at, k.revoked_at FROM api_keys k JOIN licenses l ON l.license_id = k.license_id WHERE l.owner = $1 ORDER BY k.created_at'),
     q('SELECT hostname, status, created_at, verified_at FROM custom_domains WHERE did = $1'),
     q('SELECT stripe_customer_id, created_at FROM billing_customers WHERE did = $1'),

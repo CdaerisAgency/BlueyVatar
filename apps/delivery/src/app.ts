@@ -13,6 +13,7 @@ import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock, secretsEqual } from './origin.js'
+import { openApiDocument } from './openapi.js'
 import { BlobError } from './blob.js'
 import { ResizeBusyError, type Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -291,6 +292,12 @@ export function createApp(deps: AppDeps) {
 
   // Liveness: the process answers. Readiness: Postgres answers within the time budget.
   app.get('/healthz', (c) => c.text('ok'))
+
+  // Machine-readable API description (issue #142). Public, no key, no metering.
+  app.get('/openapi.json', (c) => {
+    c.header('cache-control', 'public, max-age=3600')
+    return c.json(openApiDocument)
+  })
 
   app.get('/readyz', async (c) => {
     if (deps.ready) {
