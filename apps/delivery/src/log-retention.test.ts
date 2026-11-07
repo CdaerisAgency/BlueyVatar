@@ -27,7 +27,7 @@ describe.skipIf(!url)('log retention purge', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0015_billing.sql', '0012_reports.sql', '0019_log_retention.sql']) await pool.query(read(f))
+    for (const f of ['0001_init.sql', '0015_billing.sql', '0012_reports.sql', '0020_log_retention.sql']) await pool.query(read(f))
   }, 60_000)
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)

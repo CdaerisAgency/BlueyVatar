@@ -368,7 +368,7 @@ A 5 GB cap therefore never bites below about 185,000 origin requests per day, so
 
 Delivery runs `enforceLogRetention` (`apps/delivery/src/log-retention.ts`) a minute after start and then daily:
 
-- `reports.ip_hash` is set to NULL once a report is older than the age limit. The report row stays, because it records a takedown decision and holds no request data. The hash only drives the per-IP report rate limit, which looks back far less than 90 days. Migration 0019 drops the NOT NULL constraint for this.
+- `reports.ip_hash` is set to NULL once a report is older than the age limit. The report row stays, because it records a takedown decision and holds no request data. The hash only drives the per-IP report rate limit, which looks back far less than 90 days. Migration 0020 drops the NOT NULL constraint for this.
 - `stripe_events` rows (processed webhook event ids) older than the age limit are deleted. Stripe stops retrying a webhook within days, so a 90 day idempotency window is ample.
 - Size cap: if the live bytes of those two (event rows plus kept IP hashes) exceed `LOG_RETENTION_MAX_GB`, the oldest rows across both go first, in batches of 1,000, until the total fits.
 - `rate_windows` is already cleaned hourly by `rate-cleanup.ts` once its window ends (minutes), well inside the policy.
