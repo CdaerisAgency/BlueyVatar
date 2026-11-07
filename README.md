@@ -85,4 +85,4 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
 - [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.
 - [ ] Lexicons: clear the `com.blueyvatar` namespace and publish the schemas under `_lexicon.blueyvatar.com`.
-- [ ] Billing: choose the payment processor, tax handling, and invoicing (open item in spec section 13).
+- [x] Billing: Stripe Checkout, Customer Portal, and a signed webhook (spec section 12.1). Follow-up: a Plus price, the overage rate, and the Stripe dashboard setup in docs/deploy.md.

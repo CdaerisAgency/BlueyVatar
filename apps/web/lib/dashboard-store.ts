@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { ENTITLEMENTS, type Tier } from '@blueyvatar/core'
+import { ENTITLEMENTS, effectiveTier, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
 import type { KeyKind } from './keys'
 import { getPool } from './store'
@@ -11,6 +11,8 @@ export interface LicenseRow {
   tier: Tier
   status: 'active' | 'past_due' | 'suspended' | 'canceled'
   term: 'monthly' | 'annual'
+  /** Set while past due. After this instant `tier` already reads as Free. */
+  graceEndsAt?: Date | null
 }
 
 export interface KeyRow {
@@ -133,9 +135,10 @@ async function inTx<T>(pool: pg.Pool, did: string, fn: (c: pg.PoolClient) => Pro
 
 function postgres(pool: pg.Pool): DashboardStore {
   const readLicense = async (q: { query: pg.Pool['query'] }, did: string): Promise<LicenseRow | undefined> => {
-    const r = await q.query('SELECT license_id, owner, tier, status, term FROM licenses WHERE owner = $1 ORDER BY created_at LIMIT 1', [did])
+    const r = await q.query('SELECT license_id, owner, tier, status, term, grace_ends_at FROM licenses WHERE owner = $1 ORDER BY created_at LIMIT 1', [did])
     const x = r.rows[0]
-    return x && { licenseId: x.license_id, owner: x.owner, tier: x.tier, status: x.status, term: x.term }
+    // A past-due license reads as Free once its grace period ends, with no webhook needed (spec section 12).
+    return x && { licenseId: x.license_id, owner: x.owner, tier: effectiveTier({ tier: x.tier, status: x.status, graceEndsAt: x.grace_ends_at }, new Date()), status: x.status, term: x.term, graceEndsAt: x.grace_ends_at }
   }
   return {
     async ensureLicense(did) {

@@ -133,6 +133,40 @@ After an avatar changes (an image record upsert, or a Bluesky profile change, wh
 
 Reports from the public form land in the `reports` table (status `open`). Review them with SQL, for example `SELECT id, target_did, reason, details, created_at FROM reports WHERE status = 'open' ORDER BY created_at`. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. To take down a reported account, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`; it blocks all of the account's images, purges them, and records who and why on the report. To block one image, use the steps below. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
 
+## Stripe billing
+
+Stripe is the payment processor (issue #67). The web app sells Pro ($9 per month) and Business ($49 per month) through Checkout and manages them through the Customer Portal. Until all four variables below are set, `/account/billing` says billing is unavailable, no Stripe call is made, and `/api/stripe/webhook` answers 503 naming the missing variables. Use a Stripe test-mode account first, then repeat the steps in live mode.
+
+### Environment variables (web app)
+
+| Variable | Value |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Secret or restricted API key (`sk_...` or `rk_...`). A restricted key needs write on Checkout Sessions, Customer portal sessions, and Customers. |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret (`whsec_...`) of the webhook endpoint created in step 5. |
+| `STRIPE_PRICE_PRO` | Price id (`price_...`) of the Pro monthly price. |
+| `STRIPE_PRICE_BUSINESS` | Price id (`price_...`) of the Business monthly price. |
+
+Keep them in Infisical and push them with `fly secrets set --app <web app>`. They are never committed. `PUBLIC_URL` must be `https://blueyvatar.com` in production, since Checkout and portal return URLs are built from it.
+
+### Dashboard steps
+
+1. **Products and prices.** Create two products, "blueyvatar Pro" and "blueyvatar Business". Give each one recurring monthly price in USD: $9.00 for Pro and $49.00 for Business, with tax behavior set to Exclusive (tax is added on top). Copy each price id into `STRIPE_PRICE_PRO` and `STRIPE_PRICE_BUSINESS`. The Plus user plan has no price and is not sold.
+2. **Stripe Tax.** Settings, Tax: set the business head office address, add the registrations where tax must be collected, and set the default product tax category to "Software as a service (SaaS)" or the category counsel confirms. Checkout sends `automatic_tax` and collects the billing address and optional tax ID, so tax is computed per customer.
+3. **Invoices.** Settings, Billing, Invoices: set the business name, address, support email, and invoice footer, and turn on customer emails for receipts and invoices. Stripe Billing creates an invoice for every subscription payment, with tax shown.
+4. **Customer Portal.** Settings, Billing, Customer portal: enable payment method updates, invoice history, and subscription cancellation (at period end). Enable "Customers can switch plans" and add both products so Pro and Business can switch between each other. Set the business information and the return link to `https://blueyvatar.com/account/billing`. Save the default configuration.
+5. **Webhook endpoint.** Developers, Webhooks, Add endpoint with the URL `https://blueyvatar.com/api/stripe/webhook`. Subscribe it to exactly these events and no others: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`. For local testing, run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the secret it prints.
+6. **Payment retries.** Settings, Billing, Subscriptions and emails: use Smart Retries and email customers about failed payments. Set "If all retries for a payment fail" to cancel the subscription, and keep the retry window within the 7 day grace period below.
+7. **Migration.** Migration 0015 (billing tables and `licenses.grace_ends_at`) runs with the delivery release command. Deploy delivery first, then web.
+8. **Smoke test in test mode.** Subscribe with card 4242 4242 4242 4242, confirm the license shows Pro on `/account/keys`, cancel in the portal, and confirm it returns to Free. Use card 4000 0000 0000 0341 to see a failed renewal move the license to past due.
+
+### Behavior to know
+
+- **Webhook handling.** The endpoint verifies the signature against the raw request body (a 5 minute timestamp tolerance), then applies the event in one database transaction that also records the event id in `stripe_events`. A redelivery changes nothing. If an event cannot be applied (for example a subscription arrives before its customer is linked), the endpoint answers 500 and Stripe retries. Check Developers, Webhooks, Event deliveries for failures.
+- **Tier mapping.** `active` and `trialing` subscriptions give the price's tier. `past_due` keeps the tier during the grace period. `unpaid`, `canceled`, `incomplete`, `incomplete_expired`, and `paused` give Free. Enterprise licenses are contracts and billing never changes them. A price id that is neither `STRIPE_PRICE_PRO` nor `STRIPE_PRICE_BUSINESS` is ignored.
+- **Grace period (proposal for the owner).** `PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts` is 7. A license that goes past due keeps its paid tier for 7 days from the first failed payment, then serves at Free limits. Delivery and the dashboard evaluate the expiry on every read, so no webhook is needed. Data, avatars, and profiles are never deleted. The owner has not approved the number yet.
+- **Plus.** There is no Plus price in the spec, so Plus stays on the `PLUS_DIDS` list until one is decided.
+- **Overage.** Metered overage is not billed yet. It needs the per-miss cost measured after deploy, then a metered price and usage reporting.
+
 ## Infisical secrets
 
 Infisical stays the secret store. The team uses only the `prod` environment, so staging values sit there with a `STAGING_` prefix (for example `STAGING_DATABASE_URL`) and production values use the plain names from the table below. Staging and production never share a database URL, session secret, origin secret, Tap password, or OAuth key. Push values to Fly with `fly secrets set --app <app>` (or an Infisical sync, steps not verified here). Names match `.env.example`. Non-secret settings live in `fly/*.toml` `[env]`.
@@ -141,7 +175,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; `DATABASE_URL` (pooled) if web reads the database |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `TAP_ADMIN_PASSWORD` is the same value for tap and indexer. Which web variables are required in production was not audited against the code beyond `.env.example`.
