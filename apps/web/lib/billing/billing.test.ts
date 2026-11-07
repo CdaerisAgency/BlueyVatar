@@ -463,7 +463,7 @@ describe.skipIf(!url)('postgres billing store', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql', '0024_organizations.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
+    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql', '0026_organizations.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
