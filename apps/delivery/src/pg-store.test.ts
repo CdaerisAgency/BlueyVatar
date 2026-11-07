@@ -14,6 +14,7 @@ const migration14 = readFileSync(new URL('../../../db/migrations/0014_gallery.sq
 const migration15 = readFileSync(new URL('../../../db/migrations/0015_billing.sql', import.meta.url), 'utf8')
 const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_domain.sql', import.meta.url), 'utf8')
 const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
+const migration25 = readFileSync(new URL('../../../db/migrations/0025_profile_view_counters.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -37,6 +38,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration15)
     await pool.query(migration16)
     await pool.query(migration17)
+    await pool.query(migration25)
   }, 60_000)
 
   afterAll(async () => {
@@ -190,6 +192,13 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await usage.add('lic1', 'origin_resolution', 4)).toBe(5)
     const { rows } = await pool.query(`SELECT count FROM usage_counters WHERE license_id = 'lic1' AND meter = 'origin_resolution'`)
     expect(rows.map((r) => Number(r.count))).toEqual([5])
+  })
+
+  it('upserts keyed profile JSON calls into one daily row per DID', async () => {
+    const usage = new PgUsageMeter(pool)
+    await Promise.all([usage.addProfileCall(DID), usage.addProfileCall(DID), usage.addProfileCall(DID)])
+    const { rows } = await pool.query(`SELECT views, json_calls FROM profile_view_counters WHERE did = $1`, [DID])
+    expect(rows.map((r) => [Number(r.views), Number(r.json_calls)])).toEqual([[0, 3]])
   })
 
   it('tracks service costs per DID and claims each alert once', async () => {
