@@ -5,7 +5,8 @@ import { decideLink, HOLD_DAYS, HOLD_MS, type LinkDecision, type LinkFacts } fro
 import { decryptJson, encryptJson } from './token-crypto'
 
 export type LinkMethod = 'trusted_pds' | 'code'
-export type LinkRow = { emailHash: string; method: LinkMethod; verifiedAt: Date; primary: boolean }
+/** `emailDomain` is the domain of the linked address (never the address), or null for links made before migration 0016. */
+export type LinkRow = { emailHash: string; method: LinkMethod; verifiedAt: Date; primary: boolean; emailDomain: string | null }
 
 export interface Store {
   oauthState: NodeSavedStateStore
@@ -19,8 +20,9 @@ export interface Store {
      * Links the hash to the DID under the ownership policy (spec section 6): one hash, one DID; newest
      * verification wins and the old link is removed in the same transaction; cap of 10 per account;
      * a hash released by another DID is held for 30 days. The first email an account links becomes primary.
+     * `emailDomain` (the part after the @, never the address) is stored on the row and refreshed when the owner verifies again.
      */
-    link(emailHash: string, did: string, method: LinkMethod, emailMd5?: string, emailEnc?: string): Promise<LinkDecision>
+    link(emailHash: string, did: string, method: LinkMethod, emailMd5?: string, emailEnc?: string, emailDomain?: string): Promise<LinkDecision>
     /** The primary email encrypted at rest for notices, or undefined when none is stored (decrypt with token-crypto). */
     noticeAddress(did: string): Promise<string | undefined>
     /** Unlinks and starts the 30-day hold. Returns false when the DID did not own the hash. */
@@ -41,7 +43,7 @@ export interface Store {
 export function memoryStore(clock: () => number = Date.now): Store {
   const states = new Map<string, NodeSavedState>()
   const sessions = new Map<string, NodeSavedSession>()
-  type MemLink = { did: string; method: LinkMethod; verifiedAt: Date; emailMd5?: string; primary: boolean }
+  type MemLink = { did: string; method: LinkMethod; verifiedAt: Date; emailMd5?: string; emailDomain?: string; primary: boolean }
   const links = new Map<string, MemLink>()
   const holds = new Map<string, { did: string; releasedAt: number }>()
   const notice = new Map<string, { emailHash: string; enc: string }>()
@@ -72,26 +74,26 @@ export function memoryStore(clock: () => number = Date.now): Store {
     links: {
       async list(did) {
         return ownedBy(did)
-          .map(([emailHash, v]) => ({ emailHash, method: v.method, verifiedAt: v.verifiedAt, primary: v.primary }))
+          .map(([emailHash, v]) => ({ emailHash, method: v.method, verifiedAt: v.verifiedAt, primary: v.primary, emailDomain: v.emailDomain ?? null }))
           .sort((a, b) => Number(b.primary) - Number(a.primary) || a.verifiedAt.getTime() - b.verifiedAt.getTime())
       },
       async inspect(did, emailHash) {
         return facts(did, emailHash)
       },
-      async link(emailHash, did, method, emailMd5, emailEnc) {
+      async link(emailHash, did, method, emailMd5, emailEnc, emailDomain) {
         const f = facts(did, emailHash)
         const d = decideLink(f)
         if (!d.ok) return d
         if (f.owner === 'self') {
           const cur = links.get(emailHash)!
-          links.set(emailHash, { ...cur, method, verifiedAt: new Date(clock()), emailMd5: emailMd5 ?? cur.emailMd5 })
+          links.set(emailHash, { ...cur, method, verifiedAt: new Date(clock()), emailMd5: emailMd5 ?? cur.emailMd5, emailDomain: emailDomain ?? cur.emailDomain })
           reconcile(did, emailHash, emailEnc)
           return d
         }
         const prev = links.get(emailHash)
         links.delete(emailHash)
         if (prev) promote(prev.did)
-        links.set(emailHash, { did, method, verifiedAt: new Date(clock()), emailMd5, primary: f.count === 0 })
+        links.set(emailHash, { did, method, verifiedAt: new Date(clock()), emailMd5, emailDomain, primary: f.count === 0 })
         holds.delete(emailHash)
         if (prev) reconcile(prev.did)
         reconcile(did, emailHash, emailEnc)
@@ -261,10 +263,10 @@ export function pgStore(pool: pg.Pool): Store {
     links: {
       async list(did) {
         const r = await pool.query(
-          'SELECT email_hash, method, verified_at, is_primary FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash',
+          'SELECT email_hash, method, verified_at, is_primary, email_domain FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash',
           [did],
         )
-        return r.rows.map((x) => ({ emailHash: x.email_hash, method: x.method, verifiedAt: x.verified_at, primary: x.is_primary }))
+        return r.rows.map((x) => ({ emailHash: x.email_hash, method: x.method, verifiedAt: x.verified_at, primary: x.is_primary, emailDomain: x.email_domain ?? null }))
       },
       async inspect(did, emailHash) {
         return pgFacts(pool, did, emailHash)
@@ -273,7 +275,7 @@ export function pgStore(pool: pg.Pool): Store {
         const r = await pool.query('SELECT email_enc FROM notice_emails WHERE did = $1', [did])
         return r.rows[0]?.email_enc ?? undefined
       },
-      async link(emailHash, did, method, emailMd5, emailEnc) {
+      async link(emailHash, did, method, emailMd5, emailEnc, emailDomain) {
         return inTx(pool, async (c) => {
           await lockFor(c, emailHash, did)
           const f = await pgFacts(c, did, emailHash)
@@ -281,8 +283,8 @@ export function pgStore(pool: pg.Pool): Store {
           if (!d.ok) return d
           if (f.owner === 'self') {
             await c.query(
-              `UPDATE email_links SET method = $2, verified_at = now(), email_md5 = coalesce($3, email_md5) WHERE email_hash = $1`,
-              [emailHash, method, emailMd5 ?? null],
+              `UPDATE email_links SET method = $2, verified_at = now(), email_md5 = coalesce($3, email_md5), email_domain = coalesce($4, email_domain) WHERE email_hash = $1`,
+              [emailHash, method, emailMd5 ?? null, emailDomain ?? null],
             )
             await reconcilePg(c, did, emailHash, emailEnc)
             return d
@@ -293,8 +295,8 @@ export function pgStore(pool: pg.Pool): Store {
             if (old.rows[0]) await reconcilePg(c, old.rows[0].did)
           }
           await c.query(
-            'INSERT INTO email_links (email_hash, did, method, email_md5, is_primary) VALUES ($1, $2, $3, $4, $5)',
-            [emailHash, did, method, emailMd5 ?? null, f.count === 0],
+            'INSERT INTO email_links (email_hash, did, method, email_md5, is_primary, email_domain) VALUES ($1, $2, $3, $4, $5, $6)',
+            [emailHash, did, method, emailMd5 ?? null, f.count === 0, emailDomain ?? null],
           )
           await c.query('DELETE FROM email_holds WHERE email_hash = $1', [emailHash])
           await reconcilePg(c, did, emailHash, emailEnc)
@@ -342,6 +344,7 @@ export function pgStore(pool: pg.Pool): Store {
           emailHash: x.email_hash,
           emailMd5: x.email_md5 ?? undefined,
           emailEnc: x.email_enc ?? undefined,
+          emailDomain: x.email_domain ?? undefined,
           codeHash: x.code_hash,
           masked: x.masked,
           attempts: x.attempts,
@@ -351,12 +354,13 @@ export function pgStore(pool: pg.Pool): Store {
       },
       async put(p) {
         await pool.query(
-          `INSERT INTO email_codes (did, email_hash, email_md5, code_hash, masked, attempts, expires_at, created_at, email_enc)
-           VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)
+          `INSERT INTO email_codes (did, email_hash, email_md5, code_hash, masked, attempts, expires_at, created_at, email_enc, email_domain)
+           VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9)
            ON CONFLICT (did) DO UPDATE SET email_hash = EXCLUDED.email_hash, email_md5 = EXCLUDED.email_md5,
              code_hash = EXCLUDED.code_hash, masked = EXCLUDED.masked, attempts = 0,
-             expires_at = EXCLUDED.expires_at, created_at = EXCLUDED.created_at, email_enc = EXCLUDED.email_enc`,
-          [p.did, p.emailHash, p.emailMd5 ?? null, p.codeHash, p.masked, new Date(p.expiresAt), new Date(p.createdAt), p.emailEnc ?? null],
+             expires_at = EXCLUDED.expires_at, created_at = EXCLUDED.created_at, email_enc = EXCLUDED.email_enc,
+             email_domain = EXCLUDED.email_domain`,
+          [p.did, p.emailHash, p.emailMd5 ?? null, p.codeHash, p.masked, new Date(p.expiresAt), new Date(p.createdAt), p.emailEnc ?? null, p.emailDomain ?? null],
         )
         // An unconfirmed code (and the encrypted address it carries) never outlives its 15 minutes by much.
         await pool.query('DELETE FROM email_codes WHERE expires_at < now() - interval \'1 hour\'')

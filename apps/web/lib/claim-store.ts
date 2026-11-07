@@ -1,4 +1,4 @@
-import type { ClaimRecord } from './claims'
+import type { ClaimRecord, OAuthProvider } from './claims'
 import type { MastodonApp } from './mastodon-oauth'
 import { getPool } from './store'
 
@@ -14,7 +14,7 @@ export type AttestationRow = {
   createdAt: Date
 }
 
-export type PendingVerification = { state: string; did: string; rkey: string; provider: 'github' | 'mastodon'; instance?: string }
+export type PendingVerification = { state: string; did: string; rkey: string; provider: 'github' | 'mastodon' | OAuthProvider; instance?: string }
 
 const STATE_TTL_MS = 15 * 60_000
 
@@ -22,6 +22,8 @@ export interface ClaimStore {
   /** Mirrors a claim record into the claims table so delivery can read it before the indexer does. */
   upsertClaim(did: string, rkey: string, record: ClaimRecord): Promise<void>
   deleteClaim(did: string, rkey: string): Promise<void>
+  /** Claim rows stored for the DID. Backs the per-account cap. */
+  countClaims(did: string): Promise<number>
   /** Latest attestation per claim for the DID. */
   latestAttestations(did: string): Promise<AttestationRow[]>
   /** Stores a verified attestation. Earlier verified rows for the claim become revoked; their uris are returned. */
@@ -49,6 +51,9 @@ export function memoryClaimStore(): ClaimStore & { claims: Map<string, ClaimReco
     },
     async deleteClaim(did, rkey) {
       claims.delete(key(did, rkey))
+    },
+    async countClaims(did) {
+      return [...claims.keys()].filter((k) => k.startsWith(`${did}/`)).length
     },
     async latestAttestations(did) {
       const latest = new Map<string, AttestationRow>()
@@ -99,6 +104,10 @@ export function pgClaimStore(pool: import('pg').Pool): ClaimStore {
     },
     async deleteClaim(did, rkey) {
       await pool.query('DELETE FROM claims WHERE did = $1 AND rkey = $2', [did, rkey])
+    },
+    async countClaims(did) {
+      const r = await pool.query('SELECT count(*)::int AS n FROM claims WHERE did = $1', [did])
+      return r.rows[0].n as number
     },
     async latestAttestations(did) {
       const r = await pool.query(

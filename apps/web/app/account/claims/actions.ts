@@ -4,15 +4,18 @@ import { randomBytes } from 'node:crypto'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
-import { MAX_CLAIMS, METHOD_FOR, PLATFORM_LABELS, isPlatform, normalizeClaim, parseMastodonUri, profileLinkFor, type ClaimRecord } from '../../../lib/claims'
+import { MAX_CLAIMS, PLATFORM_LABELS, isOAuthProvider, isPlatform, normalizeClaim, parseMastodonUri, profileLinkFor, providerAuthorizeUrl, providerConfig, verifyBluesky, verifyDnsTxt, type ClaimRecord } from '../../../lib/claims'
+import { methodFor, platformAvailable } from '../../../lib/claim-providers'
 import { createClaim, getClaim, listClaims, putClaim, repoHandle } from '../../../lib/claims-repo'
 import { githubAuthorizeUrl, githubConfig } from '../../../lib/github-oauth'
 import { authorizeUrl, registerApp } from '../../../lib/mastodon-oauth'
 import { PUBLIC_URL } from '../../../lib/oauth'
+import { limited } from '../../../lib/rate-guard'
 import { RepoError, repoSession } from '../../../lib/repo'
 import { safeFetch } from '../../../lib/safe-fetch'
 import { verifyRelMe } from '../../../lib/verify'
 import { attestVerified, coolingDown, removeClaim } from '../../../lib/verification-service'
+import { reportError } from '../../../lib/obs'
 
 const CALLBACK_PATH = '/account/claims/callback'
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/claims?${key}=${encodeURIComponent(value)}`)
@@ -22,16 +25,20 @@ export async function addClaim(form: FormData): Promise<void> {
   const did = (await currentDid()) ?? redirect('/login')
   const checked = normalizeClaim(String(form.get('platform') ?? ''), String(form.get('account') ?? ''))
   if (!checked.ok) return back('error', checked.error)
+  const wait = await limited(['claimAdd.did'], did)
+  if (wait) return back('error', wait)
+  if (!platformAvailable(checked.value.platform)) return back('error', `${PLATFORM_LABELS[checked.value.platform]} verification is not available yet.`)
   try {
     const session = await repoSession(did)
     const existing = await listClaims(session)
-    if (existing.length >= MAX_CLAIMS) return back('error', `You can keep up to ${MAX_CLAIMS} claims. Delete one first.`)
+    // The database count is checked too, so rows written outside the repo list cannot grow past the cap.
+    if (existing.length >= MAX_CLAIMS || (await getClaimStore().countClaims(did)) >= MAX_CLAIMS) return back('error', `You can keep up to ${MAX_CLAIMS} claims. Delete one first.`)
     if (existing.some((c) => c.value.uri === checked.value.uri)) return back('error', 'You already added that account.')
     const record: ClaimRecord = { ...checked.value, createdAt: new Date().toISOString() }
     const ref = await createClaim(session, record)
     await getClaimStore().upsertClaim(did, ref.uri.slice(ref.uri.lastIndexOf('/') + 1), record)
   } catch (err) {
-    console.error('claim add failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim add failed', err)
     return back('error', message(err))
   }
   return back('done', 'Claim added. Run verification to show it on your profile.')
@@ -42,7 +49,7 @@ export async function deleteClaimAction(form: FormData): Promise<void> {
   try {
     await removeClaim(await repoSession(did), String(form.get('rkey') ?? ''))
   } catch (err) {
-    console.error('claim delete failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim delete failed', err)
     return back('error', message(err))
   }
   return back('done', 'Claim deleted and its attestation removed.')
@@ -59,7 +66,7 @@ export async function setHidden(form: FormData): Promise<void> {
     await putClaim(session, claim.rkey, value, claim.cid)
     await getClaimStore().upsertClaim(did, claim.rkey, value)
   } catch (err) {
-    console.error('claim hide failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim hide failed', err)
     return back('error', message(err))
   }
   return back('done', hidden ? 'Hidden from hovercards.' : 'Shown in hovercards.')
@@ -69,6 +76,8 @@ export async function setHidden(form: FormData): Promise<void> {
 export async function verifyClaim(form: FormData): Promise<void> {
   const did = (await currentDid()) ?? redirect('/login')
   const rkey = String(form.get('rkey') ?? '')
+  const wait = await limited(['claimVerify.did', 'claimVerify.ip'], did)
+  if (wait) return back('error', wait)
   let target: string
   try {
     const session = await repoSession(did)
@@ -78,7 +87,7 @@ export async function verifyClaim(form: FormData): Promise<void> {
     const norm = isPlatform(claim.value.platform) ? normalizeClaim(claim.value.platform, claim.value.uri) : null
     if (!norm?.ok || norm.value.uri !== claim.value.uri) return back('error', 'This claim cannot be verified. Delete it and add it again.')
     const platform = norm.value.platform
-    const method = METHOD_FOR[platform]
+    const method = methodFor(platform)
     const store = getClaimStore()
     const redirectUri = `${PUBLIC_URL}${CALLBACK_PATH}`
 
@@ -92,8 +101,28 @@ export async function verifyClaim(form: FormData): Promise<void> {
       return back('done', `${PLATFORM_LABELS[platform]} verified.`)
     }
 
+    if (method === 'dns-txt') {
+      if (coolingDown(`dns:${did}:${rkey}`, 10_000)) return back('error', 'Wait a few seconds before checking again.')
+      const r = await verifyDnsTxt(claim.value.uri, did)
+      if (!r.ok) return back('error', `The domain was not verified. ${r.reason}`)
+      await attestVerified(did, claim, method)
+      return back('done', 'Domain verified.')
+    }
+    if (method === 'bsky-proof') {
+      if (coolingDown(`bsky:${did}:${rkey}`, 10_000)) return back('error', 'Wait a few seconds before checking again.')
+      const r = await verifyBluesky(claim.value.uri, did, safeFetch)
+      if (!r.ok) return back('error', `Bluesky was not verified. ${r.reason}`)
+      await attestVerified(did, claim, method)
+      return back('done', 'Bluesky verified.')
+    }
+
     const state = randomBytes(24).toString('base64url')
-    if (method === 'github-oauth') {
+    if (isOAuthProvider(platform) && method === `${platform}-oauth`) {
+      const cfg = providerConfig(platform)
+      if (!cfg) return back('error', `${PLATFORM_LABELS[platform]} verification is not available yet.`)
+      await store.putState({ state, did, rkey, provider: platform })
+      target = providerAuthorizeUrl(platform, cfg, redirectUri, state)
+    } else if (method === 'github-oauth') {
       const cfg = githubConfig()
       if (!cfg) return back('error', 'GitHub verification is not configured on this server.')
       await store.putState({ state, did, rkey, provider: 'github' })
@@ -110,7 +139,7 @@ export async function verifyClaim(form: FormData): Promise<void> {
       target = authorizeUrl(app, state)
     }
   } catch (err) {
-    console.error('claim verify failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim verify failed', err)
     return back('error', message(err))
   }
   return redirect(target)

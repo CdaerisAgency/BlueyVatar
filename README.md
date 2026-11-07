@@ -2,7 +2,7 @@
 
 blueyvatar is a Gravatar-style avatar service built on atproto. Users keep their avatar images and profile records in their own repository on their own PDS. The service indexes those records, links verified email hashes to atproto identities, and serves resized avatars through Cloudflare's free CDN at Gravatar-compatible URLs (`/avatar/{sha256}`, or `/avatar/{md5}` for older Gravatar clients), with atproto identities as a second route (`/u/{handle-or-did}`).
 
-This code follows the product spec at [docs/spec/blueyvatar-product-spec-v6.md](docs/spec/blueyvatar-product-spec-v6.md). Section numbers in code comments refer to spec v6.
+This code follows the product spec at [docs/spec/blueyvatar-product-spec-v7.md](docs/spec/blueyvatar-product-spec-v7.md). Section numbers in code comments refer to spec v7.
 
 ## Layout
 
@@ -89,3 +89,7 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [x] Adapters: Tangled profile avatar field confirmed against live repos; `org.tangled.actor.profile` enabled, with `sh.tangled.actor.profile` as a fallback (`docs/research/tangled-collection-v1.md`).
 - [ ] Lexicons: name cleared, validator, permission set, publish script, and the `OAUTH_USE_PERMISSION_SET` flag are in place. Remaining at deploy: run the publish and create the `_lexicon.blueyvatar.com` TXT record (docs/deploy.md).
 - [x] Billing: Stripe Checkout, Customer Portal, and a signed webhook (spec section 12.1). Follow-up: a Plus price, the overage rate, and the Stripe dashboard setup in docs/deploy.md.
+
+## License
+
+Licensed per component: AGPL-3.0 for the apps and `packages/core`, Apache-2.0 for `lexicons/com/blueyvatar`. See [docs/licensing-v1.md](docs/licensing-v1.md) and the `LICENSE` file in each directory.

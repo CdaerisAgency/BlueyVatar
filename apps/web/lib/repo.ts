@@ -1,7 +1,8 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import { oauthClient } from './auth'
 import { bskyAvatarBlob, readCapped } from './import'
-import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, planFor, validateImageBytes, type ImageMime, type NewImageFields } from './records'
+import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, validateImageBytes, type ImageMime, type NewImageFields } from './records'
+import { resolvePlan } from './plan'
 
 /** Shapes of the XRPC responses used here (com.atproto.repo.*). */
 export type StrongRef = { uri: string; cid: string }
@@ -160,7 +161,7 @@ export const imageLabels = (img: StoredImage): string[] => labelValues(img.value
  */
 export async function saveNewImage(session: OAuthSession, bytes: Uint8Array, mime: ImageMime, fields: NewImageFields): Promise<void> {
   const existing = await listImages(session)
-  const plan = planFor(session.did)
+  const plan = await resolvePlan(session.did)
   if (!canAddImage(existing.length, plan)) throw new RepoError(limitMessage(plan))
   const blob = await uploadBlob(session, bytes, mime)
   const { alt, labels, license } = fields

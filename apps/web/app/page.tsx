@@ -2,14 +2,18 @@ import Link from 'next/link'
 import AvatarRing from '../components/AvatarRing'
 import { ButtonLink } from '../components/Button'
 import { Eyebrow, SectionTitle } from '../components/Type'
+import { PricingHashRedirect } from '../components/PricingHashRedirect'
 import { COPY } from '../lib/copy'
-import { PRICING } from '../lib/pricing'
+import { pageMetadata } from '../lib/site'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
+
+export const metadata = pageMetadata('/', 'blueyvatar | Avatars and profiles in your atproto repository', 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.')
 
 export default function Home() {
   return (
     <main>
+      <PricingHashRedirect />
       <div className={`${inner} grid grid-cols-1 items-center gap-12 pt-8 pb-12 md:grid-cols-[1.2fr_1fr] md:pt-14`}>
         <div className="flex flex-col items-start gap-[22px]">
           <Eyebrow>{COPY.hero.eyebrow}</Eyebrow>
@@ -87,38 +91,6 @@ export default function Home() {
               ))}
             </code>
           </pre>
-        </section>
-      </div>
-
-      <div id="pricing" className={`${inner} py-16`}>
-        <section aria-labelledby="pricing-title">
-          <SectionTitle id="pricing-title" className="mb-3">
-            {COPY.pricing.title}
-          </SectionTitle>
-          <p className="mb-10 max-w-[560px]">{COPY.pricing.lead}</p>
-          <ul className="m-0 grid list-none grid-cols-1 gap-8 p-0 md:grid-cols-3 md:gap-6">
-            {PRICING.map((t) => (
-              <li
-                key={t.id}
-                className={`relative flex flex-col gap-3.5 rounded-bv-card bg-bv-white p-7 ${t.highlighted ? 'border-2 border-bv-black' : 'border-[1.5px] border-bv-line'}`}
-              >
-                {t.highlighted && (
-                  <span className="absolute -top-3.5 left-6 rounded-bv-pill bg-bv-orange px-3 py-[5px] text-xs font-semibold tracking-[0.08em] text-bv-black uppercase">
-                    {COPY.pricing.badge}
-                  </span>
-                )}
-                <h3 className="m-0 font-sans text-sm tracking-[0.08em] text-bv-ink-3 uppercase">{t.name}</h3>
-                <span className="font-display text-[44px] leading-none font-semibold">
-                  ${t.amount}
-                  {t.per && <small className="font-sans text-lg font-normal text-bv-ink-3">{COPY.pricing.perMonth}</small>}
-                </span>
-                <p className="m-0">{COPY.pricing.tiers[t.id].body}</p>
-                <ButtonLink href="/login" variant={t.highlighted ? 'primary' : 'secondary'} className="mt-auto">
-                  {COPY.pricing.tiers[t.id].cta}
-                </ButtonLink>
-              </li>
-            ))}
-          </ul>
         </section>
       </div>
     </main>

@@ -12,3 +12,14 @@ export function looksLikeEmail(value: string): boolean {
   const v = value.trim()
   return v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 }
+
+/**
+ * The domain part of an email address, lowercased, or null when there is none. Only this part is stored on the link
+ * row (issue #128); the full address is never kept in the clear.
+ */
+export function emailDomain(email: string): string | null {
+  const v = email.trim()
+  const at = v.lastIndexOf('@')
+  const d = at === -1 ? '' : v.slice(at + 1).toLowerCase().replace(/\.$/, '')
+  return d !== '' && d.length <= 253 && !/[\s@]/.test(d) ? d : null
+}

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { currentDid, oauthClient, setSessionCookie } from '../../../lib/auth'
 import { linkFromSession, type LinkOutcome } from '../../../lib/link'
 import { PUBLIC_URL } from '../../../lib/oauth'
+import { reportError } from '../../../lib/obs'
+import { limitedResult } from '../../../lib/rate-guard'
+import { limitedResponse } from '../../../lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +14,8 @@ function back(path: string, key: string, value: string) {
 }
 
 export async function GET(req: Request) {
+  const gate = await limitedResult(['callback.ip'])
+  if (!gate.ok) return limitedResponse(gate.retryAfterSec)
   let result: { did: string; state: string | null; outcome?: LinkOutcome }
   try {
     const client = await oauthClient()
@@ -27,7 +32,7 @@ export async function GET(req: Request) {
       }
     }
   } catch (err) {
-    console.error('oauth callback failed', err instanceof Error ? err.message : 'unknown')
+    reportError('oauth callback failed', err)
     return back('/login', 'error', 'Sign-in did not complete. Try again.')
   }
 

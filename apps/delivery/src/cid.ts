@@ -5,7 +5,7 @@ const SHA2_256 = 0x12
 
 /**
  * Check that blob bytes match their CID before they are cached immutably
- * (spec v6, section 7). atproto blob CIDs use SHA-256.
+ * (spec v7, section 7). atproto blob CIDs use SHA-256.
  */
 export function bytesMatchCid(bytes: Uint8Array, cid: string): boolean {
   let parsed: CID

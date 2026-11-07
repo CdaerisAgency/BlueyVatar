@@ -1,14 +1,23 @@
+import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { Fraunces, Inter } from 'next/font/google'
 import { SiteFooter, SiteNav } from '../components/SiteChrome'
+import { defaultOgImage, siteUrl } from '../lib/site'
 import './globals.css'
 
 const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz'], weight: 'variable', display: 'swap', variable: '--font-fraunces' })
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap', variable: '--font-inter' })
 
-export const metadata = {
+const description = 'Avatars and profiles that live in your atproto repository.'
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: 'blueyvatar',
-  description: 'Avatars and profiles that live in your atproto repository.',
+  description,
+  // Public pages set their own canonical URL; this covers the rest, resolved against metadataBase.
+  alternates: { canonical: './' },
+  openGraph: { title: 'blueyvatar', description, siteName: 'blueyvatar', type: 'website', images: [defaultOgImage()] },
+  twitter: { card: 'summary', title: 'blueyvatar', description, images: [defaultOgImage()] },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

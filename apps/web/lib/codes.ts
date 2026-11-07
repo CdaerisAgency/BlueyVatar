@@ -13,6 +13,8 @@ export type PendingCode = {
   emailMd5?: string
   /** The address encrypted at rest (`v1:` envelope). Stored on confirm as the primary email when it becomes primary, and used for the move notice. */
   emailEnc?: string
+  /** Domain of the address (lowercase), stored on the link row at confirm. Absent for codes sent before migration 0016. */
+  emailDomain?: string
   codeHash: string
   masked: string
   attempts: number
@@ -29,12 +31,13 @@ export function hashCode(did: string, emailHash: string, code: string): string {
   return createHash('sha256').update(`${did}\n${emailHash}\n${code}`).digest('hex')
 }
 
-export function newPending(did: string, emailHash: string, masked: string, code: string, now: number, emailMd5?: string, emailEnc?: string): PendingCode {
+export function newPending(did: string, emailHash: string, masked: string, code: string, now: number, emailMd5?: string, emailEnc?: string, emailDomain?: string): PendingCode {
   return {
     did,
     emailHash,
     emailMd5,
     emailEnc,
+    emailDomain,
     codeHash: hashCode(did, emailHash, code),
     masked,
     attempts: 0,

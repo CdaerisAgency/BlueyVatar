@@ -3,7 +3,9 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getPool } from '../../lib/store'
+import { clientIp } from '../../lib/rate-limit'
 import { hashIp, parseReport, submitReport } from '../../lib/reports'
+import { reportError } from '../../lib/obs'
 
 /** Public: no account needed. Errors are logged without the form values, so reporter contact never reaches logs. */
 export async function submitReportAction(form: FormData): Promise<void> {
@@ -16,13 +18,13 @@ export async function submitReportAction(form: FormData): Promise<void> {
   const pool = getPool()
   if (!pool) return redirect(dest('error'))
   const h = await headers()
-  const ip = h.get('cf-connecting-ip') ?? h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const ip = clientIp(h)
   let status = 'sent'
   try {
     const res = await submitReport(pool, parsed.value, hashIp(ip, process.env.REPORT_IP_SECRET ?? process.env.SESSION_SECRET ?? 'blueyvatar'))
     if (!res.ok) status = 'limited'
   } catch (err) {
-    console.error('report submit failed', err instanceof Error ? err.name : 'unknown')
+    reportError('report submit failed', err)
     status = 'error'
   }
   return redirect(dest(status))

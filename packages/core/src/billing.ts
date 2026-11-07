@@ -12,6 +12,16 @@ export const PAST_DUE_GRACE_MS = PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000
 export const PAID_TIERS = ['pro', 'business'] as const satisfies readonly Tier[]
 export type PaidTier = (typeof PAID_TIERS)[number]
 
+/**
+ * Plus is the paid user plan (spec section 11.2, $9.99 per month). It is sold through the same Stripe Checkout and
+ * webhook as the developer tiers but is not a developer tier: it never changes a license, only the user's plan.
+ */
+export const PLUS_PLAN = 'plus' as const
+/** Everything a Stripe price can map to. */
+export const PAID_PLANS = [...PAID_TIERS, PLUS_PLAN] as const
+export type PaidPlan = (typeof PAID_PLANS)[number]
+export const isPaidTier = (v: unknown): v is PaidTier => (PAID_TIERS as readonly unknown[]).includes(v)
+
 const RANK: Record<Tier, number> = { free: 0, pro: 1, business: 2, enterprise: 3 }
 
 /** The Stripe subscription statuses, as sent in webhook payloads. */
@@ -35,6 +45,11 @@ export function entitles(sub: SubscriptionFacts, now: Date): boolean {
   if (sub.status === 'active' || sub.status === 'trialing') return true
   if (sub.status === 'past_due') return sub.pastDueSince !== null && now < graceEndsAt(sub.pastDueSince)
   return false
+}
+
+/** Whether any Plus subscription still entitles the user's Plus plan at `now`. Same status and grace rules as the developer tiers. */
+export function plusEntitled(subs: readonly { tier: string; status: SubscriptionStatus; pastDueSince: Date | null }[], now: Date): boolean {
+  return subs.some((s) => s.tier === PLUS_PLAN && entitles({ tier: 'pro', status: s.status, pastDueSince: s.pastDueSince }, now))
 }
 
 export interface LicenseBilling {

@@ -1,4 +1,4 @@
-# blueyvatar - Product Spec v6
+# blueyvatar - Product Spec v7
 
 Nov 3, 2026 by @Chris Duncan
 
@@ -158,7 +158,7 @@ The service defines three record types in the user's repository and keeps everyt
 
 **Gallery images (feature 21).** A gallery image is another `com.blueyvatar.image` record. The optional string field `purpose` tells them apart: `avatar` (the default when the field is absent, so every existing record stays valid) or `gallery`. A gallery record may also carry `caption` (up to 140 characters) and `sort` (an integer, lowest first; images without one follow, newest first). The change is additive and the lexicons are not published yet (issue #54). The indexer stores `purpose`, `caption`, and `sort` on the `images` row (migration 0014). Avatar resolution reads `purpose = 'avatar'` rows only, so a gallery upload never becomes the avatar, whatever its date or `isDefault` value. A record with any other `purpose` is neither an avatar nor a gallery image.
 
-Gallery rules follow the avatar rules. The gallery is a Plus user feature (section 11.2), gated by the same plan check as other Plus features (`PLUS_DIDS` until plan storage exists). The profile JSON carries `gallery`, an array of `{ url, caption }`, and it is empty for Free users. The profile page renders it for Plus users only. Each image passes the same filters as an avatar: the account-level `!no-unauthenticated` label hides the gallery, blocked images (section 9) never appear, and only rating `g` images show. URLs are signed `/img` paths (512 pixel PNG) under the visibility rules of section 10, never PDS URLs. A profile shows at most 12 gallery images (`GALLERY_MAX`). The web avatar editor lists avatar records only.
+Gallery rules follow the avatar rules. The gallery is a Plus user feature (section 11.2), gated by the same plan check as other Plus features (a Plus subscription, or a `PLUS_DIDS` manual grant). The profile JSON carries `gallery`, an array of `{ url, caption }`, and it is empty for Free users. The profile page renders it for Plus users only. Each image passes the same filters as an avatar: the account-level `!no-unauthenticated` label hides the gallery, blocked images (section 9) never appear, and only rating `g` images show. URLs are signed `/img` paths (512 pixel PNG) under the visibility rules of section 10, never PDS URLs. A profile shows at most 12 gallery images (`GALLERY_MAX`). The web avatar editor lists avatar records only.
 
 **Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
 
@@ -397,7 +397,7 @@ Each image record carries a `license` value the user picks. The values in sectio
 
 ## 11. Service tiers
 
-The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. The owner approved the Pro ($9 per month) and Business ($49 per month) prices (issue #67). Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run. The Plus user plan has no price yet.
+The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. The owner approved the Pro ($9 per month) and Business ($49 per month) prices (issue #67). Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run. Plus is $9.99 per month, approved by the owner.
 
 ### 11.1 Developer tiers
 
@@ -425,6 +425,8 @@ The proposal has four developer tiers and two user plans, with privacy and safet
 The row "Delivery from your own domain or node" is the Enterprise path to a federated node, in the style of [Libravatar's DNS-based delegation](https://wiki.libravatar.org/api/).
 
 ### 11.2 User plans
+
+Plus costs $9.99 per month through Stripe (section 12.1).
 
 | Capability | Free | Plus |
 | --- | --- | --- |
@@ -484,12 +486,12 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 
 ### 12.1 Stripe billing
 
-- **Checkout and portal.** Pro and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PRO` and `STRIPE_PRICE_BUSINESS`. With any Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
+- **Checkout and portal.** Plus, Pro, and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, and `STRIPE_PRICE_PLUS`. `STRIPE_PRICE_PLUS` is optional: with it unset Plus is not sold. With any other Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
 - **Webhook.** One endpoint verifies the Stripe signature against the raw body and handles `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`. Each event id is stored in the same transaction as its effects, so a redelivered event changes nothing, and a failed event leaves no trace so Stripe's retry applies it. An event older than the stored subscription state is ignored.
-- **Data.** Migration 0015 adds `billing_customers` (DID to Stripe customer), `subscriptions` (a mirror of each Stripe subscription, keyed to the DID and the license), `stripe_events`, and `licenses.grace_ends_at`.
+- **Data.** Migration 0017 allows `plus` in `subscriptions.tier`. Migration 0015 adds `billing_customers` (DID to Stripe customer), `subscriptions` (a mirror of each Stripe subscription, keyed to the DID and the license), `stripe_events`, and `licenses.grace_ends_at`.
 - **Tier resolution.** A license's tier is derived from all of its subscriptions: the highest tier among `active`, `trialing`, and in-grace `past_due` subscriptions, else Free. The derived tier is written to `licenses` on every event. Enterprise licenses are contracts and are never changed by billing.
 - **Past due.** A past-due license keeps its paid tier for a grace period, then serves at Free limits. The grace period is a proposal of 7 days from the first failed payment (`PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts`), pending owner approval. Expiry is evaluated when a license is read (`effectiveTier`), so it needs no webhook and a missed event cannot extend paid limits. Recovery to `active` clears the grace period. A downgrade changes limits only, as stated above.
-- **Plus.** The Plus user plan has no price in this spec, so billing does not sell it and Plus stays on the `PLUS_DIDS` list until a price is decided.
+- **Plus.** Plus is the user plan (section 11.2) at $9.99 per month. A Plus price maps to a subscription row with tier `plus`, which never changes a license. A DID has Plus while a Plus subscription is `active`, `trialing`, or `past_due` inside the grace period, or while it is listed in `PLUS_DIDS` (kept as a manual grant). A person can hold one Plus subscription and one developer subscription at once.
 
 ## 13. Open questions and risks
 

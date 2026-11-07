@@ -1,6 +1,6 @@
 # Atproto spaces status and fit for restricted avatars (v1)
 
-Checked: November 7, 2026. Scope: issue #65 (Q8, atproto spaces timing; spec section 13 item 8 and section 10.2). Sources are primary only: atproto.com blog and specs, and github.com/bluesky-social pages. Spec references are to `docs/spec/blueyvatar-product-spec-v6.md`; code references are to `origin/main` at `fdac76a`. I read the pages listed below and did not run any spaces code. "No published answer" means none of the pages I reached states it.
+Checked: November 7, 2026. Scope: issue #65 (Q8, atproto spaces timing; spec section 13 item 8 and section 10.2). Sources are primary only: atproto.com blog and specs, and github.com/bluesky-social pages. Spec references are to `docs/spec/blueyvatar-product-spec-v7.md`; code references are to `origin/main` at `fdac76a`. I read the pages listed below and did not run any spaces code. "No published answer" means none of the pages I reached states it.
 
 ## Decisions needed
 

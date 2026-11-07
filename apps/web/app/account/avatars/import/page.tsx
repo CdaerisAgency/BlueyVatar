@@ -5,7 +5,9 @@ import { currentDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
 import { sourceLabel } from '../../../../lib/import'
 import { RepoError, listImages, repoSession } from '../../../../lib/repo'
-import { LICENSES, canAddImage, limitMessage, planFor } from '../../../../lib/records'
+import { LICENSES, canAddImage, limitMessage } from '../../../../lib/records'
+import { resolvePlan } from '../../../../lib/plan'
+import { limited } from '../../../../lib/rate-guard'
 import AccountNav from '../../AccountNav'
 import { confirmImport } from './actions'
 
@@ -18,9 +20,11 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   const parsed = parseSourceParam(source)
   let problem: string | null = parsed ? null : 'Unknown import source.'
   let preview: { uri: string; suggested: string | null; label: string } | null = null
-  if (parsed) {
+  const wait = parsed ? await limited(['import.did', 'import.ip'], did) : null
+  if (wait) problem = wait
+  if (parsed && !wait) {
     try {
-      const plan = planFor(did)
+      const plan = await resolvePlan(did)
       if (!canAddImage((await listImages(await repoSession(did))).length, plan)) throw new RepoError(limitMessage(plan))
       const img = await loadImport(did, source)
       preview = { uri: `data:${img.mime};base64,${Buffer.from(img.bytes).toString('base64')}`, suggested: img.suggested, label: sourceLabel(img.source) }

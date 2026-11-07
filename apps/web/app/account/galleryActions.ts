@@ -3,8 +3,11 @@
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../lib/auth'
 import { RepoError, repoSession } from '../../lib/repo'
+import { limited } from '../../lib/rate-guard'
 import { validateImageBytes } from '../../lib/records'
+import { checkUploadForm } from '../../lib/upload-caps'
 import { GALLERY_PLUS_MESSAGE, addGalleryImage, deleteGalleryImage, isPlus, moveGalleryImage, validateGalleryFields } from '../../lib/gallery'
+import { reportError } from '../../lib/obs'
 
 const back = (key: 'galleryError' | 'galleryDone', value: string): never => redirect(`/account?${key}=${encodeURIComponent(value)}#gallery`)
 
@@ -14,16 +17,18 @@ async function signedIn(): Promise<string> {
 }
 
 function fail(err: unknown): never {
-  console.error('gallery action failed', err instanceof Error ? err.message : 'unknown')
+  reportError('gallery action failed', err)
   return back('galleryError', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
 }
 
 export async function uploadGalleryImage(form: FormData): Promise<void> {
   const did = await signedIn()
-  if (!isPlus(did)) return back('galleryError', GALLERY_PLUS_MESSAGE)
-  const file = form.get('file')
-  if (!(file instanceof File) || file.size === 0) return back('galleryError', 'Choose an image file.')
-  if (file.size > 1_000_000) return back('galleryError', 'The image is larger than 1,000,000 bytes. Resize or compress it and try again.')
+  if (!(await isPlus(did))) return back('galleryError', GALLERY_PLUS_MESSAGE)
+  const wait = await limited(['upload.did', 'upload.ip'], did)
+  if (wait) return back('galleryError', wait)
+  const picked = checkUploadForm(form)
+  if (!picked.ok) return back('galleryError', picked.error)
+  const file = picked.value
   const bytes = new Uint8Array(await file.arrayBuffer())
   const img = validateImageBytes(bytes)
   if (!img.ok) return back('galleryError', img.error)

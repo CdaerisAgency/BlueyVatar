@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
 import { currentDid } from '../../../../lib/auth'
 import { getClaimStore } from '../../../../lib/claim-store'
-import { PLATFORM_LABELS, normalizeClaim } from '../../../../lib/claims'
+import { PLATFORM_LABELS, isOAuthProvider, normalizeClaim, providerClaimMatches, providerConfig, providerIdentities } from '../../../../lib/claims'
 import { getClaim } from '../../../../lib/claims-repo'
 import { githubClaimMatches, githubConfig, githubLogin } from '../../../../lib/github-oauth'
 import { accountUrl, mastodonClaimMatches } from '../../../../lib/mastodon-oauth'
 import { PUBLIC_URL } from '../../../../lib/oauth'
+import { limitedResult } from '../../../../lib/rate-guard'
+import { limitedResponse } from '../../../../lib/rate-limit'
 import { repoSession } from '../../../../lib/repo'
 import { safeFetch } from '../../../../lib/safe-fetch'
 import { attestVerified } from '../../../../lib/verification-service'
+import { reportError } from '../../../../lib/obs'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,8 +21,10 @@ function back(key: 'error' | 'done', value: string) {
   return NextResponse.redirect(new URL(`/account/claims?${key}=${encodeURIComponent(value)}`, PUBLIC_URL), 303)
 }
 
-/** Shared redirect target for GitHub and Mastodon. The state row says which provider and claim it is for. */
+/** Shared redirect target for every OAuth provider. The state row says which provider and claim it is for. */
 export async function GET(req: Request) {
+  const gate = await limitedResult(['callback.ip'])
+  if (!gate.ok) return limitedResponse(gate.retryAfterSec)
   const q = new URL(req.url).searchParams
   const state = q.get('state')
   const code = q.get('code')
@@ -41,6 +46,14 @@ export async function GET(req: Request) {
         return back('error', 'The GitHub account you signed in with does not match this claim.')
       }
       await attestVerified(pending.did, claim, 'github-oauth')
+    } else if (isOAuthProvider(pending.provider)) {
+      const p = pending.provider
+      const cfg = providerConfig(p)
+      const ids = norm.value.platform === p && cfg ? await providerIdentities(p, cfg, code, REDIRECT_URI) : []
+      if (!providerClaimMatches(p, ids, claim.value.uri)) {
+        return back('error', `The ${PLATFORM_LABELS[p]} account you signed in with does not match this claim.`)
+      }
+      await attestVerified(pending.did, claim, `${p}-oauth`)
     } else {
       const app = pending.instance ? await getClaimStore().mastodonApp(pending.instance) : null
       const url = norm.value.platform === 'mastodon' && app ? await accountUrl(app, code, safeFetch) : null
@@ -51,7 +64,7 @@ export async function GET(req: Request) {
     }
     return back('done', `${PLATFORM_LABELS[norm.value.platform]} verified.`)
   } catch (err) {
-    console.error('claim callback failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim callback failed', err)
     return back('error', 'Verification did not complete. Try again.')
   }
 }

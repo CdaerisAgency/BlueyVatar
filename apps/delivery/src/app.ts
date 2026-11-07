@@ -1,10 +1,11 @@
+import { createLogger, Metrics } from '@blueyvatar/core'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
   ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
-  type ImageFormat, WARM_HEADER,
+  type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
 import { errorBody, type ErrorCode } from './errors.js'
@@ -43,16 +44,30 @@ export interface AppDeps {
   warmSecret?: string
   /** HMAC secret for /img paths (IMG_SIGNING_SECRET). The redirect routes sign, /img verifies. */
   imgSigningSecret: string
-  /** PLUS_DIDS comma list: the user plan gate (spec section 11.2). Gallery images ship in profile JSON only for these DIDs. */
+  /** PLUS_DIDS comma list: manual Plus grants (spec section 11.2). Gallery images ship in profile JSON for these DIDs and for DIDs with a Plus subscription. */
   plusDids?: string
   /** Clock for the restricted-scope day bucket. Tests override it. */
   now?: () => number
+  /** Structured logger. Defaults to a silent one so tests stay quiet. */
+  logger?: Logger
+  /** Counters and timings behind GET /metrics. */
+  metrics?: Metrics
+  /** Error reporter (SENTRY_DSN). Unset or disabled means unhandled errors are only logged. */
+  errors?: ErrorTracker
+  /** Readiness probe for GET /readyz: resolves when dependencies answer, rejects otherwise. Absent means ready. */
+  ready?: () => Promise<void>
+  /** Time budget for the readiness probe in milliseconds. Defaults to 2000. */
+  readyTimeoutMs?: number
+  /** Bearer token for GET /metrics. Without it the route answers 404. */
+  metricsToken?: string
 }
 
 type Ok = Extract<EntitlementResult, { ok: true }>
 
 function fail(c: Context, status: number, code: ErrorCode, message: string) {
-  return c.json(errorBody(code, message), status as 400)
+  // Server errors carry the request id in the body so a user can quote it. Client errors do not:
+  // hash lookups must answer byte for byte the same whether or not a link exists (issue 59).
+  return c.json(errorBody(code, message, status >= 500 ? (c.get('requestId' as never) as string | undefined) : undefined), status as 400)
 }
 
 function rateHeaders(c: Context, e: EntitlementResult) {
@@ -103,6 +118,25 @@ function isRestricted(v: Visibility): boolean {
 
 export function createApp(deps: AppDeps) {
   const app = new Hono()
+  const logger = deps.logger ?? createLogger({ app: 'delivery', write: () => {} })
+  const metrics = deps.metrics ?? new Metrics()
+
+  // Request id first, so every response, including origin lock rejections and errors, carries it.
+  app.use('*', async (c, next) => {
+    const id = requestIdFrom(c.req.header(REQUEST_ID_HEADER))
+    c.set('requestId' as never, id as never)
+    c.header(REQUEST_ID_HEADER, id)
+    const started = performance.now()
+    await next()
+    c.header(REQUEST_ID_HEADER, id)
+    const ms = performance.now() - started
+    const route = c.req.routePath === '/*' || !c.req.routePath ? 'unmatched' : c.req.routePath
+    const status = c.res.status
+    metrics.inc('delivery_http_requests_total', { route, status: statusClass(status) })
+    metrics.observe('delivery_http_request_duration_ms', ms, { route })
+    // Route pattern only: no path parameters, query, or IP, so no handle, DID, hash, or token is logged.
+    logger.info('request', { requestId: id, method: c.req.method, route, status, ms: Math.round(ms) })
+  })
 
   // Image responses never set cookies, and nothing here does (spec section 14.1).
   app.use('*', async (c, next) => {
@@ -130,6 +164,7 @@ export function createApp(deps: AppDeps) {
       deps.limiter,
     )
     rateHeaders(c, e)
+    if (!e.ok && e.status === 429) metrics.inc('delivery_rate_limit_rejections_total')
     if (!e.ok && e.status === 429 && e.window) {
       c.header('retry-after', String(Math.max(1, e.window.reset - Math.floor(Date.now() / 1000))))
     }
@@ -206,6 +241,7 @@ export function createApp(deps: AppDeps) {
 
     const gate = async (did: string) => (await deps.index.isRepoActive(did)) && (await visibilityAllows(c, did, e)) !== null
     const identity = await lookup(gate)
+    metrics.inc('delivery_resolutions_total', { route: 'avatar', result: identity ? 'found' : 'miss' })
     if (e.licenseId) {
       const used = await deps.usage.add(e.licenseId, 'origin_resolution')
       await deps.alerts?.check(e.licenseId, e.tier, used)
@@ -239,11 +275,42 @@ export function createApp(deps: AppDeps) {
   }
 
   app.onError((err, c) => {
-    console.error('unhandled error', err)
-    return c.json(errorBody('internal', 'Internal server error'), 500)
+    const requestId = c.get('requestId' as never) as string | undefined
+    logger.error('unhandled error', { requestId, method: c.req.method, route: c.req.routePath, err })
+    deps.errors?.captureException(err, { requestId, method: c.req.method, url: c.req.url, headers: c.req.raw.headers })
+    c.header(REQUEST_ID_HEADER, requestId ?? '')
+    return c.json(errorBody('internal', 'Internal server error', requestId), 500)
   })
 
+  // Liveness: the process answers. Readiness: Postgres answers within the time budget.
   app.get('/healthz', (c) => c.text('ok'))
+
+  app.get('/readyz', async (c) => {
+    if (deps.ready) {
+      let timer: NodeJS.Timeout | undefined
+      try {
+        await Promise.race([
+          deps.ready(),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('readiness check timed out')), deps.readyTimeoutMs ?? 2000) }),
+        ])
+      } catch (err) {
+        metrics.inc('delivery_readyz_failures_total')
+        logger.error('readiness check failed', { requestId: c.get('requestId' as never), err })
+        return c.json(errorBody('not_ready', 'Dependency check failed', c.get('requestId' as never) as string | undefined), 503)
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    return c.json({ status: 'ready' })
+  })
+
+  // Prometheus text format. Needs a bearer token (METRICS_TOKEN); without one the route does not exist.
+  app.get('/metrics', (c) => {
+    const expected = deps.metricsToken
+    const got = /^Bearer (.+)$/.exec(c.req.header('authorization') ?? '')?.[1]
+    if (!expected || !got || !secretsEqual(got, expected)) return fail(c, 404, 'not_found', 'Not found')
+    return c.body(metrics.render(), 200, { 'content-type': 'text/plain; version=0.0.4; charset=utf-8', 'cache-control': 'no-store' })
+  })
 
   // Gravatar-compatible route. Hash only (SHA256 or MD5); raw email is never accepted (spec section 6).
   app.get('/avatar/:hash', async (c) => {
@@ -291,6 +358,7 @@ export function createApp(deps: AppDeps) {
     } else {
       identity = await deps.resolver.resolveIdentity(id)
     }
+    metrics.inc('delivery_resolutions_total', { route: 'profile', result: identity ? 'found' : 'miss' })
     if (e.licenseId) await deps.usage.add(e.licenseId, 'profile_json')
     if (!identity || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
     const vis = await deps.index.visibility(identity.did)
@@ -312,7 +380,7 @@ export function createApp(deps: AppDeps) {
     // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:
     // the rating filter is the avatar default (g), blocked images never come back, and URLs
     // are signed /img paths. The page shows at most GALLERY_MAX.
-    const gallery = isPlusDid(identity.did, deps.plusDids)
+    const gallery = isPlusDid(identity.did, deps.plusDids) || (await deps.index.hasPlusSubscription(identity.did, new Date(deps.now?.() ?? Date.now())))
       ? (await deps.resolver.galleryItems(identity))
           .filter((g) => ratingAllowed(g.rating, 'g'))
           .slice(0, GALLERY_MAX)
@@ -476,11 +544,13 @@ export function createApp(deps: AppDeps) {
       const original = await deps.resolver.getBlob(identity, cid)
       bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
     } catch (err) {
+      logger.warn('image fetch or resize failed', { requestId: c.get('requestId' as never), did, kind: err instanceof BlobError ? err.kind : 'resize', err })
       if (err instanceof BlobError && err.kind === 'not_found') return fail(c, 404, 'not_found', 'Original image not found')
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
     }
     // /img has no key: a resize on a CDN miss is a service cost against the DID, not a license charge.
     // Cache warming (valid x-warm-auth) is a service cost the indexer chose to incur, so it is not metered.
+    metrics.inc('delivery_transforms_total', { format })
     const warm = c.req.header(WARM_HEADER)
     const isWarm = !!deps.warmSecret && !!warm && secretsEqual(warm, deps.warmSecret)
     if (!isWarm) {

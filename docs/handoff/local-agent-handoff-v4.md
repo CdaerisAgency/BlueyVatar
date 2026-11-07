@@ -4,7 +4,7 @@ Written November 4, 2026, from the cloud session that built phases 1 and 2. The 
 
 ## 1. What the project is
 
-blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v6.md`.
+blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v7.md`.
 
 - Repository: `CdaerisAgency/BlueyVatar` (the old lowercase URL redirects; set your remote to `https://github.com/CdaerisAgency/BlueyVatar.git`)
 - Local path: `C:\Users\super\OneDrive\Documents\GitHub\BlueyVatar`
@@ -90,6 +90,7 @@ These need the owner's decision and are not your work: issue 67 (pricing) and is
 - Encrypt OAuth tokens at rest.
 - Gate cross-origin `/profile` requests on the hovercards entitlement.
 - Schedule re-verification of `rel="me"` link claims.
-- Billing storage. Everyone is on Free for now, and `PLUS_DIDS` grants Plus for testing.
+- Plus is sold through Stripe at $9.99 per month (owner decision). Create the Plus product and price, set `STRIPE_PRICE_PLUS` on the web app (see `docs/deploy.md`, Stripe billing), and apply migrations 0016 and 0017. With the variable unset Plus is not offered. `PLUS_DIDS` still grants Plus manually for testing and gifts.
+- Email domain on link rows (issue #128, owner approved). Migration 0016 adds `email_links.email_domain`, filled at link time with the domain only, never the address. Links made earlier stay empty until the owner verifies the email again. `/privacy` discloses it. Delegated serving itself is not built yet (memo `docs/research/dns-delegation-v2.md`).
 - Log retention period and a log shipper (the spec requires a published retention period).
 - Verify the Tap `TAP_DATABASE_URL` path form (`sqlite:///data/tap.db`) in staging.

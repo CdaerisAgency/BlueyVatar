@@ -4,10 +4,11 @@ import { emailHash, emailMd5 } from '@blueyvatar/core'
 import { generateCode, newPending, RESEND_GAP_MS, type PendingCode } from './codes'
 import { emailSender, type EmailSender } from './email'
 import { decideLink, linkErrorMessage, movedNotice } from './email-policy'
-import { looksLikeEmail, maskEmail } from './mask'
+import { emailDomain, looksLikeEmail, maskEmail } from './mask'
 import { linkMethod, parseTrustedHosts, pdsHost } from './pds'
 import { getStore, type Store } from './store'
 import { decryptJson, encryptJson } from './token-crypto'
+import { reportError } from './obs'
 
 export type LinkOutcome =
   | { kind: 'linked'; masked: string }
@@ -41,7 +42,7 @@ export async function sendCode(
   })
   // The encrypted address lives in the pending row for at most the life of this code. Confirming stores it as
   // the primary email for notices (when it becomes primary) and uses it to tell a previous owner of a move.
-  await store.codes.put(newPending(did, hash, masked, code, now, emailMd5(email), encryptJson(email.trim())))
+  await store.codes.put(newPending(did, hash, masked, code, now, emailMd5(email), encryptJson(email.trim()), emailDomain(email) ?? undefined))
   return { kind: 'code_sent', masked }
 }
 
@@ -52,7 +53,7 @@ export async function confirmLink(
   store: Store = getStore(),
   sender: EmailSender = emailSender(),
 ): Promise<LinkOutcome> {
-  const d = await store.links.link(pending.emailHash, did, 'code', pending.emailMd5, pending.emailEnc)
+  const d = await store.links.link(pending.emailHash, did, 'code', pending.emailMd5, pending.emailEnc, pending.emailDomain)
   await store.codes.delete(did)
   if (!d.ok) return { kind: 'error', message: linkErrorMessage(d) }
   if (d.moved && pending.emailEnc) {
@@ -60,7 +61,7 @@ export async function confirmLink(
     const n = movedNotice(PUBLIC_URL)
     await Promise.resolve()
       .then(() => sender.send({ to: decryptJson<string>(pending.emailEnc), ...n }))
-      .catch((err) => console.error('move notice failed', err instanceof Error ? err.message : 'unknown'))
+      .catch((err) => reportError('move notice failed', err))
   }
   return { kind: 'linked', masked: pending.masked }
 }
@@ -84,7 +85,7 @@ export async function linkFromSession(session: OAuthSession): Promise<LinkOutcom
     const facts = await store.links.inspect(did, emailHash(email))
     // A trusted host vouches for its own users, but taking a hash from another account always needs the mailed code.
     if (facts.owner !== 'other') {
-      const d = await store.links.link(emailHash(email), did, method, emailMd5(email), encryptJson(email.trim()))
+      const d = await store.links.link(emailHash(email), did, method, emailMd5(email), encryptJson(email.trim()), emailDomain(email) ?? undefined)
       if (!d.ok) return { kind: 'error', message: linkErrorMessage(d) }
       return { kind: 'linked', masked: maskEmail(email) }
     }

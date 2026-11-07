@@ -5,7 +5,8 @@ import { currentDid } from '../../../lib/auth'
 import { cfSaasConfig, createHostname, deleteHostname, fallbackOrigin, CfError } from '../../../lib/cf-saas'
 import { getDomainStore } from '../../../lib/domain-store'
 import { validateCustomHostname } from '../../../lib/domains'
-import { planFor } from '../../../lib/records'
+import { resolvePlan } from '../../../lib/plan'
+import { limited } from '../../../lib/rate-guard'
 
 const back = (error?: string): never => redirect(error ? `/account/domain?error=${encodeURIComponent(error)}` : '/account/domain')
 
@@ -22,9 +23,11 @@ function reservedHosts(): string[] {
 export async function addDomain(form: FormData): Promise<void> {
   const did = await currentDid()
   if (!did) return redirect('/login')
+  const wait = await limited(['domain.did', 'domain.ip'], did)
+  if (wait) return back(wait)
   const cfg = cfSaasConfig()
   if (!cfg) return back('Custom domains are not available yet.')
-  if (planFor(did) !== 'plus') return back('Custom profile domains are part of the Plus plan.')
+  if ((await resolvePlan(did)) !== 'plus') return back('Custom profile domains are part of the Plus plan.')
   const store = getDomainStore()
   if (await store.get(did)) return back('Remove your current domain before adding another.')
   const v = validateCustomHostname(String(form.get('hostname') ?? ''), reservedHosts())
@@ -45,6 +48,8 @@ export async function addDomain(form: FormData): Promise<void> {
 export async function removeDomain(): Promise<void> {
   const did = await currentDid()
   if (!did) return redirect('/login')
+  const wait = await limited(['domain.did', 'domain.ip'], did)
+  if (wait) return back(wait)
   const store = getDomainStore()
   const row = await store.get(did)
   if (row) {

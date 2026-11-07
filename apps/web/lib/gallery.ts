@@ -5,11 +5,11 @@
  */
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import { GALLERY_CAPTION_MAX, GALLERY_MAX } from '@blueyvatar/core'
+import { resolvePlan } from './plan'
 import { RepoError, createImage, listGalleryRecords, uploadBlob, xrpc, type ImageRecord, type StoredImage } from './repo'
 import {
   IMAGE_COLLECTION,
   graphemeCount,
-  planFor,
   validateImageBytes,
   validateNewImage,
   type Check,
@@ -22,7 +22,7 @@ export const GALLERY_PLUS_MESSAGE = 'Gallery images are part of the Plus plan.'
 export const galleryFullMessage = `The gallery holds up to ${GALLERY_MAX} images. Delete one to add another.`
 export const GALLERY_RKEY_PATTERN = /^[A-Za-z0-9._~:-]{1,512}$/
 
-export const isPlus = (did: string): boolean => planFor(did) === 'plus'
+export const isPlus = async (did: string): Promise<boolean> => (await resolvePlan(did)) === 'plus'
 
 export function validateCaption(raw: string): Check<string> {
   const v = raw.trim()
@@ -64,7 +64,7 @@ export function validateGalleryFields(input: GalleryInput): Check<NewImageFields
 
 /** Plan gate and cap, checked against the PDS. Returns the current gallery. */
 async function gatedGallery(session: OAuthSession): Promise<StoredImage[]> {
-  if (!isPlus(session.did)) throw new RepoError(GALLERY_PLUS_MESSAGE)
+  if (!(await isPlus(session.did))) throw new RepoError(GALLERY_PLUS_MESSAGE)
   return listGallery(session)
 }
 
@@ -95,7 +95,7 @@ export async function addGalleryImage(session: OAuthSession, bytes: Uint8Array, 
 /** Delete one gallery record. Avatar records and unknown keys are refused. */
 export async function deleteGalleryImage(session: OAuthSession, rkey: string): Promise<void> {
   if (!GALLERY_RKEY_PATTERN.test(rkey)) throw new RepoError('Invalid image.')
-  if (!isPlus(session.did)) throw new RepoError(GALLERY_PLUS_MESSAGE)
+  if (!(await isPlus(session.did))) throw new RepoError(GALLERY_PLUS_MESSAGE)
   const target = (await listGallery(session)).find((i) => i.rkey === rkey)
   if (!target) throw new RepoError('That gallery image no longer exists.')
   await xrpc(session, 'POST', 'com.atproto.repo.deleteRecord', { body: { repo: session.did, collection: IMAGE_COLLECTION, rkey } })
