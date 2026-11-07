@@ -18,11 +18,11 @@ describe.skipIf(!url)('migration runner', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-  })
+  }, 60_000)
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
     await pool?.end()
-  })
+  }, 60_000)
 
   it('applies the repo migrations once and is idempotent', async () => {
     const first = await migrate(pool, repoMigrations)
