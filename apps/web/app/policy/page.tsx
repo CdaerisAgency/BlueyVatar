@@ -1,7 +1,6 @@
 import { PageMain } from '../../components/Page'
 export const metadata = { title: 'Content policy' }
 
-// TODO(#66): policy text is pending legal review. Do not treat the wording as final.
 export default function PolicyPage() {
   return (
     <PageMain>

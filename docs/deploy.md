@@ -142,7 +142,7 @@ Fly keeps recent logs for `fly logs` only, and any longer retention needs a log 
 ## Provisioned resources
 
 - Neon project `blueyvatar` (ID `rough-heart-79040132`), region `aws-us-east-1` (N. Virginia, near Fly `iad`), Postgres 16, created November 3, 2026.
-  - Branch `production` (default; 0.25 to 1 CU autoscaling, suspends after Neon's default idle period; set suspension to never if cold starts matter), database `blueyvatar`, role `blueyvatar_app`.
+  - Branch `production` (default; 0.25 to 1 CU autoscaling, suspends after Neon's default idle period (owner decision: keep suspend on idle)), database `blueyvatar`, role `blueyvatar_app`.
   - Branch `staging` (0.25 to 1 CU, suspends after 5 minutes idle).
   - Connection strings come from the Neon console or API and go into Infisical; they are never committed. The pooled host contains `-pooler`; the direct host (for migrations) is the same host without it.
 
