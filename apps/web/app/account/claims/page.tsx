@@ -1,14 +1,14 @@
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
-import { redirect } from 'next/navigation'
 import AccountNav from '../AccountNav'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
 import { DNS_PROOF_LABEL, PLATFORMS, PLATFORM_LABELS, isPlatform, profileLinkFor, proofToken } from '../../../lib/claims'
 import { methodFor, platformAvailable } from '../../../lib/claim-providers'
 import { listClaims, repoHandle, type StoredClaim } from '../../../lib/claims-repo'
 import { PUBLIC_URL } from '../../../lib/oauth'
-import { RepoError, repoSession } from '../../../lib/repo'
+import { detectAtprotoApps, type AtprotoApp } from '@blueyvatar/core'
+import { RepoError, repoSession, xrpc } from '../../../lib/repo'
 import { addClaim, deleteClaimAction, setHidden, verifyClaim } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -33,15 +33,22 @@ const checkLabel = (platform: Parameters<typeof methodFor>[0], label: string): s
 }
 
 export default async function ClaimsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/claims')
   const { error, done } = await searchParams
   let claims: StoredClaim[] = []
   let handle: string | null = null
   let loadError: string | null = null
+  let apps: AtprotoApp[] = []
   try {
     const session = await repoSession(did)
-    ;[claims, handle] = await Promise.all([listClaims(session), repoHandle(session).catch(() => null)])
+    ;[claims, handle, apps] = await Promise.all([
+      listClaims(session),
+      repoHandle(session).catch(() => null),
+      // No sign-in needed: the DID is already proven, so records in an app's collection mean the same identity.
+      xrpc<{ collections?: unknown }>(session, 'GET', 'com.atproto.repo.describeRepo', { params: { repo: did } })
+        .then((r) => (Array.isArray(r.collections) ? detectAtprotoApps(r.collections) : []))
+        .catch(() => [] as AtprotoApp[]),
+    ])
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Your claims could not be loaded.'
   }
@@ -59,9 +66,25 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         Claims live in your repo. Your profile shows a claim only after blueyvatar verifies it. Hidden accounts are omitted from hovercards.
       </p>
 
+      <h2>atproto apps</h2>
+      {apps.length === 0 ? (
+        <p>No other atproto apps found in your repo yet.</p>
+      ) : (
+        <>
+          <p>Your repo has records from these apps. They count as linked because you signed in with this account. Nothing to verify.</p>
+          <ul>
+            {apps.map((a) => (
+              <li key={a.id}>
+                <strong>{a.name}</strong> <a href={a.url}>{a.url.replace('https://', '')}</a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       <h2>Your claims</h2>
       {claims.length === 0 ? (
-        <p>No claims yet.</p>
+        <p>You have no claims yet. Add one below to show a verified link to your GitHub, Mastodon, website, or another account on your profile. Each claim is checked before it appears.</p>
       ) : (
         <ul>
           {claims.map((c) => {

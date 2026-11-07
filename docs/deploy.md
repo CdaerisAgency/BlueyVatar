@@ -198,7 +198,28 @@ After an avatar changes (an image record upsert, or a Bluesky profile change, wh
 
 ## Blocking an image
 
-Reports from the public form land in the `reports` table (status `open`). Review them with SQL, for example `SELECT id, target_did, reason, details, created_at FROM reports WHERE status = 'open' ORDER BY created_at`. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. To take down a reported account, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`; it blocks all of the account's images, purges them, and records who and why on the report. To block one image, use the steps below. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
+Reports from the public form land in the `reports` table (status `open`). Moderators work them in the web admin page at `/admin` (issue #145). `pnpm ops:block` and `pnpm ops:block-did` still work for emergencies, and they write to the same audit log.
+
+### Web admin page
+
+Admin access is off until both variables are set on the web app, and then `/admin` answers 404 to everyone else.
+
+| Variable | Value |
+| --- | --- |
+| `ADMIN_DIDS` | DIDs allowed to use `/admin`, separated by commas or spaces. These accounts sign in through the normal atproto login first. |
+| `ADMIN_TOTP_SECRET` | Base32 secret for the second factor. Generate one with `openssl rand 20 | base32`, add it to an authenticator app as a manual time-based entry (SHA-1, 6 digits, 30 seconds), and keep it in Infisical. |
+| `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL` | The same values the ops CLI uses. With any of them unset, a block or takedown still takes effect in the database, the page says the cache purge did not run, and you purge `/img/` for the account in Cloudflare yourself. |
+
+Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin session ends after 30 minutes and can be ended earlier from the page. Wrong codes lock the account for 15 minutes after 5 failures. Every action asks for a reason and is recorded in the `admin_actions` table, which the page shows under "Audit log". Run migration 0021 before the first deploy. `/admin` is disallowed in `robots.txt`, answers `X-Robots-Tag: noindex`, and is not listed in the sitemap.
+
+Actions on the page:
+
+- Dismiss a report, or take down the account: this blocks every indexed image, purges the cache, and marks the reports actioned.
+- Reporter follow-up: when a report is dismissed or actioned and the reporter left a valid email address, the page sends them a one-line outcome message (no reason, no details), then deletes the stored address whether or not the send worked. Reports with no address, or with something that is not an email, send nothing. The message uses the same email sender as account notices (`RESEND_API_KEY`).
+- Suspend an account: a reversible hold. Images indexed after the suspension are not blocked until the suspension is renewed. Lifting it restores only the images the suspension blocked.
+- Unblock one image, for example after an appeal.
+
+To block one image from a shell, use the steps below. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. To take down a whole account from a shell, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
 
 ## Stripe billing
 
@@ -259,7 +280,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `SENTRY_DSN`, `METRICS_TOKEN` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; optional `SENTRY_DSN`, `METRICS_TOKEN` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `SENTRY_DSN` and `METRICS_TOKEN` are new secrets (see Observability). `SENTRY_DSN` can be the same project DSN on all three apps, since events are tagged with `app`. `METRICS_TOKEN` should differ per app. Staging uses `STAGING_SENTRY_DSN` and `STAGING_METRICS_TOKEN`, ideally pointing at a separate Sentry project or environment. Non-secret tuning values (`LOG_LEVEL`, `READY_TIMEOUT_MS`, `INDEXER_STALL_SECONDS`, `TAP_PROBE_INTERVAL_SECONDS`, `HEALTH_PORT`) are listed in `.env.example` and can go in `fly/*.toml` `[env]`.
@@ -477,6 +498,27 @@ Fly keeps logs only briefly for `fly logs`; the exact window is **unconfirmed** 
 3. Cost at expected volume: at the table above, 0.3 to 2.7 GB per 90 days is within free tiers at several vendors, but plan limits change and are **unconfirmed** here. Owner action: confirm the plan and that a paid destination is acceptable (the issue asked).
 4. Logs must never carry client IPs, query strings, cookies, keys, or raw DIDs, because the logger removes them before they reach any sink (Observability, Logging). Per request, a shipped line holds timestamp, route pattern, status, duration, and request id. The key id and a user agent length class from the issue's field list are not logged; that is stricter than required.
 
+## Publish the npm packages
+
+Two public packages ship from `packages/`: `@blueyvatar/avatar` (URL builder, hashing, Gravatar migration helper, React component) and `@blueyvatar/hovercards`. Neither is published yet. The workflow `.github/workflows/publish-npm.yml` runs only when a version tag such as `v0.1.0` is pushed, and it publishes with npm provenance. It fails before publishing if the `NPM_TOKEN` secret is missing.
+
+### One-time setup (owner)
+
+1. Create the `blueyvatar` organization on npmjs.com (owner decision on issue #153). Packages under the `@blueyvatar` scope are public, so the free plan is enough.
+2. Create a granular access token on npmjs.com with read and write access to the `@blueyvatar` packages, and an expiry you will track. Store it in Infisical as `NPM_TOKEN`.
+3. Add the same value as the GitHub repository secret `NPM_TOKEN` (Settings, Secrets and variables, Actions). Infisical stays the source of truth. Whether an Infisical to GitHub sync is set up here was not verified.
+4. Provenance needs a public source repository when npm verifies the build. The repository is private today (see docs/licensing-v1.md), and npm rejects `--provenance` from a private repository. Make the repository public first, or remove `--provenance` from the workflow and from `publishConfig` in `packages/avatar/package.json` for a private-repo publish. This was not tested here.
+
+### Release steps
+
+1. Set `version` in the `package.json` of each package to release (`packages/avatar`, `packages/hovercards`) and merge to `main`. On the first release, also remove the "not published yet" status line from each package README.
+2. Run locally as a dry run: `pnpm --filter @blueyvatar/avatar build && cd packages/avatar && npm pack --dry-run`. Confirm only `dist` and `README.md` are listed.
+3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The tag must equal the package version with a leading `v`. A package whose version differs from the tag is skipped, and the run fails if no package matches.
+4. Watch the "Publish npm packages" run. Then check the package page shows the provenance badge.
+5. A published version cannot be replaced. To fix a bad release, publish a new version and run `npm deprecate` on the bad one.
+
+The versioning policy is in `packages/avatar/README.md`.
+
 ## Release checklist
 
 1. Merge to `main`. The deploy workflow builds and deploys delivery, web, and indexer.
@@ -496,3 +538,7 @@ Fly keeps logs only briefly for `fly logs`; the exact window is **unconfirmed** 
 - Fly staging apps in the `personal` organization, region `iad`, created November 4, 2026: `blueyvatar-tap-staging` (volume `tap_data`, ID `vol_r1jd8enn1q2dj19r`, 10 GB), `blueyvatar-delivery-staging`, `blueyvatar-indexer-staging`, `blueyvatar-web-staging`.
   - Deployed: tap (image `0.1.10`, TCP check passing), delivery (five migrations applied to the Neon `staging` branch; `/healthz` returns 200, a direct hit on `/u/x` returns 403 `origin_forbidden`), indexer (running; Cloudflare purges logged only).
   - Not deployed: web, which waits on the Cloudflare setup and the `TRUSTED_PDS_HOSTS` value.
+
+## Account data deletion and billing retention
+
+Signed-in users can download their data and delete it at `/account/data`. Deletion removes everything except Stripe billing rows (`billing_customers`, `subscriptions`), which are marked `deleted_at` and kept for 7 years for tax and accounting. It cancels active Stripe subscriptions first, so `STRIPE_SECRET_KEY` must be set on web for that step. The indexer runs a daily job (`apps/indexer/src/billing-retention.ts`) that deletes billing rows 7 years after `deleted_at`, and `stripe_events` rows 7 years after they were processed (they hold no DID). Email hashes stay as 30-day holds, as for any deleted account.
