@@ -80,3 +80,7 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.
 - [ ] Lexicons: clear the `com.blueyvatar` namespace and publish the schemas under `_lexicon.blueyvatar.com`.
 - [ ] Billing: choose the payment processor, tax handling, and invoicing (open item in spec section 13).
+
+## License
+
+Licensed per component: AGPL-3.0 for the apps and `packages/core`, Apache-2.0 for `lexicons/com/blueyvatar`. See [docs/licensing-v1.md](docs/licensing-v1.md) and the `LICENSE` file in each directory.
