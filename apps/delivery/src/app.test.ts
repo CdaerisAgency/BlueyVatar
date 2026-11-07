@@ -16,7 +16,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   const resolver: AvatarResolver = {
     resolveIdentity: async (id) => (id.value === DID || id.value === 'alice.test' ? ident : null),
     candidates: async () => candidates,
-    getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ label: 'Site', url: 'https://alice.example/' }, { label: 'Bad', url: 'http://alice.example/' }] } : null),
+    getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ uri: `at://${DID}/app.bsky.actor.link/l1`, cid: 'cl1' }, { uri: `at://${DID}/app.bsky.actor.link/l2`, cid: 'cl2' }, { uri: `at://${DID}/app.bsky.actor.link/l3`, cid: 'stale' }] } : null),
     getBlob: async () => new Uint8Array([1, 2, 3]),
   }
   const usage = new MemoryUsageMeter()
@@ -34,6 +34,11 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     defaultUrlAllowlist: ['example.com'],
     trustCloudflare: true,
   }
+  index.linkRecords.set(DID, [
+    { rkey: 'l1', cid: 'cl1', url: 'https://alice.example/', title: 'Site' },
+    { rkey: 'l2', cid: 'cl2', url: 'http://alice.example/', title: 'Insecure' },
+    { rkey: 'l3', cid: 'cl3', url: 'https://old.example/', title: 'Edited' },
+  ])
   const sent: UsageAlert[] = []
   deps.alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger())
   return { app: createApp(deps), index, usage, sent, deps }

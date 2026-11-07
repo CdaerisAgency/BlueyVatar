@@ -30,6 +30,8 @@ function writes(): IndexWrites {
     deleteProfile: async (did) => console.log('deleteProfile', did),
     upsertClaim: async (did, rkey) => console.log('upsertClaim', did, rkey),
     deleteClaim: async (did, rkey) => console.log('deleteClaim', did, rkey),
+    upsertProfileLink: async (r) => console.log('upsertProfileLink', r),
+    deleteProfileLink: async (did, rkey) => console.log('deleteProfileLink', did, rkey),
     setRepoStatus: async (did, handle, active, status) => console.log('setRepoStatus', did, handle, active, status),
     purgeImages: async (did, cids) => console.log('purgeImages', did, cids),
   }
@@ -42,7 +44,7 @@ indexer.identity(async (evt) => {
 })
 indexer.record(async (evt) => {
   await handleRecord(
-    { did: evt.did, collection: evt.collection, rkey: evt.rkey, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
+    { did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: 'cid' in evt ? (evt.cid as string | undefined) : undefined, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
     db,
   )
 })

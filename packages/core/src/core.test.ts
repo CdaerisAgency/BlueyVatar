@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   emailHash, emailMd5, isMd5Hex, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
   parseAvatarParams, ParamError, pickCandidate, imagePath, readBlobRef, selfLabelValues,
-  activeAdapters, DEFAULT_ADAPTERS, sanitizeProfileLinks, type Candidate,
+  activeAdapters, DEFAULT_ADAPTERS, sanitizeProfileLinks, resolveProfileLinks, type Candidate,
 } from './index.js'
 
 const opts = { tier: 'free' as const, defaultUrlAllowlist: ['example.com'] }
@@ -121,5 +121,35 @@ describe('sanitizeProfileLinks', () => {
     expect(sanitizeProfileLinks(many)).toHaveLength(10)
     expect(sanitizeProfileLinks(undefined)).toEqual([])
     expect(sanitizeProfileLinks('x')).toEqual([])
+  })
+})
+
+describe('resolveProfileLinks', () => {
+  const did = 'did:plc:a'
+  const uri = (k: string) => `at://${did}/app.bsky.actor.link/${k}`
+  const recs = [
+    { rkey: 'a', cid: 'ca', url: 'https://a.test/', title: 'A' },
+    { rkey: 'b', cid: 'cb', url: 'https://b.test/', title: null },
+    { rkey: 'c', cid: 'cc', url: 'http://c.test/', title: 'C' },
+  ]
+  it('resolves refs in profile order and drops stale, foreign, missing, and non-https ones', () => {
+    const refs = [
+      { uri: uri('b'), cid: 'cb' },
+      { uri: uri('a'), cid: 'OLD' },
+      { uri: 'at://did:plc:other/app.bsky.actor.link/a', cid: 'ca' },
+      { uri: uri('zzz'), cid: 'cz' },
+      { uri: uri('c'), cid: 'cc' },
+      { uri: uri('a'), cid: 'ca' },
+      'junk',
+    ]
+    expect(resolveProfileLinks(did, refs, recs)).toEqual([
+      { label: 'b.test', url: 'https://b.test/' },
+      { label: 'A', url: 'https://a.test/' },
+    ])
+  })
+  it('ignores a missing links field and caps at 10 refs', () => {
+    expect(resolveProfileLinks(did, undefined, recs)).toEqual([])
+    const many = Array.from({ length: 12 }, (_, i) => ({ rkey: `k${i}`, cid: `c${i}`, url: `https://e${i}.test`, title: null }))
+    expect(resolveProfileLinks(did, many.map((r) => ({ uri: uri(r.rkey), cid: r.cid })), many)).toHaveLength(10)
   })
 })

@@ -1,4 +1,8 @@
-/** Profile links, read from the links field of app.bsky.actor.profile (spec sections 3 and 8). Never copied or stored. */
+/**
+ * Profile links (spec sections 3 and 8). app.bsky.actor.profile#links is a list of strongRefs to
+ * app.bsky.actor.link records in the same repo. The service reads them and does not copy them
+ * into com.blueyvatar.profile.
+ */
 export const MAX_PROFILE_LINKS = 10
 export const MAX_LINK_LABEL_GRAPHEMES = 100
 export const MAX_LINK_URL_LENGTH = 2048
@@ -35,4 +39,35 @@ export function sanitizeProfileLinks(raw: unknown): ProfileLink[] {
     out.push({ label: l, url: u.href })
   }
   return out
+}
+
+export const LINK_COLLECTION = 'app.bsky.actor.link'
+
+/** An indexed app.bsky.actor.link record. `cid` is the record CID. */
+export interface IndexedLinkRecord {
+  rkey: string
+  cid: string
+  url: string
+  title: string | null
+}
+
+/**
+ * Resolve the profile's `links` strongRefs, in order, against the indexed link records of the
+ * same repo. A ref is dropped when it is malformed, points at another repo or collection, has no
+ * indexed record, or its cid no longer matches (the link was edited after the profile saved it).
+ * The https-only sanitizer and the cap of 10 then apply to the resolved URLs.
+ */
+export function resolveProfileLinks(did: string, refs: unknown, records: IndexedLinkRecord[]): ProfileLink[] {
+  if (!Array.isArray(refs)) return []
+  const byRkey = new Map(records.map((r) => [r.rkey, r]))
+  const prefix = `at://${did}/${LINK_COLLECTION}/`
+  const resolved: { url: string; title: string | null }[] = []
+  for (const ref of refs.slice(0, MAX_PROFILE_LINKS)) {
+    if (!ref || typeof ref !== 'object') continue
+    const { uri, cid } = ref as { uri?: unknown; cid?: unknown }
+    if (typeof uri !== 'string' || typeof cid !== 'string' || !uri.startsWith(prefix)) continue
+    const rec = byRkey.get(uri.slice(prefix.length))
+    if (rec && rec.cid === cid) resolved.push({ url: rec.url, title: rec.title })
+  }
+  return sanitizeProfileLinks(resolved)
 }
