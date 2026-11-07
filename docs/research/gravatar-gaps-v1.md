@@ -1,6 +1,6 @@
 # Gravatar behaviors the blueyvatar spec still lacks (v1)
 
-Research for issue #62. Sources are official Gravatar pages only, fetched November 7, 2026. Compared against `docs/spec/blueyvatar-product-spec-v6.md` (sections 5 to 11), `packages/core/src/params.ts`, and `apps/delivery/src/app.ts`. "Not published" means no official page I could reach states it.
+Research for issue #62. Sources are official Gravatar pages only, fetched November 7, 2026. Compared against `docs/spec/blueyvatar-product-spec-v7.md` (sections 5 to 11), `packages/core/src/params.ts`, and `apps/delivery/src/app.ts`. "Not published" means no official page I could reach states it.
 
 | Gravatar behavior | Source | blueyvatar today | Gap | Recommendation |
 | --- | --- | --- | --- | --- |

@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../../lib/auth'
 import { loadImport } from '../../../../lib/import-load'
 import { RepoError, listImages, repoSession, saveNewImage } from '../../../../lib/repo'
-import { canAddImage, limitMessage, planFor, validateNewImage } from '../../../../lib/records'
+import { canAddImage, limitMessage, validateNewImage } from '../../../../lib/records'
+import { resolvePlan } from '../../../../lib/plan'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -22,7 +23,7 @@ export async function confirmImport(form: FormData): Promise<void> {
   if (!fields.ok) return redirect(`/account/avatars/import?source=${encodeURIComponent(source)}&error=${encodeURIComponent(fields.error)}`)
   try {
     const session = await repoSession(did)
-    const plan = planFor(did)
+    const plan = await resolvePlan(did)
     if (!canAddImage((await listImages(session)).length, plan)) return back('error', limitMessage(plan))
     const img = await loadImport(did, source)
     await saveNewImage(session, img.bytes, img.mime, fields.value)

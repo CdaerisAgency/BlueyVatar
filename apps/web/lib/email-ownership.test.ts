@@ -6,6 +6,7 @@ import { newPending } from './codes'
 import { HOLD_MS, MAX_LINKED_EMAILS, decideLink } from './email-policy'
 import type { EmailSender } from './email'
 import { confirmLink, sendCode } from './link'
+import { emailDomain } from './mask'
 import { decryptJson, encryptJson } from './token-crypto'
 import { memoryStore, pgStore, type Store } from './store'
 
@@ -20,6 +21,21 @@ class Outbox implements EmailSender {
     this.sent.push(m)
   }
 }
+
+describe('emailDomain', () => {
+  it('returns the lowercased part after the last @, and nothing else', () => {
+    expect(emailDomain('Alice@Example.COM')).toBe('example.com')
+    expect(emailDomain('  a@b.test  ')).toBe('b.test')
+    expect(emailDomain('"a@b"@c.test')).toBe('c.test')
+    expect(emailDomain('a@mail.example.org.')).toBe('mail.example.org')
+  })
+  it('returns null when there is no usable domain', () => {
+    expect(emailDomain('nodomain')).toBeNull()
+    expect(emailDomain('trailing@')).toBeNull()
+    expect(emailDomain('a@b c.test')).toBeNull()
+    expect(emailDomain(`a@${'x'.repeat(254)}.test`)).toBeNull()
+  })
+})
 
 describe('decideLink (pure)', () => {
   it('re-verifying your own email is free even at the cap', () => {
@@ -76,6 +92,42 @@ function suite(name: string, make: () => Promise<{ store: Store; age?: (ms: numb
       expect(outbox.sent[1]!.text).toMatch(/add this address again/)
       // The pending row (and the raw address) is gone.
       expect(await store.codes.get(B)).toBeUndefined()
+    })
+
+    it('domain: linking by code stores the email domain on the link row and never the address', async () => {
+      const D1 = 'did:plc:domain1'
+      const outbox = new Outbox()
+      expect((await sendCode(D1, 'Person@Corp.Example.com', store, outbox)).kind).toBe('code_sent')
+      const pending = (await store.codes.get(D1))!
+      expect(pending.emailDomain).toBe('corp.example.com')
+      expect((await confirmLink(D1, pending, store, outbox)).kind).toBe('linked')
+      const row = (await store.links.list(D1))[0]!
+      expect(row.emailDomain).toBe('corp.example.com')
+      expect(JSON.stringify(row)).not.toMatch(/person|@/i)
+    })
+
+    it('domain: a direct link stores it, a re-verify without one keeps it, and a new one replaces it', async () => {
+      const D2 = 'did:plc:domain2'
+      await store.links.link(h(501), D2, 'trusted_pds', undefined, undefined, 'one.test')
+      expect((await store.links.list(D2))[0]!.emailDomain).toBe('one.test')
+      await store.links.link(h(501), D2, 'code')
+      expect((await store.links.list(D2))[0]!.emailDomain).toBe('one.test')
+      await store.links.link(h(501), D2, 'code', undefined, undefined, 'two.test')
+      expect((await store.links.list(D2))[0]!.emailDomain).toBe('two.test')
+    })
+
+    it('domain: links made without one read as null, and a move takes the new owner\'s domain', async () => {
+      const D3 = 'did:plc:domain3'
+      const D4 = 'did:plc:domain4'
+      await store.links.link(h(502), D3, 'code')
+      expect((await store.links.list(D3))[0]!.emailDomain).toBeNull()
+      await store.links.link(h(503), D3, 'code', undefined, undefined, 'old.test')
+      await store.links.link(h(503), D4, 'code', undefined, undefined, 'new.test')
+      expect((await store.links.list(D3)).find((l) => l.emailHash === h(503))).toBeUndefined()
+      expect((await store.links.list(D4))[0]!.emailDomain).toBe('new.test')
+      // Unlinking removes the row, and the domain with it.
+      await store.links.remove(D4, h(503))
+      expect(await store.links.list(D4)).toHaveLength(0)
     })
 
     it('rule 2: no move notice when the hash was not linked elsewhere', async () => {
@@ -228,7 +280,7 @@ if (url) {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     const pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain']) await pool.query(m(n))
     return {
       store: pgStore(pool),
       // Age every hold instead of waiting 30 days.
@@ -257,6 +309,20 @@ if (url) {
       await pool.query(`DROP SCHEMA ${s2} CASCADE`)
       await pool.end()
     })
+    it('0016 adds email_domain to links and pending codes, is repeatable, and refuses an address', async () => {
+      await pool.query(m('0010_email_ownership'))
+      await pool.query(m('0013_notice_emails'))
+      await pool.query(m('0016_email_domain'))
+      await pool.query(m('0016_email_domain'))
+      const cols = await pool.query(`SELECT table_name FROM information_schema.columns WHERE table_schema = $1 AND column_name = 'email_domain' ORDER BY table_name`, [s2])
+      expect(cols.rows.map((r) => r.table_name)).toEqual(['email_codes', 'email_links'])
+      await pool.query(`INSERT INTO email_links (email_hash, did, method, email_domain) VALUES ($1, 'did:plc:d16', 'code', 'example.com')`, [h(601)])
+      await pool.query(`INSERT INTO email_links (email_hash, did, method) VALUES ($1, 'did:plc:d16', 'code')`, [h(602)])
+      expect((await pool.query('SELECT email_domain FROM email_links WHERE email_hash = $1', [h(602)])).rows[0].email_domain).toBeNull()
+      await expect(pool.query(`INSERT INTO email_links (email_hash, did, method, email_domain) VALUES ($1, 'did:plc:d16', 'code', 'a@example.com')`, [h(603)])).rejects.toThrow()
+      await expect(pool.query(`INSERT INTO email_links (email_hash, did, method, email_domain) VALUES ($1, 'did:plc:d16', 'code', 'has space.com')`, [h(604)])).rejects.toThrow()
+    })
+
     it('0007 backfills one primary per DID and enforces cap and single primary in the database', async () => {
       await pool.query(`INSERT INTO email_links (email_hash, did, method, verified_at) VALUES ($1, 'did:plc:old', 'code', now() - interval '2 days'), ($2, 'did:plc:old', 'code', now() - interval '1 day')`, [h(1), h(2)])
       await pool.query(m('0010_email_ownership'))
@@ -287,7 +353,7 @@ describe.skipIf(!url)('postgres: no plaintext address at rest', () => {
     await admin.query(`CREATE SCHEMA ${s3}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${s3}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain']) await pool.query(m(n))
   })
   afterAll(async () => {
     await pool.query(`DROP SCHEMA ${s3} CASCADE`)
@@ -306,9 +372,13 @@ describe.skipIf(!url)('postgres: no plaintext address at rest', () => {
     }
     await sendCode(A, addr, store, outbox)
     expect(await dump()).not.toContain('needle')
-    expect(await dump()).not.toContain('plaintext-check')
+    // Only the domain is kept in the clear, on the pending code and then on the link row, never the full address.
+    expect(await dump()).not.toContain('@plaintext-check')
+    expect((await pool.query('SELECT email_domain FROM email_codes WHERE did = $1', [A])).rows[0].email_domain).toBe('plaintext-check.test')
     await confirmLink(A, (await store.codes.get(A))!, store, outbox)
     expect(await dump()).not.toContain('needle')
+    expect(await dump()).not.toContain('@plaintext-check')
+    expect((await pool.query('SELECT email_domain FROM email_links WHERE did = $1', [A])).rows[0].email_domain).toBe('plaintext-check.test')
     expect(decryptJson<string>((await store.links.noticeAddress(A))!)).toBe(addr)
     expect((await pool.query('SELECT email_enc FROM notice_emails WHERE did = $1', [A])).rows[0].email_enc).toMatch(/^v1:/)
     // Moving it to another account mails the previous owner at the same address and leaves nothing readable behind.

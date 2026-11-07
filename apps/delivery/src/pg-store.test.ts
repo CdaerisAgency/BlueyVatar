@@ -12,6 +12,8 @@ const migration2 = readFileSync(new URL('../../../db/migrations/0002_web_auth.sq
 const migration7 = readFileSync(new URL('../../../db/migrations/0008_blocked_images.sql', import.meta.url), 'utf8')
 const migration14 = readFileSync(new URL('../../../db/migrations/0014_gallery.sql', import.meta.url), 'utf8')
 const migration15 = readFileSync(new URL('../../../db/migrations/0015_billing.sql', import.meta.url), 'utf8')
+const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_domain.sql', import.meta.url), 'utf8')
+const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -33,6 +35,8 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration7)
     await pool.query(migration14)
     await pool.query(migration15)
+    await pool.query(migration16)
+    await pool.query(migration17)
   }, 60_000)
 
   afterAll(async () => {
@@ -92,6 +96,31 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await index.isBlocked(DID, 'bafyone')).toBe(true)
     await pool.query(`UPDATE blocked_images SET unblocked_at = now() WHERE did = $1`, [DID])
     expect(await index.isBlocked(DID, 'bafyone')).toBe(false)
+  })
+
+  it('hasPlusSubscription follows status and the past-due grace period', async () => {
+    const index = new PgIndexStore(pool)
+    const did = 'did:plc:plussub'
+    const t0 = new Date('2026-11-01T00:00:00Z')
+    const day = 86_400_000
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('lic_plus', $1, 'free')`, [did])
+    const put = (status: string, pastDue: Date | null, tier = 'plus') =>
+      pool.query(
+        `INSERT INTO subscriptions (stripe_subscription_id, stripe_customer_id, did, license_id, price_id, tier, status, past_due_since, last_event_at)
+              VALUES ('sub_plus', 'cus_plus', $1, 'lic_plus', 'price_plus', $4, $2, $3, now())
+         ON CONFLICT (stripe_subscription_id) DO UPDATE SET status = EXCLUDED.status, past_due_since = EXCLUDED.past_due_since, tier = EXCLUDED.tier`,
+        [did, status, pastDue, tier],
+      )
+    expect(await index.hasPlusSubscription(did, t0)).toBe(false)
+    await put('active', null)
+    expect(await index.hasPlusSubscription(did, t0)).toBe(true)
+    await put('past_due', t0)
+    expect(await index.hasPlusSubscription(did, new Date(t0.getTime() + 6 * day))).toBe(true)
+    expect(await index.hasPlusSubscription(did, new Date(t0.getTime() + 8 * day))).toBe(false)
+    await put('canceled', null)
+    expect(await index.hasPlusSubscription(did, t0)).toBe(false)
+    await put('active', null, 'pro')
+    expect(await index.hasPlusSubscription(did, t0)).toBe(false)
   })
 
   it('keeps gallery images out of avatar reads and orders them by sort, unset last, then newest', async () => {

@@ -51,6 +51,8 @@ export interface IndexStore {
   verifiedAccounts(did: string): Promise<VerifiedAccount[]>
   /** Indexed app.bsky.actor.link records of a repo, for resolving the profile's links strongRefs. */
   profileLinks(did: string): Promise<IndexedLinkRecord[]>
+  /** True when the DID has a Plus subscription that entitles Plus at `now` (active, trialing, or past due inside the grace period). Manual PLUS_DIDS grants are checked separately. */
+  hasPlusSubscription(did: string, now: Date): Promise<boolean>
 }
 
 export class MemoryIndexStore implements IndexStore {
@@ -63,6 +65,8 @@ export class MemoryIndexStore implements IndexStore {
   blocked = new Set<string>()
   accounts = new Map<string, VerifiedAccount[]>()
   linkRecords = new Map<string, IndexedLinkRecord[]>()
+  /** DIDs with an entitling Plus subscription. */
+  plusSubscribers = new Set<string>()
   async didForEmailHash(hash: string) {
     const did = this.emails.get(hash.length === 32 ? (this.md5s.get(hash) ?? '') : hash) ?? null
     if (did && (await this.visibility(did)).emailLookupOptOut) return null
@@ -75,6 +79,7 @@ export class MemoryIndexStore implements IndexStore {
   async isBlocked(did: string, cid: string) { return this.blocked.has(`${did}/${cid}`) }
   async verifiedAccounts(did: string) { return this.accounts.get(did) ?? [] }
   async profileLinks(did: string) { return this.linkRecords.get(did) ?? [] }
+  async hasPlusSubscription(did: string) { return this.plusSubscribers.has(did) }
 }
 
 /** Gallery order: lowest sort first, images without a sort after those, ties newest first. */

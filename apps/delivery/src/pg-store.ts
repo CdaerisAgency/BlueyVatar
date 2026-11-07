@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { effectiveTier, isRating, type IndexedLinkRecord, type Tier } from '@blueyvatar/core'
+import { effectiveTier, isRating, plusEntitled, type IndexedLinkRecord, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
@@ -68,6 +68,14 @@ export class PgIndexStore implements IndexStore {
   async profileLinks(did: string): Promise<IndexedLinkRecord[]> {
     const { rows } = await this.pool.query<IndexedLinkRecord>('SELECT rkey, cid, url, title FROM profile_links WHERE did = $1', [did])
     return rows
+  }
+
+  async hasPlusSubscription(did: string, now: Date): Promise<boolean> {
+    const { rows } = await this.pool.query<{ status: SubscriptionStatus; past_due_since: Date | null }>(
+      `SELECT status, past_due_since FROM subscriptions WHERE did = $1 AND tier = 'plus' AND status IN ('active', 'trialing', 'past_due')`,
+      [did],
+    )
+    return plusEntitled(rows.map((r) => ({ tier: 'plus', status: r.status, pastDueSince: r.past_due_since })), now)
   }
 
   async visibility(did: string): Promise<Visibility> {

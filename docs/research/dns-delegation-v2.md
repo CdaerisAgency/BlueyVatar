@@ -149,7 +149,7 @@ Phase 1 is the smallest step that delivers value: it uses no new fetch path from
 
 1. Is Enterprise-only registration acceptable, or should Pro and Business plans get delegation too?
 2. Should a delegate 404 fall through to local resolution (recommended here) or end in the default image?
-3. Is storing the registered email domain on the link row acceptable under the privacy policy?
+3. Is storing the registered email domain on the link row acceptable under the privacy policy? Answered by the owner: yes, the domain only and never the full address, stored at link time. Migration 0016 adds `email_links.email_domain`, and `/privacy` discloses it. The domain is stored for every linked address, not only for registered domains, because registration does not exist yet.
 4. Libravatar's page does not describe delegation for OpenID hashes, so it is out of scope unless the owner wants it.
 
 ## Sources
@@ -163,4 +163,4 @@ Phase 1 is the smallest step that delivers value: it uses no new fetch path from
 - RFC 5452 (DNS forgery resilience): <https://www.rfc-editor.org/rfc/rfc5452>
 - RFC 4033 (DNSSEC introduction), cited only through RFC 5452's pointer: <https://www.rfc-editor.org/rfc/rfc4033>
 - OWASP SSRF Prevention Cheat Sheet: <https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html>
-- In-repo: spec sections 3, 7, 9, 11.1, 14 and 14.1 (`docs/spec/blueyvatar-product-spec-v6.md`), `docs/self-hosting-v1.md`, `docs/deploy.md`, `docs/research/decisions-phase2-v1.md`, `packages/core/src/verification/safe-fetch.ts`
+- In-repo: spec sections 3, 7, 9, 11.1, 14 and 14.1 (`docs/spec/blueyvatar-product-spec-v7.md`), `docs/self-hosting-v1.md`, `docs/deploy.md`, `docs/research/decisions-phase2-v1.md`, `packages/core/src/verification/safe-fetch.ts`

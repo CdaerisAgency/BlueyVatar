@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PAST_DUE_GRACE_DAYS, PAST_DUE_GRACE_MS, effectiveTier, entitles, graceEndsAt, resolveLicenseBilling, type SubscriptionFacts } from './index.js'
+import { PAID_PLANS, PAID_TIERS, PAST_DUE_GRACE_DAYS, PAST_DUE_GRACE_MS, effectiveTier, entitles, graceEndsAt, isPaidTier, plusEntitled, resolveLicenseBilling, type SubscriptionFacts } from './index.js'
 
 const T0 = new Date('2026-11-01T00:00:00Z')
 const day = 24 * 60 * 60 * 1000
@@ -60,5 +60,30 @@ describe('effectiveTier', () => {
   })
   it('never changes Enterprise', () => {
     expect(effectiveTier({ tier: 'enterprise', status: 'past_due', graceEndsAt: T0 }, new Date(T0.getTime() + 30 * day))).toBe('enterprise')
+  })
+})
+
+describe('Plus plan', () => {
+  const plus = (o: { status?: SubscriptionFacts['status']; pastDueSince?: Date | null } = {}) => ({ tier: 'plus', status: o.status ?? 'active', pastDueSince: o.pastDueSince ?? null })
+  it('is sellable but is not a developer tier', () => {
+    expect(PAID_PLANS).toEqual(['pro', 'business', 'plus'])
+    expect(PAID_TIERS).not.toContain('plus')
+    expect(isPaidTier('plus')).toBe(false)
+    expect(isPaidTier('pro')).toBe(true)
+  })
+  it.each(['active', 'trialing'] as const)('entitles %s', (status) => {
+    expect(plusEntitled([plus({ status })], T0)).toBe(true)
+  })
+  it.each(['canceled', 'unpaid', 'incomplete', 'incomplete_expired', 'paused'] as const)('does not entitle %s', (status) => {
+    expect(plusEntitled([plus({ status })], T0)).toBe(false)
+  })
+  it('keeps Plus through the past-due grace period, then ends it', () => {
+    const s = plus({ status: 'past_due', pastDueSince: T0 })
+    expect(plusEntitled([s], new Date(T0.getTime() + 7 * day - 1))).toBe(true)
+    expect(plusEntitled([s], new Date(T0.getTime() + 7 * day))).toBe(false)
+  })
+  it('ignores developer subscriptions', () => {
+    expect(plusEntitled([{ tier: 'pro', status: 'active', pastDueSince: null }], T0)).toBe(false)
+    expect(plusEntitled([], T0)).toBe(false)
   })
 })

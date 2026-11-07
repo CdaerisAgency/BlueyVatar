@@ -20,7 +20,7 @@ function fail(err: unknown): never {
 
 export async function uploadGalleryImage(form: FormData): Promise<void> {
   const did = await signedIn()
-  if (!isPlus(did)) return back('galleryError', GALLERY_PLUS_MESSAGE)
+  if (!(await isPlus(did))) return back('galleryError', GALLERY_PLUS_MESSAGE)
   const file = form.get('file')
   if (!(file instanceof File) || file.size === 0) return back('galleryError', 'Choose an image file.')
   if (file.size > 1_000_000) return back('galleryError', 'The image is larger than 1,000,000 bytes. Resize or compress it and try again.')

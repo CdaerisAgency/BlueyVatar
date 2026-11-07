@@ -1,4 +1,4 @@
-import type { PaidTier } from '@blueyvatar/core'
+import type { PaidPlan } from '@blueyvatar/core'
 import Stripe from 'stripe'
 import { NOT_CONFIGURED, missingForCheckout, priceFor, secretKey, type Env } from './config'
 import type { BillingStore } from './store'
@@ -41,11 +41,12 @@ export function checkoutParams(opts: { did: string; licenseId: string; price: st
   }
 }
 
-export async function createCheckoutUrl(ctx: Ctx, did: string, licenseId: string, tier: PaidTier): Promise<UrlResult> {
+export async function createCheckoutUrl(ctx: Ctx, did: string, licenseId: string, tier: PaidPlan): Promise<UrlResult> {
   const env = ctx.env ?? process.env
   if (!ctx.client || missingForCheckout(env, tier).length > 0) return { ok: false, error: NOT_CONFIGURED }
   const price = priceFor(tier, env)!
-  const current = await ctx.store.subscriptionFor(did)
+  // A user can hold one developer subscription and one Plus subscription, never two of the same kind.
+  const current = await ctx.store.subscriptionFor(did, tier === 'plus' ? 'plus' : 'developer')
   if (current) return { ok: false, error: 'You already have a subscription. Use Manage billing to change or cancel it.' }
   const session = await ctx.client.checkout.sessions.create(
     checkoutParams({ did, licenseId, price, customer: await ctx.store.customerFor(did), baseUrl: ctx.baseUrl }),

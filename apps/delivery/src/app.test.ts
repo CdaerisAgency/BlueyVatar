@@ -813,6 +813,16 @@ describe('profile gallery (F21)', () => {
     expect(g.every((x: { url: string }) => x.url.startsWith('/img/'))).toBe(true)
   })
 
+  it('returns the gallery for a DID with a Plus subscription, with no PLUS_DIDS entry', async () => {
+    const { deps, index } = setup()
+    deps.resolver = { ...deps.resolver, galleryItems: async () => items(2) }
+    deps.plusDids = undefined
+    const app = createApp(deps)
+    expect(await gal(app)).toEqual([])
+    index.plusSubscribers.add(DID)
+    expect(await gal(app)).toHaveLength(2)
+  })
+
   it('applies the avatar rating filter', async () => {
     const list = [...items(1, 'g'), { cid: 'bafypg', rating: 'pg' as const, caption: null }, { cid: 'bafyr', rating: 'r' as const, caption: null }, { cid: 'bafyx', rating: 'x' as const, caption: null }]
     expect(await gal(galleryApp(list, DID))).toHaveLength(1)
