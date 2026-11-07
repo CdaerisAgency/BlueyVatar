@@ -86,6 +86,6 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Indexer: deploy Tap on Fly.io with the service profile as the signal collection and the five collections as filters; implement the `onPurge` hook for cache warming (done: see docs/deploy.md, CDN cache warming).
 - [ ] Delivery: count the `transform` meter when a new variant is generated, and add usage alerts at 80 and 100 percent of included volume.
 - [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
-- [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.
+- [x] Adapters: Tangled profile avatar field confirmed against live repos; `org.tangled.actor.profile` enabled, with `sh.tangled.actor.profile` as a fallback (`docs/research/tangled-collection-v1.md`).
 - [ ] Lexicons: name cleared, validator, permission set, publish script, and the `OAUTH_USE_PERMISSION_SET` flag are in place. Remaining at deploy: run the publish and create the `_lexicon.blueyvatar.com` TXT record (docs/deploy.md).
-- [ ] Billing: choose the payment processor, tax handling, and invoicing (open item in spec section 13).
+- [x] Billing: Stripe Checkout, Customer Portal, and a signed webhook (spec section 12.1). Follow-up: a Plus price, the overage rate, and the Stripe dashboard setup in docs/deploy.md.

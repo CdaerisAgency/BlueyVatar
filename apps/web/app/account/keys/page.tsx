@@ -1,5 +1,6 @@
 import { PageMain, TableBox } from '../../../components/Page'
 import { ENTITLEMENTS, TIERS, type Tier } from '@blueyvatar/core'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
@@ -56,7 +57,7 @@ export default async function KeysPage() {
         </li>
         {inc.per === 'day' && <li>Free limits are per day, so the monthly total above is for reference.</li>}
       </ul>
-      <p>Tier changes are not available yet because billing is not set up. The table below is read-only.</p>
+      <p>Change your plan on the <Link href="/account/billing">Billing</Link> page. The table below shows what each tier includes.</p>
 
       {periods.length > 0 && (
         <>
