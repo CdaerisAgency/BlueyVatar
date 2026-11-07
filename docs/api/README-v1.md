@@ -1,0 +1,12 @@
+# BlueyVatar delivery API reference (v1)
+
+The delivery API serves avatars and profile JSON. The proposed delivery host is `https://img.blueyvatar.com`. This host is not final, so write it as a configurable base URL in your client and expect the docs to name the final host before launch. All paths in these pages are relative to that base URL.
+
+| Page | Covers |
+| --- | --- |
+| [hashing-v1.md](hashing-v1.md) | Computing the email hash on the client (SHA-256, and MD5 for legacy clients) |
+| [json-mode-v1.md](json-mode-v1.md) | The `json=true` response shape and its version policy |
+| [cache-ttl-v1.md](cache-ttl-v1.md) | The `ttl` parameter, tier limits, and CDN interaction |
+| [errors-v1.md](errors-v1.md) | Error codes, rate limit headers, and other response headers |
+
+Source of truth: `apps/delivery/src/app.ts`, `apps/delivery/src/errors.ts`, `packages/core/src/params.ts`, `packages/core/src/tiers.ts`, and `packages/core/src/hash.ts`.

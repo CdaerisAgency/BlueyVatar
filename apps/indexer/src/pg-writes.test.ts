@@ -22,7 +22,7 @@ describe.skipIf(!url)('postgres index writes', () => {
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
     for (const m of migrations) await pool.query(m)
-    await pool.query(readFileSync(new URL('../../../db/migrations/0007_profile_links.sql', import.meta.url), 'utf8'))
+    await pool.query(readFileSync(new URL('../../../db/migrations/0009_profile_links.sql', import.meta.url), 'utf8'))
   })
 
   afterAll(async () => {
