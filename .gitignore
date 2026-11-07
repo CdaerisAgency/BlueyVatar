@@ -7,3 +7,5 @@ packages/core/src/lexicons/
 coverage/
 *.tsbuildinfo
 apps/web/lib/docs.generated.ts
+test-results/
+playwright-report/

@@ -41,5 +41,24 @@ jobs:
       - name: Deploy indexer
         run: flyctl deploy --remote-only --config fly/indexer.toml --dockerfile Dockerfile
 
+      # Smoke test of the live apps (tools/smoke/smoke.ts). It needs only Node. A failure fails the workflow.
+      # Set the repository variable SMOKE_HANDLE to an account with an avatar to enable the cache and profile checks.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Smoke test production
+        env:
+          SMOKE_HANDLE: ${{ vars.SMOKE_HANDLE }}
+          SMOKE_OPTED_OUT_HASH: ${{ vars.SMOKE_OPTED_OUT_HASH }}
+        run: |
+          # New machines and the edge can take a moment to settle, so retry a few times before failing.
+          for attempt in 1 2 3; do
+            if node --experimental-strip-types tools/smoke/smoke.ts --env production; then exit 0; fi
+            echo "Smoke test failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          exit 1
+
       # Tap is deployed by hand (docs/deploy.md): a restart interrupts the firehose
       # and a bad upgrade can force a re-backfill, so a person should watch it.

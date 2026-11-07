@@ -98,7 +98,9 @@ Tap is a separate app that the indexer connects to (`TAP_URL`).
 
 ### Live Tap test
 
-`apps/indexer/src/tap-live.test.ts` runs the indexer path against a real Tap (issue #42). It signs in to a dedicated test account, writes, updates, and deletes records in all seven filtered collections, consumes the events over the `@atproto/tap` channel, runs them through `handleRecord` and `PgIndexWrites` into a throwaway Postgres schema, and asserts the rows. It also asserts that the Tap event `cid` equals the record CID returned by the PDS for every collection (`app.bsky.actor.link` and both Tangled profile NSIDs included, issue #101), that a stored link's strongRef resolves and an outdated ref is dropped, and that every event is acked only after its handler finished. Set `TAP_LIVE_CHECK_STATUS=1` to also deactivate and reactivate the account and check that `repos` follows. It skips with a message in CI because `TAP_LIVE_URL` is unset.
+`apps/indexer/src/tap-live.test.ts` runs the indexer path against a real Tap (issue #42). The full description, the self-contained local run (`pnpm tap:live:local`, local PDS and PLC plus the pinned Tap image, no real accounts), the manual GitHub Actions workflow, and what has and has not been verified are in `docs/testing-live-tap-v1.md`. It skips in CI because neither `LIVE_TAP_TEST` nor `TAP_LIVE_URL` is set.
+
+The rest of this section is external mode, against a staging Tap and a test account you own.
 
 Run it after a staging deploy:
 
@@ -118,7 +120,7 @@ export TEST_DATABASE_URL=postgres://postgres@localhost:5432/postgres
 pnpm tap:live                                # tools/tap-live.sh, add TAP_LIVE_CHECK_STATUS=1 for the status step
 ```
 
-Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message lists the events seen for the test DID. The first green run closes #42. To test locally, run the pinned image: `docker run --rm -p 2480:2480 -e TAP_SIGNAL_COLLECTION=com.blueyvatar.profile -e TAP_COLLECTION_FILTERS=<the list in fly/tap.toml> -e TAP_ADMIN_PASSWORD=test ghcr.io/bluesky-social/indigo/tap:0.1.10@sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb`, then use `TAP_LIVE_ADMIN_PASSWORD=test`. A local Tap still needs outbound access to the relay and the test account's PDS. Not yet run against a live Tap as of this writing.
+Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message lists the events seen for the test DID. Run with `TAP_LIVE_CHECK_STATUS=1` to include the account status check. The local, self-contained run replaces the `docker run` recipe that used to be here.
 
 ## Cloudflare
 
@@ -174,8 +176,12 @@ Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It re
 - Addresses: `security@blueyvatar.com` (the vulnerability contact in `SECURITY.md`) and `alerts@blueyvatar.com`. Each has its own routing rule.
 - Destination: `chris@cdaeris.com`. Cloudflare sends a verification email to a new destination address, and rules cannot forward to it until that link is clicked.
 - DNS: Email Routing adds the MX records (`route1`, `route2`, `route3.mx.cloudflare.net`), the SPF TXT record `v=spf1 include:_spf.mx.cloudflare.net ~all`, and a DKIM record at `cf2024-1._domainkey`. Do not add other MX records or a second SPF record for the apex; a domain can publish only one SPF record.
-- Token: the API token used for setup is in Infisical project `blueyvatar`, environment `dev`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
+- Token: the API token used for setup is in Infisical project `blueyvatar`, environment `prod`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
 - To add an address: `POST /zones/{zone_id}/email/routing/rules` with a `literal` matcher on `to` and a `forward` action. To add a destination: `POST /accounts/{account_id}/email/routing/addresses`. Docs: <https://developers.cloudflare.com/email-routing/>.
+
+## Notification emails
+
+Usage alerts (80 and 100 percent), billing notices (failed payment, grace expiry, cancellation), and key revoked notices are mailed to the account's primary email from `notice_emails` (issue 144). Delivery and web both send through Resend, so set `RESEND_API_KEY`, `EMAIL_FROM`, `PUBLIC_URL`, and `TOKEN_ENCRYPTION_KEY` on both apps. Without a stored address delivery logs the usage alert instead. Owners switch usage and billing messages off at `/account/notifications` (migration 0019); security notices stay on. Grace expiry is mailed when Stripe ends a subscription that was past due, since the license itself drops to Free limits with no event.
 
 ## CDN cache warming
 
@@ -192,7 +198,27 @@ After an avatar changes (an image record upsert, or a Bluesky profile change, wh
 
 ## Blocking an image
 
-Reports from the public form land in the `reports` table (status `open`). Review them with SQL, for example `SELECT id, target_did, reason, details, created_at FROM reports WHERE status = 'open' ORDER BY created_at`. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. To take down a reported account, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`; it blocks all of the account's images, purges them, and records who and why on the report. To block one image, use the steps below. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
+Reports from the public form land in the `reports` table (status `open`). Moderators work them in the web admin page at `/admin` (issue #145). `pnpm ops:block` and `pnpm ops:block-did` still work for emergencies, and they write to the same audit log.
+
+### Web admin page
+
+Admin access is off until both variables are set on the web app, and then `/admin` answers 404 to everyone else.
+
+| Variable | Value |
+| --- | --- |
+| `ADMIN_DIDS` | DIDs allowed to use `/admin`, separated by commas or spaces. These accounts sign in through the normal atproto login first. |
+| `ADMIN_TOTP_SECRET` | Base32 secret for the second factor. Generate one with `openssl rand 20 | base32`, add it to an authenticator app as a manual time-based entry (SHA-1, 6 digits, 30 seconds), and keep it in Infisical. |
+| `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL` | The same values the ops CLI uses. With any of them unset, a block or takedown still takes effect in the database, the page says the cache purge did not run, and you purge `/img/` for the account in Cloudflare yourself. |
+
+Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin session ends after 30 minutes and can be ended earlier from the page. Wrong codes lock the account for 15 minutes after 5 failures. Every action asks for a reason and is recorded in the `admin_actions` table, which the page shows under "Audit log". Run migration 0021 before the first deploy. `/admin` is disallowed in `robots.txt`, answers `X-Robots-Tag: noindex`, and is not listed in the sitemap.
+
+Actions on the page:
+
+- Dismiss a report, or take down the account: this blocks every indexed image, purges the cache, and marks the reports actioned.
+- Suspend an account: a reversible hold. Images indexed after the suspension are not blocked until the suspension is renewed. Lifting it restores only the images the suspension blocked.
+- Unblock one image, for example after an appeal.
+
+To block one image from a shell, use the steps below. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. To take down a whole account from a shell, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
 
 ## Stripe billing
 
@@ -253,7 +279,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `SENTRY_DSN`, `METRICS_TOKEN` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; optional `SENTRY_DSN`, `METRICS_TOKEN` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `SENTRY_DSN` and `METRICS_TOKEN` are new secrets (see Observability). `SENTRY_DSN` can be the same project DSN on all three apps, since events are tagged with `app`. `METRICS_TOKEN` should differ per app. Staging uses `STAGING_SENTRY_DSN` and `STAGING_METRICS_TOKEN`, ideally pointing at a separate Sentry project or environment. Non-secret tuning values (`LOG_LEVEL`, `READY_TIMEOUT_MS`, `INDEXER_STALL_SECONDS`, `TAP_PROBE_INTERVAL_SECONDS`, `HEALTH_PORT`) are listed in `.env.example` and can go in `fly/*.toml` `[env]`.
@@ -421,12 +447,63 @@ Thresholds are starting points to tune after a week of real traffic. "Page" mean
 3. Create the alerts in the table in Sentry, Grafana, or Fly's managed Prometheus. Nothing is created automatically.
 4. After the first deploy, check `curl https://<delivery host>/readyz`, `curl https://<web host>/api/health`, and `fly ssh console --app blueyvatar-indexer -C "node -e \"fetch('http://localhost:8080/readyz').then(r=>r.text()).then(console.log)\""`, and confirm the `outboxBuffer` value in the indexer response is a number.
 
+## Log retention
+
+Policy (issue #146, owner decision): logs are kept 90 days or until a size cap is reached, whichever comes first. The same sentence is published on `/privacy`. This section covers request logs, logs held in our own database, and the settings that make every store agree.
+
+### Settings
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `LOG_RETENTION_DAYS` | `90` | Age limit in days. Values above 90 are clamped to 90, because 90 is the published ceiling. Lower it only if you also change `/privacy`. |
+| `LOG_RETENTION_MAX_GB` | `5` | Size cap in gigabytes, applied to each log store separately (the log destination and the database). Invalid values fall back to the default. |
+
+Both are read by delivery, which runs the database purge. Set them as Fly secrets or in `fly/delivery.toml` `[env]`. The log destination has its own settings, listed below, and must be set to the same two numbers by hand.
+
+### Why 5 GB
+
+No traffic data exists yet (spec section 11 calls its numbers placeholders), so the default comes from arithmetic on what the code logs. Delivery writes one JSON line per request with level, app, message, time, route pattern, status, duration, and request id (see Observability, Logging). That is about 250 to 350 bytes, so call it 300 bytes with shipper metadata. Cloudflare caches `/img/*` and serves the rate limit and redirect traffic from the edge only on hits, so the origin sees a fraction of all requests.
+
+| Origin requests per day | Lines in 90 days | Size in 90 days at 300 bytes |
+| --- | --- | --- |
+| 10,000 | 0.9 million | 0.3 GB |
+| 100,000 | 9 million | 2.7 GB |
+| 185,000 | 16.7 million | 5 GB |
+| 1,000,000 | 90 million | 27 GB |
+
+A 5 GB cap therefore never bites below about 185,000 origin requests per day, so at launch volumes the 90 day limit is the one that applies, and the cap is a guard against a traffic spike or a log-spam bug filling the destination. Above that volume the cap wins and older lines drop earlier than 90 days, which the policy allows. The figure is also small enough to fit common free or low cost tiers of log destinations (confirm against the vendor, see below). Revisit it after the first month of real traffic: multiply the daily line count by 300 bytes and by 90.
+
+### Database-held logs
+
+Delivery runs `enforceLogRetention` (`apps/delivery/src/log-retention.ts`) a minute after start and then daily:
+
+- `reports.ip_hash` is set to NULL once a report is older than the age limit. The report row stays, because it records a takedown decision and holds no request data. The hash only drives the per-IP report rate limit, which looks back far less than 90 days. Migration 0020 drops the NOT NULL constraint for this.
+- `stripe_events` rows (processed webhook event ids) older than the age limit are deleted. Stripe stops retrying a webhook within days, so a 90 day idempotency window is ample.
+- Size cap: if the live bytes of those two (event rows plus kept IP hashes) exceed `LOG_RETENTION_MAX_GB`, the oldest rows across both go first, in batches of 1,000, until the total fits.
+- `rate_windows` is already cleaned hourly by `rate-cleanup.ts` once its window ends (minutes), well inside the policy.
+- Not logs, so not purged here: `usage_alerts`, `usage_counters`, and `service_usage_counters` (billing and quota accounting, one row per period), and `oauth_state` and `email_codes` rows that expire in minutes.
+
+Check a run in the delivery logs for `log retention purge` (printed only when something was removed). A purge failure logs `log retention purge failed` and retries the next day.
+
+### Fly and external log retention
+
+Fly keeps logs only briefly for `fly logs`; the exact window is **unconfirmed** (not stated in the Fly docs we have read), so treat it as shorter than 90 days and never as the record of retention. Nothing is shipped yet. Until a destination is set up, request logs live only in Fly's short buffer, which is within the policy (shorter than 90 days) but gives no look-back for abuse investigations. To meet the policy with look-back, ship logs and set the destination as follows. Vendor details below are **unconfirmed**: verify each on the vendor's current docs and record the date when you do.
+
+1. Ship with Fly's log shipper, an app that reads Fly's NATS log stream and forwards it: <https://github.com/superfly/fly-log-shipper>. Run it as its own Fly app with a read-only org token. It supports several sinks (Axiom, Loki, Datadog, and others, per its README).
+2. At the destination, set retention to 90 days and a 5 GB (or `LOG_RETENTION_MAX_GB`) cap:
+   - Grafana Loki: `retention_period: 2160h` (90 days) with the compactor's `retention_enabled: true`. Loki has no total size cap setting that we have confirmed, so watch storage and lower `retention_period` if needed, or use a destination below.
+   - Axiom: set the dataset retention to 90 days in the dataset settings. A size cap is not a dataset setting we have confirmed; the plan's ingest limit is the practical cap.
+   - Any other sink: both a 90 day expiry and a size limit must exist, or a scheduled job must enforce them. If a sink cannot, do not choose it.
+3. Cost at expected volume: at the table above, 0.3 to 2.7 GB per 90 days is within free tiers at several vendors, but plan limits change and are **unconfirmed** here. Owner action: confirm the plan and that a paid destination is acceptable (the issue asked).
+4. Logs must never carry client IPs, query strings, cookies, keys, or raw DIDs, because the logger removes them before they reach any sink (Observability, Logging). Per request, a shipped line holds timestamp, route pattern, status, duration, and request id. The key id and a user agent length class from the issue's field list are not logged; that is stricter than required.
+
 ## Release checklist
 
 1. Merge to `main`. The deploy workflow builds and deploys delivery, web, and indexer.
 2. delivery runs pending migrations in the release command, then starts. A failing migration aborts the deploy and leaves the previous version running.
 3. Check `/readyz` on delivery, `/api/health` on web, and the indexer's `/readyz` (see Observability), then the indexer logs for a Tap connection (`fly logs --app blueyvatar-indexer`). `/healthz` stays the liveness route.
 4. Deploy Tap by hand only when its pin changes.
+5. Log retention: confirm `LOG_RETENTION_MAX_GB` (default 5) and `LOG_RETENTION_DAYS` (default 90) match the log destination's settings, and that `/privacy` still says 90 days or the size cap, whichever comes first (see Log retention).
 
 ## Provisioned resources
 
@@ -439,3 +516,7 @@ Thresholds are starting points to tune after a week of real traffic. "Page" mean
 - Fly staging apps in the `personal` organization, region `iad`, created November 4, 2026: `blueyvatar-tap-staging` (volume `tap_data`, ID `vol_r1jd8enn1q2dj19r`, 10 GB), `blueyvatar-delivery-staging`, `blueyvatar-indexer-staging`, `blueyvatar-web-staging`.
   - Deployed: tap (image `0.1.10`, TCP check passing), delivery (five migrations applied to the Neon `staging` branch; `/healthz` returns 200, a direct hit on `/u/x` returns 403 `origin_forbidden`), indexer (running; Cloudflare purges logged only).
   - Not deployed: web, which waits on the Cloudflare setup and the `TRUSTED_PDS_HOSTS` value.
+
+## Account data deletion and billing retention
+
+Signed-in users can download their data and delete it at `/account/data`. Deletion removes everything except Stripe billing rows (`billing_customers`, `subscriptions`), which are marked `deleted_at` and kept for 7 years for tax and accounting. It cancels active Stripe subscriptions first, so `STRIPE_SECRET_KEY` must be set on web for that step. The indexer runs a daily job (`apps/indexer/src/billing-retention.ts`) that deletes billing rows 7 years after `deleted_at`, and `stripe_events` rows 7 years after they were processed (they hold no DID). Email hashes stay as 30-day holds, as for any deleted account.

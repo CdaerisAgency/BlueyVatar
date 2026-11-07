@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GALLERY_MAX } from '@blueyvatar/core'
-import { pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
+import { pageAtprotoApps, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
 
 const base: PublicProfile = { did: 'did:plc:a', handle: 'alice.test', displayName: 'Alice', description: 'Hi there', avatar: { url: '/img/x/y/256.png' }, jobTitle: null, company: null, location: null, pronouns: null }
 
@@ -21,6 +21,12 @@ describe('profile page model', () => {
   it('re-checks links and interests', () => {
     expect(pageLinks({ ...base, links: [{ label: 'A', url: 'https://a.test/' }, { label: 'B', url: 'javascript:1' }] })).toEqual([{ label: 'A', url: 'https://a.test/' }])
     expect(pageInterests({ ...base, interests: ['go', '', 3, 'tea'] })).toEqual(['go', 'tea'])
+  })
+  it('keeps only well-formed atproto apps, once each', () => {
+    const a = { name: 'Tangled', url: 'https://tangled.org' }
+    expect(pageAtprotoApps({ ...base, atprotoApps: [a, a, { name: 'X', url: 'http://x.test' }, { name: 3, url: 'https://y.test' }, null] })).toEqual(['Tangled'])
+    expect(pageAtprotoApps(base)).toEqual([])
+    expect(pageAtprotoApps({ ...base, atprotoApps: 'nope' })).toEqual([])
   })
   describe('gallery', () => {
     const g = (n: number) => Array.from({ length: n }, (_, i) => ({ url: `/img/d/c${i}/sig/512.png`, caption: i === 0 ? 'First' : '' }))

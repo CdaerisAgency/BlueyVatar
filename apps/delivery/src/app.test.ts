@@ -27,6 +27,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     galleryItems: async () => [],
     getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ uri: `at://${DID}/app.bsky.actor.link/l1`, cid: 'cl1' }, { uri: `at://${DID}/app.bsky.actor.link/l2`, cid: 'cl2' }, { uri: `at://${DID}/app.bsky.actor.link/l3`, cid: 'stale' }] } : null),
     getBlob: async () => new Uint8Array([1, 2, 3]),
+    repoApps: async () => [{ id: 'tangled', name: 'Tangled', url: 'https://tangled.org' }],
   }
   const usage = new MemoryUsageMeter()
   const deps: AppDeps = {
@@ -275,6 +276,12 @@ describe('delivery API', () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
+  })
+
+  it('lists detected atproto apps in the profile JSON', async () => {
+    const { app } = setup()
+    const body = await (await app.request('/profile/alice.test')).json()
+    expect(body.atprotoApps).toEqual([{ id: 'tangled', name: 'Tangled', url: 'https://tangled.org' }])
   })
 
   it('returns attested accounts only, with hidden ones flagged and the Free cap applied', async () => {

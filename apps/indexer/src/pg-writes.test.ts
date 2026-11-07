@@ -7,7 +7,7 @@ import { PgIndexWrites } from './pg-writes.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
-const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
+const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery', '0019_notification_prefs'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
 const schema = `t_indexer_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 
