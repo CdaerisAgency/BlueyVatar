@@ -21,7 +21,7 @@ describe.skipIf(!url)('operator block and unblock', () => {
     await pool.query(sql('0001_init.sql'))
     await pool.query(sql('0008_blocked_images.sql'))
     await pool.query(sql('0012_reports.sql'))
-    await pool.query(sql('0019_admin.sql'))
+    await pool.query(sql('0021_admin.sql'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)

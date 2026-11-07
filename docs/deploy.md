@@ -204,7 +204,7 @@ Admin access is off until both variables are set on the web app, and then `/admi
 | `ADMIN_TOTP_SECRET` | Base32 secret for the second factor. Generate one with `openssl rand 20 | base32`, add it to an authenticator app as a manual time-based entry (SHA-1, 6 digits, 30 seconds), and keep it in Infisical. |
 | `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL` | The same values the ops CLI uses. With any of them unset, a block or takedown still takes effect in the database, the page says the cache purge did not run, and you purge `/img/` for the account in Cloudflare yourself. |
 
-Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin session ends after 30 minutes and can be ended earlier from the page. Wrong codes lock the account for 15 minutes after 5 failures. Every action asks for a reason and is recorded in the `admin_actions` table, which the page shows under "Audit log". Run migration 0019 before the first deploy. `/admin` is disallowed in `robots.txt`, answers `X-Robots-Tag: noindex`, and is not listed in the sitemap.
+Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin session ends after 30 minutes and can be ended earlier from the page. Wrong codes lock the account for 15 minutes after 5 failures. Every action asks for a reason and is recorded in the `admin_actions` table, which the page shows under "Audit log". Run migration 0021 before the first deploy. `/admin` is disallowed in `robots.txt`, answers `X-Robots-Tag: noindex`, and is not listed in the sitemap.
 
 Actions on the page:
 
