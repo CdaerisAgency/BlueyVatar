@@ -33,7 +33,7 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
       <ul>
         <li>Linked email hashes and domains, pending codes, and the encrypted primary email. Each hash is held for {HOLD_DAYS} days so no other account can claim it right away.</li>
         <li>Profile links, claims, attestations, and visibility rules.</li>
-        <li>Your license and API keys, which stop working at once.</li>
+        <li>Your license and API keys, which stop working at once. You leave any organization you belong to. An organization you created and that has no other members is deleted with its keys. If it still has other members, remove them first.</li>
         <li>Your custom domain, including its Cloudflare hostname.</li>
         <li>Your indexed avatars and profile, with their cached copies purged.</li>
         <li>Your sign-in session.</li>

@@ -187,7 +187,7 @@ export async function accountSummary(pool: pg.Pool, did: string): Promise<Accoun
     one<AccountSummary['images'][number]>('SELECT cid, rkey, rating, is_default FROM images WHERE did = $1 ORDER BY created_at DESC LIMIT 200'),
     one<AccountSummary['blocked'][number]>('SELECT cid, reason, kind, blocked_by, blocked_at FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL ORDER BY blocked_at DESC'),
     one<{ open: number; total: number }>("SELECT count(*) FILTER (WHERE status = 'open')::int AS open, count(*)::int AS total FROM reports WHERE target_did = $1"),
-    one<{ tier: string; status: string }>('SELECT tier, status FROM licenses WHERE owner = $1 ORDER BY created_at DESC LIMIT 1'),
+    one<{ tier: string; status: string }>('SELECT tier, status FROM licenses WHERE owner = $1 AND org_id IS NULL ORDER BY created_at DESC LIMIT 1'),
     one<AccountSummary['subscriptions'][number]>('SELECT tier, status, cancel_at_period_end FROM subscriptions WHERE did = $1 ORDER BY updated_at DESC'),
     one<{ n: number }>("SELECT count(*)::int AS n FROM email_holds WHERE did = $1 AND released_at > now() - interval '30 days'"),
     one<NonNullable<AccountSummary['suspension']>>('SELECT reason, suspended_by, suspended_at FROM account_suspensions WHERE did = $1 AND lifted_at IS NULL'),

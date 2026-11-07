@@ -46,7 +46,8 @@ export async function createCheckoutUrl(ctx: Ctx, did: string, licenseId: string
   if (!ctx.client || missingForCheckout(env, tier).length > 0) return { ok: false, error: NOT_CONFIGURED }
   const price = priceFor(tier, env)!
   // A user can hold one developer subscription and one Plus subscription, never two of the same kind.
-  const current = await ctx.store.subscriptionFor(did, tier === 'plus' ? 'plus' : 'developer')
+  // Developer subscriptions are per license, so an organization license has its own.
+  const current = await ctx.store.subscriptionFor(did, tier === 'plus' ? 'plus' : 'developer', tier === 'plus' ? undefined : licenseId)
   if (current) return { ok: false, error: 'You already have a subscription. Use Manage billing to change or cancel it.' }
   const session = await ctx.client.checkout.sessions.create(
     checkoutParams({ did, licenseId, price, customer: await ctx.store.customerFor(did), baseUrl: ctx.baseUrl }),

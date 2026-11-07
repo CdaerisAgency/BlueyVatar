@@ -33,6 +33,8 @@ export const BUCKETS = {
   'upload.ip': { limit: 90, windowSec: HOUR },
   'key.did': { limit: 20, windowSec: HOUR },
   'key.ip': { limit: 60, windowSec: HOUR },
+  'org.did': { limit: 60, windowSec: HOUR },
+  'org.ip': { limit: 120, windowSec: HOUR },
   'addEmail.did': { limit: 5, windowSec: HOUR },
   'addEmail.ip': { limit: 20, windowSec: HOUR },
   'codeFail.did': { limit: 10, windowSec: HOUR },

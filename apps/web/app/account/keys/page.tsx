@@ -4,6 +4,9 @@ import Link from 'next/link'
 import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
+import { isScope, resolveScope } from '../../../lib/orgs/scope'
+import { getOrganization } from '../../../lib/orgs/store'
+import { getPool } from '../../../lib/store'
 import AccountNav from '../AccountNav'
 import { CreateKeyForm, KeyActions } from './KeyControls'
 
@@ -12,10 +15,22 @@ export const dynamic = 'force-dynamic'
 const n = (v: number | null) => (v === null ? 'Custom' : v.toLocaleString('en-US'))
 const ALERT_TEXT = { ok: 'Below 80 percent of included volume.', warn80: 'At or above 80 percent of included volume.', over100: 'Included volume reached.', 'n/a': 'No monthly alert for this tier.' }
 
-export default async function KeysPage() {
+export default async function KeysPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
   const did = await requireDid('/account/keys')
+  const orgId = (await searchParams).org || null
   const store = getDashboardStore()
-  const license = await store.ensureLicense(did)
+  const scope = await resolveScope(did, orgId)
+  if (!isScope(scope)) {
+    return (
+      <PageMain>
+        <AccountNav />
+        <h1>License and API keys</h1>
+        <p role="alert">{scope.error}</p>
+      </PageMain>
+    )
+  }
+  const license = scope.license
+  const org = orgId ? await getOrganization(getPool()!, orgId) : null
   const keys = await store.listKeys(license.licenseId)
   const now = new Date()
   const period = periodStartOf(now)
@@ -37,6 +52,7 @@ export default async function KeysPage() {
       <AccountNav />
       <h1>License and API keys</h1>
       <p>Signed in as {did}</p>
+      {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
 
       <h2>License</h2>
       <ul>
@@ -55,7 +71,7 @@ export default async function KeysPage() {
         </li>
         {inc.per === 'day' && <li>Free limits are per day, so the monthly total above is for reference.</li>}
       </ul>
-      <p>Change your plan on the <Link href="/account/billing">Billing</Link> page. The table below shows what each tier includes.</p>
+      <p>Change your plan on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Billing</Link> page. The table below shows what each tier includes.</p>
 
       {periods.length > 0 && (
         <>
@@ -94,13 +110,13 @@ export default async function KeysPage() {
             <code>{k.prefix}...</code> {k.kind} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
             {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : ''}
             {k.kind === 'publishable' && !k.revokedAt && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
-            {!k.revokedAt && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} />}
+            {!k.revokedAt && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} orgId={orgId ?? ''} />}
           </li>
         ))}
       </ul>
       <p>Only a SHA256 hash and a short prefix are stored, so a lost key cannot be shown again. Rotate it instead.</p>
 
-      <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} />
+      <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} orgId={orgId ?? ''} />
 
       <h2>Tiers</h2>
       <TableBox label="Tiers">
