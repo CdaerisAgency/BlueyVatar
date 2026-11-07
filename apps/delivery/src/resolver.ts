@@ -216,12 +216,20 @@ export class AtprotoResolver implements AvatarResolver {
         updatedAt: img.createdAt,
       })
     }
-    for (const adapter of activeAdapters(this.opts.adapters)) {
+    const active = activeAdapters(this.opts.adapters)
+    const absent = new Set<string>()
+    for (const adapter of active) {
+      // A fallback adapter is read only when the adapter it backs up has no record.
+      const primary = adapter.fallbackFor
+      if (primary && active.some((a) => a.id === primary) && !absent.has(primary)) continue
       try {
         const record = adapter.collection === bsky.collection && adapter.rkey === bsky.rkey
           ? bskyRecord
           : await this.getRecord(identity, adapter.collection, adapter.rkey)
-        if (!record) continue
+        if (!record) {
+          absent.add(adapter.id)
+          continue
+        }
         const blob = readBlobRef(getPath(record, adapter.avatarPath))
         if (!blob || !adapter.accept.includes(blob.mimeType)) continue
         if (await this.opts.index.isBlocked(identity.did, blob.cid)) continue

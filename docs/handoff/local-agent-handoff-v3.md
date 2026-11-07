@@ -76,7 +76,7 @@ After each step, update the "Provisioned resources" section of `docs/deploy.md` 
 | 42 | Live Tap test against the real firehose |
 | 52, 53 | Staging and production deploy, origin lockdown verified |
 | 54 | Publish the lexicons (needs the domain live and name clearance confirmed; the owner says clearance is done) |
-| 55 | Tangled adapter (disabled in `packages/core/src/adapters.ts` until Tangled publishes the needed data) |
+| 55 | Tangled adapter (`org.tangled.actor.profile` enabled, `sh.tangled.actor.profile` enabled as a fallback; see `docs/research/tangled-collection-v1.md`) |
 
 These need the owner's decision and are not your work: issue 67 (pricing) and issues 60 and 66 (legal).
 
