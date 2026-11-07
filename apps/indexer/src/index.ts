@@ -9,7 +9,7 @@ import { reverifyFromEnv } from './reverify-wiring.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
- * record as its signal collection and the four collections in handlers.ts as
+ * record as its signal collection and the collections in handlers.ts as
  * its collection filters (spec section 4). Tap is in beta; Jetstream is the
  * documented fallback.
  */

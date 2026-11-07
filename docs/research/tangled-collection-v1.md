@@ -122,7 +122,16 @@ What this means per cache miss with the decision above:
 | Legacy record only (unmigrated) | 2 | about 0.2 s |
 | No Tangled record (most Bluesky users) | 2 | about 0.2 s |
 
-Delivery runs adapters one after another, so the two reads add up. Skipping the legacy read when the new record exists saves one read for every migrated user. For an account with no Tangled record, both reads return 400 and the two extra reads are the cost of supporting Tangled. Because image URLs are immutable and cached by the CDN, this cost applies to cache misses only. Reading the two Tangled collections in parallel, or a negative cache for accounts with no Tangled record, would cut it further. Neither is part of this change.
+Delivery runs adapters one after another, so the two reads add up. Skipping the legacy read when the new record exists saves one read for every migrated user. For an account with no Tangled record, both reads return 400 and the two extra reads are the cost of supporting Tangled. Because image URLs are immutable and cached by the CDN, this cost applies to cache misses only. Reading the two Tangled collections in parallel, or a negative cache for accounts with no Tangled record, would cut it further. Neither is part of this change. Both were added afterward, see the next section.
+
+## Follow-up changes (issue #132)
+
+- **Parallel reads.** Delivery starts the Bluesky-independent adapter reads together and decides in priority order. The legacy record is still used only when the new collection has no record, but its read now starts at the same time, so a migrated user costs one extra read (in parallel) where it used to cost none. A cache miss now waits for the slowest read, not the sum.
+- **Negative cache.** A "no record" answer is remembered per DID and collection for 10 minutes (`NO_RECORD_TTL_MS`), up to 10,000 entries. Errors are never cached. The Bluesky profile is not cached this way because its labels hide the whole account. Delivery and the indexer are separate processes with no channel between them, so there is no invalidation: a new Tangled record can take up to 10 minutes to appear after a miss was cached.
+- **Avatar size limit.** `maxAvatarBytes` on the Tangled adapters is 1,000,000. A blob whose record declares a larger size is treated as no avatar and logged as `adapter avatar over size limit`. A record that declares no size passes this check.
+- **Indexer.** `org.tangled.actor.profile` and `sh.tangled.actor.profile` are now in the indexer handlers and in `TAP_COLLECTION_FILTERS` (now seven collections). A change purges the DID's cached images and the new avatar, then warms them, the same as a Bluesky profile change. Tap must be redeployed with the new filter list.
+
+Risk 5 below is resolved by the indexer change. Risk 6 is resolved by the size limit.
 
 ## Risks and follow-ups
 

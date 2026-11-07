@@ -35,6 +35,15 @@ export interface AvatarResolver {
   getBlob(identity: Identity, cid: string): Promise<Uint8Array>
 }
 
+/** Fixed log message for an avatar over its adapter's size limit. */
+export const AVATAR_TOO_LARGE_LOG = 'adapter avatar over size limit'
+/**
+ * The delivery process has no channel from the indexer, so a new Tangled record can take up
+ * to this long to show after a miss was cached.
+ */
+export const NO_RECORD_TTL_MS = 10 * 60_000
+export const NO_RECORD_MAX = 10_000
+
 export interface AtprotoResolverOptions {
   index: IndexStore
   adapters: readonly ProfileAdapter[]
@@ -48,6 +57,10 @@ export interface AtprotoResolverOptions {
   sleep?: (ms: number) => Promise<void>
   negativeTtlMs?: number
   negativeMax?: number
+  /** How long "no record" is remembered per DID and collection. Default 10 minutes. */
+  noRecordTtlMs?: number
+  /** Size cap for the no-record cache. Default 10,000 entries. */
+  noRecordMax?: number
   /** Size cap for the original-bytes cache in MB. Default from BLOB_CACHE_MB, else 32. */
   blobCacheMb?: number
 }
@@ -62,6 +75,7 @@ export class AtprotoResolver implements AvatarResolver {
   private backoffMs: (attempt: number) => number
   private sleep: (ms: number) => Promise<void>
   private failing: NegativeCache
+  private noRecord: NegativeCache
   private originals: ByteLru
 
   constructor(private opts: AtprotoResolverOptions) {
@@ -72,6 +86,7 @@ export class AtprotoResolver implements AvatarResolver {
     this.backoffMs = opts.backoffMs ?? ((n) => (n === 1 ? 100 : 300))
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)))
     this.failing = new NegativeCache(opts.negativeTtlMs ?? 30_000, opts.negativeMax ?? 256)
+    this.noRecord = new NegativeCache(opts.noRecordTtlMs ?? NO_RECORD_TTL_MS, opts.noRecordMax ?? NO_RECORD_MAX)
     this.originals = new ByteLru(Math.floor((opts.blobCacheMb ?? parseMb(process.env.BLOB_CACHE_MB, 32)) * 1024 * 1024))
   }
 
@@ -183,6 +198,19 @@ export class AtprotoResolver implements AvatarResolver {
     return out
   }
 
+  /**
+   * Adapter record read with a short negative cache for "no record", keyed by DID and
+   * collection. Errors are never cached. The Bluesky profile does not use this path because
+   * its labels hide the whole account and must always be fresh.
+   */
+  private async readAdapterRecord(identity: Identity, collection: string, rkey: string) {
+    const key = `${identity.did}\u0000${collection}`
+    if (this.noRecord.has(key)) return null
+    const record = await this.getRecord(identity, collection, rkey)
+    if (!record) this.noRecord.add(key)
+    return record
+  }
+
   /** The label covers the whole account. A failed read hides everything: serving could reveal a labeled account. */
   private async readAccountLabels(identity: Identity): Promise<{ hidden: boolean; record: Record<string, unknown> | null }> {
     const bsky = BLUESKY_PROFILE_ADAPTER
@@ -217,27 +245,42 @@ export class AtprotoResolver implements AvatarResolver {
       })
     }
     const active = activeAdapters(this.opts.adapters)
+    // Start every record read at once, then decide in priority order. A fallback adapter's
+    // read is speculative: its result is used only when the adapter it backs up has no record.
+    const reads = active.map((adapter) =>
+      adapter.collection === bsky.collection && adapter.rkey === bsky.rkey
+        ? Promise.resolve(bskyRecord)
+        : this.readAdapterRecord(identity, adapter.collection, adapter.rkey))
+    const settled = await Promise.allSettled(reads)
     const absent = new Set<string>()
-    for (const adapter of active) {
-      // A fallback adapter is read only when the adapter it backs up has no record.
+    for (const [i, adapter] of active.entries()) {
+      // A fallback adapter is used only when the adapter it backs up has no record.
       const primary = adapter.fallbackFor
       if (primary && active.some((a) => a.id === primary) && !absent.has(primary)) continue
+      const result = settled[i]
+      if (!result) continue
+      if (result.status === 'rejected') {
+        // An adapter that errors is skipped and logged, never fails the request.
+        this.log('adapter failed', { adapter: adapter.id, did: identity.did, err: String(result.reason) })
+        continue
+      }
       try {
-        const record = adapter.collection === bsky.collection && adapter.rkey === bsky.rkey
-          ? bskyRecord
-          : await this.getRecord(identity, adapter.collection, adapter.rkey)
+        const record = result.value
         if (!record) {
           absent.add(adapter.id)
           continue
         }
         const blob = readBlobRef(getPath(record, adapter.avatarPath))
         if (!blob || !adapter.accept.includes(blob.mimeType)) continue
+        if (adapter.maxAvatarBytes !== undefined && blob.size !== undefined && blob.size > adapter.maxAvatarBytes) {
+          this.log(AVATAR_TOO_LARGE_LOG, { adapter: adapter.id, did: identity.did, size: blob.size, max: adapter.maxAvatarBytes })
+          continue
+        }
         if (await this.opts.index.isBlocked(identity.did, blob.cid)) continue
         // On app.bsky.actor.profile these labels cover the whole account (spec section 9).
         const rating = ratingFromLabels(selfLabelValues(getPath(record, adapter.labelsPath)))
         out.push({ source: `adapter:${adapter.id}`, did: identity.did, blob, rating })
       } catch (err) {
-        // An adapter that errors is skipped and logged, never fails the request.
         this.log('adapter failed', { adapter: adapter.id, did: identity.did, err: String(err) })
       }
     }

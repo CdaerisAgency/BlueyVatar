@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_ADAPTERS, pickCandidate } from '@blueyvatar/core'
-import { AtprotoResolver, type Identity } from './resolver.js'
+import { AVATAR_TOO_LARGE_LOG, AtprotoResolver, NO_RECORD_TTL_MS, type Identity } from './resolver.js'
 import { MemoryIndexStore } from './store.js'
 
 const ident: Identity = { did: 'did:plc:abc123', handle: 'alice.test', pds: 'https://pds.test' }
@@ -99,7 +99,7 @@ describe('Tangled adapters', () => {
     expect(cands.map((c) => [c.source, c.blob.cid, c.blob.mimeType])).toEqual([
       ['adapter:tangled', newRecord.avatar.ref.$link, 'image/jpeg'],
     ])
-    expect(reads).toEqual([bsky, org])
+    expect(reads.sort()).toEqual([bsky, org, sh].sort())
   })
 
   it('falls back to the legacy collection only when the new record is missing', async () => {
@@ -114,7 +114,7 @@ describe('Tangled adapters', () => {
   it('does not fall back when the new record exists without an avatar', async () => {
     const { resolver, reads } = tangledResolver({ [org]: newRecordNoAvatar, [sh]: legacyRecord })
     expect(await resolver.candidates(ident)).toEqual([])
-    expect(reads).toEqual([bsky, org])
+    expect(reads.sort()).toEqual([bsky, org, sh].sort())
   })
 
   it('returns nothing when neither collection has a record', async () => {
@@ -125,7 +125,7 @@ describe('Tangled adapters', () => {
   it('skips an adapter that errors, and does not treat the error as a missing record', async () => {
     const { resolver, reads } = tangledResolver({ [org]: 'error', [sh]: legacyRecord })
     const cands = await resolver.candidates(ident)
-    expect(reads).toEqual([bsky, org])
+    expect(reads.sort()).toEqual([bsky, org, sh].sort())
     expect(cands).toEqual([])
   })
 
@@ -133,6 +133,108 @@ describe('Tangled adapters', () => {
     const gif = { ...newRecord, avatar: tangledBlob('bafkreiccccccccccccccccccccccccccccccccccccccccccccccccccccc', 'image/gif', 10) }
     const { resolver } = tangledResolver({ [org]: gif })
     expect(await resolver.candidates(ident)).toEqual([])
+  })
+})
+
+describe('Tangled adapter performance', () => {
+  const org = 'org.tangled.actor.profile'
+  const sh = 'sh.tangled.actor.profile'
+
+  /** Fake fetch where each Tangled read takes `delayMs` of fake time. Tracks overlap. */
+  function timed(records: Record<string, Record<string, unknown> | 'error'>, delayMs: number, logs: unknown[][] = []) {
+    const state = { inFlight: 0, maxInFlight: 0, calls: [] as string[] }
+    const fetch = (async (url: URL) => {
+      const collection = url.searchParams.get('collection') ?? ''
+      state.calls.push(collection)
+      const tangled = collection.endsWith('tangled.actor.profile')
+      if (tangled) {
+        state.inFlight++
+        state.maxInFlight = Math.max(state.maxInFlight, state.inFlight)
+        await new Promise((r) => setTimeout(r, delayMs))
+        state.inFlight--
+      }
+      const rec = records[collection]
+      if (rec === 'error') return new Response('boom', { status: 500 })
+      return rec ? Response.json({ value: rec }) : new Response('{"error":"RecordNotFound"}', { status: 400 })
+    }) as unknown as typeof globalThis.fetch
+    const resolver = new AtprotoResolver({
+      index: new MemoryIndexStore(), adapters: DEFAULT_ADAPTERS, fetch, maxRetries: 0,
+      log: (...a) => { logs.push(a) },
+    })
+    return { resolver, state, logs }
+  }
+
+  it('reads both Tangled collections in parallel and keeps priority order', async () => {
+    vi.useFakeTimers()
+    try {
+      const { resolver, state } = timed({ [org]: newRecord, [sh]: legacyRecord }, 100)
+      let done = false
+      const p = resolver.candidates(ident).then((c) => { done = true; return c })
+      await vi.advanceTimersByTimeAsync(100)
+      // Sequential reads would need 200 ms of fake time.
+      expect(done).toBe(true)
+      expect(state.maxInFlight).toBe(2)
+      expect((await p).map((c) => c.source)).toEqual(['adapter:tangled'])
+    } finally { vi.useRealTimers() }
+  })
+
+  it('uses the legacy result when the new record is missing, even if legacy answers first', async () => {
+    const { resolver } = timed({ [sh]: legacyRecord }, 1)
+    expect((await resolver.candidates(ident)).map((c) => c.source)).toEqual(['adapter:tangled-legacy'])
+  })
+
+  it('does not hit the PDS again for a cached "no record"', async () => {
+    const { resolver, state } = timed({}, 1)
+    await resolver.candidates(ident)
+    const first = state.calls.filter((c) => c.endsWith('tangled.actor.profile')).length
+    expect(first).toBe(2)
+    await resolver.candidates(ident)
+    expect(state.calls.filter((c) => c.endsWith('tangled.actor.profile')).length).toBe(2)
+  })
+
+  it('expires the no-record entry after the TTL and caps its size', async () => {
+    let now = 0
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      const { resolver, state } = timed({}, 0)
+      await resolver.candidates(ident)
+      now += NO_RECORD_TTL_MS + 1
+      await resolver.candidates(ident)
+      expect(state.calls.filter((c) => c === org).length).toBe(2)
+      const small = new AtprotoResolver({ index: new MemoryIndexStore(), adapters: DEFAULT_ADAPTERS, noRecordMax: 1, maxRetries: 0, fetch: (async () => new Response('{}', { status: 400 })) as unknown as typeof globalThis.fetch })
+      await small.candidates(ident)
+      expect(small['noRecord']['m'].size).toBe(1)
+    } finally { vi.restoreAllMocks() }
+  })
+
+  it('does not cache errors, and always re-reads the Bluesky profile', async () => {
+    const { resolver, state } = timed({ [org]: 'error' }, 0)
+    await resolver.candidates(ident)
+    await resolver.candidates(ident)
+    expect(state.calls.filter((c) => c === org).length).toBe(2)
+    expect(state.calls.filter((c) => c === 'app.bsky.actor.profile').length).toBe(2)
+  })
+
+  it('keeps a cached miss per DID', async () => {
+    const { resolver, state } = timed({}, 0)
+    await resolver.candidates(ident)
+    await resolver.candidates({ ...ident, did: 'did:plc:other' })
+    expect(state.calls.filter((c) => c === org).length).toBe(2)
+  })
+
+  it('treats a Tangled avatar over 1,000,000 bytes as no avatar and logs a fixed message', async () => {
+    const big = { ...newRecord, avatar: tangledBlob('bafkreibigbigbigbigbigbigbigbigbigbigbigbigbigbigbigbigbigbigb', 'image/png', 2_533_667) }
+    const { resolver, logs } = timed({ [org]: big, [sh]: legacyRecord }, 0)
+    expect(await resolver.candidates(ident)).toEqual([])
+    expect(logs.filter(([m]) => m === AVATAR_TOO_LARGE_LOG)).toHaveLength(1)
+    expect(AVATAR_TOO_LARGE_LOG).toBe('adapter avatar over size limit')
+  })
+
+  it('accepts an avatar of exactly 1,000,000 bytes and one with no declared size', async () => {
+    const edge = { ...newRecord, avatar: tangledBlob('bafkreiedgeedgeedgeedgeedgeedgeedgeedgeedgeedgeedgeedgeedgeed', 'image/png', 1_000_000) }
+    expect((await timed({ [org]: edge }, 0).resolver.candidates(ident)).length).toBe(1)
+    const { size: _s, ...noSize } = newRecord.avatar
+    expect((await timed({ [org]: { ...newRecord, avatar: noSize } }, 0).resolver.candidates(ident)).length).toBe(1)
   })
 })
 
