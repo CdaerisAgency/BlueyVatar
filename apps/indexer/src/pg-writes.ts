@@ -8,6 +8,8 @@ export interface PgWritesOptions {
    * for CDN purges or cache warming (spec sections 4 and 9).
    */
   onPurge?: (did: string, cids: string[]) => Promise<void>
+  /** Warms one blob through the CDN. Used after a purge when the caller asks. Best-effort. */
+  onWarm?: (did: string, cid: string) => Promise<void>
   /** Called after an image upsert, for cache warming. Best-effort: not awaited, errors are logged. */
   onImageUpserted?: (did: string, cid: string) => Promise<void>
 }
@@ -109,9 +111,13 @@ export class PgIndexWrites implements IndexWrites {
     }
   }
 
-  async purgeImages(did: string, cids?: string[]): Promise<void> {
-    if (!this.opts.onPurge) return
+  async purgeImages(did: string, cids?: string[], opts: { warm?: boolean } = {}): Promise<void> {
+    if (!this.opts.onPurge && !(opts.warm && this.opts.onWarm)) return
     const list = cids ?? (await this.pool.query<{ cid: string }>('SELECT DISTINCT cid FROM images WHERE did = $1', [did])).rows.map((r) => r.cid)
-    if (list.length) await this.opts.onPurge(did, list)
+    if (!list.length) return
+    await this.opts.onPurge?.(did, list)
+    // Re-warm after the purge so the first visitor does not pay for the miss. Fire and forget.
+    const warm = this.opts.onWarm
+    if (opts.warm && warm) for (const cid of list) warm(did, cid).catch((err) => console.warn('post-purge warm failed', err))
   }
 }
