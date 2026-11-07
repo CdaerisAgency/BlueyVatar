@@ -24,12 +24,9 @@ export async function addClaim(form: FormData): Promise<void> {
   const did = (await currentDid()) ?? redirect('/login')
   const checked = normalizeClaim(String(form.get('platform') ?? ''), String(form.get('account') ?? ''))
   if (!checked.ok) return back('error', checked.error)
-<<<<<<< HEAD
   const wait = await limited(['claimAdd.did'], did)
   if (wait) return back('error', wait)
-=======
   if (!platformAvailable(checked.value.platform)) return back('error', `${PLATFORM_LABELS[checked.value.platform]} verification is not available yet.`)
->>>>>>> origin/main
   try {
     const session = await repoSession(did)
     const existing = await listClaims(session)
