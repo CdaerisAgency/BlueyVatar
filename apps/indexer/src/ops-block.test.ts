@@ -21,6 +21,7 @@ describe.skipIf(!url)('operator block and unblock', () => {
     await pool.query(sql('0001_init.sql'))
     await pool.query(sql('0008_blocked_images.sql'))
     await pool.query(sql('0012_reports.sql'))
+    await pool.query(sql('0019_admin.sql'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
@@ -35,9 +36,15 @@ describe.skipIf(!url)('operator block and unblock', () => {
     expect(rows).toEqual([{ reason: 'abuse report', blocked_by: 'ops' }])
   })
 
+  it('audits block and unblock', async () => {
+    const log = await pool.query('SELECT actor, action, target_cid FROM admin_actions WHERE target_did = $1 ORDER BY id', [DID])
+    expect(log.rows).toEqual([{ actor: 'ops', action: 'block_image', target_cid: 'bafyone' }])
+  })
+
   it('unblocks and purges, and reports when nothing was blocked', async () => {
     const purge = vi.fn(async () => {})
-    expect(await unblockImage(pool, purge, DID, 'bafyone')).toBe(true)
+    expect(await unblockImage(pool, purge, DID, 'bafyone', 'ops')).toBe(true)
+    expect((await pool.query("SELECT 1 FROM admin_actions WHERE action = 'unblock_image' AND actor = 'ops'")).rowCount).toBe(1)
     expect(await active()).toBe(0)
     expect(purge).toHaveBeenCalledOnce()
     expect(await unblockImage(pool, purge, DID, 'bafyone')).toBe(false)
@@ -57,5 +64,8 @@ describe.skipIf(!url)('operator block and unblock', () => {
     const r = await pool.query('SELECT status, actioned_by, action_reason FROM reports WHERE id = $1', [rows[0].id])
     expect(r.rows[0]).toEqual({ status: 'actioned', actioned_by: 'ops', action_reason: 'policy' })
     expect((await pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL', [did])).rowCount).toBe(2)
+    expect((await pool.query('SELECT kind FROM blocked_images WHERE did = $1', [did])).rows.every((r) => r.kind === 'takedown')).toBe(true)
+    const log = await pool.query('SELECT actor, action, report_id::int AS report_id, reason FROM admin_actions WHERE target_did = $1', [did])
+    expect(log.rows).toEqual([{ actor: 'ops', action: 'takedown', report_id: Number(rows[0].id), reason: 'policy' }])
   })
 })
