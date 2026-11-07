@@ -52,6 +52,13 @@ export function SiteFooter() {
           ))}
         </nav>
       </div>
+      <p className={`${inner} m-0 pb-7`}>
+        {COPY.footer.climate.text}{' '}
+        <a href={COPY.footer.climate.href} target="_blank" rel="noopener" className="text-bv-ink-3 underline hover:text-bv-blue">
+          {COPY.footer.climate.linkLabel}
+        </a>
+        .
+      </p>
     </footer>
   )
 }
