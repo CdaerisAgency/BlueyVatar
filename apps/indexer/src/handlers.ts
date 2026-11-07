@@ -1,4 +1,4 @@
-import { getPath, ratingFromLabels, readBlobRef, selfLabelValues } from '@blueyvatar/core'
+import { GALLERY_CAPTION_MAX, getPath, purposeOf, ratingFromLabels, readBlobRef, selfLabelValues } from '@blueyvatar/core'
 
 /** Collections the indexer cares about (spec section 4). */
 export const COLLECTIONS = {
@@ -10,7 +10,7 @@ export const COLLECTIONS = {
 } as const
 
 export interface IndexWrites {
-  upsertImage(row: { did: string; rkey: string; cid: string; mimeType: string; rating: string; isDefault: boolean; license: string | null; createdAt: string }): Promise<void>
+  upsertImage(row: { did: string; rkey: string; cid: string; mimeType: string; rating: string; isDefault: boolean; license: string | null; purpose: string; caption: string | null; sort: number | null; createdAt: string }): Promise<void>
   /** Returns the blob CID of the deleted record, when known, so its cached URLs can be purged. */
   deleteImage(did: string, rkey: string): Promise<string | undefined | void>
   upsertProfile(did: string, record: Record<string, unknown>): Promise<void>
@@ -54,6 +54,9 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
         rating: ratingFromLabels(selfLabelValues(getPath(evt.record, 'labels'))),
         isDefault: getPath(evt.record, 'isDefault') === true,
         license: typeof evt.record.license === 'string' ? evt.record.license : null,
+        purpose: purposeOf(evt.record.purpose),
+        caption: typeof evt.record.caption === 'string' && evt.record.caption.trim() !== '' ? [...evt.record.caption].slice(0, GALLERY_CAPTION_MAX).join('') : null,
+        sort: Number.isSafeInteger(evt.record.sort) && Math.abs(evt.record.sort as number) < 2 ** 31 ? (evt.record.sort as number) : null,
         createdAt: typeof evt.record.createdAt === 'string' ? evt.record.createdAt : new Date().toISOString(),
       })
       return

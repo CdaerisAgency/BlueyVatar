@@ -1,7 +1,7 @@
 import { IdResolver } from '@atproto/identity'
 import {
   BLUESKY_PROFILE_ADAPTER, activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
-  type Candidate, type ProfileAdapter,
+  type Candidate, type ProfileAdapter, type Rating,
 } from '@blueyvatar/core'
 import { bytesMatchCid } from './cid.js'
 import { BlobError, ByteLru, NegativeCache, normalizePdsEndpoint, parseMb } from './blob.js'
@@ -16,10 +16,19 @@ export interface Identity {
   pds: string
 }
 
+/** One gallery image that passed the account label and blocklist checks. The caller filters by rating. */
+export interface GalleryItem {
+  cid: string
+  rating: Rating
+  caption: string | null
+}
+
 export interface AvatarResolver {
   resolveIdentity(identifier: { kind: 'did' | 'handle'; value: string }): Promise<Identity | null>
   /** Candidates in resolution order (spec section 7). */
   candidates(identity: Identity): Promise<Candidate[]>
+  /** Gallery images in display order, empty when the account label hides the account. Blocked images are left out. */
+  galleryItems(identity: Identity): Promise<GalleryItem[]>
   /** Raw record from the user's PDS, or null. */
   getRecord(identity: Identity, collection: string, rkey: string): Promise<Record<string, unknown> | null>
   /** Original blob bytes from the PDS via com.atproto.sync.getBlob. */
@@ -163,18 +172,35 @@ export class AtprotoResolver implements AvatarResolver {
     })
   }
 
-  async candidates(identity: Identity): Promise<Candidate[]> {
-    // The label covers the whole account, so it is read before any source is consulted.
-    // A failed read hides everything: serving the avatar could reveal a labeled account.
+  async galleryItems(identity: Identity): Promise<GalleryItem[]> {
+    // Same account-level label rule as avatars. Gallery images are never avatar candidates.
+    if ((await this.readAccountLabels(identity)).hidden) return []
+    const out: GalleryItem[] = []
+    for (const img of await this.opts.index.galleryImages(identity.did)) {
+      if (await this.opts.index.isBlocked(identity.did, img.cid)) continue
+      out.push({ cid: img.cid, rating: img.rating, caption: img.caption ?? null })
+    }
+    return out
+  }
+
+  /** The label covers the whole account. A failed read hides everything: serving could reveal a labeled account. */
+  private async readAccountLabels(identity: Identity): Promise<{ hidden: boolean; record: Record<string, unknown> | null }> {
     const bsky = BLUESKY_PROFILE_ADAPTER
-    let bskyRecord: Record<string, unknown> | null
     try {
-      bskyRecord = await this.getRecord(identity, bsky.collection, bsky.rkey)
+      const record = await this.getRecord(identity, bsky.collection, bsky.rkey)
+      return { hidden: selfLabelValues(getPath(record, bsky.labelsPath)).includes(NO_UNAUTHENTICATED_LABEL), record }
     } catch (err) {
       this.log('profile label read failed', { did: identity.did, err: String(err) })
-      return []
+      return { hidden: true, record: null }
     }
-    if (selfLabelValues(getPath(bskyRecord, bsky.labelsPath)).includes(NO_UNAUTHENTICATED_LABEL)) return []
+  }
+
+  async candidates(identity: Identity): Promise<Candidate[]> {
+    // The label covers the whole account, so it is read before any source is consulted.
+    const bsky = BLUESKY_PROFILE_ADAPTER
+    const labels = await this.readAccountLabels(identity)
+    if (labels.hidden) return []
+    const bskyRecord = labels.record
 
     const out: Candidate[] = []
     const images = await this.opts.index.serviceImages(identity.did)

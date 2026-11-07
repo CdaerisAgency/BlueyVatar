@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
+import { DEFAULT_ADAPTERS, pickCandidate } from '@blueyvatar/core'
 import { AtprotoResolver, type Identity } from './resolver.js'
 import { MemoryIndexStore } from './store.js'
 
@@ -49,5 +49,49 @@ describe('AtprotoResolver !no-unauthenticated label', () => {
     const { resolver, reads } = resolverFor({ avatar })
     await resolver.candidates(ident)
     expect(reads()).toBe(1)
+  })
+})
+
+describe('gallery images', () => {
+  const gallery = { rkey: 'g', cid: 'bafygallery', mimeType: 'image/png', rating: 'g' as const, isDefault: false, purpose: 'gallery', caption: 'Hi', sort: 1, createdAt: '2026-12-01T00:00:00Z' }
+
+  it('never becomes the avatar, even when it is the newest or the default', async () => {
+    const { resolver, index } = resolverFor({ avatar })
+    index.images.set(ident.did, [gallery, { ...gallery, rkey: 'g2', cid: 'bafygallery2', isDefault: true }, serviceImage])
+    const cands = await resolver.candidates(ident)
+    expect(cands.map((c) => c.blob.cid)).toEqual(['bafyother', 'bafyreiabc123'])
+    expect(pickCandidate(cands, 'g', false)).toMatchObject({ kind: 'image', candidate: { blob: { cid: 'bafyother' } } })
+  })
+
+  it('leaves a gallery-only account on the default avatar', async () => {
+    const { resolver, index } = resolverFor({})
+    index.images.set(ident.did, [gallery])
+    expect(pickCandidate(await resolver.candidates(ident), 'g', false)).toEqual({ kind: 'default' })
+  })
+
+  it('treats a record without purpose as an avatar and an unknown purpose as neither', async () => {
+    const { resolver, index } = resolverFor({})
+    index.images.set(ident.did, [serviceImage, { ...gallery, purpose: 'banner' }])
+    expect((await resolver.candidates(ident)).map((c) => c.blob.cid)).toEqual(['bafyother'])
+    expect(await resolver.galleryItems(ident)).toEqual([])
+  })
+
+  it('lists gallery items in order and skips blocked images', async () => {
+    const { resolver, index } = resolverFor({})
+    index.images.set(ident.did, [{ ...gallery, rkey: 'b', cid: 'bafyb', sort: 2 }, gallery, { ...gallery, rkey: 'c', cid: 'bafyc', sort: 3 }])
+    index.blocked.add(`${ident.did}/bafyb`)
+    expect(await resolver.galleryItems(ident)).toEqual([
+      { cid: 'bafygallery', rating: 'g', caption: 'Hi' },
+      { cid: 'bafyc', rating: 'g', caption: 'Hi' },
+    ])
+  })
+
+  it('hides the gallery for a labeled account and when the profile read fails', async () => {
+    const labeled = resolverFor({ labels: labels('!no-unauthenticated') })
+    labeled.index.images.set(ident.did, [gallery])
+    expect(await labeled.resolver.galleryItems(ident)).toEqual([])
+    const broken = resolverFor('error')
+    broken.index.images.set(ident.did, [gallery])
+    expect(await broken.resolver.galleryItems(ident)).toEqual([])
   })
 })

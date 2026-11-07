@@ -12,6 +12,10 @@ export type ImageRecord = {
   labels?: unknown
   license?: string
   isDefault?: boolean
+  /** `gallery` for gallery images. Absent means avatar. */
+  purpose?: string
+  caption?: string
+  sort?: number
   createdAt: string
 }
 export type ProfileRecord = {
@@ -61,7 +65,8 @@ export async function listImages(session: OAuthSession): Promise<StoredImage[]> 
     const r = await xrpc<{ cursor?: string; records: { uri: string; cid: string; value: ImageRecord }[] }>(session, 'GET', 'com.atproto.repo.listRecords', {
       params: { repo: session.did, collection: IMAGE_COLLECTION, limit: '100', ...(cursor ? { cursor } : {}) },
     })
-    for (const x of r.records) out.push({ uri: x.uri, cid: x.cid, rkey: rkeyOf(x.uri), value: x.value })
+    // Gallery images are not avatars: they stay out of the avatar list, its limit, and the default toggle.
+    for (const x of r.records) if ((x.value.purpose ?? 'avatar') === 'avatar') out.push({ uri: x.uri, cid: x.cid, rkey: rkeyOf(x.uri), value: x.value })
     cursor = r.cursor
     if (!cursor) break
   }

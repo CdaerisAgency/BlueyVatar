@@ -1,5 +1,5 @@
 /** Pure helpers for /p/[handle]: link-preview metadata and the fields the page shows. */
-import { sanitizeProfileLinks, type ProfileLink } from '@blueyvatar/core'
+import { GALLERY_MAX, sanitizeProfileLinks, type ProfileLink } from '@blueyvatar/core'
 
 export interface PublicProfile {
   did: string
@@ -14,6 +14,7 @@ export interface PublicProfile {
   pronouns: string | null
   timezone?: string | null
   interests?: unknown
+  gallery?: unknown
   verifiedAccounts?: { platform: string; uri: string; hidden: boolean }[]
 }
 
@@ -22,6 +23,26 @@ export const pageLinks = (p: PublicProfile): ProfileLink[] => sanitizeProfileLin
 
 export const pageInterests = (p: PublicProfile): string[] =>
   Array.isArray(p.interests) ? p.interests.filter((i): i is string => typeof i === 'string' && i.trim() !== '').slice(0, 20) : []
+
+export interface GalleryImage { url: string; caption: string | null }
+
+/**
+ * Gallery images the page renders. Plus users only (the profile JSON already leaves the gallery
+ * out for others, and this checks again). Only signed /img paths count, so a raw PDS URL never
+ * renders. The cap is applied here too.
+ */
+export function pageGallery(p: PublicProfile, plus: boolean): GalleryImage[] {
+  if (!plus || !Array.isArray(p.gallery)) return []
+  const out: GalleryImage[] = []
+  for (const g of p.gallery as unknown[]) {
+    if (typeof g !== 'object' || g === null) continue
+    const { url, caption } = g as { url?: unknown; caption?: unknown }
+    if (typeof url !== 'string' || !url.startsWith('/img/')) continue
+    out.push({ url, caption: typeof caption === 'string' && caption.trim() !== '' ? caption : null })
+    if (out.length >= GALLERY_MAX) break
+  }
+  return out
+}
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}...` : s)
 
