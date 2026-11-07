@@ -6,6 +6,8 @@ import { getClaim } from '../../../../lib/claims-repo'
 import { githubClaimMatches, githubConfig, githubLogin } from '../../../../lib/github-oauth'
 import { accountUrl, mastodonClaimMatches } from '../../../../lib/mastodon-oauth'
 import { PUBLIC_URL } from '../../../../lib/oauth'
+import { limitedResult } from '../../../../lib/rate-guard'
+import { limitedResponse } from '../../../../lib/rate-limit'
 import { repoSession } from '../../../../lib/repo'
 import { safeFetch } from '../../../../lib/safe-fetch'
 import { attestVerified } from '../../../../lib/verification-service'
@@ -20,6 +22,8 @@ function back(key: 'error' | 'done', value: string) {
 
 /** Shared redirect target for GitHub and Mastodon. The state row says which provider and claim it is for. */
 export async function GET(req: Request) {
+  const gate = await limitedResult(['callback.ip'])
+  if (!gate.ok) return limitedResponse(gate.retryAfterSec)
   const q = new URL(req.url).searchParams
   const state = q.get('state')
   const code = q.get('code')
