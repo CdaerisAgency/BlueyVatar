@@ -58,19 +58,28 @@ export async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsi
 
 export const rkeyOf = (uri: string): string => uri.slice(uri.lastIndexOf('/') + 1)
 
-export async function listImages(session: OAuthSession): Promise<StoredImage[]> {
+async function listImageRecords(session: OAuthSession): Promise<StoredImage[]> {
   const out: StoredImage[] = []
   let cursor: string | undefined
   for (let page = 0; page < 5; page++) {
     const r = await xrpc<{ cursor?: string; records: { uri: string; cid: string; value: ImageRecord }[] }>(session, 'GET', 'com.atproto.repo.listRecords', {
       params: { repo: session.did, collection: IMAGE_COLLECTION, limit: '100', ...(cursor ? { cursor } : {}) },
     })
-    // Gallery images are not avatars: they stay out of the avatar list, its limit, and the default toggle.
-    for (const x of r.records) if ((x.value.purpose ?? 'avatar') === 'avatar') out.push({ uri: x.uri, cid: x.cid, rkey: rkeyOf(x.uri), value: x.value })
+    for (const x of r.records) out.push({ uri: x.uri, cid: x.cid, rkey: rkeyOf(x.uri), value: x.value })
     cursor = r.cursor
     if (!cursor) break
   }
   return out
+}
+
+/** Avatar records only. Gallery images stay out of the avatar list, its limit, and the default toggle. */
+export async function listImages(session: OAuthSession): Promise<StoredImage[]> {
+  return (await listImageRecords(session)).filter((x) => (x.value.purpose ?? 'avatar') === 'avatar')
+}
+
+/** Gallery records only, in no particular order. See lib/gallery.ts for ordering. */
+export async function listGalleryRecords(session: OAuthSession): Promise<StoredImage[]> {
+  return (await listImageRecords(session)).filter((x) => x.value.purpose === 'gallery')
 }
 
 export async function getProfile(session: OAuthSession): Promise<{ cid: string; value: ProfileRecord } | null> {

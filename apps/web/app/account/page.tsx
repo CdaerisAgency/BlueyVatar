@@ -12,13 +12,14 @@ import { PUBLIC_URL } from '../../lib/oauth'
 import { repoSession } from '../../lib/repo'
 import { getStore } from '../../lib/store'
 import AccountNav from './AccountNav'
+import GallerySection from './GallerySection'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; linked?: string; qr?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; linked?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
   const did = await currentDid()
   if (!did) redirect('/login')
-  const { error, linked, qr } = await searchParams
+  const { error, linked, qr, galleryError, galleryDone } = await searchParams
   const links = await getStore().links.list(did)
 
   // QR code for the user's own profile. The target can be a verified, visible platform.
@@ -89,6 +90,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </label>
         <Button type="submit" variant="primary">Send code</Button>
       </form>
+      <GallerySection did={did} error={galleryError} done={galleryDone} />
       <h2>QR code</h2>
       {svg && qrUrl ? (
         <>
