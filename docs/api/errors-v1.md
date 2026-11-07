@@ -21,12 +21,12 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | Code | Status | Meaning |
 | --- | --- | --- |
 | `invalid_identifier` | 400 | The path identifier is malformed. `/avatar/{hash}` needs a 64-hex SHA-256 or 32-hex MD5 hash. `/u/{id}` needs a handle or DID. `/profile/{id}` and `/qr/{id}` need a SHA-256 hash, handle, or DID. Emails are always invalid. |
-| `invalid_size` | 400 | `s` is not an integer of at least 1. Values above the tier maximum are clamped, not rejected. |
+| `invalid_size` | 400 (404 on `/img`) | `s` is not an integer of at least 1. Values above the tier maximum are clamped, not rejected. On `/img`, a size outside 1 to 2048 returns this code with status 404. |
 | `invalid_default` | 400 | `d` is neither a known style nor a parseable URL. |
 | `default_url_not_allowed` | 400 | `d` is a URL that is not HTTPS or whose host is not on the allowlist. |
 | `invalid_rating` | 400 | `r` is not `g`, `pg`, `r`, or `x`. |
 | `invalid_format` | 400 | `fmt` is not `png`, `jpeg`, or `webp`. |
-| `invalid_quality` | 400 | `q` is not an integer from 1 to 100. |
+| `invalid_quality` | 400 (404 on `/img`) | `q` is not an integer from 1 to 100. On `/img`, a `-q` value outside 1 to 100 returns this code with status 404. |
 | `invalid_ttl` | 400 | `ttl` is not `<n>h` or `<n>d` within 1h to 28d. |
 | `invalid_key` | 401 | Unknown API key, or a secret key sent outside the `x-api-key` header. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |

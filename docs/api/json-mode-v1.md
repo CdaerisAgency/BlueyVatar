@@ -26,7 +26,7 @@ Add `json=true` to an avatar request (`/avatar/{hash}` or `/u/{id}`) to receive 
 | `rating` | string or null | `g`, `pg`, `r`, or `x` for the chosen image. `null` when `found` is `false`. |
 | `url` | string or null | Path of the immutable resized image, relative to the base URL. `null` when `found` is `false`. |
 
-`url` follows the same `s`, `fmt`, and `q` parameters as the redirect. For `jpeg` and `webp` it includes a `-q<quality>` suffix, for example `/80-q85.webp`. Fetch it with a normal GET. `/img` URLs need no key.
+`url` follows the same `s`, `fmt`, and `q` parameters as the redirect, with two adjustments. The size snaps up to the nearest step of the size ladder (16, 24, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 512, 1024, 2048), so `s=100` yields `/128.png`. For `jpeg` and `webp`, `q` snaps to the nearest allowed quality, 60 or 85. Quality 85 is the default and has no suffix. Quality 60 adds `-q60`, for example `/80-q60.webp`. PNG ignores `q`. Fetch the path with a normal GET. `/img` URLs need no key.
 
 ## Behavior
 
