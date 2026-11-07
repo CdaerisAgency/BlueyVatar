@@ -299,6 +299,8 @@ Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to i
 - The service never stores raw email addresses, never sets tracking cookies on avatar requests, and keeps request logs for a short, published period.
 - Embed guidance tells sites to add a no-referrer policy to avatar images, as [Libravatar recommends](https://wiki.libravatar.org/api/).
 
+**Enumeration.** Hash lookups must not reveal whether an email has a linked account. On `/avatar/{hash}`, an unlinked hash, a hash whose owner opted out of email lookup, a hash for an inactive repo, and a hash for an avatar the caller may not see under the owner's visibility rules all return the same response: the same status, the same redirect to the default image, and the same headers. The service makes these checks from its own database before it resolves any identity over the network, so the timing does not separate them either. Profile and QR lookups by hash answer a restricted profile with the same 404 as an unlinked hash. Rate limits (100 anonymous requests per IP per day) slow bulk testing but do not stop it, so the opt-out is the user's real control (section 13, item 6).
+
 **What the service cannot promise.** Public atproto data is [rebroadcast by a global firehose](https://atproto.com/blog/atproto-spaces-alpha). When a user deletes an image record, the service purges its own caches, but it cannot recall copies that others already hold.
 
 ## 10. Licensing and permissions

@@ -362,4 +362,67 @@ describe('origin lockdown wiring', () => {
     expect((await app.request(`/avatar/${emailHash('alice@example.com')}`)).status).toBe(403)
     expect((await app.request(`/avatar/${emailHash('alice@example.com')}`, { headers: { 'x-origin-auth': 'k' } })).status).toBe(302)
   })
+
+  describe('hash enumeration (issue 59)', () => {
+    const summarize = (r: Response) => ({
+      status: r.status,
+      location: r.headers.get('location'),
+      cacheControl: r.headers.get('cache-control'),
+      contentType: r.headers.get('content-type'),
+    })
+
+    it('answers unlinked, opted-out, and restricted hashes identically', async () => {
+      const { app, index } = setup()
+      const unlinked = emailHash('nobody@example.com')
+      const optedOut = emailHash('optout@example.com')
+      const restricted = emailHash('restricted@example.com')
+      const inactive = emailHash('gone@example.com')
+      index.emails.set(optedOut, 'did:plc:optout')
+      index.rules.set('did:plc:optout', { ...PUBLIC_VISIBILITY, emailLookupOptOut: true })
+      index.emails.set(restricted, 'did:plc:restricted')
+      index.rules.set('did:plc:restricted', { ...PUBLIC_VISIBILITY, keyedOnly: true })
+      index.emails.set(inactive, 'did:plc:gone')
+      index.inactive.add('did:plc:gone')
+
+      for (const query of ['', '?d=identicon', '?d=404']) {
+        const results = []
+        for (const h of [unlinked, optedOut, restricted, inactive]) {
+          const res = await app.request(`/avatar/${h}${query}`)
+          const { location, ...rest } = summarize(res)
+          // The seed is the requested hash, so only the seed may differ in the redirect target.
+          results.push({ ...rest, location: location?.replace(h, 'HASH') ?? null, body: await res.text() })
+        }
+        for (const r of results.slice(1)) expect(r).toEqual(results[0])
+      }
+    })
+
+    it('does not resolve identities for hashes the caller may not see', async () => {
+      const { deps, index } = setup()
+      const restricted = emailHash('restricted@example.com')
+      index.emails.set(restricted, 'did:plc:restricted')
+      index.rules.set('did:plc:restricted', { ...PUBLIC_VISIBILITY, domainAllowlist: ['only.example'] })
+      let resolved = 0
+      const app = createApp({ ...deps, resolver: { ...deps.resolver, resolveIdentity: async (i) => { resolved++; return deps.resolver.resolveIdentity(i) } } })
+      await app.request(`/avatar/${restricted}`)
+      expect(resolved).toBe(0)
+    })
+
+    it('still serves a restricted avatar to a caller that passes the rule', async () => {
+      const { app, index } = setup()
+      index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+      const h = emailHash('alice@example.com')
+      expect((await app.request(`/avatar/${h}`)).headers.get('location')).toMatch(/^\/default\//)
+      const ok = await app.request(`/avatar/${h}`, { headers: { 'x-api-key': 'sk_test' } })
+      expect(ok.headers.get('location')).toMatch(/^\/img\//)
+    })
+
+    it('profile and QR lookups by hash return 404 for restricted, like unlinked', async () => {
+      const { app, index } = setup()
+      index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+      const restricted = await app.request(`/profile/${emailHash('alice@example.com')}`)
+      const unlinked = await app.request(`/profile/${emailHash('nobody@example.com')}`)
+      expect(restricted.status).toBe(404)
+      expect(await restricted.json()).toEqual(await unlinked.json())
+    })
+  })
 })
