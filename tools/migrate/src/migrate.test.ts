@@ -32,6 +32,13 @@ describe.skipIf(!url)('migration runner', () => {
     await pool.query("INSERT INTO rate_windows (bucket, reset_at) VALUES ('b', now())")
   })
 
+  it('0018 lets pending verifications name every OAuth provider and still rejects others', async () => {
+    for (const p of ['github', 'mastodon', 'instagram', 'threads', 'tiktok', 'youtube', 'twitch']) {
+      await pool.query('INSERT INTO verification_state (state, did, rkey, provider) VALUES ($1, $2, $3, $4)', [`s-${p}`, 'did:plc:a', 'r', p])
+    }
+    await expect(pool.query("INSERT INTO verification_state (state, did, rkey, provider) VALUES ('s-x', 'did:plc:a', 'r', 'x')")).rejects.toThrow(/provider_check/)
+  })
+
   it('rolls back a failing file and applies files in name order', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mig-'))
     writeFileSync(join(dir, '0002_b.sql'), 'CREATE TABLE t_b (id int);')

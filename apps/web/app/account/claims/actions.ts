@@ -4,7 +4,8 @@ import { randomBytes } from 'node:crypto'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
-import { MAX_CLAIMS, METHOD_FOR, PLATFORM_LABELS, isPlatform, normalizeClaim, parseMastodonUri, profileLinkFor, type ClaimRecord } from '../../../lib/claims'
+import { MAX_CLAIMS, PLATFORM_LABELS, isOAuthProvider, isPlatform, normalizeClaim, parseMastodonUri, profileLinkFor, providerAuthorizeUrl, providerConfig, verifyBluesky, verifyDnsTxt, type ClaimRecord } from '../../../lib/claims'
+import { methodFor, platformAvailable } from '../../../lib/claim-providers'
 import { createClaim, getClaim, listClaims, putClaim, repoHandle } from '../../../lib/claims-repo'
 import { githubAuthorizeUrl, githubConfig } from '../../../lib/github-oauth'
 import { authorizeUrl, registerApp } from '../../../lib/mastodon-oauth'
@@ -22,6 +23,7 @@ export async function addClaim(form: FormData): Promise<void> {
   const did = (await currentDid()) ?? redirect('/login')
   const checked = normalizeClaim(String(form.get('platform') ?? ''), String(form.get('account') ?? ''))
   if (!checked.ok) return back('error', checked.error)
+  if (!platformAvailable(checked.value.platform)) return back('error', `${PLATFORM_LABELS[checked.value.platform]} verification is not available yet.`)
   try {
     const session = await repoSession(did)
     const existing = await listClaims(session)
@@ -78,7 +80,7 @@ export async function verifyClaim(form: FormData): Promise<void> {
     const norm = isPlatform(claim.value.platform) ? normalizeClaim(claim.value.platform, claim.value.uri) : null
     if (!norm?.ok || norm.value.uri !== claim.value.uri) return back('error', 'This claim cannot be verified. Delete it and add it again.')
     const platform = norm.value.platform
-    const method = METHOD_FOR[platform]
+    const method = methodFor(platform)
     const store = getClaimStore()
     const redirectUri = `${PUBLIC_URL}${CALLBACK_PATH}`
 
@@ -92,8 +94,28 @@ export async function verifyClaim(form: FormData): Promise<void> {
       return back('done', `${PLATFORM_LABELS[platform]} verified.`)
     }
 
+    if (method === 'dns-txt') {
+      if (coolingDown(`dns:${did}:${rkey}`, 10_000)) return back('error', 'Wait a few seconds before checking again.')
+      const r = await verifyDnsTxt(claim.value.uri, did)
+      if (!r.ok) return back('error', `The domain was not verified. ${r.reason}`)
+      await attestVerified(did, claim, method)
+      return back('done', 'Domain verified.')
+    }
+    if (method === 'bsky-proof') {
+      if (coolingDown(`bsky:${did}:${rkey}`, 10_000)) return back('error', 'Wait a few seconds before checking again.')
+      const r = await verifyBluesky(claim.value.uri, did, safeFetch)
+      if (!r.ok) return back('error', `Bluesky was not verified. ${r.reason}`)
+      await attestVerified(did, claim, method)
+      return back('done', 'Bluesky verified.')
+    }
+
     const state = randomBytes(24).toString('base64url')
-    if (method === 'github-oauth') {
+    if (isOAuthProvider(platform) && method === `${platform}-oauth`) {
+      const cfg = providerConfig(platform)
+      if (!cfg) return back('error', `${PLATFORM_LABELS[platform]} verification is not available yet.`)
+      await store.putState({ state, did, rkey, provider: platform })
+      target = providerAuthorizeUrl(platform, cfg, redirectUri, state)
+    } else if (method === 'github-oauth') {
       const cfg = githubConfig()
       if (!cfg) return back('error', 'GitHub verification is not configured on this server.')
       await store.putState({ state, did, rkey, provider: 'github' })
