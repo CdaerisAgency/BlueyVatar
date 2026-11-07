@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto'
-import { effectiveTier, isRating, plusEntitled, type IndexedLinkRecord, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
+import { DAILY_METERS, effectiveTier, isRating, plusEntitled, type IndexedLinkRecord, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
 import type { AlertLedger, AlertThreshold } from './alerts.js'
-import type { Meter, ServiceMeter, UsageMeter } from './usage.js'
+import type { Meter, ServiceMeter, UsageMeter, UsageSnapshot } from './usage.js'
 
 /** Postgres implementations of the delivery stores, against db/migrations/0001_init.sql. */
 
@@ -175,14 +175,43 @@ export class PgUsageMeter implements UsageMeter {
   constructor(private pool: pg.Pool) {}
 
   async add(licenseId: string, meter: Meter, n = 1): Promise<number> {
+    // Day rows ride in the same statement as the monthly counter, so the two never disagree on the
+    // UTC date. Billing and alerts read only the monthly counter.
+    const daily = (DAILY_METERS as readonly string[]).includes(meter)
+      ? `WITH day AS (
+           INSERT INTO usage_daily (license_id, meter, day, count)
+                VALUES ($1, $2, (now() AT TIME ZONE 'UTC')::date, $3)
+           ON CONFLICT (license_id, meter, day) DO UPDATE SET count = usage_daily.count + EXCLUDED.count
+         ) `
+      : ''
     const { rows } = await this.pool.query<{ count: string }>(
-      `INSERT INTO usage_counters (license_id, meter, period_start, count)
+      `${daily}INSERT INTO usage_counters (license_id, meter, period_start, count)
             VALUES ($1, $2, date_trunc('month', now() AT TIME ZONE 'UTC')::date, $3)
        ON CONFLICT (license_id, meter, period_start) DO UPDATE SET count = usage_counters.count + EXCLUDED.count
        RETURNING count`,
       [licenseId, meter, n],
     )
     return Number(rows[0]!.count)
+  }
+
+  async read(licenseId: string, periods: readonly string[], days: readonly string[]): Promise<UsageSnapshot> {
+    const monthly = new Map<string, number>()
+    const daily = new Map<string, number>()
+    if (periods.length > 0) {
+      const r = await this.pool.query(
+        'SELECT meter, period_start::text AS period, count FROM usage_counters WHERE license_id = $1 AND period_start = ANY($2::date[])',
+        [licenseId, periods],
+      )
+      for (const x of r.rows) monthly.set(`${x.period}|${x.meter}`, Number(x.count))
+    }
+    if (days.length > 0) {
+      const r = await this.pool.query(
+        'SELECT meter, day::text AS day, count FROM usage_daily WHERE license_id = $1 AND day = ANY($2::date[])',
+        [licenseId, days],
+      )
+      for (const x of r.rows) daily.set(`${x.day}|${x.meter}`, Number(x.count))
+    }
+    return { monthly, daily }
   }
 
   async addProfileCall(did: string, n = 1): Promise<void> {

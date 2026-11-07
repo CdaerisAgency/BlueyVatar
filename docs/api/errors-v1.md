@@ -34,6 +34,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
 | `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
+| `secret_key_required` | 403 | `GET /usage` was called with a publishable key. Use a secret key in the `x-api-key` header. See [usage-v1.md](usage-v1.md). |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |
 | `invalid_signature` | 403 | An `/img` path is unsigned, or its signature does not match the file name. Fetch the avatar again through `/avatar` or `/u`. |
 | `signature_expired` | 403 | A signed `/img` path for a restricted avatar is past its day bucket. Fetch the avatar again. |

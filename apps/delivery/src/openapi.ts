@@ -22,7 +22,7 @@ const errors = {
   '400': errRef('Malformed identifier or parameter. Codes: invalid_identifier, invalid_size, invalid_default, default_url_not_allowed, invalid_rating, invalid_format, invalid_quality, invalid_ttl, invalid_platform.'),
   '401': errRef('invalid_key'),
   '402': errRef('license_inactive'),
-  '403': errRef('origin_not_allowed, tier_required, origin_forbidden, or access_denied.'),
+  '403': errRef('origin_not_allowed, tier_required, origin_forbidden, access_denied, or secret_key_required.'),
   '429': { description: 'rate_limited. Wait retry-after seconds.', headers: { ...rateHeaders, 'retry-after': hdr('RetryAfter') }, content: { 'application/json': { schema: ref('schemas/Error') } } },
   '500': errRef('internal'),
 } as const
@@ -53,6 +53,7 @@ export const openApiDocument = {
   tags: [
     { name: 'Avatars', description: 'Avatar delivery (spec section 7).' },
     { name: 'Profile', description: 'Profile JSON, QR codes, and platform redirects.' },
+    { name: 'Usage', description: 'Metered usage for secret keys.' },
     { name: 'Images', description: 'Signed, immutable image objects behind the redirects.' },
     { name: 'Service', description: 'Health and description.' },
   ],
@@ -61,6 +62,22 @@ export const openApiDocument = {
     '/readyz': { get: { summary: 'Readiness check', description: 'Runs a dependency check (Postgres) within a time budget.', tags: ['Service'], responses: { '200': { description: 'Ready.', content: { 'application/json': { schema: { type: 'object' } } } }, '503': errRef('not_ready: a dependency check failed or timed out.') } } },
     '/metrics': { get: { summary: 'Prometheus metrics', description: 'Needs a bearer token (METRICS_TOKEN). Answers not_found when no token is configured or the token is wrong.', tags: ['Service'], responses: { '200': { description: 'Prometheus text format.', content: { 'text/plain': { schema: { type: 'string' } } } }, '404': errRef('not_found') } } },
     '/openapi.json': { get: { summary: 'This document', tags: ['Service'], responses: { '200': { description: 'OpenAPI 3.1 JSON.', content: { 'application/json': { schema: { type: 'object' } } } } } } },
+    '/usage': {
+      get: {
+        summary: 'Usage for a secret key',
+        description: 'Metered usage of the license behind a secret key: current period, per-meter counts, and history by tier. Secret keys only, in the x-api-key header. Counts toward the rate limit but is not metered. Never cached, and sends no CORS headers.',
+        tags: ['Usage'],
+        security: [{ apiKeyHeader: [] }],
+        responses: {
+          '200': { description: 'Usage document.', headers: { ...rateHeaders, 'x-tier': hdr('Tier') }, content: { 'application/json': { schema: ref('schemas/Usage') } } },
+          '401': errRef('invalid_key, including a missing key or a key sent only as the token query parameter.'),
+          '402': errors['402'],
+          '403': errRef('secret_key_required: a publishable key was used.'),
+          '429': errors['429'],
+          '500': errors['500'],
+        },
+      },
+    },
     '/avatar/{hash}': { get: avatarOp('Avatar by email hash (Gravatar compatible)', 'Hash', [q('name')]) },
     '/u/{id}': { get: avatarOp('Avatar by handle or DID', 'Id') },
     '/profile/{id}': {
@@ -192,6 +209,25 @@ export const openApiDocument = {
               code: { type: 'string', enum: [...ERROR_CODES], description: 'Stable. Branch on this and the HTTP status.' },
               message: { type: 'string', description: 'For people. May change.' },
               docs: { type: 'string', format: 'uri', description: 'Link to https://blueyvatar.com/docs/errors#<code>.' },
+            },
+          },
+        },
+      },
+      Usage: {
+        type: 'object',
+        required: ['tier', 'period', 'included', 'total', 'meters', 'history'],
+        properties: {
+          tier: { type: 'string', enum: ['free', 'pro', 'business', 'enterprise'] },
+          period: { type: 'object', required: ['start', 'end'], properties: { start: { type: 'string', format: 'date' }, end: { type: 'string', format: 'date' } } },
+          included: { type: 'object', required: ['volume', 'per'], properties: { volume: { type: ['integer', 'null'] }, per: { type: ['string', 'null'], enum: ['month', 'day', null] } } },
+          total: { type: 'integer', minimum: 0, description: 'Origin resolutions this period.' },
+          meters: { type: 'object', required: ['origin_resolution', 'profile_json', 'transform'], properties: { origin_resolution: { type: 'integer' }, profile_json: { type: 'integer' }, transform: { type: 'integer' } } },
+          history: {
+            type: 'object',
+            required: ['months', 'days'],
+            properties: {
+              months: { type: 'array', items: { type: 'object' } },
+              days: { type: 'array', items: { type: 'object' } },
             },
           },
         },

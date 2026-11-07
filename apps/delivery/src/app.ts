@@ -2,7 +2,7 @@ import { createLogger, Metrics, normalizeBackgroundColor } from '@blueyvatar/cor
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, historyDays, historyPeriods, includedVolume, periodEndOf, periodStartOf, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
@@ -78,7 +78,7 @@ function overloaded(c: Context, err: ResizeBusyError) {
   return fail(c, 503, 'overloaded', 'Image processing is busy; retry shortly')
 }
 
-function rateHeaders(c: Context, e: EntitlementResult) {
+function rateHeaders(c: Context, e: EntitlementResult, metered = true) {
   const w = e.window
   if (w && w.limit > 0) {
     c.header('x-rate-limit-limit', String(w.limit))
@@ -87,7 +87,7 @@ function rateHeaders(c: Context, e: EntitlementResult) {
   }
   if (e.ok) {
     c.header('x-tier', e.tier)
-    if (e.licenseId) c.header('x-usage-cost', '1')
+    if (e.licenseId && metered) c.header('x-usage-cost', '1')
   }
 }
 
@@ -159,7 +159,7 @@ export function createApp(deps: AppDeps) {
     ?? deps.remoteAddress?.(c)
     ?? 'unknown'
 
-  async function entitle(c: Context) {
+  async function entitle(c: Context, metered = true) {
     const e = await checkEntitlement(
       {
         headerKey: c.req.header('x-api-key'),
@@ -171,7 +171,7 @@ export function createApp(deps: AppDeps) {
       deps.licenses,
       deps.limiter,
     )
-    rateHeaders(c, e)
+    rateHeaders(c, e, metered)
     if (!e.ok && e.status === 429) metrics.inc('delivery_rate_limit_rejections_total')
     if (!e.ok && e.status === 429 && e.window) {
       c.header('retry-after', String(Math.max(1, e.window.reset - Math.floor(Date.now() / 1000))))
@@ -327,6 +327,43 @@ export function createApp(deps: AppDeps) {
   })
 
   // Gravatar-compatible route. Hash only (SHA256 or MD5); raw email is never accepted (spec section 6).
+  // Usage API (spec sections 10.3 and 11.1). Secret keys only. The call hits the rate limit like any
+  // keyed request but writes no meter and sends no x-usage-cost.
+  app.get('/usage', async (c) => {
+    const e = await entitle(c, false)
+    if (!e.ok) return fail(c, e.status, e.code, e.message)
+    c.header('cache-control', 'private, no-store')
+    if (!e.licenseId || c.req.header('x-api-key') === undefined) {
+      return fail(c, 401, 'invalid_key', 'Send a secret key in the x-api-key header')
+    }
+    if (e.keyKind !== 'secret') {
+      return fail(c, 403, 'secret_key_required', 'Usage is available to secret keys only')
+    }
+    const now = new Date()
+    const period = periodStartOf(now)
+    const months = historyPeriods(e.tier, now)
+    const days = historyDays(e.tier, now)
+    const snap = await deps.usage.read(e.licenseId, [period, ...months], days)
+    const m = (p: string, meter: string) => snap.monthly.get(`${p}|${meter}`) ?? 0
+    const meters = (p: string) => ({ origin_resolution: m(p, 'origin_resolution'), profile_json: m(p, 'profile_json'), transform: m(p, 'transform') })
+    const inc = includedVolume(e.tier)
+    return c.json({
+      tier: e.tier,
+      period: { start: period, end: periodEndOf(period) },
+      included: { volume: inc.volume, per: inc.per },
+      total: m(period, 'origin_resolution'),
+      meters: meters(period),
+      history: {
+        months: months.map((p) => ({ period: p, ...meters(p) })),
+        days: days.map((d) => ({
+          date: d,
+          origin_resolution: snap.daily.get(`${d}|origin_resolution`) ?? 0,
+          profile_json: snap.daily.get(`${d}|profile_json`) ?? 0,
+        })),
+      },
+    })
+  })
+
   app.get('/avatar/:hash', async (c) => {
     const hash = c.req.param('hash').toLowerCase().replace(/\.(png|jpe?g|webp)$/, '')
     // MD5 is accepted for older Gravatar clients and takes the same path as SHA256.

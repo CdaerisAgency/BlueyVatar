@@ -11,7 +11,7 @@ export interface RequestInfo {
 }
 
 export type EntitlementResult =
-  | { ok: true; tier: Tier; licenseId: string | null; window: RateWindow }
+  | { ok: true; tier: Tier; licenseId: string | null; /** Null for anonymous callers. */ keyKind: 'secret' | 'publishable' | null; window: RateWindow }
   | { ok: false; status: number; code: ErrorCode; message: string; window?: RateWindow }
 
 function requestHost(info: RequestInfo): string | null {
@@ -38,7 +38,7 @@ export async function checkEntitlement(
     if (window.exceeded) {
       return { ok: false, status: 429, code: 'rate_limited', message: 'Anonymous daily limit reached', window }
     }
-    return { ok: true, tier: 'free', licenseId: null, window }
+    return { ok: true, tier: 'free', licenseId: null, keyKind: null, window }
   }
 
   const found = await licenses.findKey(raw)
@@ -67,6 +67,6 @@ export async function checkEntitlement(
   if (ent.overage === 'blocked' && window.exceeded) {
     return { ok: false, status: 429, code: 'rate_limited', message: 'Included volume reached', window }
   }
-  return { ok: true, tier: license.tier, licenseId: license.licenseId, window }
+  return { ok: true, tier: license.tier, licenseId: license.licenseId, keyKind: key.kind, window }
 }
 

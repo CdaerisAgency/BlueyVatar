@@ -1,5 +1,5 @@
 import type { RateLimiter, RateWindow } from './licenses.js'
-import type { Meter, ServiceMeter, UsageMeter } from './usage.js'
+import type { Meter, ServiceMeter, UsageMeter, UsageSnapshot } from './usage.js'
 import { periodStart } from './usage.js'
 
 /**
@@ -127,6 +127,12 @@ export class BatchedUsageMeter extends Flusher implements UsageMeter {
     if (raced) raced.base = Math.max(raced.base, total)
     else if (this.licenses.size < MAX_TRACKED) this.licenses.set(key, { licenseId, meter, base: total, pending: 0, touched: this.now() })
     return total
+  }
+
+  /** Reads bypass the batch: pending increments are flushed first so /usage reflects this process's own traffic. */
+  async read(licenseId: string, periods: readonly string[], days: readonly string[]): Promise<UsageSnapshot> {
+    await this.flush()
+    return this.inner.read(licenseId, periods, days)
   }
 
   async addService(did: string, meter: ServiceMeter, n = 1): Promise<void> {
