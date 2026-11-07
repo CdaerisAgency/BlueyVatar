@@ -7,6 +7,21 @@ export function isSha256Hex(value: string): boolean {
   return SHA256_HEX.test(value)
 }
 
+/**
+ * The delivery route also accepts MD5 hex hashes, which older Gravatar and Libravatar clients
+ * still send (spec section 13, item 2). MD5 is only a lookup key here, never a secret.
+ */
+const MD5_HEX = /^[0-9a-f]{32}$/
+
+export function isMd5Hex(value: string): boolean {
+  return MD5_HEX.test(value)
+}
+
+/** MD5 hex of the same normalized email that `emailHash` uses. */
+export function emailMd5(email: string): string {
+  return createHash('md5').update(email.trim().toLowerCase()).digest('hex')
+}
+
 /** Same normalization Gravatar uses: trim, lowercase, SHA256 hex. */
 export function emailHash(email: string): string {
   return createHash('sha256').update(email.trim().toLowerCase()).digest('hex')

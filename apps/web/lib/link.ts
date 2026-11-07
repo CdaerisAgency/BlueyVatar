@@ -1,6 +1,6 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import { PUBLIC_URL } from './oauth'
-import { emailHash } from '@blueyvatar/core'
+import { emailHash, emailMd5 } from '@blueyvatar/core'
 import { generateCode, newPending, RESEND_GAP_MS } from './codes'
 import { emailSender } from './email'
 import { looksLikeEmail, maskEmail } from './mask'
@@ -28,7 +28,7 @@ export async function sendCode(did: string, email: string): Promise<LinkOutcome>
     subject: 'Your blueyvatar verification code',
     text: `Your code is ${code}. It expires in 15 minutes.\n\nIf you did not ask to link this address on ${PUBLIC_URL}, ignore this message.`,
   })
-  await store.codes.put(newPending(did, emailHash(email), masked, code, now))
+  await store.codes.put(newPending(did, emailHash(email), masked, code, now, emailMd5(email)))
   return { kind: 'code_sent', masked }
 }
 
@@ -47,7 +47,7 @@ export async function linkFromSession(session: OAuthSession): Promise<LinkOutcom
     trusted: parseTrustedHosts(process.env.TRUSTED_PDS_HOSTS),
   })
   if (method === 'trusted_pds') {
-    await getStore().links.upsert(emailHash(email), did, method)
+    await getStore().links.upsert(emailHash(email), did, method, emailMd5(email))
     return { kind: 'linked', masked: maskEmail(email) }
   }
   return sendCode(did, email)

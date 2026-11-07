@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  emailHash, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
+  emailHash, emailMd5, isMd5Hex, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
   parseAvatarParams, ParamError, pickCandidate, imagePath, snapSize, ladderPaths, IMAGE_SIZE_LADDER, readBlobRef, selfLabelValues,
   activeAdapters, DEFAULT_ADAPTERS, type Candidate,
 } from './index.js'
@@ -11,6 +11,15 @@ describe('hash and identifiers', () => {
   it('normalizes email before hashing', () => {
     expect(emailHash('  MyEmail@Example.com ')).toBe(emailHash('myemail@example.com'))
     expect(isSha256Hex(emailHash('a@b.c'))).toBe(true)
+  })
+  it('computes the MD5 from the same normalized email', () => {
+    // Gravatar's documented MD5 example input, hashed after trim and lowercase.
+    expect(emailMd5('  MyEmail@Example.com ')).toBe(emailMd5('myemail@example.com'))
+    expect(emailMd5(' MyEmailAddress@example.com ')).toBe('0bc83cb571cd1c50ba6f3e8a78ef1346')
+    expect(isMd5Hex(emailMd5('a@b.c'))).toBe(true)
+    expect(isMd5Hex(emailHash('a@b.c'))).toBe(false)
+    expect(isSha256Hex(emailMd5('a@b.c'))).toBe(false)
+    expect(isMd5Hex('A'.repeat(32))).toBe(false)
   })
   it('classifies identifiers', () => {
     expect(parseIdentifier('did:plc:ewvi7nxzyoun6zhxrhs64oiz')?.kind).toBe('did')

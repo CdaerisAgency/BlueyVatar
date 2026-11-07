@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { emailHash, emailMd5 } from '@blueyvatar/core'
 import { ConsoleSender, DEFAULT_FROM, ResendSender, emailSender } from './email'
 import { CODE_TTL_MS, MAX_ATTEMPTS, checkCode, generateCode, hashCode, newPending } from './codes'
 import { maskEmail, looksLikeEmail } from './mask'
@@ -17,6 +18,13 @@ describe('codes', () => {
     expect(p.codeHash).toMatch(/^[0-9a-f]{64}$/)
     expect(JSON.stringify(p)).not.toContain('123456')
     expect(p.codeHash).toBe(hashCode(DID, HASH, '123456'))
+  })
+  it('carries the MD5 of the same normalized email until the code is confirmed', () => {
+    const email = ' Alice@Example.com '
+    const p = newPending(DID, emailHash(email), 'a***@e***.com', '123456', 0, emailMd5(email))
+    expect(p.emailMd5).toBe(emailMd5('alice@example.com'))
+    expect(p.emailMd5).toMatch(/^[0-9a-f]{32}$/)
+    expect(newPending(DID, HASH, 'm', '123456', 0).emailMd5).toBeUndefined()
   })
   it('accepts the right code and trims input', () => {
     const p = newPending(DID, HASH, 'm', '000042', 1000)

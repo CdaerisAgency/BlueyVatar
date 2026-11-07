@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailHash, type Candidate } from '@blueyvatar/core'
+import { emailHash, emailMd5, type Candidate } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -52,11 +52,60 @@ describe('delivery API', () => {
     expect(res.headers.get('set-cookie')).toBeNull()
   })
 
-  it('rejects anything that is not a SHA256 hash', async () => {
+  it('rejects a raw email in the hash position', async () => {
     const { app } = setup()
     const res = await app.request('/avatar/alice@example.com')
     expect(res.status).toBe(400)
     expect((await res.json()).error.code).toBe('invalid_identifier')
+  })
+
+  it('redirects an MD5 email hash exactly like its SHA256', async () => {
+    const { app, index } = setup()
+    index.md5s.set(emailMd5('alice@example.com'), emailHash('alice@example.com'))
+    const sha = await app.request(`/avatar/${emailHash('alice@example.com')}?s=64`)
+    const md5 = await app.request(`/avatar/${emailMd5('  Alice@Example.com ')}?s=64`)
+    expect(md5.status).toBe(302)
+    expect(md5.headers.get('location')).toBe(sha.headers.get('location'))
+    expect(md5.headers.get('x-rate-limit-limit')).toBe('100')
+    expect(md5.headers.get('set-cookie')).toBeNull()
+    expect((await app.request(`/avatar/${emailMd5('alice@example.com').toUpperCase()}.png`)).status).toBe(302)
+  })
+
+  it('rejects hashes that are neither 32 nor 64 hex characters', async () => {
+    const { app } = setup()
+    for (const bad of ['a'.repeat(31), 'a'.repeat(33), 'a'.repeat(40), 'a'.repeat(63), 'a'.repeat(65), 'z'.repeat(32), 'alice@example.com']) {
+      const res = await app.request(`/avatar/${bad}`)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error.code).toBe('invalid_identifier')
+    }
+  })
+
+  it('answers unlinked and opted-out hashes identically, for MD5 as for SHA256', async () => {
+    const { app, index } = setup()
+    index.md5s.set(emailMd5('alice@example.com'), emailHash('alice@example.com'))
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, emailLookupOptOut: true })
+    const shape = async (hash: string, d: string) => {
+      const res = await app.request(`/avatar/${hash}?d=${d}`, { headers: { 'cf-connecting-ip': '203.0.113.50' } })
+      return { status: res.status, cache: res.headers.get('cache-control'), body: await res.text() }
+    }
+    for (const d of ['404', 'mp']) {
+      expect(await shape(emailMd5('alice@example.com'), d)).toEqual(await shape(emailMd5('nobody@example.com'), d))
+      expect(await shape(emailHash('alice@example.com'), d)).toEqual(await shape(emailHash('nobody@example.com'), d))
+    }
+    expect((await shape(emailMd5('alice@example.com'), '404')).status).toBe(404)
+  })
+
+  it('applies visibility rules and the anonymous daily limit to MD5 lookups', async () => {
+    const { app, index } = setup()
+    const md5 = emailMd5('alice@example.com')
+    index.md5s.set(md5, emailHash('alice@example.com'))
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+    expect((await app.request(`/avatar/${md5}?d=404`)).status).toBe(404)
+    expect((await app.request(`/avatar/${md5}`, { headers: { 'x-api-key': 'sk_test' } })).status).toBe(302)
+    index.rules.clear()
+    let last = 0
+    for (let i = 0; i < 101; i++) last = (await app.request(`/avatar/${md5}`, { headers: { 'cf-connecting-ip': '203.0.113.77' } })).status
+    expect(last).toBe(429)
   })
 
   it('serves the default when nothing passes the rating filter', async () => {
