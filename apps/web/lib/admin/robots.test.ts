@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { readdirSync } from 'node:fs'
 import robots from '../../app/robots'
+import { STATIC_PAGES } from '../site'
 import { BUCKETS } from '../rate-limit'
 
 describe('admin discovery and limits', () => {
@@ -9,8 +9,8 @@ describe('admin discovery and limits', () => {
     const list = Array.isArray(rules) ? rules : [rules]
     expect(list.some((r) => r.userAgent === '*' && [r.disallow].flat().includes('/admin'))).toBe(true)
   })
-  it('there is no sitemap that could list /admin', () => {
-    expect(readdirSync(new URL('../../app', import.meta.url)).filter((f) => f.startsWith('sitemap'))).toEqual([])
+  it('the sitemap page list has no admin path', () => {
+    expect(STATIC_PAGES.some((p) => p.startsWith('/admin'))).toBe(false)
   })
   it('admin sign-in has failure lockouts and action limits', () => {
     for (const b of ['adminLogin.did', 'adminLogin.ip', 'adminFail.did', 'adminFail.ip', 'adminAction.did', 'adminAction.ip'] as const) expect(BUCKETS[b].limit).toBeGreaterThan(0)

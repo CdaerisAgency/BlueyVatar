@@ -1,6 +1,9 @@
 import type { MetadataRoute } from 'next'
+import { absoluteUrl, ROBOTS_ALLOW, ROBOTS_DISALLOW } from '../lib/site'
 
-/** Keeps the admin pages out of search results. There is no sitemap entry for them either. */
 export default function robots(): MetadataRoute.Robots {
-  return { rules: [{ userAgent: '*', allow: '/', disallow: ['/admin'] }] }
+  return {
+    rules: { userAgent: '*', allow: [...ROBOTS_ALLOW], disallow: [...ROBOTS_DISALLOW] },
+    sitemap: absoluteUrl('/sitemap.xml'),
+  }
 }

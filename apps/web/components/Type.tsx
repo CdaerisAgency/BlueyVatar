@@ -11,10 +11,10 @@ export function Eyebrow({ children, onDark = false }: { children: ReactNode; onD
 }
 
 /** The serif heading used for each Home section. */
-export function SectionTitle({ id, children, className = '' }: { id: string; children: ReactNode; className?: string }) {
+export function SectionTitle({ id, children, className = '', as: Tag = 'h2' }: { id: string; children: ReactNode; className?: string; as?: 'h1' | 'h2' }) {
   return (
-    <h2 id={id} className={`mt-0 mb-9 max-w-[640px] text-[clamp(30px,7vw,40px)] ${className}`}>
+    <Tag id={id} className={`mt-0 mb-9 max-w-[640px] text-[clamp(30px,7vw,40px)] ${className}`}>
       {children}
-    </h2>
+    </Tag>
   )
 }
