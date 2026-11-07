@@ -78,7 +78,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 17 | Hosted profile page | G | Rendered from the service profile record plus app.bsky.actor.profile | v1 |
 | 18 | Extended profile fields | G | Fields in the service profile lexicon (section 5) | v1 |
 | 19 | Verified accounts | G | Verification records plus service attestation (section 8) | v2 |
-| 20 | Links | G | Reuse the links field in the Bluesky profile lexicon | v1 |
+| 20 | Links | G | Reuse the links field in the Bluesky profile lexicon: strongRefs to `app.bsky.actor.link` records | v1 |
 | 21 | Image gallery | G | Extra blobs in the user repo | Later |
 | 22 | Hovercards | G | Embeddable script reading the profile API | v2 |
 | 23 | QR code | G | Endpoint returning a QR for the profile URL | v2 |
@@ -122,7 +122,7 @@ The service defines three record types in the user's repository and keeps everyt
 | Email link | none | none | Service database only | Hash of a verified email mapped to a DID (section 6) |
 | Permission rules | none in v1 | none | Service database | Who may fetch each avatar and profile field (section 10) |
 
-**Reuse the Bluesky profile where it fits.** The Bluesky profile record already holds display name, description, an avatar blob that [accepts PNG and JPEG up to 1,000,000 bytes](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json), self-labels, and a links list capped at 10 items. The service reads it as the fallback source and does not copy it.
+**Reuse the Bluesky profile where it fits.** The Bluesky profile record already holds display name, description, an avatar blob that [accepts PNG and JPEG up to 1,000,000 bytes](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json), self-labels, and a links list capped at 10 items. The links field holds strongRefs (uri and cid) to `app.bsky.actor.link` records in the same repo, each with a URL and an optional title, so the indexer also follows that collection and the profile API resolves the refs in order, dropping any whose cid no longer matches. The service reads it as the fallback source and does not copy it.
 
 **Avatar image record (draft).**
 
@@ -150,6 +150,12 @@ The service defines three record types in the user's repository and keeps everyt
   }
 }
 ```
+
+**Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
+
+- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified. A crop box in the web editor is a later addition.
+- **Minimum size.** Sources must be at least 80 pixels on both sides. The web editor rejects smaller images with a clear message, and delivery treats a smaller source as an invalid image rather than upscaling it.
+- **Client resize.** Before upload, the web editor downscales images in the browser with a canvas to at most 2048 pixels on the long side, then re-encodes toward the 1,000,000 byte cap: JPEG at quality 0.92, 0.85, then 0.75, with a PNG kept as PNG if it fits. This is best effort, so phone photos usually pass but the result is not guaranteed. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
 
 The blob limits copy the Bluesky avatar field so a user can reuse one file in both places. The license values are placeholders for the user-declared license in section 10.
 
@@ -253,7 +259,7 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 | Field | Source | Phase |
 | --- | --- | --- |
 | Display name, description, avatar | `app.bsky.actor.profile` | v1 |
-| Links (up to 10) | Links field in `app.bsky.actor.profile` | v1 |
+| Links (up to 10) | Links field in `app.bsky.actor.profile` (strongRefs to `app.bsky.actor.link` records) | v1 |
 | Job title, company, location | `com.blueyvatar.profile` | v1 |
 | Pronouns, pronunciation, timezone, interests | `com.blueyvatar.profile` | v1 |
 | Background color | `com.blueyvatar.profile` | v2 |
@@ -273,12 +279,14 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 
 Gravatar's four ratings map onto atproto's existing self-label values, so ratings travel with the image and other apps can read them. The mapping below is a proposal. The values atproto supports for self-labeling are [`!no-unauthenticated`, `porn`, `sexual`, `nudity`, and `graphic-media`](https://docs.bsky.app/docs/advanced-guides/moderation).
 
-| Rating | Meaning | Self-label on the image record |
-| --- | --- | --- |
-| G | Suitable for all audiences | No label |
-| PG | Non-sexual nudity or mild content | `nudity` |
-| R | Sexually suggestive or graphic media | `sexual` or `graphic-media` |
-| X | Adult content | `porn` |
+| Rating | Meaning | Example | Self-label on the image record |
+| --- | --- | --- | --- |
+| G | Suitable for all audiences | A portrait, a pet, a logo, or a landscape | No label |
+| PG | Non-sexual nudity or mild content | A classical statue, a breastfeeding photo, or a beach photo with bare skin and no sexual context | `nudity` |
+| R | Sexually suggestive or graphic media | Lingerie or provocative posing without explicit acts, or a medical image with graphic injury | `sexual` or `graphic-media` |
+| X | Adult content | Explicit sexual imagery | `porn` |
+
+**Difference from Gravatar's R.** Gravatar's R rating [includes nudity](https://docs.gravatar.com/api/images/) alongside violence and strong language. blueyvatar rates non-sexual nudity PG, following Bluesky's `nudity` label, and reserves R for sexually suggestive or graphic content. An image Gravatar rates R for non-sexual nudity may therefore be PG here, and a G-only request still excludes it.
 
 Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to ignore](https://docs.bsky.app/docs/advanced-guides/moderation), which is why it sits at PG. Gravatar shows [only G-rated images unless the caller asks for more](https://docs.gravatar.com/api/images/), and the service keeps that default.
 
@@ -290,6 +298,8 @@ Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to i
 - The service stops serving avatars for accounts whose repo is no longer active (taken down, suspended, or deactivated).
 - The service never stores raw email addresses, never sets tracking cookies on avatar requests, and keeps request logs for a short, published period.
 - Embed guidance tells sites to add a no-referrer policy to avatar images, as [Libravatar recommends](https://wiki.libravatar.org/api/).
+
+**Enumeration.** Hash lookups must not reveal whether an email has a linked account. On `/avatar/{hash}`, an unlinked hash, a hash whose owner opted out of email lookup, a hash for an inactive repo, and a hash for an avatar the caller may not see under the owner's visibility rules all return the same response: the same status, the same redirect to the default image, and the same headers. The service makes these checks from its own database before it resolves any identity over the network, so the timing does not separate them either. Profile and QR lookups by hash answer a restricted profile with the same 404 as an unlinked hash. Rate limits (100 anonymous requests per IP per day) slow bulk testing but do not stop it, so the opt-out is the user's real control (section 13, item 6).
 
 **What the service cannot promise.** Public atproto data is [rebroadcast by a global firehose](https://atproto.com/blog/atproto-spaces-alpha). When a user deletes an image record, the service purges its own caches, but it cannot recall copies that others already hold.
 

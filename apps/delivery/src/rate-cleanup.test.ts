@@ -17,11 +17,11 @@ describe.skipIf(!url)('rate window cleanup', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
-  })
+  }, 60_000)
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
     await pool?.end()
-  })
+  }, 60_000)
 
   it('removes only expired rows', async () => {
     await pool.query("INSERT INTO rate_windows (bucket, count, reset_at) VALUES ('old', 3, now() - interval '1 minute'), ('live', 1, now() + interval '1 minute')")

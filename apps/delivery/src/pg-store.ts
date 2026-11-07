@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { isRating, type Tier } from '@blueyvatar/core'
+import { isRating, type IndexedLinkRecord, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
@@ -53,6 +53,11 @@ export class PgIndexStore implements IndexStore {
     }))
   }
 
+  async profileLinks(did: string): Promise<IndexedLinkRecord[]> {
+    const { rows } = await this.pool.query<IndexedLinkRecord>('SELECT rkey, cid, url, title FROM profile_links WHERE did = $1', [did])
+    return rows
+  }
+
   async visibility(did: string): Promise<Visibility> {
     const { rows } = await this.pool.query<{
       keyed_only: boolean; domain_allowlist: string[]; hidden_profile: boolean; email_lookup_opt_out: boolean
@@ -78,7 +83,7 @@ export class PgIndexStore implements IndexStore {
   }
 
   async isBlocked(did: string, cid: string): Promise<boolean> {
-    const { rowCount } = await this.pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND cid = $2', [did, cid])
+    const { rowCount } = await this.pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND cid = $2 AND unblocked_at IS NULL', [did, cid])
     return (rowCount ?? 0) > 0
   }
 

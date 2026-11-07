@@ -79,6 +79,9 @@ importers:
       '@blueyvatar/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@blueyvatar/hovercards':
+        specifier: workspace:*
+        version: link:../../packages/hovercards
       next:
         specifier: 16.4.4
         version: 16.4.4(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -112,6 +115,15 @@ importers:
         version: 3.2.7(@types/node@22.20.5)
 
   packages/core: {}
+
+  packages/hovercards:
+    devDependencies:
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@22.20.5)
 
   tools/migrate:
     dependencies:

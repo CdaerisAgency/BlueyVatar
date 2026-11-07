@@ -20,6 +20,7 @@ describe.skipIf(!url)('postgres index writes', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
+    await pool.query(readFileSync(new URL('../../../db/migrations/0007_profile_links.sql', import.meta.url), 'utf8'))
   })
 
   afterAll(async () => {
@@ -59,5 +60,15 @@ describe.skipIf(!url)('postgres index writes', () => {
     await db.deleteClaim(DID, 'c1')
     expect((await pool.query('SELECT 1 FROM profiles')).rowCount).toBe(0)
     expect((await pool.query('SELECT 1 FROM claims')).rowCount).toBe(0)
+  })
+
+  it('upserts link records by did and rkey and deletes them', async () => {
+    const db = new PgIndexWrites(pool)
+    const evt = { did: DID, collection: 'app.bsky.actor.link', rkey: 'l1', action: 'create' as const }
+    await handleRecord({ ...evt, cid: 'bafy1', record: { url: 'https://a.test/', title: 'A', createdAt: '2026-01-01T00:00:00Z' } }, db)
+    await handleRecord({ ...evt, action: 'update', cid: 'bafy2', record: { url: 'https://b.test/', createdAt: '2026-01-01T00:00:00Z' } }, db)
+    expect((await pool.query('SELECT cid, url, title FROM profile_links')).rows).toEqual([{ cid: 'bafy2', url: 'https://b.test/', title: null }])
+    await handleRecord({ ...evt, action: 'delete' }, db)
+    expect((await pool.query('SELECT 1 FROM profile_links')).rowCount).toBe(0)
   })
 })
