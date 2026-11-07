@@ -1,3 +1,5 @@
+import { PageMain } from '../../../components/Page'
+import { Button } from '../../../components/Button'
 import { redirect } from 'next/navigation'
 import AccountNav from '../AccountNav'
 import { currentDid } from '../../../lib/auth'
@@ -35,7 +37,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
   const link = handle ? profileLinkFor(PUBLIC_URL, handle) : null
 
   return (
-    <main>
+    <PageMain>
       <h1>Verified accounts</h1>
       <AccountNav />
       {error && <p role="alert">{error}</p>}
@@ -55,14 +57,14 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
             const verified = a?.result === 'verified' && a.claimUri === c.value.uri
             const label = PLATFORM_LABELS[c.value.platform] ?? c.value.platform
             return (
-              <li key={c.rkey} style={{ marginBottom: 12 }}>
+              <li key={c.rkey} className="mb-3">
                 <strong>{label}</strong> <code>{c.value.uri}</code>{' '}
                 {verified ? <span>Verified ({a!.method}){c.value.hidden ? ', hidden from hovercards' : ''}</span> : <span>Not verified</span>}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                <div className="mt-1 flex flex-wrap gap-2">
                   {isPlatform(c.value.platform) ? (
                     <form action={verifyClaim}>
                       <input type="hidden" name="rkey" value={c.rkey} />
-                      <button type="submit">{verified ? 'Verify again' : METHOD_FOR[c.value.platform] === 'rel-me' ? 'Check my page' : `Verify with ${label}`}</button>
+                      <Button type="submit">{verified ? 'Verify again' : METHOD_FOR[c.value.platform] === 'rel-me' ? 'Check my page' : `Verify with ${label}`}</Button>
                     </form>
                   ) : (
                     <span>Verification is coming later.</span>
@@ -70,11 +72,11 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                   <form action={setHidden}>
                     <input type="hidden" name="rkey" value={c.rkey} />
                     <input type="hidden" name="hidden" value={String(!c.value.hidden)} />
-                    <button type="submit">{c.value.hidden ? 'Show in hovercards' : 'Hide from hovercards'}</button>
+                    <Button type="submit">{c.value.hidden ? 'Show in hovercards' : 'Hide from hovercards'}</Button>
                   </form>
                   <form action={deleteClaimAction}>
                     <input type="hidden" name="rkey" value={c.rkey} />
-                    <button type="submit">Delete</button>
+                    <Button type="submit">Delete</Button>
                   </form>
                 </div>
               </li>
@@ -102,8 +104,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         </label>{' '}
         <label>
           Account or address <input name="account" required maxLength={300} placeholder="username, @name@instance, or https://..." />
-        </label>{' '}
-        <button type="submit">Add</button>
+        </label>
+        <Button type="submit" variant="primary">Add</Button>
       </form>
 
       <h2>How each platform is checked</h2>
@@ -124,6 +126,6 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
           Your profile link for rel=&quot;me&quot; checks: <code>{link}</code>
         </p>
       )}
-    </main>
+    </PageMain>
   )
 }

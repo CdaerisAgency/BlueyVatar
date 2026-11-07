@@ -1,3 +1,4 @@
+import { Note, PageMain } from '../../../components/Page'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
@@ -11,17 +12,17 @@ export default async function VisibilityPage() {
   if (!did) redirect('/login')
   const rules = await getDashboardStore().getRules(did)
   return (
-    <main>
+    <PageMain>
       <h1>Visibility</h1>
       <p>Signed in as {did}</p>
       <p>Current setting: {isPublic(rules) ? 'Public. Anyone can fetch your avatar and profile.' : 'Restricted by the rules below.'}</p>
-      <div role="note" style={{ border: '1px solid currentColor', padding: 12, margin: '12px 0' }}>
+      <Note>
         <p>
           <strong>Your avatar in your repo stays public.</strong>
         </p>
         <p>{PUBLIC_DATA_NOTICE}</p>
-      </div>
+      </Note>
       <VisibilityForm rules={rules} />
-    </main>
+    </PageMain>
   )
 }

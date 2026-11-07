@@ -1,3 +1,5 @@
+import AvatarRing from '../../../components/AvatarRing'
+import { PageMain } from '../../../components/Page'
 import type { PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
@@ -9,13 +11,15 @@ export default async function AvatarPage({ params, searchParams }: { params: Pro
   const { report } = await searchParams
   const res = await fetch(`${DELIVERY_URL}/profile/${encodeURIComponent(handle)}`, { next: { revalidate: 300 } })
   const p = res.ok ? ((await res.json()) as PublicProfile) : null
-  if (!p || !p.avatar) return <main><h1>Avatar not found</h1></main>
+  if (!p || !p.avatar) return <PageMain narrow><h1>Avatar not found</h1></PageMain>
   return (
-    <main>
-      <img src={`${DELIVERY_URL}${p.avatar.url}`} alt="" width={256} height={256} referrerPolicy="no-referrer" />
-      <h1>{p.displayName ?? p.handle ?? handle}</h1>
-      <p><a href={`/p/${encodeURIComponent(handle)}`}>View profile</a></p>
+    <PageMain narrow>
+      <div className="flex flex-col items-center text-center">
+        <AvatarRing src={`${DELIVERY_URL}${p.avatar.url}`} alt="" size={380} referrerPolicy="no-referrer" />
+        <h1 className="mt-5 mb-2">{p.displayName ?? p.handle ?? handle}</h1>
+        <p><a href={`/p/${encodeURIComponent(handle)}`}>View profile</a></p>
+      </div>
       <ReportForm did={p.did} source="avatar" back={`/a/${encodeURIComponent(handle)}`} status={report} />
-    </main>
+    </PageMain>
   )
 }

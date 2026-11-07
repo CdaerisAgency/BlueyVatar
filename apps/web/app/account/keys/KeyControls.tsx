@@ -1,4 +1,5 @@
 'use client'
+import { Button } from '../../../components/Button'
 
 import { useActionState } from 'react'
 import { createKey, revokeKey, rotateKey, saveDomains, type KeyState } from './actions'
@@ -15,7 +16,7 @@ function Result({ s }: { s: KeyState }) {
           <p>
             <strong>Copy this {s.keyKind} key now. It is shown only once and cannot be recovered.</strong>
           </p>
-          <pre style={{ overflowX: 'auto', padding: 8, border: '1px solid currentColor' }}>
+          <pre tabIndex={0}>
             <code>{s.key}</code>
           </pre>
         </div>
@@ -37,13 +38,13 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason }:
             {allowPublishable && <option value="publishable">Publishable (pk_, browsers)</option>}
             {allowSecret && <option value="secret">Secret (sk_, servers)</option>}
           </select>
-        </label>{' '}
+        </label>
         <label>
           Label <input name="label" maxLength={60} placeholder="optional" />
-        </label>{' '}
-        <button type="submit" disabled={pending || !!disabledReason}>
+        </label>
+        <Button type="submit" variant="primary" disabled={pending || !!disabledReason}>
           Create key
-        </button>
+        </Button>
       </form>
       <Result s={state} />
     </section>
@@ -65,23 +66,23 @@ export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: stri
               <textarea name="domains" rows={3} cols={40} defaultValue={domains.join('\n')} />
             </label>
             <br />
-            <button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving}>
               Save domains
-            </button>
+            </Button>
             <Result s={dom} />
           </form>
         ) : (
           <p>Domain restrictions are not included in the Free tier.</p>
         ))}
-      <form action={rotate} style={{ display: 'inline' }}>
+      <form action={rotate} className="inline">
         <input type="hidden" name="hash" value={hash} />
-        <button type="submit" disabled={rotating}>
+        <Button type="submit" disabled={rotating}>
           Rotate
-        </button>
+        </Button>
       </form>{' '}
-      <form action={revokeKey} style={{ display: 'inline' }}>
+      <form action={revokeKey} className="inline">
         <input type="hidden" name="hash" value={hash} />
-        <button type="submit">Revoke</button>
+        <Button type="submit">Revoke</Button>
       </form>
       <Result s={rot} />
     </div>

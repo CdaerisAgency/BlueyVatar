@@ -1,3 +1,5 @@
+import { PageMain } from '../../../components/Page'
+import { Button } from '../../../components/Button'
 import { redirect } from 'next/navigation'
 import { verifyCode } from '../../actions'
 import { currentDid } from '../../../lib/auth'
@@ -12,14 +14,16 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   if (!pending) redirect('/account')
   const { error } = await searchParams
   return (
-    <main>
+    <PageMain narrow>
       <h1>Enter your code</h1>
       <p>We sent a 6-digit code to {pending.masked}. It expires in 15 minutes.</p>
       {error && <p role="alert">{error}</p>}
       <form action={verifyCode}>
-        <input name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="one-time-code" />{' '}
-        <button type="submit">Verify</button>
+        <label>
+          6-digit code <input name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="one-time-code" />
+        </label>
+        <Button type="submit" variant="primary">Verify</Button>
       </form>
-    </main>
+    </PageMain>
   )
 }

@@ -1,0 +1,31 @@
+/*
+ * Chrysalis design tokens (monarch palette). The single source of truth for color, type, and shape.
+ * Tailwind turns each entry into utilities such as bg-bv-cream, text-bv-ink-2, font-display, and rounded-bv-card.
+ */
+@theme {
+  /* Only these colors exist. */
+  --color-*: initial;
+  --color-bv-cream: #fffbf4; /* page background */
+  --color-bv-white: #ffffff; /* cards */
+  --color-bv-black: #1a1a1a; /* text, rules, outlines, the developer band */
+  --color-bv-orange: #f28c28; /* primary buttons, badges, the avatar glow. Always black text on it */
+  --color-bv-orange-deep: #b4400e; /* text links, small uppercase labels */
+  --color-bv-blue: #1f4e9b; /* logo only, plus link hover */
+  --color-bv-line: #e6dfd3; /* card borders, footer rule */
+  --color-bv-ink-2: #4a4640; /* body copy on cream */
+  --color-bv-ink-3: #6b6660; /* captions, footer */
+  --color-bv-code-bg: #262522; /* code block inside the dark band */
+  --color-bv-code-muted: #8f8a82; /* code comments */
+
+  --radius-bv-pill: 999px;
+  --radius-bv-card: 16px;
+
+  --breakpoint-sm: 30rem;
+}
+
+/* The next/font variables are set on <html> at runtime, so these must not be inlined at build time. */
+@theme inline {
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

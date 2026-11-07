@@ -1,7 +1,9 @@
 import { cache } from 'react'
 import type { Metadata } from 'next'
-import { ReportForm } from '../../report/ReportForm'
+import AvatarRing from '../../../components/AvatarRing'
+import { PageMain } from '../../../components/Page'
 import { pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
+import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
 // Link previews are fetched by outside crawlers, so the image needs the public delivery origin.
@@ -23,40 +25,43 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const { handle } = await params
   const { report } = await searchParams
   const p = await load(handle)
-  if (!p) return <main><h1>Profile not found</h1></main>
+  if (!p) return <PageMain narrow><h1>Profile not found</h1></PageMain>
   // Only https links render, and accounts the user hid stay off the page.
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
   const links = pageLinks(p)
   const interests = pageInterests(p)
+  const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
   return (
-    <main>
-      {p.avatar && <img src={`${DELIVERY_URL}${p.avatar.url}`} alt="" width={128} height={128} referrerPolicy="no-referrer" />}
-      <h1>{p.displayName ?? p.handle}</h1>
-      {p.pronouns && <p>{p.pronouns}</p>}
-      {(p.jobTitle || p.company) && <p>{[p.jobTitle, p.company].filter(Boolean).join(', ')}</p>}
-      {p.location && <p>{p.location}</p>}
-      {p.timezone && <p>Time zone: {p.timezone}</p>}
-      {p.description && <p>{p.description}</p>}
-      {interests.length > 0 && <p>Interests: {interests.join(', ')}</p>}
-      {links.length > 0 && (
-        <ul aria-label="Links">
-          {links.map((l) => (
-            <li key={l.url}>
-              <a href={l.url} rel="me nofollow noopener noreferrer">{l.label}</a>
-            </li>
-          ))}
-        </ul>
-      )}
-      {accounts.length > 0 && (
-        <ul aria-label="Verified accounts">
-          {accounts.map((a) => (
-            <li key={a.uri}>
-              <a href={a.uri} rel="me noopener">{a.platform}</a>
-            </li>
-          ))}
-        </ul>
-      )}
+    <PageMain narrow>
+      <div className="flex flex-col items-center text-center [&_p]:mb-2">
+        {p.avatar && <AvatarRing src={`${DELIVERY_URL}${p.avatar.url}`} alt="" size={380} referrerPolicy="no-referrer" />}
+        <h1 className="mt-5 mb-2">{p.displayName ?? p.handle}</h1>
+        {p.pronouns && <p>{p.pronouns}</p>}
+        {(p.jobTitle || p.company) && <p>{[p.jobTitle, p.company].filter(Boolean).join(', ')}</p>}
+        {p.location && <p>{p.location}</p>}
+        {p.timezone && <p>Time zone: {p.timezone}</p>}
+        {p.description && <p>{p.description}</p>}
+        {interests.length > 0 && <p>Interests: {interests.join(', ')}</p>}
+        {links.length > 0 && (
+          <ul aria-label="Links" className={list}>
+            {links.map((l) => (
+              <li key={l.url}>
+                <a href={l.url} rel="me nofollow noopener noreferrer">{l.label}</a>
+              </li>
+            ))}
+          </ul>
+        )}
+        {accounts.length > 0 && (
+          <ul aria-label="Verified accounts" className={list}>
+            {accounts.map((a) => (
+              <li key={a.uri}>
+                <a href={a.uri} rel="me noopener">{a.platform}</a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       <ReportForm did={p.did} source="profile" back={`/p/${encodeURIComponent(handle)}`} status={report} />
-    </main>
+    </PageMain>
   )
 }

@@ -1,3 +1,4 @@
+import { Button } from '../../components/Button'
 import { REASONS, REASON_LABELS, MAX_DETAILS, type Source } from '../../lib/reports'
 import { submitReportAction } from './actions'
 
@@ -33,7 +34,7 @@ export function ReportForm({ did, source, back, status }: { did: string; source:
               <input type="email" name="contact" maxLength={254} autoComplete="email" />
             </label>
           </p>
-          <button type="submit">Send report</button>
+          <Button type="submit">Send report</Button>
         </form>
       </details>
     </section>

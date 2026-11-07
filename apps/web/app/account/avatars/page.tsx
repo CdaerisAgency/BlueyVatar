@@ -1,3 +1,5 @@
+import { PageMain } from '../../../components/Page'
+import { Button } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
@@ -28,7 +30,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   const canAdd = !loadError && canAddImage(images.length, plan)
 
   return (
-    <main>
+    <PageMain>
       <AccountNav />
       <h1>Avatars</h1>
       {error && <p role="alert">{error}</p>}
@@ -39,29 +41,29 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
         Your images ({images.length} of {imageLimit(plan)})
       </h2>
       {images.length === 0 && !loadError ? <p>No images yet.</p> : null}
-      <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 16 }}>
+      <ul>
         {images.map((img) => {
           const isDefault = img.value.isDefault === true
           return (
-            <li key={img.rkey} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <li key={img.rkey} className="flex items-start gap-3">
               {/* The blob is served by the user's PDS, so next/image optimization does not apply. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={blobUrl(pds, did, img.value.image.ref.$link)} alt={img.value.alt ?? ''} width={96} height={96} style={{ objectFit: 'cover' }} referrerPolicy="no-referrer" />
+              <img src={blobUrl(pds, did, img.value.image.ref.$link)} alt={img.value.alt ?? ''} width={96} height={96} className="object-cover" referrerPolicy="no-referrer" />
               <div>
                 <div>
                   {isDefault ? <strong>Default</strong> : null} Rating {ratingFromLabels(imageLabels(img)).toUpperCase()}, license {img.value.license ?? 'unset'}
                 </div>
                 {img.value.alt ? <div>{img.value.alt}</div> : null}
-                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <div className="mt-1 flex gap-2">
                   {!isDefault && (
                     <form action={makeDefault}>
                       <input type="hidden" name="rkey" value={img.rkey} />
-                      <button type="submit">Set as default</button>
+                      <Button type="submit">Set as default</Button>
                     </form>
                   )}
                   <form action={removeImage}>
                     <input type="hidden" name="rkey" value={img.rkey} />
-                    <button type="submit">Delete</button>
+                    <Button type="submit">Delete</Button>
                   </form>
                 </div>
               </div>
@@ -98,7 +100,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
         you need real access control, this service cannot provide it for repository images.
       </p>
       {canAdd ? (
-        <form action={uploadImage} encType="multipart/form-data" style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
+        <form action={uploadImage} encType="multipart/form-data">
           <ImageFileInput />
           <label>
             Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
@@ -132,11 +134,11 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           <label>
             <input name="isDefault" type="checkbox" /> Use as my default image
           </label>
-          <button type="submit">Upload</button>
+          <Button type="submit" variant="primary">Upload</Button>
         </form>
       ) : (
         !loadError && <p>You have reached the {imageLimit(plan)} image limit for the Free plan. Delete an image to add another.</p>
       )}
-    </main>
+    </PageMain>
   )
 }

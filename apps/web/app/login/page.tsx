@@ -1,17 +1,23 @@
 import { login } from '../actions'
+import { Button } from '../../components/Button'
+import { PageMain } from '../../components/Page'
+import { COPY } from '../../lib/copy'
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams
   return (
-    <main>
-      <h1>Sign in</h1>
+    <PageMain narrow>
+      <h1>{COPY.login.title}</h1>
+      <p>{COPY.login.lead}</p>
       {error && <p role="alert">{error}</p>}
       <form action={login}>
         <label>
-          Your atproto handle <input name="handle" placeholder="alice.bsky.social" required autoComplete="username" />
-        </label>{' '}
-        <button type="submit">Continue</button>
+          {COPY.login.label} <input name="handle" placeholder={COPY.login.placeholder} required autoComplete="username" />
+        </label>
+        <Button type="submit" variant="primary">
+          {COPY.login.submit}
+        </Button>
       </form>
-    </main>
+    </PageMain>
   )
 }
