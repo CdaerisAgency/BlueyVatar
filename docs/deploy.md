@@ -174,7 +174,7 @@ Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It re
 - Addresses: `security@blueyvatar.com` (the vulnerability contact in `SECURITY.md`) and `alerts@blueyvatar.com`. Each has its own routing rule.
 - Destination: `chris@cdaeris.com`. Cloudflare sends a verification email to a new destination address, and rules cannot forward to it until that link is clicked.
 - DNS: Email Routing adds the MX records (`route1`, `route2`, `route3.mx.cloudflare.net`), the SPF TXT record `v=spf1 include:_spf.mx.cloudflare.net ~all`, and a DKIM record at `cf2024-1._domainkey`. Do not add other MX records or a second SPF record for the apex; a domain can publish only one SPF record.
-- Token: the API token used for setup is in Infisical project `blueyvatar`, environment `dev`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
+- Token: the API token used for setup is in Infisical project `blueyvatar`, environment `prod`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
 - To add an address: `POST /zones/{zone_id}/email/routing/rules` with a `literal` matcher on `to` and a `forward` action. To add a destination: `POST /accounts/{account_id}/email/routing/addresses`. Docs: <https://developers.cloudflare.com/email-routing/>.
 
 ## CDN cache warming
