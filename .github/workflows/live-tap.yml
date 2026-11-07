@@ -1,0 +1,53 @@
+name: Live Tap
+
+# Manual only. Runs the indexer against the Tap image pinned in fly/tap.toml, with a local PLC
+# directory and PDS, so nothing leaves the runner. Not part of CI. See docs/testing-live-tap-v1.md.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-tap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-tap:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blueyvatar_test
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Point the test at the service port
+        run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate lexicon types
+        run: pnpm lex:build
+
+      - name: Live Tap test
+        run: pnpm tap:live:local

@@ -3,51 +3,60 @@ import { Tap, type TapEvent, type TapHandler } from '@atproto/tap'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { resolveProfileLinks } from '@blueyvatar/core'
-import { COLLECTIONS, handleRecord } from './handlers.js'
+import { managedMode, startManagedStack, type LiveStack } from '../test-support/tap-live-stack.js'
+import { COLLECTIONS, type IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
+import { createIndexer } from './wiring.js'
 
 /**
- * Live integration test for the indexer against a real Tap instance (issue #42).
+ * Live integration test for the indexer against a real Tap instance (issue #42). Opt-in: with no
+ * flag and no variables below it skips, so default `pnpm -r test` and CI are unaffected.
  *
- * It signs in to a dedicated test account on a PDS, writes records in all seven collections that
- * Tap filters on, consumes the resulting events through the same `@atproto/tap` channel the indexer
- * uses, runs them through `handleRecord` and `PgIndexWrites` into a throwaway Postgres schema, and
- * asserts the rows. It also checks that the Tap event `cid` is the record CID (issue #101: profile
- * links are dropped when the strongRef cid differs from the indexed cid) and that every event is
- * acknowledged only after its handler finished.
+ * Two ways to run it (docs/testing-live-tap-v1.md):
  *
- * Skipped unless every required variable is set. See docs/deploy.md, "Live Tap test".
+ *  1. Managed (LIVE_TAP_TEST=1 plus Docker, or TAP_LIVE_TAP_BIN). The test starts a local PLC
+ *     directory and PDS (apps/indexer/live-stack) and the Tap image pinned in fly/tap.toml with the
+ *     production signal collection and collection filters, then creates its own account. No real
+ *     accounts and no network writes. Needs TEST_DATABASE_URL.
  *
- *   TAP_LIVE_URL            Tap base URL, for example http://localhost:2480
- *   TAP_LIVE_ADMIN_PASSWORD Tap admin password (falls back to TAP_ADMIN_PASSWORD; omit when Tap has none)
- *   TAP_LIVE_PDS_URL        PDS of the test account (default https://bsky.social)
- *   TAP_LIVE_IDENTIFIER     test account handle or DID
- *   TAP_LIVE_APP_PASSWORD   app password for the test account
- *   TEST_DATABASE_URL       Postgres for the throwaway schema
+ *  2. External. Point it at a running Tap and a test account you own:
+ *       TAP_LIVE_URL, TAP_LIVE_IDENTIFIER, TAP_LIVE_APP_PASSWORD, TEST_DATABASE_URL
+ *       optional: TAP_LIVE_ADMIN_PASSWORD, TAP_LIVE_PDS_URL (default https://bsky.social),
+ *       TAP_LIVE_CHECK_STATUS=1 (also deactivate and reactivate the account)
+ *
+ * What it asserts, through the same `@atproto/tap` channel and `createIndexer` wiring the indexer
+ * uses (src/wiring.ts) into `PgIndexWrites` on a throwaway schema: create, update and delete rows for
+ * images, profiles, claims and profile links; that the Tap event `cid` is the record CID (issue #101);
+ * that an event whose handler failed is not acked and comes back; and that account status events
+ * update `repos`.
+ *
  *   TAP_LIVE_TIMEOUT_MS     per-wait timeout (default 90000)
- *   TAP_LIVE_CHECK_STATUS=1 also deactivate and reactivate the account to check `repos` status updates
  */
 const env = process.env
-const tapUrl = env.TAP_LIVE_URL
-const adminPassword = env.TAP_LIVE_ADMIN_PASSWORD ?? env.TAP_ADMIN_PASSWORD
-const pdsUrl = (env.TAP_LIVE_PDS_URL ?? 'https://bsky.social').replace(/\/+$/, '')
-const identifier = env.TAP_LIVE_IDENTIFIER
-const appPassword = env.TAP_LIVE_APP_PASSWORD
+const mode = managedMode()
+const managed = mode.kind === 'managed'
 const dbUrl = env.TEST_DATABASE_URL
 const waitMs = Number(env.TAP_LIVE_TIMEOUT_MS ?? 90_000)
-const checkStatus = env.TAP_LIVE_CHECK_STATUS === '1'
+const checkStatus = managed || env.TAP_LIVE_CHECK_STATUS === '1'
 
-const missing = [
-  ['TAP_LIVE_URL', tapUrl],
-  ['TAP_LIVE_IDENTIFIER', identifier],
-  ['TAP_LIVE_APP_PASSWORD', appPassword],
+const externalMissing = [
+  ['TAP_LIVE_URL', env.TAP_LIVE_URL],
+  ['TAP_LIVE_IDENTIFIER', env.TAP_LIVE_IDENTIFIER],
+  ['TAP_LIVE_APP_PASSWORD', env.TAP_LIVE_APP_PASSWORD],
   ['TEST_DATABASE_URL', dbUrl],
 ]
   .filter(([, v]) => !v)
   .map(([k]) => k)
-const enabled = missing.length === 0
+const flagged = env.LIVE_TAP_TEST === '1'
+// With the flag set, a missing prerequisite fails loudly in beforeAll instead of skipping, except
+// when neither Docker nor a Tap binary is present, which the issue asks to skip.
+const enabled = managed || (!flagged && externalMissing.length === 0)
 if (!enabled) {
-  console.info(`[tap-live] skipped: set ${missing.join(', ')} to run the live Tap test (see docs/deploy.md, "Live Tap test").`)
+  console.info(
+    mode.kind === 'skip' && flagged
+      ? `[tap-live] skipped: ${mode.reason}.`
+      : `[tap-live] skipped: set LIVE_TAP_TEST=1 (with Docker), or ${externalMissing.join(', ')}, to run the live Tap test (docs/testing-live-tap-v1.md).`,
+  )
 }
 
 const schema = `t_taplive_${process.pid}_${Date.now()}`
@@ -58,13 +67,19 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 interface Seen {
   evt: TapEvent
-  /** Order of "handled" and "acked" marks, to prove ack follows the handler. */
+  /**
+   * Handler outcome for this delivery: 'failed' (handler threw, so no ack), or 'ack-called' then
+   * 'acked'. `SimpleIndexer` only calls ack after the handler resolved, so 'ack-called' means the
+   * handler succeeded first.
+   */
   marks: string[]
 }
 
 describe.skipIf(!enabled)('indexer against a live Tap', () => {
   let pool: pg.Pool
   let tap: Tap
+  let stack: LiveStack | undefined
+  let pdsUrl = ''
   let did = ''
   let jwt = ''
   let channelError: unknown
@@ -72,12 +87,16 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
   const seen: Seen[] = []
   const log: string[] = []
   const created: { collection: string; rkey: string }[] = []
+  /** `did/rkey` keys whose next claim upsert throws, to prove a failed handler is not acked. */
+  const failClaimOnce = new Set<string>()
 
   async function xrpc<T = Record<string, unknown>>(nsid: string, body: unknown, opts: { raw?: Buffer; type?: string } = {}): Promise<T> {
+    // Procedures without input (activateAccount) reject any body, so send none when there is none.
+    const payload = opts.raw ?? (body === undefined ? undefined : JSON.stringify(body))
     const res = await fetch(`${pdsUrl}/xrpc/${nsid}`, {
       method: 'POST',
-      headers: { 'content-type': opts.type ?? 'application/json', ...(jwt ? { authorization: `Bearer ${jwt}` } : {}) },
-      body: opts.raw ?? JSON.stringify(body),
+      headers: { ...(payload === undefined ? {} : { 'content-type': opts.type ?? 'application/json' }), ...(jwt ? { authorization: `Bearer ${jwt}` } : {}) },
+      body: typeof payload === 'string' || payload === undefined ? payload : new Uint8Array(payload),
     })
     const text = await res.text()
     if (!res.ok) throw new Error(`${nsid} failed: ${res.status} ${text}`)
@@ -100,7 +119,10 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
       if (channelError) throw new Error(`Tap channel failed while waiting for ${what}: ${String(channelError)}`)
       const v = await probe()
       if (v) return v
-      if (Date.now() > deadline) throw new Error(`timed out after ${waitMs} ms waiting for ${what}. Events seen for the test DID: ${JSON.stringify(seen.filter((s) => (s.evt as { did: string }).did === did).map((s) => s.evt.type === 'record' ? `${s.evt.action} ${s.evt.collection}/${s.evt.rkey}` : `identity ${s.evt.status}`))}`)
+      if (Date.now() > deadline) {
+        const events = seen.filter((s) => (s.evt as { did: string }).did === did).map((s) => (s.evt.type === 'record' ? `${s.evt.action} ${s.evt.collection}/${s.evt.rkey}` : `identity ${s.evt.status}`))
+        throw new Error(`timed out after ${waitMs} ms waiting for ${what}. Events seen for the test DID: ${JSON.stringify(events)}. Handler errors: ${JSON.stringify(log.slice(-5))}${stack ? `. Tap logs: ${stack.tapLogs().slice(-1500)}` : ''}`)
+      }
       await new Promise((r) => setTimeout(r, 500))
     }
   }
@@ -110,6 +132,28 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
     seen.filter((s) => s.evt.type === 'record' && s.evt.did === did && s.evt.collection === collection && s.evt.rkey === rkey && (!action || s.evt.action === action))
 
   beforeAll(async () => {
+    if (!dbUrl) throw new Error('TEST_DATABASE_URL is required (the test creates and drops its own schema).')
+    let tapUrl: string
+    let adminPassword: string | undefined
+    let identifier: string
+    let appPassword: string
+    if (managed) {
+      stack = await startManagedStack((mode as { runtime: 'docker' | 'binary' }).runtime)
+      console.info(`[tap-live] managed stack: Tap via ${stack.describe}, local PDS ${stack.pdsUrl}, local PLC ${stack.plcUrl}`)
+      tapUrl = stack.tapUrl
+      adminPassword = stack.tapAdminPassword
+      pdsUrl = stack.pdsUrl
+      identifier = stack.identifier
+      appPassword = stack.appPassword
+    } else {
+      if (externalMissing.length) throw new Error(`missing ${externalMissing.join(', ')}`)
+      tapUrl = env.TAP_LIVE_URL!
+      adminPassword = env.TAP_LIVE_ADMIN_PASSWORD ?? env.TAP_ADMIN_PASSWORD
+      pdsUrl = (env.TAP_LIVE_PDS_URL ?? 'https://bsky.social').replace(/\/+$/, '')
+      identifier = env.TAP_LIVE_IDENTIFIER!
+      appPassword = env.TAP_LIVE_APP_PASSWORD!
+    }
+
     const admin = new pg.Client({ connectionString: dbUrl })
     await admin.connect()
     await admin.query(`CREATE SCHEMA ${schema}`)
@@ -123,30 +167,51 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
     jwt = session.accessJwt
     did = session.did
 
-    const db = new PgIndexWrites(pool)
-    tap = new Tap(tapUrl!, { adminPassword })
-    // Same wiring as src/index.ts, plus marks that record the handler and ack order.
+    // The production wiring (src/wiring.ts) over the real Postgres writes. The proxy can make one
+    // claim upsert throw so the test can watch an unacked event come back.
+    const pgWrites = new PgIndexWrites(pool)
+    const db = new Proxy(pgWrites, {
+      get(target, prop) {
+        const v = Reflect.get(target, prop, target) as unknown
+        if (typeof v !== 'function') return v
+        if (prop === 'upsertClaim') {
+          return async (d: string, rkey: string, record: Record<string, unknown>) => {
+            if (failClaimOnce.delete(`${d}/${rkey}`)) throw new Error('injected handler failure')
+            return (v as PgIndexWrites['upsertClaim']).call(target, d, rkey, record)
+          }
+        }
+        return v.bind(target) as unknown
+      },
+    }) as IndexWrites
+    const onError = (err: Error) => void log.push(`tap error: ${err.message}${err.cause ? ` (${String((err.cause as Error).message ?? err.cause)})` : ''}`)
+    const indexer = createIndexer(db, onError)
     const handler: TapHandler = {
-      onEvent: async (evt, { ack }) => {
+      onEvent: async (evt, opts) => {
         const entry: Seen = { evt, marks: [] }
         seen.push(entry)
-        if (evt.type === 'record') {
-          await handleRecord({ did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: evt.cid, action: evt.action, record: evt.record as Record<string, unknown> | undefined }, db)
-        } else {
-          await db.setRepoStatus(evt.did, evt.handle, evt.isActive, evt.status)
+        try {
+          await indexer.onEvent(evt, {
+            ...opts,
+            ack: async () => {
+              entry.marks.push('ack-called')
+              await opts.ack()
+              entry.marks.push('acked')
+            },
+          })
+        } catch (e) {
+          entry.marks.push('failed')
+          throw e
         }
-        entry.marks.push('handled')
-        await ack()
-        entry.marks.push('acked')
       },
-      onError: (err) => void log.push(`tap error: ${err.message}`),
+      onError,
     }
+    tap = new Tap(tapUrl, { adminPassword })
     const channel = tap.channel(handler)
     destroy = () => channel.destroy()
     channel.start().catch((err) => {
       channelError = err
     })
-  })
+  }, 300_000)
 
   afterAll(async () => {
     // Best-effort cleanup of the test account's records, then the throwaway schema.
@@ -154,10 +219,14 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
       if (c.collection === COLLECTIONS.bskyProfile) continue
       await deleteRecord(c.collection, c.rkey).catch(() => undefined)
     }
-    await destroy?.().catch(() => undefined)
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
-  })
+    try {
+      await destroy?.().catch(() => undefined)
+      await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
+      await pool?.end()
+    } finally {
+      await stack?.stop()
+    }
+  }, 60_000)
 
   it('indexes create, update and delete across all seven collections with correct CIDs', async () => {
     const now = new Date().toISOString()
@@ -224,7 +293,7 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
     // The stored link cid is the record CID, so the strongRef in the profile resolves and is not dropped.
     const [stored] = await q<{ rkey: string; cid: string; url: string; title: string | null }>('SELECT rkey, cid, url, title FROM profile_links WHERE did = $1 AND rkey = $2', [did, linkRkey])
     expect(stored?.cid).toBe(linkCid1)
-    expect(resolveProfileLinks(did, [linkRef], [stored!])).toEqual([{ url: 'https://example.com/tap-live', title: 'First' }])
+    expect(resolveProfileLinks(did, [linkRef], [stored!])).toEqual([{ url: 'https://example.com/tap-live', label: 'First' }])
 
     // Updates: new cid and fields.
     const linkCid2 = await putRecord(COLLECTIONS.bskyLink, linkRkey, { url: 'https://example.com/tap-live', title: 'Second', createdAt: now })
@@ -240,7 +309,7 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
     // The old strongRef no longer resolves, which is the behavior #101 relies on.
     const [updated] = await q<{ rkey: string; cid: string; url: string; title: string | null }>('SELECT rkey, cid, url, title FROM profile_links WHERE did = $1 AND rkey = $2', [did, linkRkey])
     expect(resolveProfileLinks(did, [linkRef], [updated!])).toEqual([])
-    expect(resolveProfileLinks(did, [{ ...linkRef, cid: linkCid2 }], [updated!])).toEqual([{ url: 'https://example.com/tap-live', title: 'Second' }])
+    expect(resolveProfileLinks(did, [{ ...linkRef, cid: linkCid2 }], [updated!])).toEqual([{ url: 'https://example.com/tap-live', label: 'Second' }])
 
     // Deletes: rows disappear.
     await deleteRecord(COLLECTIONS.image, imageRkey)
@@ -261,11 +330,32 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
     await waitFor('tangled delete events', () => recordEvents(COLLECTIONS.tangledProfile, 'self', 'delete').length > 0 && recordEvents(COLLECTIONS.tangledLegacyProfile, 'self', 'delete').length > 0)
   }, waitMs * 8)
 
-  it('acknowledges each event only after its handler succeeded', async () => {
-    expect(seen.length).toBeGreaterThan(0)
-    await waitFor('all handled events acked', () => seen.every((s) => s.marks.length === 2))
-    for (const s of seen) expect(s.marks).toEqual(['handled', 'acked'])
-  }, waitMs * 2)
+  it('acknowledges an event only after its handler succeeded, and Tap redelivers one that failed', async () => {
+    const rkey = `ack${run}`
+    const claim = { platform: 'github', uri: 'https://github.com/tap-live-ack', createdAt: new Date().toISOString() }
+    failClaimOnce.add(`${did}/${rkey}`)
+    const cid = await putRecord(COLLECTIONS.claim, rkey, claim)
+
+    // First delivery: the handler throws, so the channel must not ack and the row must not exist.
+    const failed = await waitFor('the failed delivery', () => recordEvents(COLLECTIONS.claim, rkey).find((s) => s.marks.includes('failed')))
+    expect(failed.marks).toEqual(['failed'])
+    expect(await q('SELECT 1 FROM claims WHERE did = $1 AND rkey = $2', [did, rkey])).toHaveLength(0)
+
+    // Tap never saw an ack, so after its retry timeout it sends the same event again. This time the
+    // handler succeeds, the row appears, and only then is the ack sent.
+    const retried = await waitFor('redelivery of the unacked event', () => recordEvents(COLLECTIONS.claim, rkey).find((s) => s !== failed && s.marks.includes('acked')))
+    expect(retried.marks).toEqual(['ack-called', 'acked'])
+    expect(retried.evt.type === 'record' && retried.evt.cid).toBe(cid)
+    expect((await q<{ uri: string }>('SELECT uri FROM claims WHERE did = $1 AND rkey = $2', [did, rkey]))[0]?.uri).toBe(claim.uri)
+    expect(log.some((l) => l.includes('injected handler failure'))).toBe(true)
+
+    // Across the whole run, the only delivery without an ack is the injected failure.
+    await deleteRecord(COLLECTIONS.claim, rkey)
+    await waitFor('claim delete', async () => (await q('SELECT 1 FROM claims WHERE did = $1 AND rkey = $2', [did, rkey])).length === 0)
+    await waitFor('all other deliveries acked', () => seen.every((s) => s === failed || s.marks.length === 2))
+    for (const s of seen) if (s !== failed) expect(s.marks).toEqual(['ack-called', 'acked'])
+    expect(seen.filter((s) => s.marks.includes('failed'))).toHaveLength(1)
+  }, waitMs * 3)
 
   it.skipIf(!checkStatus)('updates repos when the account status changes', async () => {
     await xrpc('com.atproto.server.deactivateAccount', {})
@@ -273,7 +363,7 @@ describe.skipIf(!enabled)('indexer against a live Tap', () => {
       await waitFor('repos row inactive', async () => (await q<{ active: boolean; status: string }>('SELECT active, status FROM repos WHERE did = $1', [did]))[0]?.active === false)
       expect((await q<{ status: string }>('SELECT status FROM repos WHERE did = $1', [did]))[0]?.status).toBe('deactivated')
     } finally {
-      await xrpc('com.atproto.server.activateAccount', {})
+      await xrpc('com.atproto.server.activateAccount', undefined)
     }
     await waitFor('repos row active again', async () => (await q<{ active: boolean }>('SELECT active FROM repos WHERE did = $1', [did]))[0]?.active === true)
   }, waitMs * 4)

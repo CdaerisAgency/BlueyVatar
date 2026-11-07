@@ -1,13 +1,14 @@
-import { SimpleIndexer, Tap } from '@atproto/tap'
+import { Tap } from '@atproto/tap'
 import pg from 'pg'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
-import { handleRecord, type IndexWrites } from './handlers.js'
+import type { IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
 import { pgReverifyStore, reverifyDue, scheduleReverify } from './reverify.js'
 import { reverifyFromEnv } from './reverify-wiring.js'
 import { IndexerHealth, probeTap, startHealthServer } from './health.js'
 import { errors, log, metrics } from './obs.js'
+import { createIndexer } from './wiring.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
@@ -72,20 +73,10 @@ async function tracked(type: 'identity' | 'record', id: number, run: () => Promi
   }
 }
 
-const indexer = new SimpleIndexer()
-indexer.identity((evt) => tracked('identity', evt.id, async () => {
-  await db.setRepoStatus(evt.did, evt.handle, evt.isActive, evt.status)
-}))
-indexer.record((evt) => tracked('record', evt.id, async () => {
-  await handleRecord(
-    { did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: evt.cid, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
-    db,
-  )
-}))
-indexer.error((err) => {
+const indexer = createIndexer(db, (err) => {
   log.error('tap error', { err })
   errors.captureException(err, { tags: { task: 'tap_channel' } })
-})
+}, tracked)
 
 const channel = tap.channel(indexer)
 process.on('SIGTERM', () => void channel.destroy())
