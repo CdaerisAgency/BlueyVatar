@@ -78,6 +78,23 @@ jobs:
       - name: Accessibility (axe-core and hovercard keyboard)
         run: pnpm --filter @blueyvatar/web a11y
 
+  # Warns (never fails) when a pull request touches apps/ without a changelog line.
+  changelog:
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for a changelog change
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if echo "$changed" | grep -q '^apps/' && ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
+            echo "::warning file=CHANGELOG.md::This pull request changes apps/ but not CHANGELOG.md. If users or API developers will notice the change, add a line."
+          fi
+
   docker:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
