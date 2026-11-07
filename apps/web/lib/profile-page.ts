@@ -16,6 +16,21 @@ export interface PublicProfile {
   interests?: unknown
   gallery?: unknown
   verifiedAccounts?: { platform: string; uri: string; hidden: boolean }[]
+  atprotoApps?: unknown
+}
+
+/** App names for the profile page. Only entries with a string name and an https URL count, and each app shows once. */
+export function pageAtprotoApps(p: PublicProfile): string[] {
+  if (!Array.isArray(p.atprotoApps)) return []
+  const names: string[] = []
+  for (const a of p.atprotoApps as unknown[]) {
+    if (typeof a !== 'object' || a === null) continue
+    const { name, url } = a as { name?: unknown; url?: unknown }
+    if (typeof name !== 'string' || name.trim() === '' || name.length > 40 || typeof url !== 'string' || !/^https:\/\//.test(url)) continue
+    if (!names.includes(name)) names.push(name)
+    if (names.length >= 20) break
+  }
+  return names
 }
 
 /** Links come from the delivery JSON, but are checked again here so the page never renders a non-https href. */

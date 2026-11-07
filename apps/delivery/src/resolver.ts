@@ -1,6 +1,6 @@
 import { IdResolver } from '@atproto/identity'
 import {
-  BLUESKY_PROFILE_ADAPTER, activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
+  BLUESKY_PROFILE_ADAPTER, detectAtprotoAppsForRepo, activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
   type Candidate, type ProfileAdapter, type Rating,
 } from '@blueyvatar/core'
 import { bytesMatchCid } from './cid.js'
@@ -33,6 +33,8 @@ export interface AvatarResolver {
   getRecord(identity: Identity, collection: string, rkey: string): Promise<Record<string, unknown> | null>
   /** Original blob bytes from the PDS via com.atproto.sync.getBlob. */
   getBlob(identity: Identity, cid: string): Promise<Uint8Array>
+  /** atproto apps the account has records in (issue #155), from describeRepo. Empty when the PDS cannot be read. */
+  repoApps?(identity: Identity): Promise<{ id: string; name: string; url: string }[]>
 }
 
 /** Fixed log message for an avatar over its adapter's size limit. */
@@ -77,6 +79,7 @@ export class AtprotoResolver implements AvatarResolver {
   private failing: NegativeCache
   private noRecord: NegativeCache
   private originals: ByteLru
+  private appsCache = new Map<string, { at: number; apps: { id: string; name: string; url: string }[] }>()
 
   constructor(private opts: AtprotoResolverOptions) {
     this.fetch = opts.fetch ?? globalThis.fetch
@@ -118,6 +121,16 @@ export class AtprotoResolver implements AvatarResolver {
     if (!res.ok) throw new Error(`getRecord ${collection} returned ${res.status}`)
     const body = (await res.json()) as { value?: Record<string, unknown> }
     return body.value ?? null
+  }
+
+  /** Cached for 10 minutes per DID so a busy profile does not call the PDS on every view. */
+  async repoApps(identity: Identity) {
+    const hit = this.appsCache.get(identity.did)
+    if (hit && Date.now() - hit.at < NO_RECORD_TTL_MS) return hit.apps
+    const apps = (await detectAtprotoAppsForRepo({ pds: identity.pds, did: identity.did, fetch: this.fetch, timeoutMs: this.timeoutMs })).map(({ id, name, url }) => ({ id, name, url }))
+    if (this.appsCache.size >= NO_RECORD_MAX) this.appsCache.clear()
+    this.appsCache.set(identity.did, { at: Date.now(), apps })
+    return apps
   }
 
   async getBlob(identity: Identity, cid: string) {

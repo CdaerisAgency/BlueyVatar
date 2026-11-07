@@ -4,7 +4,7 @@ import AvatarRing from '../../../components/AvatarRing'
 import { PageMain } from '../../../components/Page'
 import { PLATFORM_LABELS } from '../../../lib/claims'
 import { resolvePlan } from '../../../lib/plan'
-import { pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
+import { pageAtprotoApps, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
@@ -31,6 +31,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   // Only https links render, and accounts the user hid stay off the page.
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
   const links = pageLinks(p)
+  const apps = pageAtprotoApps(p)
   const interests = pageInterests(p)
   const gallery = pageGallery(p, (await resolvePlan(p.did)) === 'plus')
   const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
@@ -62,6 +63,11 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
               </li>
             ))}
           </ul>
+        )}
+        {apps.length > 0 && (
+          <p>
+            On atproto: <span aria-label="atproto apps">{apps.join(', ')}</span>
+          </p>
         )}
       </div>
       {gallery.length > 0 && (

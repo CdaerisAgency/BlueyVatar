@@ -309,6 +309,7 @@ export function createApp(deps: AppDeps) {
     // oldest verifications are kept. Hidden accounts stay in the list with hidden: true.
     const cap = ENTITLEMENTS[e.tier].maxVerifiedAccountsInJson
     const verified = await deps.index.verifiedAccounts(identity.did)
+    const atprotoApps = (await deps.resolver.repoApps?.(identity).catch(() => [])) ?? []
     // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:
     // the rating filter is the avatar default (g), blocked images never come back, and URLs
     // are signed /img paths. The page shows at most GALLERY_MAX.
@@ -335,6 +336,7 @@ export function createApp(deps: AppDeps) {
       interests: own?.interests ?? [],
       gallery,
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
+      atprotoApps,
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
     })
   })
