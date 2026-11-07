@@ -98,6 +98,22 @@ export function keyRevokedNotice(i: { did: string; prefix: string; label?: strin
   return { subject: 'A blueyvatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
+/**
+ * One-line outcome for someone who filed a report and left an address (issue #145). The reporter has no
+ * account, so there is no preferences link. The admin's internal reason is never included.
+ */
+export function reportOutcomeNotice(i: { reportId: number; outcome: 'actioned' | 'dismissed'; publicUrl: string }): Notice {
+  const line =
+    i.outcome === 'actioned'
+      ? 'We reviewed your report and took action on the content you reported.'
+      : 'We reviewed your report and did not take action on the content you reported.'
+  const text =
+    `${line}\n\nThank you for helping keep blueyvatar safe. We do not share details of a decision.\n\n` +
+    `--\nReport number: ${i.reportId}\nThis is a one-time message about your report. We deleted your email address from our records after sending it. ` +
+    `Our content policy: ${base(i.publicUrl)}/policy`
+  return { subject: `Update on your blueyvatar report #${i.reportId}`, text }
+}
+
 /** Where a notifier finds the owner's address and preferences. */
 export interface NoticeDirectory {
   /** The decrypted primary email, or null when none is on file. */

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  keyRevokedNotice, Notifier, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  keyRevokedNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -80,5 +80,20 @@ describe('pgNoticeDirectory', () => {
   })
   it('returns null without a row', async () => {
     expect(await pgNoticeDirectory({ query: async () => ({ rows: [] }) }, key).address(DID)).toBeNull()
+  })
+})
+
+describe('reportOutcomeNotice', () => {
+  it('is one short plain message with no account frame and no dashes', () => {
+    const a = reportOutcomeNotice({ reportId: 7, outcome: 'actioned', publicUrl: URL + '/' })
+    const d = reportOutcomeNotice({ reportId: 8, outcome: 'dismissed', publicUrl: URL })
+    expect(a.subject).toContain('#7')
+    expect(a.text).toContain('took action')
+    expect(d.text).toContain('did not take action')
+    expect(a.text).toContain('https://blueyvatar.com/policy')
+    for (const n of [a, d]) {
+      expect(n.text).not.toContain('Account:')
+      expect(n.text + n.subject).not.toContain(String.fromCharCode(0x2014))
+    }
   })
 })

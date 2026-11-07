@@ -1,9 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { emailSender } from '@blueyvatar/core/verification'
 import { adminToken, clearAdminCookie, requireAdmin, requireAdminDid, setAdminCookie } from '../../lib/admin/guard'
 import { totpSecret } from '../../lib/admin/config'
 import { cleanReason, dismissReport, suspend, takedown, unblockImage, unsuspend, type Result } from '../../lib/admin/moderation'
+import { PUBLIC_URL } from '../../lib/oauth'
+import { notifyReporters } from '../../lib/admin/followup'
 import { purgerFromEnv } from '../../lib/admin/purge'
 import { consumeTotp, createAdminSession, revokeAdminSession } from '../../lib/admin/session'
 import { failed, limited, lockedOut } from '../../lib/rate-guard'
@@ -49,13 +52,21 @@ const accountPath = (did: string) => `/admin/account?did=${encodeURIComponent(di
 
 export async function dismissAction(form: FormData): Promise<void> {
   const id = Number(form.get('report'))
-  return run('/admin', ({ did, pool }, reason) => dismissReport(pool, did, id, reason), `Report ${id} dismissed.`, form)
+  return run('/admin', async ({ did, pool }, reason) => {
+    const r = await dismissReport(pool, did, id, reason)
+    if (r.ok) await notifyReporters(pool, emailSender(), [id], 'dismissed', PUBLIC_URL)
+    return r
+  }, `Report ${id} dismissed.`, form)
 }
 
 export async function takedownAction(form: FormData): Promise<void> {
   const target = didOf(form)
   const report = Number(form.get('report')) || undefined
-  return run(report ? `/admin/reports/${report}` : accountPath(target), ({ did, pool }, reason) => takedown(pool, purgerFromEnv(), did, target, reason, report), 'Takedown recorded.', form)
+  return run(report ? `/admin/reports/${report}` : accountPath(target), async ({ did, pool }, reason) => {
+    const r = await takedown(pool, purgerFromEnv(), did, target, reason, report)
+    if (r.ok) await notifyReporters(pool, emailSender(), r.reportIds, 'actioned', PUBLIC_URL)
+    return r
+  }, 'Takedown recorded.', form)
 }
 
 export async function suspendAction(form: FormData): Promise<void> {
