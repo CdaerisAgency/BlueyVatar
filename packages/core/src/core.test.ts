@@ -181,7 +181,13 @@ describe('adapters', () => {
     expect(selfLabelValues({ values: [{ val: 'porn' }, { val: 1 }] })).toEqual(['porn'])
   })
   it('orders enabled adapters by priority', () => {
-    expect(activeAdapters(DEFAULT_ADAPTERS).map((a) => a.id)).toEqual(['bluesky'])
+    expect(activeAdapters(DEFAULT_ADAPTERS).map((a) => a.id)).toEqual(['bluesky', 'tangled', 'tangled-legacy'])
+  })
+  it('marks the legacy Tangled adapter as a fallback for the new one', () => {
+    const legacy = DEFAULT_ADAPTERS.find((a) => a.id === 'tangled-legacy')
+    expect(legacy?.fallbackFor).toBe('tangled')
+    expect(legacy?.collection).toBe('sh.tangled.actor.profile')
+    expect(DEFAULT_ADAPTERS.find((a) => a.id === 'tangled')?.collection).toBe('org.tangled.actor.profile')
   })
 })
 
