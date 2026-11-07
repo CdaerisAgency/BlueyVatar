@@ -73,6 +73,9 @@ importers:
       '@atproto/oauth-client-node':
         specifier: 0.5.13
         version: 0.5.13
+      '@blueyvatar/avatar':
+        specifier: workspace:*
+        version: link:../../packages/avatar
       '@blueyvatar/core':
         specifier: workspace:*
         version: link:../../packages/core
