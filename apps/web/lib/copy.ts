@@ -5,7 +5,7 @@
  */
 export const COPY = {
   brand: 'blueyvatar',
-  nav: { how: 'How it works', developers: 'Developers', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in with Bluesky' },
+  nav: { how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in with Bluesky' },
   hero: {
     eyebrow: 'One avatar. Every app.',
     title: 'Your face, carried by your own account.',
@@ -47,7 +47,7 @@ export const COPY = {
       business: { body: '1 million requests a month, custom domains, and a support contact.', cta: 'Start Business' },
     },
   },
-  // Only destinations that exist today. Add Docs, Status, and Terms here when those pages ship.
+  // Only destinations that exist today. Add Status and Terms here when those pages ship.
   footer: {
     tagline: 'blueyvatar. Built on atproto.',
     // Wording follows Stripe Climate guidance: state the share of revenue, make no carbon-neutral or donation claim.
@@ -55,6 +55,7 @@ export const COPY = {
     climate: { text: 'We contribute 1% of revenue to carbon removal through', linkLabel: 'Stripe Climate', href: 'https://stripe.com/climate' },
     links: [
       { label: 'Developers', href: '/#dev' },
+      { label: 'Docs', href: '/docs' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'Integrations', href: '/integrations' },
       { label: 'Gravatar alternative', href: '/gravatar-alternative' },
