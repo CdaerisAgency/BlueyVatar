@@ -119,7 +119,7 @@ describe('delivery API', () => {
   it('applies tier entitlements and meters keyed requests', async () => {
     const { app, usage } = setup()
     const res = await app.request('/u/did:plc:abc123?fmt=webp&q=70', { headers: { 'x-api-key': 'sk_test' } })
-    expect(res.headers.get('location')).toBe('/img/did%3Aplc%3Aabc123/bafyreiabc123/80-q70.webp')
+    expect(res.headers.get('location')).toBe('/img/did%3Aplc%3Aabc123/bafyreiabc123/80-q60.webp')
     expect(res.headers.get('x-tier')).toBe('pro')
     expect(usage.counts.get('L1:origin_resolution')).toBe(1)
   })
@@ -237,10 +237,11 @@ describe('delivery API', () => {
       expect(res.headers.get('x-adjusted-params')).toBe('fmt,q')
     })
 
-    it('encodes jpeg and quality in the path, and omits quality for png', async () => {
+    it('encodes a non-default jpeg quality in the path, and omits quality for png and the default', async () => {
       const { app } = setup()
       const h = { 'x-api-key': 'sk_test' }
-      expect((await app.request('/u/alice.test?fmt=jpeg', { headers: h })).headers.get('location')).toMatch(/\/80-q85\.jpeg$/)
+      expect((await app.request('/u/alice.test?fmt=jpeg&q=60', { headers: h })).headers.get('location')).toMatch(/\/80-q60\.jpeg$/)
+      expect((await app.request('/u/alice.test?fmt=jpeg', { headers: h })).headers.get('location')).toMatch(/\/80\.jpeg$/)
       expect((await app.request('/u/alice.test?fmt=png&q=40', { headers: h })).headers.get('location')).toMatch(/\/80\.png$/)
     })
 
@@ -259,6 +260,74 @@ describe('delivery API', () => {
       expect(res.headers.get('content-type')).toBe('image/webp')
       expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128-q101.webp')).status).toBe(404)
       expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128.avif')).status).toBe(404)
+    })
+
+    describe('canonical /img URLs', () => {
+      const base = '/img/did%3Aplc%3Aabc123/bafyreiabc123/'
+      const get = (path: string) => setup().app.request(base + path)
+
+      it('redirects an off-ladder size to the next ladder step without resizing', async () => {
+        const { app, deps } = setup()
+        let resizes = 0
+        deps.resize = async () => { resizes++; return new Uint8Array([9, 9]) }
+        const res = await app.request(`${base}100.png`)
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe(`${base}128.png`)
+        expect(res.headers.get('cache-control')).toBe('public, max-age=3600')
+        expect(resizes).toBe(0)
+      })
+
+      it('redirects off-set qualities, PNG quality, and the redundant default quality', async () => {
+        expect((await get('80-q70.webp')).headers.get('location')).toBe(`${base}80-q60.webp`)
+        expect((await get('80-q100.jpeg')).headers.get('location')).toBe(`${base}80.jpeg`)
+        expect((await get('80-q85.webp')).headers.get('location')).toBe(`${base}80.webp`)
+        expect((await get('80-q60.png')).headers.get('location')).toBe(`${base}80.png`)
+      })
+
+      it('redirects any query string to the query-less canonical URL', async () => {
+        const res = await get('80.png?x=1&v=2')
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe(`${base}80.png`)
+      })
+
+      it('redirects a non-canonical DID encoding to the canonical path', async () => {
+        const res = await setup().app.request('/img/did:plc:abc123/bafyreiabc123/80.png')
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe(`${base}80.png`)
+      })
+
+      it('serves the redirect target as an immutable image', async () => {
+        const { app } = setup()
+        const loc = (await app.request(`${base}100.png?x=1`)).headers.get('location')!
+        const res = await app.request(loc)
+        expect(res.status).toBe(200)
+        expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+      })
+
+      it('rejects sizes outside 1 to 2048 with a stable code', async () => {
+        for (const f of ['0.png', '2049.png', '9999.png']) {
+          const res = await get(f)
+          expect(res.status).toBe(404)
+          expect((await res.json()).error.code).toBe('invalid_size')
+        }
+      })
+
+      it('rejects qualities outside 1 to 100 with a stable code', async () => {
+        for (const f of ['80-q0.webp', '80-q101.webp']) {
+          const res = await get(f)
+          expect(res.status).toBe(404)
+          expect((await res.json()).error.code).toBe('invalid_quality')
+        }
+      })
+
+      it('emits avatar redirects that /img serves directly', async () => {
+        const { app } = setup()
+        const hdr = { 'x-api-key': 'sk_test' }
+        for (const q of ['s=100', 's=1000&fmt=webp&q=70', 's=17&fmt=jpeg&q=1', 's=512&fmt=png&q=60']) {
+          const loc = (await app.request(`/u/did:plc:abc123?${q}`, { headers: hdr })).headers.get('location')!
+          expect((await app.request(loc)).status).toBe(200)
+        }
+      })
     })
   })
 
