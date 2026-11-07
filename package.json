@@ -15,7 +15,11 @@
     "lex:build": "lex build --lexicons ./lexicons --out ./packages/core/src/lexicons --clear",
     "ops:block": "pnpm --filter @blueyvatar/indexer ops:block",
     "ops:block-did": "pnpm --filter @blueyvatar/indexer ops:block-did",
-    "ops:unblock": "pnpm --filter @blueyvatar/indexer ops:unblock"
+    "ops:unblock": "pnpm --filter @blueyvatar/indexer ops:unblock",
+    "lexicons:validate": "pnpm --filter @blueyvatar/lexicon-tools validate",
+    "lexicons:dry-run": "pnpm --filter @blueyvatar/lexicon-tools dry-run",
+    "lexicons:publish": "pnpm --filter @blueyvatar/lexicon-tools publish-schemas",
+    "lexicons:verify": "pnpm --filter @blueyvatar/lexicon-tools verify"
   },
   "devDependencies": {
     "@atproto/lex": "0.4.4",

@@ -1,0 +1,18 @@
+{
+  "lexicon": 1,
+  "id": "com.blueyvatar.authFull",
+  "defs": {
+    "main": {
+      "type": "permission-set",
+      "title": "Manage your blueyvatar profile",
+      "detail": "Create, update, and delete your blueyvatar avatar and gallery images, extended profile fields, and account claims in your repository.",
+      "permissions": [
+        {
+          "type": "permission",
+          "resource": "repo",
+          "collection": ["com.blueyvatar.image", "com.blueyvatar.profile", "com.blueyvatar.claim"]
+        }
+      ]
+    }
+  }
+}

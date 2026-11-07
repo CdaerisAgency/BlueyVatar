@@ -12,7 +12,8 @@ This code follows the product spec at [docs/spec/blueyvatar-product-spec-v6.md](
 | `apps/delivery` | Delivery API (Hono on Node). Entitlement checks, rate limits, usage metering, visibility rules, and image resizing in a sandboxed child process using sharp. |
 | `apps/indexer` | Follows Tap and writes image, profile, claim, and repo status changes to Postgres. |
 | `apps/web` | Next.js app: sign-in with atproto OAuth (confidential client), profile pages, and the OAuth client metadata document. |
-| `lexicons/com/blueyvatar` | The service's own lexicons: `image`, `profile`, `claim`, `attestation`. |
+| `lexicons/com/blueyvatar` | The service's own lexicons: `image`, `profile`, `claim`, `attestation`, and the `authFull` permission set. |
+| `tools/lexicon` | Lexicon validator and publish script (`pnpm lexicons:validate`, `lexicons:dry-run`, `lexicons:publish`, `lexicons:verify`). |
 | `lexicons/vendor` | Lexicons installed with `lex install` and pinned by CID in `lexicons.json`. |
 | `db/migrations` | Postgres schema, applied in file order by `tools/migrate`. |
 | `tools/migrate` | Migration runner (`pnpm db:migrate`). |
@@ -68,6 +69,8 @@ pnpm lex:build                           # reads all of lexicons/, including ven
 
 `lex install` resolves lexicon authorities with DNS TXT lookups (`_lexicon.<authority>`), so it needs normal DNS access.
 
+`pnpm lexicons:validate` checks every lexicon file against the Lexicon and Permissions specs, and `pnpm lexicons:dry-run` prints what publishing would write plus the DNS TXT record. Publishing steps are in [docs/deploy.md](docs/deploy.md).
+
 ### Secrets
 
 Secrets (database credentials, the Tap admin password, the OAuth client signing key) live in Infisical. `.env.example` lists every variable the apps read. Never commit a filled-in `.env`.
@@ -84,5 +87,5 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Delivery: count the `transform` meter when a new variant is generated, and add usage alerts at 80 and 100 percent of included volume.
 - [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
 - [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.
-- [ ] Lexicons: clear the `com.blueyvatar` namespace and publish the schemas under `_lexicon.blueyvatar.com`.
+- [ ] Lexicons: name cleared, validator, permission set, publish script, and the `OAUTH_USE_PERMISSION_SET` flag are in place. Remaining at deploy: run the publish and create the `_lexicon.blueyvatar.com` TXT record (docs/deploy.md).
 - [ ] Billing: choose the payment processor, tax handling, and invoicing (open item in spec section 13).
