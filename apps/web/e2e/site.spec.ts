@@ -66,7 +66,7 @@ test.describe('signed-out redirects', () => {
   for (const route of ACCOUNT_ROUTES) {
     test(`${route} redirects to /login`, async ({ page }) => {
       await page.goto(route)
-      await expect(page).toHaveURL(/\/login(\?next=.*)?$/)
+      await expect(page).toHaveURL(/\/login$/)
       await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
     })
   }
