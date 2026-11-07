@@ -96,6 +96,30 @@ Tap is a separate app that the indexer connects to (`TAP_URL`).
 - **Health check.** `fly/tap.toml` uses a TCP check on port 2480. An HTTP check on `/health` returns 401 in Tap 0.1.10 because it requires the admin password (seen in staging on November 4, 2026), and the password cannot be committed in the config.
 - **Jetstream fallback.** Tap is in beta. If it fails, switch the indexer to Jetstream (<https://atproto.com/guides/streaming-data>). That needs an indexer change to filter the same collections and does not exist yet.
 
+### Live Tap test
+
+`apps/indexer/src/tap-live.test.ts` runs the indexer path against a real Tap (issue #42). It signs in to a dedicated test account, writes, updates, and deletes records in all seven filtered collections, consumes the events over the `@atproto/tap` channel, runs them through `handleRecord` and `PgIndexWrites` into a throwaway Postgres schema, and asserts the rows. It also asserts that the Tap event `cid` equals the record CID returned by the PDS for every collection (`app.bsky.actor.link` and both Tangled profile NSIDs included, issue #101), that a stored link's strongRef resolves and an outdated ref is dropped, and that every event is acked only after its handler finished. Set `TAP_LIVE_CHECK_STATUS=1` to also deactivate and reactivate the account and check that `repos` follows. It skips with a message in CI because `TAP_LIVE_URL` is unset.
+
+Run it after a staging deploy:
+
+1. Create a throwaway Bluesky account for tests and an app password for it. Do not use a real person's account: the test rewrites `app.bsky.actor.profile/self` and deletes its own records afterward.
+2. Stop the staging indexer so it does not compete for events: `fly scale count 0 --app blueyvatar-indexer-staging`. A Tap channel delivers each event to one consumer, and the test acks what it receives. Scale it back to 1 afterward.
+3. Make Tap reachable from your machine without a public address: `fly proxy 2480:2480 -a blueyvatar-tap-staging` (Tap has no public IP).
+4. Use any Postgres you can create schemas in for `TEST_DATABASE_URL` (a local one is fine; the test creates and drops its own schema). Do not point it at the staging Neon branch.
+5. Run:
+
+```sh
+export TAP_LIVE_URL=http://localhost:2480
+export TAP_LIVE_ADMIN_PASSWORD=...          # STAGING_TAP_ADMIN_PASSWORD from Infisical
+export TAP_LIVE_IDENTIFIER=<test handle or DID>
+export TAP_LIVE_APP_PASSWORD=<app password>
+export TAP_LIVE_PDS_URL=https://bsky.social # PDS of the test account
+export TEST_DATABASE_URL=postgres://postgres@localhost:5432/postgres
+pnpm tap:live                                # tools/tap-live.sh, add TAP_LIVE_CHECK_STATUS=1 for the status step
+```
+
+Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message lists the events seen for the test DID. The first green run closes #42. To test locally, run the pinned image: `docker run --rm -p 2480:2480 -e TAP_SIGNAL_COLLECTION=com.blueyvatar.profile -e TAP_COLLECTION_FILTERS=<the list in fly/tap.toml> -e TAP_ADMIN_PASSWORD=test ghcr.io/bluesky-social/indigo/tap:0.1.10@sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb`, then use `TAP_LIVE_ADMIN_PASSWORD=test`. A local Tap still needs outbound access to the relay and the test account's PDS. Not yet run against a live Tap as of this writing.
+
 ## Cloudflare
 
 DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing else from Cloudflare is used.

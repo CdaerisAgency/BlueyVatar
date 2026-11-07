@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "tap:live": "bash tools/tap-live.sh",
     "db:migrate": "pnpm --filter @blueyvatar/migrate migrate",
     "lex:install": "lex install --lexicons ./lexicons/vendor",
     "lex:build": "lex build --lexicons ./lexicons --out ./packages/core/src/lexicons --clear",
