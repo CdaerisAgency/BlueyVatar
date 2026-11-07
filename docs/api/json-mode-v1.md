@@ -20,7 +20,7 @@ Add `json=true` to an avatar request (`/avatar/{hash}` or `/u/{id}`) to receive 
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `did` | string | The resolved DID. |
+| `did` | string or null | The resolved DID. `null` when nothing is visible to the caller. |
 | `handle` | string or null | The handle, when the identity has one. |
 | `found` | boolean | `true` when an image passed the `r` rating filter and `f` is not `y`. |
 | `source` | string | Where the image came from: `blueyvatar`, `adapter:<name>`, or `blueyvatar-default`. The value is `default` when `found` is `false`. |
@@ -34,7 +34,8 @@ Add `json=true` to an avatar request (`/avatar/{hash}` or `/u/{id}`) to receive 
 
 - Entitlements, key checks, visibility rules, and metering match the redirect route. Each request counts as one origin resolution.
 - `Cache-Control: private, max-age=<ttl>` applies, as on the redirect. See [cache-ttl-v1.md](cache-ttl-v1.md).
-- JSON is returned only when the identity resolves and is visible to the caller. When the lookup finds nothing, the repo is inactive, or visibility rules deny the caller, the response is the normal default handling: a `302` to a default image, a `302` to your `d` URL, or `404 not_found` when `d=404`. Handle a non-JSON response in clients that send `json=true`.
+- A well-formed request with `json=true` always gets `200` JSON. When the lookup finds nothing, the repo is inactive, or visibility rules deny the caller, the body is `{"did": null, "handle": null, "found": false, "source": "default", "rating": null, "url": null, "updatedDate": null}`. All of these cases return the identical body, so a hash lookup cannot reveal whether a hash is linked to a restricted or inactive account. `d` is ignored in JSON mode.
+- Malformed requests (bad identifier or parameter) and key or rate limit failures still return the standard error body.
 - Errors use the standard error body. See [errors-v1.md](errors-v1.md).
 
 ## Version policy

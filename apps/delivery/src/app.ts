@@ -121,6 +121,9 @@ export function createApp(deps: AppDeps) {
       deps.limiter,
     )
     rateHeaders(c, e)
+    if (!e.ok && e.status === 429 && e.window) {
+      c.header('retry-after', String(Math.max(1, e.window.reset - Math.floor(Date.now() / 1000))))
+    }
     return e
   }
 
@@ -139,6 +142,11 @@ export function createApp(deps: AppDeps) {
     // blank is a transparent image, so it is always PNG (JPEG has no alpha channel).
     const format = style === 'blank' ? 'png' : p.format
     return c.redirect(`/default/${style}/${p.size}.${format}?seed=${encodeURIComponent(seed)}${initials ? `&initials=${initials}` : ''}`, 302)
+  }
+
+  function respondJsonMiss(c: Context, p: AvatarParams) {
+    c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
+    return c.json({ did: null, handle: null, found: false, source: 'default', rating: null, url: null, updatedDate: null })
   }
 
   /** The visibility rules when this caller may fetch the avatar (spec section 10.2), else null. */
@@ -193,9 +201,12 @@ export function createApp(deps: AppDeps) {
       const used = await deps.usage.add(e.licenseId, 'origin_resolution')
       await deps.alerts?.check(e.licenseId, e.tier, used)
     }
-    if (!identity || !(await deps.index.isRepoActive(identity.did))) return respondDefault(c, p, seed, initials)
+    // With json=true every miss answers in JSON with found: false, and every miss body is the
+    // same, so a hash lookup cannot tell an unlinked hash from a hidden or restricted one.
+    const miss = () => (p.json ? respondJsonMiss(c, p) : respondDefault(c, p, seed, initials))
+    if (!identity || !(await deps.index.isRepoActive(identity.did))) return miss()
     const vis = await visibilityAllows(c, identity.did, e)
-    if (!vis) return respondDefault(c, p, seed, initials)
+    if (!vis) return miss()
 
     const picked = pickCandidate(await deps.resolver.candidates(identity), p.rating, p.forceDefault)
     const path = picked.kind === 'image'
@@ -217,6 +228,11 @@ export function createApp(deps: AppDeps) {
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     return c.redirect(path, 302)
   }
+
+  app.onError((err, c) => {
+    console.error('unhandled error', err)
+    return c.json(errorBody('internal', 'Internal server error'), 500)
+  })
 
   app.get('/healthz', (c) => c.text('ok'))
 
@@ -449,7 +465,6 @@ export function createApp(deps: AppDeps) {
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${format}`,
       'cache-control': IMMUTABLE_CACHE_CONTROL,
-      'x-cache-status': 'MISS',
     })
   })
 
