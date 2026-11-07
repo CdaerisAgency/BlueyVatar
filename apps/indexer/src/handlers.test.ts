@@ -4,7 +4,7 @@ import { handleRecord, type IndexWrites } from './handlers.js'
 function fakeDb(): IndexWrites {
   return {
     upsertImage: vi.fn(), deleteImage: vi.fn(), upsertProfile: vi.fn(), deleteProfile: vi.fn(),
-    upsertClaim: vi.fn(), deleteClaim: vi.fn(), setRepoStatus: vi.fn(), purgeImages: vi.fn(),
+    upsertClaim: vi.fn(), deleteClaim: vi.fn(), upsertProfileLink: vi.fn(), deleteProfileLink: vi.fn(), setRepoStatus: vi.fn(), purgeImages: vi.fn(),
   } as unknown as IndexWrites
 }
 
@@ -43,5 +43,15 @@ describe('indexer handlers', () => {
     const db = fakeDb()
     await handleRecord({ did: 'did:plc:a', collection: 'app.bsky.actor.profile', rkey: 'self', action: 'delete' }, db)
     expect(db.purgeImages).toHaveBeenCalledTimes(1)
+  })
+  it('indexes link records with their CID and deletes them', async () => {
+    const db = fakeDb()
+    await handleRecord({
+      did: 'did:plc:a', collection: 'app.bsky.actor.link', rkey: '3l', cid: 'bafylink', action: 'create',
+      record: { url: 'https://a.test/', title: 'A', createdAt: '2026-11-03T00:00:00Z' },
+    }, db)
+    expect(db.upsertProfileLink).toHaveBeenCalledWith({ did: 'did:plc:a', rkey: '3l', cid: 'bafylink', url: 'https://a.test/', title: 'A', createdAt: '2026-11-03T00:00:00Z' })
+    await handleRecord({ did: 'did:plc:a', collection: 'app.bsky.actor.link', rkey: '3l', action: 'delete' }, db)
+    expect(db.deleteProfileLink).toHaveBeenCalledWith('did:plc:a', '3l')
   })
 })

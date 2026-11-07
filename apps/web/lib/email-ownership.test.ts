@@ -193,7 +193,7 @@ if (url) {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     const pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0007_email_ownership']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership']) await pool.query(m(n))
     return {
       store: pgStore(pool),
       // Age every hold instead of waiting 30 days.
@@ -224,7 +224,7 @@ if (url) {
     })
     it('0007 backfills one primary per DID and enforces cap and single primary in the database', async () => {
       await pool.query(`INSERT INTO email_links (email_hash, did, method, verified_at) VALUES ($1, 'did:plc:old', 'code', now() - interval '2 days'), ($2, 'did:plc:old', 'code', now() - interval '1 day')`, [h(1), h(2)])
-      await pool.query(m('0007_email_ownership'))
+      await pool.query(m('0010_email_ownership'))
       expect((await pool.query(`SELECT email_hash FROM email_links WHERE is_primary AND did = 'did:plc:old'`)).rows).toEqual([{ email_hash: h(1) }])
       await expect(pool.query(`UPDATE email_links SET is_primary = true WHERE email_hash = $1`, [h(2)])).rejects.toThrow()
       for (let i = 10; i < 18; i++) await pool.query(`INSERT INTO email_links (email_hash, did, method) VALUES ($1, 'did:plc:old', 'code')`, [h(i)])

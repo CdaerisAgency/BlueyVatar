@@ -53,6 +53,7 @@ Follow `docs/deploy.md`, and do staging before production.
 3. **Create the secrets in Infisical** for each environment, using the per-app table in `docs/deploy.md` under "Infisical secrets".
    - Get `DATABASE_URL` (pooled; the host contains `-pooler`) and `DATABASE_URL_DIRECT` from Neon.
    - Generate `ORIGIN_SECRET`, `SESSION_SECRET`, and `TAP_ADMIN_PASSWORD` as random hex strings. Tap and indexer use the same `TAP_ADMIN_PASSWORD`.
+   - Generate `TOKEN_ENCRYPTION_KEY` with `openssl rand -base64 32`. Web refuses to start in production without it, and it must be set before the `0007_encrypt_oauth.sql` deploy reaches web. Rotating it signs every user out.
    - Generate `OAUTH_PRIVATE_JWK` with `pnpm --filter @blueyvatar/web gen-jwk`.
    - Ask the owner for `RESEND_API_KEY` and `EMAIL_FROM`, plus the optional GitHub OAuth app and service account values, if they aren't already in Infisical.
 4. **Create the Fly apps and the Tap volume**, push the secrets with `fly secrets set`, then deploy in this order: tap, delivery (this runs the migrations), web, indexer.

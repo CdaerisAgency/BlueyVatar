@@ -1,7 +1,8 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex, isSha256Hex, parseAvatarParams,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
+  isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
@@ -66,6 +67,16 @@ function originHost(c: Context): string | null {
   return null
 }
 
+/** True when the request carries an Origin header that is neither this service's host nor the profile site's host. */
+function isCrossOriginRequest(origin: string | undefined, ownHosts: readonly string[]): boolean {
+  if (!origin) return false
+  try {
+    return !ownHosts.includes(new URL(origin).host)
+  } catch {
+    return true
+  }
+}
+
 const QR_DEFAULT_SIZE = 256
 const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
 
@@ -103,6 +114,11 @@ export function createApp(deps: AppDeps) {
     return e
   }
 
+  function isCrossOrigin(c: Context): boolean {
+    const own = [new URL(c.req.url).host, new URL(deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).host]
+    return isCrossOriginRequest(c.req.header('origin'), own)
+  }
+
   function respondDefault(c: Context, p: AvatarParams, seed: string, initials: string) {
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     if (p.default.kind === 'style' && p.default.style === '404') {
@@ -123,7 +139,17 @@ export function createApp(deps: AppDeps) {
     return true
   }
 
-  async function serveAvatar(c: Context, lookup: () => Promise<Identity | null>, seed: string, initials = '') {
+  /**
+   * `lookup` receives a gate that does the database-only checks (repo active, visibility rules).
+   * Hash lookups must call it before any network identity resolution, so that unlinked,
+   * opted-out, and restricted hashes all take the same cheap path and return the same default.
+   */
+  async function serveAvatar(
+    c: Context,
+    lookup: (gate: (did: string) => Promise<boolean>) => Promise<Identity | null>,
+    seed: string,
+    initials = '',
+  ) {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
 
@@ -136,7 +162,8 @@ export function createApp(deps: AppDeps) {
     }
     if (p.adjusted.length) c.header('x-adjusted-params', p.adjusted.join(','))
 
-    const identity = await lookup()
+    const gate = async (did: string) => (await deps.index.isRepoActive(did)) && (await visibilityAllows(c, did, e))
+    const identity = await lookup(gate)
     if (e.licenseId) {
       const used = await deps.usage.add(e.licenseId, 'origin_resolution')
       await deps.alerts?.check(e.licenseId, e.tier, used)
@@ -173,9 +200,12 @@ export function createApp(deps: AppDeps) {
     const hash = c.req.param('hash').toLowerCase().replace(/\.(png|jpe?g|webp)$/, '')
     // MD5 is accepted for older Gravatar clients and takes the same path as SHA256.
     if (!isSha256Hex(hash) && !isMd5Hex(hash)) return fail(c, 400, 'invalid_identifier', 'Expected a SHA256 (64 hex) or MD5 (32 hex) hash of the email')
-    return serveAvatar(c, async () => {
+    // Every miss (unlinked, opted out, inactive, restricted for this caller) ends in the same
+    // default redirect before any identity resolution, so the response does not reveal a link.
+    return serveAvatar(c, async (gate) => {
       const did = await deps.index.didForEmailHash(hash)
-      return did ? deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
+      if (!did || !(await gate(did))) return null
+      return deps.resolver.resolveIdentity({ kind: 'did', value: did })
     }, hash)
   })
 
@@ -197,6 +227,11 @@ export function createApp(deps: AppDeps) {
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
+    // Cross-origin browser callers are hovercards embedded on other sites (Business and Enterprise).
+    // Same-origin pages and server-to-server calls without an Origin header are not gated.
+    if (isCrossOrigin(c) && !ENTITLEMENTS[e.tier].hovercards) {
+      return fail(c, 403, 'tier_required', 'Hovercards require a Business or Enterprise key')
+    }
     const id = parseIdentifier(c.req.param('id'))
     if (!id) return fail(c, 400, 'invalid_identifier', 'Expected a hash, handle, or DID')
     let identity: Identity | null = null
@@ -210,7 +245,10 @@ export function createApp(deps: AppDeps) {
     if (!identity || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
     const vis = await deps.index.visibility(identity.did)
     if (vis.hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
-    if (!(await visibilityAllows(c, identity.did, e))) return fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    if (!(await visibilityAllows(c, identity.did, e))) {
+      // A hash lookup must not tell a restricted profile apart from an unlinked hash.
+      return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    }
 
     const [bsky, own] = await Promise.all([
       deps.resolver.getRecord(identity, 'app.bsky.actor.profile', 'self').catch(() => null),
@@ -227,6 +265,7 @@ export function createApp(deps: AppDeps) {
       handle: identity.handle,
       displayName: bsky?.displayName ?? null,
       description: bsky?.description ?? null,
+      links: resolveProfileLinks(identity.did, bsky?.links, await deps.index.profileLinks(identity.did)),
       avatar: picked.kind === 'image' ? { url: imagePath(identity.did, picked.candidate.blob.cid, 256, 'png'), source: picked.candidate.source } : null,
       jobTitle: own?.jobTitle ?? null,
       company: own?.company ?? null,
@@ -277,7 +316,9 @@ export function createApp(deps: AppDeps) {
     // The profile page lives at /p/{handle}, so an identity without a handle has no QR target.
     if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
     if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
-    if (!(await visibilityAllows(c, identity.did, e))) return fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    if (!(await visibilityAllows(c, identity.did, e))) {
+      return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    }
 
     const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
     const svg = qrSvg(`${base}/p/${identity.handle}`, p.size)
@@ -295,15 +336,27 @@ export function createApp(deps: AppDeps) {
   })
 
   // Immutable resized image. Cached by Cloudflare by file extension (spec section 14.1).
+  // Cloudflare's default cache key is the full URL including the query string, so the origin
+  // sends every non-canonical request to the one canonical URL for its variant (imagePath snaps
+  // size to the ladder and quality to the allowed set, and drops the query string). That keeps
+  // one cache entry per variant, lets the indexer purge exactly the URLs that can exist, and
+  // keeps URLs emitted before this change working. Redirecting is cheaper than a resize.
   app.get('/img/:did/:cid/:file', async (c) => {
     const did = decodeURIComponent(c.req.param('did'))
     const cid = c.req.param('cid')
     const m = IMG_FILE.exec(c.req.param('file'))
     if (!m || !/^[a-z0-9]{10,100}$/.test(cid)) return fail(c, 404, 'not_found', 'Unknown image')
     const size = Number(m[1])
-    const quality = m[2] ? Number(m[2]) : 85
+    const quality = m[2] ? Number(m[2]) : undefined
     const format = m[3] as 'png' | 'jpeg' | 'webp'
-    if (size < 1 || size > 2048 || quality < 1 || quality > 100) return fail(c, 404, 'not_found', 'Unknown image')
+    if (size < 1 || size > ABSOLUTE_MAX_SIZE) return fail(c, 404, 'invalid_size', 'Size must be from 1 to 2048')
+    if (quality !== undefined && (quality < 1 || quality > 100)) return fail(c, 404, 'invalid_quality', 'Quality must be from 1 to 100')
+    const canonical = imagePath(did, cid, size, format, quality)
+    const url = new URL(c.req.url)
+    if (url.search !== '' || url.pathname !== canonical) {
+      c.header('cache-control', 'public, max-age=3600')
+      return c.redirect(canonical, 302)
+    }
     if (!(await deps.index.isRepoActive(did)) || (await deps.index.isBlocked(did, cid))) {
       return fail(c, 404, 'not_found', 'Image unavailable')
     }
@@ -312,7 +365,7 @@ export function createApp(deps: AppDeps) {
     let bytes: Uint8Array
     try {
       const original = await deps.resolver.getBlob(identity, cid)
-      bytes = await deps.resize({ input: original, size, format, quality })
+      bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
     } catch {
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
     }

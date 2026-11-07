@@ -26,6 +26,33 @@ describe('sandboxedResizer (forked worker, built output)', () => {
     expect([meta.width, meta.height]).toEqual([64, 64])
   }, 30_000)
 
+  it('center-crops a non-square source instead of squashing it', async () => {
+    // 300x100 image: red left third, green middle third, blue right third.
+    const band = (r: number, g: number, b: number) =>
+      sharp({ create: { width: 100, height: 100, channels: 3, background: { r, g, b } } }).png().toBuffer()
+    const row = await sharp({ create: { width: 300, height: 100, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .composite([
+        { input: await band(255, 0, 0), left: 0, top: 0 },
+        { input: await band(0, 255, 0), left: 100, top: 0 },
+        { input: await band(0, 0, 255), left: 200, top: 0 },
+      ])
+      .png()
+      .toBuffer()
+    const out = await resize({ input: new Uint8Array(row), size: 80, format: 'png', quality: 80 })
+    const { data, info } = await sharp(Buffer.from(out)).raw().toBuffer({ resolveWithObject: true })
+    expect([info.width, info.height]).toEqual([80, 80])
+    const px = (x: number, y: number) => [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)]
+    expect(px(2, 40)).toEqual([0, 255, 0])
+    expect(px(77, 40)).toEqual([0, 255, 0])
+  }, 30_000)
+
+  it('rejects a source under 80px on either side as an invalid image', async () => {
+    await expect(resize({ input: await samplePng(79, 300), size: 64, format: 'png', quality: 80 })).rejects.toThrow(/invalid image/)
+    await expect(resize({ input: await samplePng(300, 79), size: 64, format: 'png', quality: 80 })).rejects.toThrow(/invalid image/)
+    const ok = await resize({ input: await samplePng(80, 80), size: 64, format: 'png', quality: 80 })
+    expect(ok.byteLength).toBeGreaterThan(0)
+  }, 30_000)
+
   it('rasterizes a QR code SVG to a square PNG of the requested size', async () => {
     const out = await resize({ input: new TextEncoder().encode(qrSvg('https://bv.test/p/alice.test', 200)), size: 200, format: 'png', quality: 85 })
     const meta = await sharp(Buffer.from(out)).metadata()

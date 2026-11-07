@@ -7,7 +7,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/index.js",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "ops:block": "tsc -p tsconfig.json && node dist/ops-block.js block",
+    "ops:unblock": "tsc -p tsconfig.json && node dist/ops-block.js unblock"
   },
   "dependencies": {
     "@atproto/tap": "0.4.17",

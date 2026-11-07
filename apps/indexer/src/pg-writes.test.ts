@@ -7,7 +7,7 @@ import { PgIndexWrites } from './pg-writes.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
-const migrations = ['0002_web_auth', '0006_email_md5', '0007_email_ownership'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
+const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
 const schema = `t_indexer_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 
@@ -22,6 +22,7 @@ describe.skipIf(!url)('postgres index writes', () => {
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
     for (const m of migrations) await pool.query(m)
+    await pool.query(readFileSync(new URL('../../../db/migrations/0007_profile_links.sql', import.meta.url), 'utf8'))
   })
 
   afterAll(async () => {
@@ -71,5 +72,15 @@ describe.skipIf(!url)('postgres index writes', () => {
     await db.setRepoStatus('did:plc:gone', null, false, 'deleted')
     expect((await pool.query('SELECT 1 FROM email_links WHERE did = $1', ['did:plc:gone'])).rowCount).toBe(0)
     expect((await pool.query('SELECT reason FROM email_holds WHERE did = $1', ['did:plc:gone'])).rows).toEqual([{ reason: 'account_deleted' }, { reason: 'account_deleted' }])
+  })
+
+  it('upserts link records by did and rkey and deletes them', async () => {
+    const db = new PgIndexWrites(pool)
+    const evt = { did: DID, collection: 'app.bsky.actor.link', rkey: 'l1', action: 'create' as const }
+    await handleRecord({ ...evt, cid: 'bafy1', record: { url: 'https://a.test/', title: 'A', createdAt: '2026-01-01T00:00:00Z' } }, db)
+    await handleRecord({ ...evt, action: 'update', cid: 'bafy2', record: { url: 'https://b.test/', createdAt: '2026-01-01T00:00:00Z' } }, db)
+    expect((await pool.query('SELECT cid, url, title FROM profile_links')).rows).toEqual([{ cid: 'bafy2', url: 'https://b.test/', title: null }])
+    await handleRecord({ ...evt, action: 'delete' }, db)
+    expect((await pool.query('SELECT 1 FROM profile_links')).rowCount).toBe(0)
   })
 })
