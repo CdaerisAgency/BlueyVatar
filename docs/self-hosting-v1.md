@@ -55,9 +55,13 @@ Names and meanings come from `.env.example`. Copy it to `.env` as a starting poi
 | `CF_PURGE_MODE` | indexer | Optional, `prefix` or the default `files`. |
 | `DEFAULT_URL_ALLOWLIST` | delivery | Optional hosts allowed as a custom `d=` default image URL. |
 | `PG_POOL_MAX` | delivery, indexer | Optional pool size (delivery 10, indexer 5). |
+| `LOG_RETENTION_DAYS` | delivery | Optional log age limit, default and maximum 90. Purges database-held logs (report IP hashes, processed Stripe event ids). |
+| `LOG_RETENTION_MAX_GB` | delivery | Optional size cap in GB per log store, default 5. Set your log destination to the same limits. |
 | `MIGRATIONS_DIR` | migrations | Optional override of `db/migrations`. |
 
 Optional features, each described in `.env.example`: custom profile domains (`CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`), GitHub verification (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`), and attestation records in a service repo (`SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`). The indexer needs the three `SERVICE_*` values to delete revoked attestations from the service repo. The full per-app secret list is in [deploy.md](deploy.md), section "Infisical secrets". That page also says which web variables are required in production was not audited beyond `.env.example`, so treat the web list as a starting point.
+
+Log retention: the hosted service keeps logs 90 days or until a 5 GB size cap, whichever comes first, and says so on `/privacy`. If you run your own instance, publish your own period on your privacy page, and set the same limits at your log destination (Fly keeps logs only briefly). Sizing and per-destination settings are in [deploy.md](deploy.md), section "Log retention".
 
 ## Secrets to generate
 
