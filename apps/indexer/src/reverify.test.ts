@@ -6,7 +6,9 @@ import {
   DAY_MS, MAX_FAILS, pgReverifyStore, reverifyDue, scheduleReverify,
   type DueClaim, type ReverifyStore, type Verifier,
 } from './reverify.js'
-import { emailNotice, makeVerifier } from './reverify-wiring.js'
+import { randomBytes } from 'node:crypto'
+import { encryptJson } from '@blueyvatar/core/verification'
+import { emailNotice, makeVerifier, pgRecipientLookup } from './reverify-wiring.js'
 
 type Row = DueClaim & { verifiedAt: Date; lastCheckedAt: Date | null; result: 'verified' | 'revoked' }
 
@@ -203,6 +205,29 @@ describe('emailNotice', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     await emailNotice(sender, async () => null, 'https://x')(claim({}), 'r')
     expect(sent).toHaveLength(1)
+  })
+})
+
+describe('pgRecipientLookup', () => {
+  const key = randomBytes(32)
+  const poolWith = (enc?: string) => ({ query: async () => ({ rows: enc ? [{ email_enc: enc }] : [] }) }) as never
+  it('decrypts the stored primary email and returns null when none is stored', async () => {
+    expect(await pgRecipientLookup(poolWith(encryptJson('who@x.test', key)), key)('did:plc:u')).toBe('who@x.test')
+    expect(await pgRecipientLookup(poolWith(), key)('did:plc:u')).toBeNull()
+  })
+  it('returns null without logging the address when the key is wrong', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await pgRecipientLookup(poolWith(encryptJson('who@x.test', key)), randomBytes(32))('did:plc:u')).toBeNull()
+    expect(JSON.stringify(err.mock.calls)).not.toContain('who@x.test')
+  })
+  it('a revoked claim mails the stored address through the revocation notice', async () => {
+    const sent: { to: string; subject: string; text: string }[] = []
+    const sender = { send: async (m: { to: string; subject: string; text: string }) => { sent.push(m) } }
+    const lookup = pgRecipientLookup(poolWith(encryptJson('who@x.test', key)), key)
+    const h = harness([row(1, { failCount: MAX_FAILS - 1 })], async () => ({ ok: false, reason: 'No link' }))
+    await reverifyDue({ store: memoryStore(h.rows), verify: async () => ({ ok: false, reason: 'No link' }), remove: async () => {}, onRevoked: emailNotice(sender, lookup, 'https://blueyvatar.test') }, { now: () => T0, sleep: async () => {} })
+    expect(sent).toHaveLength(1)
+    expect(sent[0]!.to).toBe('who@x.test')
   })
 })
 

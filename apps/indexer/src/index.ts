@@ -23,7 +23,7 @@ function writes(): IndexWrites {
     const pool = new pg.Pool({ connectionString: url, max: Number(process.env.PG_POOL_MAX ?? 5) })
     pool.on('error', (err) => console.error('postgres pool error', err))
     // Re-check attested claims older than REVERIFY_AFTER_DAYS every REVERIFY_INTERVAL_HOURS.
-    const rv = reverifyFromEnv()
+    const rv = reverifyFromEnv(pool)
     const store = pgReverifyStore(pool)
     scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
     return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warmerFromEnv() })
