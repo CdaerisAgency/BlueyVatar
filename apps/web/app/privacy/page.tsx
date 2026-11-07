@@ -17,6 +17,9 @@ export default function PrivacyPage() {
       <p>If you paid for a plan, Stripe processes your payment and we keep a record of your Stripe customer and subscriptions. When you delete your data we keep these billing records for 7 years from the day you delete, because tax and accounting rules require it, and we use them for nothing else. We then delete them automatically. We cancel any active subscription when you delete your data.</p>
       <h2>Your repository</h2>
       <p>Your avatars, profile, and gallery stay in your atproto repository. We read them to deliver them, and we cannot edit your repository. Deleting your blueyvatar data does not delete anything in your repository. Those records are yours and live on your PDS, so remove them there if you want them gone.</p>
+      <h2>Logs</h2>
+      <p>Our servers keep request logs for security, abuse handling, and fixing faults. A log line holds the time, the route (not the full address), the response status, how long it took, and a request id. We do not log IP addresses, query strings, cookies, API keys, or email addresses in these logs.</p>
+      <p>We keep logs for 90 days or until the logs reach a size cap, whichever comes first, and then delete them. Where we keep a hashed IP address in our database (for abuse reports and rate limits), it is removed on the same schedule.</p>
       <h2>Contact</h2>
       <p>For privacy or security questions, write to security@blueyvatar.com.</p>
     </PageMain>

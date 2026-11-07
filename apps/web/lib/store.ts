@@ -223,6 +223,7 @@ export async function releaseAllPg(c: Q, did: string): Promise<number> {
   const r = await c.query('DELETE FROM email_links WHERE did = $1', [did])
   await c.query('DELETE FROM email_codes WHERE did = $1', [did])
   await c.query('DELETE FROM notice_emails WHERE did = $1', [did])
+  await c.query('DELETE FROM notification_prefs WHERE did = $1', [did])
   return r.rowCount ?? 0
 }
 
