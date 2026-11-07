@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailHash, emailMd5, type Candidate } from '@blueyvatar/core'
+import { emailHash, emailMd5, imagePath, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -8,6 +8,11 @@ import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from './alerts.js'
 import { MemoryUsageMeter } from './usage.js'
 
 const DID = 'did:plc:abc123'
+const CID = 'bafyreiabc123'
+const SECRET = 'test-signing-secret'
+const DAY = 86_400_000
+/** Signed /img path as the redirect routes build it. */
+const img = (size: number, format: ImageFormat = 'png', quality?: number, scope = '') => imagePath(SECRET, DID, CID, size, format, quality, scope)
 const ident: Identity = { did: DID, handle: 'alice.test', pds: 'https://pds.test' }
 
 function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID, blob: { cid: 'bafyreiabc123', mimeType: 'image/jpeg' }, rating: 'g' }]) {
@@ -33,6 +38,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     profileBaseUrl: 'https://bv.test/',
     defaultUrlAllowlist: ['example.com'],
     trustCloudflare: true,
+    imgSigningSecret: SECRET,
   }
   const sent: UsageAlert[] = []
   deps.alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger())
@@ -46,7 +52,7 @@ describe('delivery API', () => {
     const { app } = setup()
     const res = await app.request(`/avatar/${emailHash('Alice@Example.com')}?s=4000`)
     expect(res.status).toBe(302)
-    expect(res.headers.get('location')).toBe('/img/did%3Aplc%3Aabc123/bafyreiabc123/512.png')
+    expect(res.headers.get('location')).toBe(img(512))
     expect(res.headers.get('x-adjusted-params')).toBe('s')
     expect(res.headers.get('x-rate-limit-limit')).toBe('100')
     expect(res.headers.get('set-cookie')).toBeNull()
@@ -119,7 +125,7 @@ describe('delivery API', () => {
   it('applies tier entitlements and meters keyed requests', async () => {
     const { app, usage } = setup()
     const res = await app.request('/u/did:plc:abc123?fmt=webp&q=70', { headers: { 'x-api-key': 'sk_test' } })
-    expect(res.headers.get('location')).toBe('/img/did%3Aplc%3Aabc123/bafyreiabc123/80-q70.webp')
+    expect(res.headers.get('location')).toBe(img(80, 'webp', 70))
     expect(res.headers.get('x-tier')).toBe('pro')
     expect(usage.counts.get('L1:origin_resolution')).toBe(1)
   })
@@ -152,7 +158,7 @@ describe('delivery API', () => {
     const { app, index } = setup()
     index.inactive.add(DID)
     expect((await app.request('/u/alice.test?d=404')).status).toBe(404)
-    expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')).status).toBe(404)
+    expect((await app.request(img(80))).status).toBe(404)
   })
 
   it('allows cross-origin reads of profile JSON', async () => {
@@ -197,7 +203,7 @@ describe('delivery API', () => {
 
   it('serves resized images with immutable caching', async () => {
     const { app } = setup()
-    const res = await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')
+    const res = await app.request(img(80))
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
     expect(res.headers.get('content-type')).toBe('image/png')
@@ -205,7 +211,7 @@ describe('delivery API', () => {
 
   it('meters transforms and bytes against the DID, not a license', async () => {
     const { app, usage } = setup()
-    await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')
+    await app.request(img(80))
     expect(usage.service.get(`${DID}:transform`)).toBe(1)
     expect(usage.service.get(`${DID}:bytes_delivered`)).toBe(2)
     expect(usage.counts.size).toBe(0)
@@ -233,7 +239,7 @@ describe('delivery API', () => {
     it('gives the free tier PNG only and reports ignored fmt and q', async () => {
       const { app } = setup()
       const res = await app.request('/u/alice.test?fmt=webp&q=70')
-      expect(res.headers.get('location')).toBe('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')
+      expect(res.headers.get('location')).toBe(img(80))
       expect(res.headers.get('x-adjusted-params')).toBe('fmt,q')
     })
 
@@ -254,11 +260,85 @@ describe('delivery API', () => {
 
     it('serves each variant path as its own object with the matching content type', async () => {
       const { app } = setup()
-      const res = await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128-q60.webp')
+      const res = await app.request(img(128, 'webp', 60))
       expect(res.status).toBe(200)
       expect(res.headers.get('content-type')).toBe('image/webp')
-      expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128-q101.webp')).status).toBe(404)
-      expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/128.avif')).status).toBe(404)
+      expect((await app.request(img(128, 'webp', 101))).status).toBe(404)
+      expect((await app.request(img(128).replace(/\.png$/, '.avif'))).status).toBe(404)
+    })
+  })
+
+  describe('signed image paths (issues #68 and #72)', () => {
+    const sigOf = (path: string) => path.split('/')[4]!
+
+    it('serves a validly signed path and rejects an unsigned one', async () => {
+      const { app } = setup()
+      expect((await app.request(img(80))).status).toBe(200)
+      const bare = await app.request(`/img/did%3Aplc%3Aabc123/${CID}/80.png`)
+      expect(bare.status).toBe(403)
+      expect((await bare.json()).error.code).toBe('invalid_signature')
+    })
+
+    it('rejects a tampered size, so the Free tier cap holds on /img', async () => {
+      const { app } = setup()
+      const free = await app.request('/u/alice.test?s=2048')
+      const granted = free.headers.get('location')!
+      expect(granted).toBe(img(512))
+      const res = await app.request(granted.replace('/512.png', '/2048.png'))
+      expect(res.status).toBe(403)
+      expect((await res.json()).error.code).toBe('invalid_signature')
+      expect((await app.request(granted.replace('/512.png', '/512-q50.jpeg'))).status).toBe(403)
+    })
+
+    it('rejects a tampered CID and a signature made with another secret', async () => {
+      const { app } = setup()
+      expect((await app.request(img(80).replace(CID, 'bafyreiother1'))).status).toBe(403)
+      const other = imagePath('other-secret', DID, CID, 80, 'png')
+      expect((await app.request(other)).status).toBe(403)
+    })
+
+    it('gives a public avatar the same URL to every caller', async () => {
+      const { app } = setup()
+      const anon = (await app.request('/u/alice.test')).headers.get('location')
+      const keyed = (await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_test' } })).headers.get('location')
+      const site = (await app.request('/u/alice.test?token=pk_test', { headers: { origin: 'https://app.example.com' } })).headers.get('location')
+      expect(anon).toBe(img(80))
+      expect(keyed).toBe(anon)
+      expect(site).toBe(anon)
+      expect(sigOf(anon!)).not.toContain('.')
+    })
+
+    it('scopes restricted avatars to the caller and the day, and expires them', async () => {
+      const { app, index, deps } = setup()
+      let now = 20_000 * DAY + 1000
+      deps.now = () => now
+      index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+      const keyed = (await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_test' } })).headers.get('location')!
+      expect(keyed).toBe(img(80, 'png', undefined, 'k:L1:20000'))
+      expect((await app.request(keyed)).status).toBe(200)
+      // A second key gets its own URL; the public-scope URL is refused once restricted.
+      const biz = (await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_biz' } })).headers.get('location')!
+      expect(biz).not.toBe(keyed)
+      expect((await app.request(biz)).status).toBe(200)
+      expect((await (await app.request(img(80))).json()).error.code).toBe('access_denied')
+      // Valid through the next day, then expired.
+      now += DAY
+      expect((await app.request(keyed)).status).toBe(200)
+      now += DAY
+      const expired = await app.request(keyed)
+      expect(expired.status).toBe(403)
+      expect((await expired.json()).error.code).toBe('signature_expired')
+      // A domain allowlist scopes to the origin host.
+      index.rules.set(DID, { ...PUBLIC_VISIBILITY, domainAllowlist: ['app.example.com'] })
+      const site = (await app.request('/u/alice.test', { headers: { origin: 'https://app.example.com' } })).headers.get('location')!
+      expect(site).toBe(img(80, 'png', undefined, 'd:app.example.com:20002'))
+      expect((await app.request(site)).status).toBe(200)
+    })
+
+    it('signs the avatar URL in profile JSON', async () => {
+      const { app } = setup()
+      const body = await (await app.request('/profile/alice.test')).json()
+      expect(body.avatar.url).toBe(img(256))
     })
   })
 

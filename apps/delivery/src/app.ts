@@ -2,7 +2,8 @@ import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
   DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex, isSha256Hex, parseAvatarParams,
-  parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
+  parseIdentifier, pickCandidate, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
+  type ImageFormat,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
 import { errorBody, type ErrorCode } from './errors.js'
@@ -13,7 +14,7 @@ import { originLock } from './origin.js'
 import { qrSvg } from './qr.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
-import type { IndexStore } from './store.js'
+import type { IndexStore, Visibility } from './store.js'
 import type { UsageMeter } from './usage.js'
 
 export interface AppDeps {
@@ -33,6 +34,10 @@ export interface AppDeps {
   remoteAddress?: (c: Context) => string | undefined
   /** When set, every request except GET /healthz must carry a matching x-origin-auth header. */
   originSecret?: string
+  /** HMAC secret for /img paths (IMG_SIGNING_SECRET). The redirect routes sign, /img verifies. */
+  imgSigningSecret: string
+  /** Clock for the restricted-scope day bucket. Tests override it. */
+  now?: () => number
 }
 
 type Ok = Extract<EntitlementResult, { ok: true }>
@@ -70,6 +75,10 @@ const QR_DEFAULT_SIZE = 256
 const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
 
 const IMG_FILE = /^(\d{1,4})(?:-q(\d{1,3}))?\.(png|jpeg|webp)$/
+
+function isRestricted(v: Visibility): boolean {
+  return v.keyedOnly || v.domainAllowlist.length > 0
+}
 
 export function createApp(deps: AppDeps) {
   const app = new Hono()
@@ -113,14 +122,27 @@ export function createApp(deps: AppDeps) {
     return c.redirect(`/default/${style}/${p.size}.${p.format}?seed=${encodeURIComponent(seed)}${initials ? `&initials=${initials}` : ''}`, 302)
   }
 
-  async function visibilityAllows(c: Context, did: string, e: Ok) {
+  /** The visibility rules when this caller may fetch the avatar (spec section 10.2), else null. */
+  async function visibilityAllows(c: Context, did: string, e: Ok): Promise<Visibility | null> {
     const v = await deps.index.visibility(did)
-    if (v.keyedOnly && !e.licenseId) return false
+    if (v.keyedOnly && !e.licenseId) return null
     if (v.domainAllowlist.length > 0) {
       const host = originHost(c)
-      if (!host || !hostAllowed(host, v.domainAllowlist)) return false
+      if (!host || !hostAllowed(host, v.domainAllowlist)) return null
     }
-    return true
+    return v
+  }
+
+  // Signed /img path for this caller (issues #68 and #72). Public avatars get an empty scope, so
+  // the URL is the same for everyone and the CDN caches it once. Restricted avatars carry the
+  // key id or the allowed origin host plus a day bucket, so they cache per caller per day and a
+  // leaked URL dies by the end of the next day. The size and format are signed, so a caller
+  // only gets the sizes the redirect route granted under its tier.
+  function signedPath(c: Context, e: Ok, v: Visibility, did: string, cid: string, size: number, format: ImageFormat, quality?: number) {
+    const scope = isRestricted(v)
+      ? restrictedScope(e.licenseId ? `k:${e.licenseId}` : `d:${originHost(c) ?? ''}`, deps.now?.())
+      : ''
+    return imagePath(deps.imgSigningSecret, did, cid, size, format, quality, scope)
   }
 
   async function serveAvatar(c: Context, lookup: () => Promise<Identity | null>, seed: string, initials = '') {
@@ -142,9 +164,13 @@ export function createApp(deps: AppDeps) {
       await deps.alerts?.check(e.licenseId, e.tier, used)
     }
     if (!identity || !(await deps.index.isRepoActive(identity.did))) return respondDefault(c, p, seed, initials)
-    if (!(await visibilityAllows(c, identity.did, e))) return respondDefault(c, p, seed, initials)
+    const vis = await visibilityAllows(c, identity.did, e)
+    if (!vis) return respondDefault(c, p, seed, initials)
 
     const picked = pickCandidate(await deps.resolver.candidates(identity), p.rating, p.forceDefault)
+    const path = picked.kind === 'image'
+      ? signedPath(c, e, vis, identity.did, picked.candidate.blob.cid, p.size, p.format, p.format === 'png' ? undefined : p.quality)
+      : null
     if (p.json) {
       c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
       return c.json({
@@ -153,17 +179,12 @@ export function createApp(deps: AppDeps) {
         found: picked.kind === 'image',
         source: picked.kind === 'image' ? picked.candidate.source : 'default',
         rating: picked.kind === 'image' ? picked.candidate.rating : null,
-        url: picked.kind === 'image'
-          ? imagePath(identity.did, picked.candidate.blob.cid, p.size, p.format, p.format === 'png' ? undefined : p.quality)
-          : null,
+        url: path,
       })
     }
-    if (picked.kind === 'default') return respondDefault(c, p, seed, initials)
+    if (!path) return respondDefault(c, p, seed, initials)
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
-    return c.redirect(
-      imagePath(identity.did, picked.candidate.blob.cid, p.size, p.format, p.format === 'png' ? undefined : p.quality),
-      302,
-    )
+    return c.redirect(path, 302)
   }
 
   app.get('/healthz', (c) => c.text('ok'))
@@ -227,7 +248,7 @@ export function createApp(deps: AppDeps) {
       handle: identity.handle,
       displayName: bsky?.displayName ?? null,
       description: bsky?.description ?? null,
-      avatar: picked.kind === 'image' ? { url: imagePath(identity.did, picked.candidate.blob.cid, 256, 'png'), source: picked.candidate.source } : null,
+      avatar: picked.kind === 'image' ? { url: signedPath(c, e, vis, identity.did, picked.candidate.blob.cid, 256, 'png'), source: picked.candidate.source } : null,
       jobTitle: own?.jobTitle ?? null,
       company: own?.company ?? null,
       location: own?.location ?? null,
@@ -295,17 +316,28 @@ export function createApp(deps: AppDeps) {
   })
 
   // Immutable resized image. Cached by Cloudflare by file extension (spec section 14.1).
-  app.get('/img/:did/:cid/:file', async (c) => {
+  // Only paths signed by the redirect routes are served (issues #68 and #72).
+  app.get('/img/:did/:cid/:sig/:file', async (c) => {
     const did = decodeURIComponent(c.req.param('did'))
     const cid = c.req.param('cid')
-    const m = IMG_FILE.exec(c.req.param('file'))
+    const file = c.req.param('file')
+    const m = IMG_FILE.exec(file)
     if (!m || !/^[a-z0-9]{10,100}$/.test(cid)) return fail(c, 404, 'not_found', 'Unknown image')
     const size = Number(m[1])
     const quality = m[2] ? Number(m[2]) : 85
-    const format = m[3] as 'png' | 'jpeg' | 'webp'
+    const format = m[3] as ImageFormat
     if (size < 1 || size > 2048 || quality < 1 || quality > 100) return fail(c, 404, 'not_found', 'Unknown image')
+    const scope = verifyImageSig(deps.imgSigningSecret, did, cid, file, c.req.param('sig'))
+    if (scope === null) return fail(c, 403, 'invalid_signature', 'Image path is not signed for this service')
+    if (scope && scopeExpired(scope, deps.now?.())) return fail(c, 403, 'signature_expired', 'Image path has expired; fetch the avatar again')
     if (!(await deps.index.isRepoActive(did)) || (await deps.index.isBlocked(did, cid))) {
       return fail(c, 404, 'not_found', 'Image unavailable')
+    }
+    // A public URL issued before the user switched to keyed only or a domain allowlist stays
+    // signed forever, so the current rules are checked here as well: once restricted, only
+    // scoped (and so expiring) paths are served.
+    if (!scope && isRestricted(await deps.index.visibility(did))) {
+      return fail(c, 403, 'access_denied', 'Avatar is restricted; fetch it through /avatar or /u')
     }
     const identity = await deps.resolver.resolveIdentity({ kind: 'did', value: did })
     if (!identity) return fail(c, 404, 'not_found', 'Unknown identity')
@@ -326,6 +358,12 @@ export function createApp(deps: AppDeps) {
     })
   })
 
+  // Unsigned legacy shape, or a path with the signature stripped.
+  app.get('/img/*', (c) => fail(c, 403, 'invalid_signature', 'Image path is not signed for this service'))
+
+  // Defaults stay unsigned: they carry no user content, no visibility rule applies to them, and
+  // the output is a pure function of the public style, seed, and initials, so there is nothing
+  // for a signature to protect. The 24h public cache bounds the resize cost.
   app.get('/default/:style/:file', async (c) => {
     const style = c.req.param('style')
     const m = IMG_FILE.exec(c.req.param('file'))

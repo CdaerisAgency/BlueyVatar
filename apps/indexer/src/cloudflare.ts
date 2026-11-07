@@ -10,7 +10,8 @@ import { ladderPaths } from '@blueyvatar/core'
  * https://developers.cloudflare.com/api/resources/cache/methods/purge/
  *
  * Default mode "files" purges the known size ladder per CID (sizes x formats at the default
- * quality). LIMITATION: a URL with a size off the ladder or a `-q` quality override is not purged
+ * quality, public scope, signed with IMG_SIGNING_SECRET). LIMITATION: a URL with a size off
+ * the ladder, a `-q` quality override, or a per-caller restricted scope is not purged
  * and stays cached until Cloudflare evicts it, but the `/img` route never serves it fresh after a
  * block because the origin returns 404 on the next cache miss. Mode "prefix" purges
  * `host/img/{did}/{cid}/` and covers every variant, at the cost of the 5 per minute limit.
@@ -23,6 +24,8 @@ export interface CloudflarePurgerOptions {
   apiToken: string
   /** Public origin of the delivery API, such as https://blueyvatar.com. */
   publicUrl: string
+  /** Delivery's IMG_SIGNING_SECRET, needed to build the ladder URLs in "files" mode. */
+  signingSecret?: string
   mode?: PurgeMode
   retries?: number
   retryDelayMs?: number
@@ -40,7 +43,7 @@ export class CloudflarePurger {
     const base = this.o.publicUrl.replace(/\/$/, '')
     const items = this.o.mode === 'prefix'
       ? cids.map((cid) => `${base.replace(/^https?:\/\//, '')}/img/${encodeURIComponent(did)}/${cid}/`)
-      : cids.flatMap((cid) => ladderPaths(did, cid).map((p) => base + p))
+      : cids.flatMap((cid) => ladderPaths(this.o.signingSecret ?? '', did, cid).map((p) => base + p))
     const key = this.o.mode === 'prefix' ? 'prefixes' : 'files'
     for (let i = 0; i < items.length; i += FILES_PER_REQUEST) {
       await this.send({ [key]: items.slice(i, i + FILES_PER_REQUEST) }, did)
@@ -72,11 +75,12 @@ export class CloudflarePurger {
 
 /** Returns a purge hook, or a no-op logger when CF_ZONE_ID, CF_API_TOKEN, or PUBLIC_DELIVERY_URL is unset. */
 export function purgerFromEnv(env = process.env): (did: string, cids: string[]) => Promise<void> {
-  const { CF_ZONE_ID: zoneId, CF_API_TOKEN: apiToken, PUBLIC_DELIVERY_URL: publicUrl } = env
-  if (!zoneId || !apiToken || !publicUrl) {
-    console.warn('CF_ZONE_ID, CF_API_TOKEN, or PUBLIC_DELIVERY_URL is not set; Cloudflare purges are logged only')
+  const { CF_ZONE_ID: zoneId, CF_API_TOKEN: apiToken, PUBLIC_DELIVERY_URL: publicUrl, IMG_SIGNING_SECRET: signingSecret } = env
+  const mode: PurgeMode = env.CF_PURGE_MODE === 'prefix' ? 'prefix' : 'files'
+  if (!zoneId || !apiToken || !publicUrl || (mode === 'files' && !signingSecret)) {
+    console.warn('CF_ZONE_ID, CF_API_TOKEN, PUBLIC_DELIVERY_URL, or IMG_SIGNING_SECRET (files mode) is not set; Cloudflare purges are logged only')
     return async (did, cids) => console.log('purge (no-op)', did, cids)
   }
-  const purger = new CloudflarePurger({ zoneId, apiToken, publicUrl, mode: env.CF_PURGE_MODE === 'prefix' ? 'prefix' : 'files' })
+  const purger = new CloudflarePurger({ zoneId, apiToken, publicUrl, signingSecret, mode })
   return (did, cids) => purger.purge(did, cids)
 }

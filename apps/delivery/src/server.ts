@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { serve } from '@hono/node-server'
 import type pg from 'pg'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
@@ -30,6 +31,12 @@ const { pool, index, licenses, limiter, usage, ledger } = stores()
 if (pool) scheduleRateWindowCleanup(pool)
 const originWarning = originLockWarning(process.env)
 if (originWarning) console.warn(originWarning)
+// Without a configured secret, /img URLs only work for this process's lifetime (local dev).
+let imgSigningSecret = process.env.IMG_SIGNING_SECRET
+if (!imgSigningSecret) {
+  console.warn('IMG_SIGNING_SECRET is not set; using a random per-process secret, so /img URLs break on restart')
+  imgSigningSecret = randomBytes(32).toString('hex')
+}
 const app = createApp({
   index,
   resolver: new AtprotoResolver({ index, adapters: DEFAULT_ADAPTERS, log: (m, meta) => console.warn(m, meta) }),
@@ -41,6 +48,7 @@ const app = createApp({
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
   profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,
   originSecret: process.env.ORIGIN_SECRET || undefined,
+  imgSigningSecret,
   trustCloudflare: process.env.TRUST_CLOUDFLARE === 'true',
   remoteAddress: (c) => (c.env as { incoming?: { socket?: { remoteAddress?: string } } })?.incoming?.socket?.remoteAddress,
 })

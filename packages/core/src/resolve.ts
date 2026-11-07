@@ -1,4 +1,5 @@
 import { ratingAllowed, type Rating } from './ratings.js'
+import { imagePath } from './sign.js'
 import type { BlobRef } from './adapters.js'
 
 /** One avatar candidate found for an identity, in resolution order (spec section 7). */
@@ -29,12 +30,6 @@ export function pickCandidate(
   return { kind: 'default' }
 }
 
-/** Immutable, CDN-cacheable image path (spec sections 7 and 14.1). */
-export function imagePath(did: string, cid: string, size: number, ext: 'png' | 'jpeg' | 'webp', quality?: number): string {
-  const q = quality !== undefined && ext !== 'png' ? `-q${quality}` : ''
-  return `/img/${encodeURIComponent(did)}/${cid}/${size}${q}.${ext}`
-}
-
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
 /** Sizes the service treats as common (spec section 4). Used to purge and warm `/img` URLs. */
@@ -44,9 +39,10 @@ export const WARM_SIZES = [48, 80, 128, 256, 512] as const
 export const IMAGE_FORMATS = ['png', 'jpeg', 'webp'] as const
 
 /**
- * `/img` paths for the size ladder at the default quality. Callers that request a
- * size off the ladder or a `-q` quality override are not covered.
+ * Public-scope `/img` paths for the size ladder at the default quality, signed with the
+ * delivery signing secret. Callers that request a size off the ladder, a `-q` quality
+ * override, or a restricted avatar (per-caller scope) are not covered.
  */
-export function ladderPaths(did: string, cid: string, sizes: readonly number[] = IMAGE_SIZE_LADDER, formats: readonly ('png' | 'jpeg' | 'webp')[] = IMAGE_FORMATS): string[] {
-  return sizes.flatMap((s) => formats.map((f) => imagePath(did, cid, s, f)))
+export function ladderPaths(secret: string, did: string, cid: string, sizes: readonly number[] = IMAGE_SIZE_LADDER, formats: readonly ('png' | 'jpeg' | 'webp')[] = IMAGE_FORMATS): string[] {
+  return sizes.flatMap((s) => formats.map((f) => imagePath(secret, did, cid, s, f)))
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailHash, emailMd5, isMd5Hex, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
-  parseAvatarParams, ParamError, pickCandidate, imagePath, readBlobRef, selfLabelValues,
+  parseAvatarParams, ParamError, pickCandidate, imagePath, imageSig, verifyImageSig, scopeExpired, readBlobRef, selfLabelValues,
   activeAdapters, DEFAULT_ADAPTERS, type Candidate,
 } from './index.js'
 
@@ -83,8 +83,15 @@ describe('resolution', () => {
     expect(pickCandidate([c('g', 'blueyvatar')], 'g', true)).toEqual({ kind: 'default' })
   })
   it('builds an immutable path with a file extension', () => {
-    expect(imagePath('did:plc:x', 'bafy', 80, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/80.png')
-    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 70)).toBe('/img/did%3Aplc%3Ax/bafy/80-q70.webp')
+    const sig = imageSig('s3cret', 'did:plc:x', 'bafy', '80.png')
+    expect(imagePath('s3cret', 'did:plc:x', 'bafy', 80, 'png')).toBe(`/img/did%3Aplc%3Ax/bafy/${sig}/80.png`)
+    expect(imagePath('s3cret', 'did:plc:x', 'bafy', 80, 'webp', 70)).toMatch(/^\/img\/did%3Aplc%3Ax\/bafy\/[A-Za-z0-9_-]{22}\/80-q70\.webp$/)
+    expect(verifyImageSig('s3cret', 'did:plc:x', 'bafy', '80.png', sig)).toBe('')
+    expect(verifyImageSig('other', 'did:plc:x', 'bafy', '80.png', sig)).toBeNull()
+    const scoped = imageSig('s3cret', 'did:plc:x', 'bafy', '80.png', 'k:L1:20000')
+    expect(verifyImageSig('s3cret', 'did:plc:x', 'bafy', '80.png', scoped)).toBe('k:L1:20000')
+    expect(scopeExpired('k:L1:20000', 20001 * 86_400_000)).toBe(false)
+    expect(scopeExpired('k:L1:20000', 20002 * 86_400_000)).toBe(true)
   })
 })
 
