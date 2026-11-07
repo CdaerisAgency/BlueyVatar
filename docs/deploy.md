@@ -98,7 +98,9 @@ Tap is a separate app that the indexer connects to (`TAP_URL`).
 
 ### Live Tap test
 
-`apps/indexer/src/tap-live.test.ts` runs the indexer path against a real Tap (issue #42). It signs in to a dedicated test account, writes, updates, and deletes records in all seven filtered collections, consumes the events over the `@atproto/tap` channel, runs them through `handleRecord` and `PgIndexWrites` into a throwaway Postgres schema, and asserts the rows. It also asserts that the Tap event `cid` equals the record CID returned by the PDS for every collection (`app.bsky.actor.link` and both Tangled profile NSIDs included, issue #101), that a stored link's strongRef resolves and an outdated ref is dropped, and that every event is acked only after its handler finished. Set `TAP_LIVE_CHECK_STATUS=1` to also deactivate and reactivate the account and check that `repos` follows. It skips with a message in CI because `TAP_LIVE_URL` is unset.
+`apps/indexer/src/tap-live.test.ts` runs the indexer path against a real Tap (issue #42). The full description, the self-contained local run (`pnpm tap:live:local`, local PDS and PLC plus the pinned Tap image, no real accounts), the manual GitHub Actions workflow, and what has and has not been verified are in `docs/testing-live-tap-v1.md`. It skips in CI because neither `LIVE_TAP_TEST` nor `TAP_LIVE_URL` is set.
+
+The rest of this section is external mode, against a staging Tap and a test account you own.
 
 Run it after a staging deploy:
 
@@ -118,7 +120,7 @@ export TEST_DATABASE_URL=postgres://postgres@localhost:5432/postgres
 pnpm tap:live                                # tools/tap-live.sh, add TAP_LIVE_CHECK_STATUS=1 for the status step
 ```
 
-Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message lists the events seen for the test DID. The first green run closes #42. To test locally, run the pinned image: `docker run --rm -p 2480:2480 -e TAP_SIGNAL_COLLECTION=com.blueyvatar.profile -e TAP_COLLECTION_FILTERS=<the list in fly/tap.toml> -e TAP_ADMIN_PASSWORD=test ghcr.io/bluesky-social/indigo/tap:0.1.10@sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb`, then use `TAP_LIVE_ADMIN_PASSWORD=test`. A local Tap still needs outbound access to the relay and the test account's PDS. Not yet run against a live Tap as of this writing.
+Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message lists the events seen for the test DID. Run with `TAP_LIVE_CHECK_STATUS=1` to include the account status check. The local, self-contained run replaces the `docker run` recipe that used to be here.
 
 ## Cloudflare
 

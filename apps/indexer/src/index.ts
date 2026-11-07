@@ -1,11 +1,12 @@
-import { SimpleIndexer, Tap } from '@atproto/tap'
+import { Tap } from '@atproto/tap'
 import pg from 'pg'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
-import { handleRecord, type IndexWrites } from './handlers.js'
+import type { IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
 import { pgReverifyStore, reverifyDue, scheduleReverify } from './reverify.js'
 import { reverifyFromEnv } from './reverify-wiring.js'
+import { createIndexer } from './wiring.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
@@ -45,17 +46,7 @@ function writes(): IndexWrites {
 }
 const db = writes()
 
-const indexer = new SimpleIndexer()
-indexer.identity(async (evt) => {
-  await db.setRepoStatus(evt.did, evt.handle, evt.isActive, evt.status)
-})
-indexer.record(async (evt) => {
-  await handleRecord(
-    { did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: evt.cid, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
-    db,
-  )
-})
-indexer.error((err) => console.error('tap error', err))
+const indexer = createIndexer(db, (err) => console.error('tap error', err))
 
 const channel = tap.channel(indexer)
 process.on('SIGTERM', () => void channel.destroy())
