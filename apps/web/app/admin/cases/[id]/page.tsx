@@ -100,7 +100,7 @@ export default async function CasePage({ params, searchParams }: { params: Promi
         <ul>
           {byKind('report').length > 0 && <li>{byKind('report').length} report{byKind('report').length === 1 ? '' : 's'}: {reportCats.map(([k, n]) => `${label(k)} (${n})`).join(', ')}. Reporter identity is hidden.</li>}
           {byKind('scanner').map((x) => <li key={x.id}>Scanner result at upload: {x.source ?? 'unknown service'}, {x.category}, {fmt(x.created_at)}</li>)}
-          {byKind('label').map((x) => <li key={x.id}>Label: {x.source ?? x.category}, {fmt(x.created_at)}</li>)}
+          {byKind('label').map((x) => <li key={x.id}>Label: {x.category}{x.source && <> (from <code>{x.source}</code>)</>}, {fmt(x.created_at)}</li>)}
           {byKind('manual').length > 0 && <li>Opened by a reviewer.</li>}
           {d.appeal && <li>Appeal #{d.appeal.id} against {d.appeal.action} #{d.appeal.action_id} by {d.appeal.action_by}: {d.appeal.action_reason}</li>}
         </ul>

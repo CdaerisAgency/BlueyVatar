@@ -20,6 +20,8 @@ export default function PolicyPage() {
       <p>Nudity is allowed when the image is rated correctly. See the ratings in the product documentation.</p>
       <h2>Reporting</h2>
       <p>Use the report link on any profile or avatar page. You do not need an account. Do not send identity documents or images of them. We aim to review reports within a few days. A report may lead to the image being removed from delivery and caches.</p>
+      <h2 id="screening">Image screening</h2>
+      <p>When you upload or import an image, we may check it with an automated screening service that compares it against lists of known illegal images. The check happens before the image is saved to your repository. If the service flags an image, the upload is refused, the image is not kept by us, and we record that a match happened for your account and the time. We also follow labels that moderation services apply to accounts and images on the atproto network: an image or account carrying a removal label is not served, and labels for adult or graphic content can raise an image's rating. Labels create items for our reviewers. If you think a screening result or a label is wrong, use the appeal process below.</p>
       <h2>Usage limits</h2>
       <p>To keep the service available, some actions are limited. Examples: a few email codes per hour, a limited number of avatar imports, uploads, claim checks, and key changes per hour, and short lockouts after repeated failed sign-ins or wrong codes. If you hit a limit, the page tells you how long to wait. Each account also has caps on stored items, such as 3 avatar images on Free and 20 on Plus, up to 10 linked emails, and up to 10 profile links.</p>
       <h2 id="appeals">Appeals</h2>

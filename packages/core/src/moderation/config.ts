@@ -20,7 +20,7 @@ const REPORT_SEVERITY: Record<string, Severity> = {
 /** Scanner categories that are serious on their own. Anything else a scanner flags is Moderate. */
 const SCANNER_HIGH = new Set(['illegal', 'explicit', 'sexual', 'violence', 'gore'])
 /** Label values (atproto or a labeler) that are serious on their own. Other labels are Moderate. */
-const LABEL_HIGH = new Set(['porn', 'sexual', 'nudity', 'graphic-media', 'gore', 'self-harm', 'illegal'])
+const LABEL_HIGH = new Set(['porn', 'sexual', 'nudity', 'graphic-media', 'gore', 'self-harm', 'illegal', '!takedown', '!suspend', '!hide'])
 
 /**
  * Severity of one signal from its kind and category (documented in docs/moderation-v1.md).

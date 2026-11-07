@@ -17,3 +17,5 @@ metrics.describe('indexer_last_event_id', 'Id of the last Tap event processed (t
 metrics.describe('indexer_tap_outbox_buffer', 'Events waiting in the Tap outbox, a measure of cursor lag')
 metrics.describe('indexer_ready', '1 when the indexer is ready, 0 when it has stalled')
 metrics.describe('indexer_postgres_errors_total', 'Postgres pool errors')
+metrics.describe('indexer_labels_total', 'Enforced moderation labels stored from labeler streams')
+metrics.describe('indexer_label_reviews_total', 'Review-queue items created from labels')

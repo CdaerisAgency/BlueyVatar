@@ -9,7 +9,10 @@ export type Digest = {
   slaBreaches: number
   oldestOpen: { id: number; severity: Severity; ageHours: number } | null
   openCases: number
+  /** Uploads screening refused, by service and outcome ('match' or 'outage_blocked'). */
   rejections: { service: string; reason: string; count: number }[]
+  /** Uploads let through because the scanner was down. */
+  outageAllowed: number
   labelCases: number
   escalated: number
   appeals: number
@@ -22,10 +25,11 @@ const HOURS = 3_600_000
 export async function buildDigest(q: Query, sla: SlaHours, now: Date = new Date()): Promise<Digest> {
   await syncCases(q)
   const since = new Date(now.getTime() - 24 * HOURS)
-  const [reports, open, rej, labels, counts] = await Promise.all([
-    q.query('SELECT reason AS category, count(*)::int AS count FROM reports WHERE created_at >= $1 GROUP BY reason ORDER BY count(*) DESC, reason', [since]),
+  const [reports, open, rej, outage, labels, counts] = await Promise.all([
+    q.query("SELECT reason AS category, count(*)::int AS count FROM reports WHERE created_at >= $1 AND origin = 'user' GROUP BY reason ORDER BY count(*) DESC, reason", [since]),
     q.query("SELECT id::int AS id, severity, opened_at FROM review_cases WHERE status <> 'resolved' ORDER BY opened_at, id"),
-    q.query('SELECT service, reason, count(*)::int AS count FROM upload_rejections WHERE created_at >= $1 GROUP BY service, reason ORDER BY count(*) DESC, service, reason', [since]),
+    q.query("SELECT service, outcome AS reason, count(*)::int AS count FROM upload_scan_events WHERE created_at >= $1 AND outcome IN ('match', 'outage_blocked') GROUP BY service, outcome ORDER BY count(*) DESC, service, outcome", [since]),
+    q.query("SELECT count(*)::int AS n FROM upload_scan_events WHERE created_at >= $1 AND outcome = 'outage_allowed'", [since]),
     q.query("SELECT count(DISTINCT case_id)::int AS n FROM case_signals WHERE kind = 'label' AND created_at >= $1", [since]),
     q.query(`SELECT count(*) FILTER (WHERE status = 'escalated')::int AS escalated, count(*) FILTER (WHERE status = 'appeal')::int AS appeals,
                     count(*) FILTER (WHERE child_safety)::int AS child FROM review_cases WHERE status <> 'resolved'`),
@@ -38,6 +42,7 @@ export async function buildDigest(q: Query, sla: SlaHours, now: Date = new Date(
     oldestOpen: first ? { id: first.id, severity: first.severity, ageHours: (now.getTime() - new Date(first.opened_at).getTime()) / HOURS } : null,
     openCases: open.rows.length,
     rejections: rej.rows as Digest['rejections'],
+    outageAllowed: outage.rows[0]?.n ?? 0,
     labelCases: labels.rows[0]?.n ?? 0,
     escalated: counts.rows[0]?.escalated ?? 0,
     appeals: counts.rows[0]?.appeals ?? 0,
@@ -47,7 +52,7 @@ export async function buildDigest(q: Query, sla: SlaHours, now: Date = new Date(
 
 /** True when every figure that needs attention is zero. The digest is then skipped unless MODERATION_DIGEST_ALWAYS is set. */
 export function digestIsQuiet(d: Digest): boolean {
-  return d.newReports.length === 0 && d.slaBreaches === 0 && d.openCases === 0 && d.rejections.length === 0 && d.labelCases === 0 && d.escalated === 0 && d.appeals === 0
+  return d.newReports.length === 0 && d.slaBreaches === 0 && d.openCases === 0 && d.rejections.length === 0 && d.outageAllowed === 0 && d.labelCases === 0 && d.escalated === 0 && d.appeals === 0
 }
 
 const age = (h: number) => (h < 48 ? `${Math.max(0, Math.round(h))} hours` : `${Math.round(h / 24)} days`)
@@ -69,7 +74,8 @@ export function formatDigest(d: Digest, publicUrl: string): { subject: string; t
   lines.push(`Child-safety cases open (restricted queue): ${d.childSafetyOpen}`)
   lines.push(`Cases opened by labels: ${d.labelCases}`, '')
   lines.push(`Upload rejections: ${sum(d.rejections)}`)
-  lines.push(...(d.rejections.length ? d.rejections.map((r) => `  ${r.service}, ${r.reason}: ${r.count}`) : ['  none']), '')
+  lines.push(...(d.rejections.length ? d.rejections.map((r) => `  ${r.service}, ${r.reason}: ${r.count}`) : ['  none']))
+  lines.push(`Uploads allowed while the scanner was down: ${d.outageAllowed}`, '')
   lines.push(
     `Cloudflare CSAM Scanning Tool: Cloudflare sends its own once-daily email to the address set up in the dashboard, and says whether a block failed. This digest does not read it. Check it, and the tool settings, at ${CLOUDFLARE_DASHBOARD_URL} (Caching, Configuration, CSAM Scanning Tool).`, '',
     `Open the portal: ${portal}`, '',

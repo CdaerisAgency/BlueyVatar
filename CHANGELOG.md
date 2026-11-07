@@ -7,6 +7,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ### Added
 - Moderation review portal: queues for unreviewed, escalated, appeal, resolved, and restricted child-safety cases, ordered by severity then age with SLA timers, one case per image or account, one reviewer lock per case, actions that require a reason and a cited policy, blurred and grayscale images with logged reveals, Article 17 statements of reasons that cannot be sent with an empty field, an append-only audit log, and review metrics on the admin home (#209). Reviewer guide in `docs/moderation-v1.md`.
 - Daily moderation digest email from the indexer (counts only, skipped on a quiet day), and a child-safety option on the report form (#209).
+- Upload screening through the PhotoDNA Cloud Service (off until configured) and enforcement of atproto moderation labels, with policy and privacy updates (#207).
 - Integration guides for plain HTML, WordPress, Ghost, and Discourse, and a WordPress plugin source with PHP lint and unit test in CI (#177).
 - Delivery caps concurrent image resizes (default 2 for the 512 MB VM), queues briefly, and answers 503 with Retry-After when full; metrics for in flight, queued, and shed (#198).
 - Skip link, accessibility statement at /accessibility, and an automated axe-core check in CI (#171).
@@ -31,6 +32,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 - The web app has a new look based on the Chrysalis design with the monarch palette (#109).
 
 ### Changed
+- Uploaded images no longer keep location, camera, or other photo metadata. Every upload is re-encoded in the browser and on the server with EXIF, XMP, and IPTC removed, the orientation applied, the color profile kept, and the full resolution kept (#206).
 - Uploads keep the full original image. Any resolution is accepted and shrunk to at most 4096 pixels on the long side, in the browser first and on the server as a fallback, and the upload limit is now 5 MB. The crop box saves a `crop` field on the image record instead of cropping the file, and delivery applies it before resizing (#203).
 - Delivery batches rate-window and usage counter writes in memory and flushes them every second (#198).
 - Web routes are rate limited and each account has abuse caps (#156).

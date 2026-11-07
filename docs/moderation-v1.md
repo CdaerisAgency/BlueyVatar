@@ -32,8 +32,8 @@ A case takes the most severe of its signals.
 
 | Severity | Examples |
 | --- | --- |
-| Critical | Anything about child safety: a child-safety report, or a scanner or label signal in that category. |
-| High | "Illegal content" reports. Scanner or label signals for explicit sexual content, graphic violence or gore, or self-harm. |
+| Critical | Anything about child safety: a child-safety report, an upload the screening service refused after a hash match (see below), or a scanner or label signal in that category. |
+| High | "Illegal content" reports. Scanner or label signals for explicit sexual content, graphic violence or gore, or self-harm, and removal labels (`!takedown`, `!suspend`, `!hide`). |
 | Moderate | Explicit content rated too low, impersonation, threats or harassment, private information, copyright. Other scanner or label signals. Appeals. Cases a reviewer opened by hand. |
 | Low | Spam or scams, and "something else". |
 
@@ -88,6 +88,7 @@ Write for the account owner, not for other reviewers. Keep it clear and specific
 - Only the DIDs in `MODERATION_CHILD_SAFETY_DIDS` can open the queue, when that variable is set.
 - The only actions are Divert (remove from serving), Comment, Tag, and, after a divert, closing the case.
 - Reporting to NCMEC is on hold pending counsel. The case page says so and has no submit button. Do not report from this portal, and do not copy or save the image. Follow counsel's written guidance for preservation (18 U.S.C. 2258A treats a report as a request to preserve for one year), for reporting, and for whether to tell the account owner. If a case involves a threat to someone's life or safety, DSA Article 18 asks us to inform law enforcement promptly. Ask counsel how.
+- A refused upload that matched the screening service's hash list opens a Critical case about the account here, even though nothing was stored. Treat it as a child-safety case and follow counsel's guidance.
 - If you meet child-safety content in another queue, use Escalate, tick the child-safety box, and stop looking at it. Take a break.
 
 ## Looking after yourself

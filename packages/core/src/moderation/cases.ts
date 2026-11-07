@@ -13,6 +13,7 @@ export type Signal = {
   source?: string | null
   reportId?: number
   appealId?: number
+  scanEventId?: number
   at?: Date
 }
 
@@ -81,9 +82,9 @@ export async function attachSignal(q: Query, s: Signal): Promise<{ caseId: numbe
   if (id === null) throw new Error('could not open or find a case')
 
   await q.query(
-    `INSERT INTO case_signals (case_id, kind, category, source, report_id, appeal_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO case_signals (case_id, kind, category, source, report_id, appeal_id, scan_event_id, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT DO NOTHING`,
-    [id, s.kind, s.category, s.source ?? null, s.reportId ?? null, s.appealId ?? null, at],
+    [id, s.kind, s.category, s.source ?? null, s.reportId ?? null, s.appealId ?? null, s.scanEventId ?? null, at],
   )
   await q.query(
     `UPDATE review_cases SET
@@ -96,13 +97,38 @@ export async function attachSignal(q: Query, s: Signal): Promise<{ caseId: numbe
   return { caseId: id, created }
 }
 
-/** Opens or updates cases for open reports that have none yet. Returns how many were attached. Reporter contact and IP hash are never read. */
+/**
+ * Opens or updates cases for open reports that have none yet. Returns how many were attached. Reporter contact and IP hash are never read.
+ * Reports with origin 'label' (made by label enforcement) become 'label' signals: the label value is the category and the labeler is the source.
+ */
 export async function syncReports(q: Query): Promise<number> {
   const { rows } = await q.query(
-    `SELECT r.id::int AS id, r.target_did, r.reason, r.created_at FROM reports r
+    `SELECT r.id::int AS id, r.target_did, r.reason, r.created_at, r.origin, r.label_key FROM reports r
       WHERE r.status = 'open' AND NOT EXISTS (SELECT 1 FROM case_signals s WHERE s.report_id = r.id) ORDER BY r.id LIMIT 500`,
   )
-  for (const r of rows) await attachSignal(q, { did: r.target_did, kind: 'report', category: r.reason, reportId: r.id, at: r.created_at })
+  for (const r of rows) {
+    if (r.origin === 'label' && typeof r.label_key === 'string') {
+      const parts = r.label_key.split('|')
+      await attachSignal(q, { did: r.target_did, kind: 'label', category: parts[parts.length - 1] ?? 'label', source: parts[0] ?? null, reportId: r.id, at: r.created_at })
+    } else {
+      await attachSignal(q, { did: r.target_did, kind: 'report', category: r.reason, reportId: r.id, at: r.created_at })
+    }
+  }
+  return rows.length
+}
+
+/**
+ * Upload screening matches (upload_scan_events, outcome 'match') become scanner signals. Every service wired in for upload
+ * screening is a known-image hash matcher for child sexual abuse material, so a match is a child-safety signal: it opens a case
+ * in the restricted queue about the account. The upload itself was refused, so there is no image to look at. Outages are not signals.
+ */
+export const SCAN_MATCH_CATEGORY = 'csam'
+export async function syncScans(q: Query): Promise<number> {
+  const { rows } = await q.query(
+    `SELECT e.id::int AS id, e.did, e.service, e.created_at FROM upload_scan_events e
+      WHERE e.outcome = 'match' AND NOT EXISTS (SELECT 1 FROM case_signals s WHERE s.scan_event_id = e.id) ORDER BY e.id LIMIT 500`,
+  )
+  for (const e of rows) await attachSignal(q, { did: e.did, kind: 'scanner', category: SCAN_MATCH_CATEGORY, source: e.service, scanEventId: e.id, at: e.created_at })
   return rows.length
 }
 
@@ -116,7 +142,7 @@ export async function syncAppeals(q: Query): Promise<number> {
   return rows.length
 }
 
-export async function syncCases(q: Query): Promise<{ reports: number; appeals: number }> {
-  return { reports: await syncReports(q), appeals: await syncAppeals(q) }
+export async function syncCases(q: Query): Promise<{ reports: number; appeals: number; scans: number }> {
+  return { reports: await syncReports(q), appeals: await syncAppeals(q), scans: await syncScans(q) }
 }
 

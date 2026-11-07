@@ -29,7 +29,7 @@ describe.skipIf(!url)('moderation digest', () => {
   })
   beforeEach(async () => {
     send.mockClear()
-    await pool.query('DELETE FROM moderation_digest_runs; DELETE FROM case_signals; DELETE FROM review_cases; DELETE FROM reports; DELETE FROM upload_rejections; DELETE FROM notice_emails')
+    await pool.query('DELETE FROM moderation_digest_runs; DELETE FROM case_signals; DELETE FROM review_cases; DELETE FROM reports; DELETE FROM upload_scan_events; DELETE FROM notice_emails')
   })
   const report = (did: string, reason: string, at: Date) =>
     pool.query("INSERT INTO reports (target_did, source, reason, ip_hash, reporter_contact, created_at) VALUES ($1, 'avatar', $2, 'h', 'reporter@secret.test', $3)", [did, reason, at])
@@ -39,16 +39,21 @@ describe.skipIf(!url)('moderation digest', () => {
     await report('did:plc:one', 'spam', ago(1))
     await report('did:plc:two', 'illegal', ago(3))
     await report('did:plc:old', 'harassment', ago(60))
-    await pool.query("INSERT INTO upload_rejections (service, reason, created_at) VALUES ('photodna', 'hash_match', $1), ('photodna', 'hash_match', $1), ('classifier', 'adult', $1), ('photodna', 'hash_match', $2)", [ago(5), ago(80)])
-    await pool.query("INSERT INTO review_cases (dedupe_key, subject_did, severity, status, opened_at) VALUES ('cid:bafylabelcase', 'did:plc:lab', 'high', 'escalated', $1)", [ago(40)])
-    await pool.query("INSERT INTO case_signals (case_id, kind, category, source, created_at) SELECT id, 'label', 'porn', 'labeler', $1 FROM review_cases WHERE dedupe_key = 'cid:bafylabelcase'", [ago(4)])
+    const scan = (service: string, outcome: string, at: Date) => pool.query("INSERT INTO upload_scan_events (did, service, outcome, flags, created_at) VALUES ('did:plc:scan', $1, $2, '{}', $3)", [service, outcome, at])
+    await scan('photodna', 'match', ago(5))
+    await scan('photodna', 'match', ago(6))
+    await scan('photodna', 'match', ago(80))
+    await scan('other', 'outage_blocked', ago(2))
+    await scan('photodna', 'outage_allowed', ago(2))
+    await pool.query("INSERT INTO reports (target_did, source, reason, ip_hash, origin, label_key, created_at) VALUES ('did:plc:lab', 'avatar', 'explicit', 'label', 'label', 'did:plc:labeler|at://did:plc:lab/app.bsky.actor.profile/self|porn', $1)", [ago(4)])
+    await pool.query("INSERT INTO review_cases (dedupe_key, subject_did, severity, status, opened_at) VALUES ('cid:bafyescalated', 'did:plc:esc', 'high', 'escalated', $1)", [ago(40)])
     expect(await runModerationDigest(pool, sender, ENV, NOW)).toBe('sent')
     expect(send).toHaveBeenCalledTimes(1)
     const { to, subject, text } = send.mock.calls[0]![0]
     expect(to).toBe('owner@example.test')
     expect(subject).toContain('3 new reports')
-    for (const part of ['spam: 2', 'illegal: 1', 'photodna, hash_match: 2', 'classifier, adult: 1', 'Upload rejections: 3', 'Cases opened by labels: 1', 'Escalations waiting: 1',
-      'SLA breaches (open and past due): 1', 'Oldest open case:', 'Cloudflare CSAM Scanning Tool', 'https://dash.cloudflare.com/', 'https://blueyvatar.test/admin']) {
+    for (const part of ['spam: 2', 'illegal: 1', 'photodna, match: 2', 'other, outage_blocked: 1', 'Upload rejections: 3', 'Uploads allowed while the scanner was down: 1', 'Cases opened by labels: 1', 'Escalations waiting: 1',
+      'Child-safety cases open (restricted queue): 1', 'SLA breaches (open and past due): 2', 'Oldest open case:', 'Cloudflare CSAM Scanning Tool', 'https://dash.cloudflare.com/', 'https://blueyvatar.test/admin']) {
       expect(text).toContain(part)
     }
     expect(text).not.toMatch(/did:|bafy|reporter@secret|owner@example|<img/)

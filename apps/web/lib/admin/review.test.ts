@@ -81,12 +81,26 @@ describe.skipIf(!url)('review portal', () => {
     const r1 = await report(d, 'spam')
     const r2 = await report(d, 'illegal')
     expect(await syncCases(pool)).toMatchObject({ reports: expect.any(Number) })
-    expect(await syncCases(pool)).toEqual({ reports: 0, appeals: 0 })
+    expect(await syncCases(pool)).toEqual({ reports: 0, appeals: 0, scans: 0 })
     const rows = (await pool.query('SELECT case_id FROM case_signals WHERE report_id = ANY($1)', [[r1, r2]])).rows
     expect(new Set(rows.map((r) => r.case_id)).size).toBe(1)
     const detail = await caseDetail(pool, rows[0].case_id)
     expect(detail?.c).toMatchObject({ report_count: 2, severity: 'high' })
     expect(JSON.stringify(detail)).not.toContain('secret@x.test')
+  })
+
+  it('turns label items and screening matches into signals, the match going to the restricted queue', async () => {
+    const d = did()
+    await pool.query("INSERT INTO reports (target_did, source, reason, ip_hash, origin, label_key) VALUES ($1, 'avatar', 'explicit', 'label', 'label', $2)", [d, `did:plc:labeler|at://${d}/app.bsky.actor.profile/self|porn`])
+    const s = did()
+    await pool.query("INSERT INTO upload_scan_events (did, service, outcome, flags) VALUES ($1, 'photodna', 'match', '{}'), ($1, 'photodna', 'outage_allowed', '{}')", [s])
+    await syncCases(pool)
+    const lab = (await pool.query("SELECT c.id::int AS id, c.severity, g.kind, g.category, g.source FROM review_cases c JOIN case_signals g ON g.case_id = c.id WHERE c.subject_did = $1", [d])).rows
+    expect(lab).toEqual([{ id: expect.any(Number), severity: 'high', kind: 'label', category: 'porn', source: 'did:plc:labeler' }])
+    const scan = (await pool.query("SELECT c.child_safety, c.severity, g.kind, g.source FROM review_cases c JOIN case_signals g ON g.case_id = c.id WHERE c.subject_did = $1", [s])).rows
+    expect(scan).toEqual([{ child_safety: true, severity: 'critical', kind: 'scanner', source: 'photodna' }])
+    expect(await syncCases(pool)).toEqual({ reports: 0, appeals: 0, scans: 0 })
+    expect((await caseDetail(pool, lab[0]!.id))?.c.report_count).toBe(0)
   })
 
   it('gives each case to one reviewer at a time', async () => {

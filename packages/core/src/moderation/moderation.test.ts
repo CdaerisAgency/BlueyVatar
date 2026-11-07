@@ -14,6 +14,7 @@ describe('severity', () => {
     expect(deriveSeverity('scanner', 'explicit')).toBe('high')
     expect(deriveSeverity('scanner', 'other')).toBe('moderate')
     expect(deriveSeverity('label', 'porn')).toBe('high')
+    expect(deriveSeverity('label', '!takedown')).toBe('high')
     expect(deriveSeverity('label', 'spoiler')).toBe('moderate')
     expect(deriveSeverity('appeal', 'appeal')).toBe('moderate')
   })
@@ -56,22 +57,23 @@ describe('policies and roles', () => {
 describe('digest text', () => {
   const zero: Digest = {
     since: new Date('2026-11-06T13:00:00Z'), until: new Date('2026-11-07T13:00:00Z'), newReports: [], slaBreaches: 0, oldestOpen: null, openCases: 0,
-    rejections: [], labelCases: 0, escalated: 0, appeals: 0, childSafetyOpen: 0,
+    rejections: [], outageAllowed: 0, labelCases: 0, escalated: 0, appeals: 0, childSafetyOpen: 0,
   }
   const busy: Digest = {
     ...zero, newReports: [{ category: 'spam', count: 3 }, { category: 'illegal', count: 1 }], slaBreaches: 2, openCases: 5,
-    oldestOpen: { id: 12, severity: 'high', ageHours: 30 }, rejections: [{ service: 'photodna', reason: 'hash_match', count: 4 }], labelCases: 2, escalated: 1, appeals: 3, childSafetyOpen: 1,
+    oldestOpen: { id: 12, severity: 'high', ageHours: 30 }, rejections: [{ service: 'photodna', reason: 'match', count: 4 }], outageAllowed: 2, labelCases: 2, escalated: 1, appeals: 3, childSafetyOpen: 1,
   }
   it('is quiet only when every figure is zero', () => {
     expect(digestIsQuiet(zero)).toBe(true)
     expect(digestIsQuiet({ ...zero, appeals: 1 })).toBe(false)
+    expect(digestIsQuiet({ ...zero, outageAllowed: 1 })).toBe(false)
     expect(digestIsQuiet({ ...zero, childSafetyOpen: 1 })).toBe(true)
   })
   it('has counts, the Cloudflare note, and a portal link, and nothing identifying', () => {
     const { subject, text } = formatDigest(busy, 'https://blueyvatar.com/')
     expect(subject).toContain('4 new reports')
     expect(subject).toContain('2 past SLA')
-    for (const part of ['spam: 3', 'illegal: 1', 'SLA breaches (open and past due): 2', 'Oldest open case: #12, High, open 30 hours', 'photodna, hash_match: 4',
+    for (const part of ['spam: 3', 'illegal: 1', 'SLA breaches (open and past due): 2', 'Oldest open case: #12, High, open 30 hours', 'photodna, match: 4', 'Uploads allowed while the scanner was down: 2',
       'Cases opened by labels: 2', 'Escalations waiting: 1', 'Appeals waiting: 3', 'https://dash.cloudflare.com/', 'https://blueyvatar.com/admin']) expect(text).toContain(part)
     expect(text).not.toMatch(/did:|bafy|<img/)
     expect(text + subject).not.toContain(String.fromCharCode(0x2014))

@@ -196,6 +196,46 @@ After an avatar changes (an image record upsert, or a Bluesky profile change, wh
   2. Count first-visitor misses that warming did not prevent. In Cloudflare Analytics, Caching, compare the cache hit ratio for `/img/*` with warming on against a week with `PUBLIC_DELIVERY_URL` unset on the indexer. Optionally compare p95 time to first byte for `/img` requests.
   3. Compare cost. Each warm miss costs one origin resize on Fly, plus one Cloudflare request. Free plan Cloudflare has no per-request charge, so the cost is origin CPU and egress. Divide warm misses by the extra visitor hits that landed as cache hits. Keep warming when the hit ratio improves enough to matter and origin resize counts do not rise. Cut `WARM_SIZES` to the sizes visitors actually request (see `transform` counts per size in delivery logs) when most warmed sizes never get a hit.
 
+## Upload screening and atproto labels
+
+Issue #207. Research: `docs/research/moderation-research-v1.md`. NCMEC reporting is on hold until counsel confirms, so nothing here submits a report.
+
+### Environment variables
+
+| Variable | App | Meaning |
+| --- | --- | --- |
+| `PHOTODNA_ENDPOINT` | web | Full URL of the PhotoDNA Match operation, from the API Management Portal after approval. |
+| `PHOTODNA_KEY` | web | Subscription key. Screening is off unless both are set. |
+| `SCAN_FAIL_CLOSED` | web | `1` or `true` also blocks uploads when the service is down. Default off. |
+| `LABELER_DIDS` | indexer | Comma separated labeler DIDs to follow. Empty means label enforcement is off. |
+
+Matches are always refused. A scanner outage lets the upload through and logs a warning (`upload screening unavailable`), unless `SCAN_FAIL_CLOSED` is set. Pick fail closed if counsel prefers that; the cost is that uploads stop whenever the service is down. The PhotoDNA request and response shapes in `packages/core/src/scanner.ts` are marked unverified: they sit behind the onboarding portal, so compare them with the portal schema once approved.
+
+### Apply for PhotoDNA Cloud Service (owner)
+
+1. Read the terms: <https://www.microsoft.com/en-us/photodna/termsofuse>. Access is for qualified organizations, is vetted by a third party, and is at Microsoft's discretion.
+2. Apply from <https://www.microsoft.com/en-us/photodna/cloudservice> (contact page linked from <https://www.microsoft.com/en-us/PhotoDNA/Documentation>).
+3. After approval, sign in to the API Management Portal (<https://developer.microsoftmoderator.com/apis>), copy the Match endpoint URL and your subscription key.
+4. Set the secrets: `fly secrets set PHOTODNA_ENDPOINT=... PHOTODNA_KEY=... --app blueyvatar-web`. Check that a test upload still works.
+
+### Enable the Cloudflare CSAM Scanning Tool (owner, no code)
+
+In the Cloudflare dashboard: Caching, Configuration, CSAM Scanning Tool, Configure. Add a verified notification email. It scans content served through the cache after first serve, so it backs up the upload check and does not replace it. Docs: <https://developers.cloudflare.com/cache/reference/csam-scanning/>. It sends a daily email and blocks matched URLs; filing reports remains the operator's job.
+
+### Labels
+
+Find a labeler DID from its own profile or its published DID document (a `did:plc` or `did:web` with an `#atproto_labeler` service entry). This repo deliberately does not hardcode one: Bluesky's moderation labeler DID has not been confirmed from an official Bluesky page. Confirm it from Bluesky's own documentation or account before adding it to `LABELER_DIDS`.
+
+The indexer connects to each labeler's `com.atproto.label.subscribeLabels` endpoint, resumes from the cursor stored in `label_cursors`, and stores only the values it enforces in `moderation_labels`. Label signatures are not verified (see `apps/indexer/src/labels.ts`).
+
+- `!takedown`, `!suspend`, `!hide` on an account or record: delivery stops serving it (avatar, gallery, and blob routes), and cached copies are purged.
+- `porn`, `sexual`, `nudity`, `graphic-media`: the effective rating rises (x, r, r, pg) and never falls, so rating filters apply.
+- A new enforced label adds one open item to `reports` (origin `label`), so it shows in the admin page with the other reports. A negation removes the stored label; the review item is left for an admin to dismiss.
+
+### Upload scan events and the daily digest
+
+`upload_scan_events` holds one row per match or outage: account, service, outcome, flags, time. It holds no image and no hash, and no page reads it. `scanCounts()` in `apps/web/lib/upload-screen.ts` returns the same counts; the indexer's daily moderation digest (see Web admin page) now reads the table directly. The metric `web_upload_screen_total{outcome}` counts the same events.
+
 ## Blocking an image
 
 Reports from the public form land in the `reports` table (status `open`). Moderators work them as cases in the web admin page at `/admin` (issues #145 and #209). `pnpm ops:block` and `pnpm ops:block-did` still work for emergencies, and they write to the same audit log.
@@ -212,7 +252,7 @@ Admin access is off until both variables are set on the web app, and then `/admi
 
 Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin session ends after 30 minutes and can be ended earlier from the page. Wrong codes lock the account for 15 minutes after 5 failures. Every action asks for a reason and is recorded in the `admin_actions` table, which the page shows under "Audit log". Run migration 0021 before the first deploy. `/admin` is disallowed in `robots.txt`, answers `X-Robots-Tag: noindex`, and is not listed in the sitemap.
 
-The page is a review portal with queues, cases, and a daily digest. How reviewers use it is in `docs/moderation-v1.md`. Run migration 0031 before deploying (it needs 0012, 0021, and 0028). It adds the case tables, reviewer wellness settings, rating overrides, the `upload_rejections` table, new audit log columns, and an append-only trigger on `admin_actions`.
+The page is a review portal with queues, cases, and a daily digest. How reviewers use it is in `docs/moderation-v1.md`. Run migration 0031 before deploying (it needs 0012, 0021, 0028, and 0030). It adds the case tables, reviewer wellness settings, rating overrides, new audit log columns, and an append-only trigger on `admin_actions`.
 
 Review portal settings (all optional). The web app reads the first three. The indexer reads `MODERATION_SLA_HOURS` too, to count SLA breaches in the digest, so set the same value on both.
 
@@ -233,7 +273,7 @@ Daily moderation digest (runs in the indexer, which is always on; the web and de
 
 The digest has no Cloudflare data. Cloudflare's CSAM Scanning Tool sends its own daily email to the address set in the dashboard (Caching, Configuration, CSAM Scanning Tool), and the digest links to the dashboard so it stays on your checklist.
 
-Upload screening should write one row to `upload_rejections` (`service`, `reason`, optional `did`) for each upload it rejects, and call `attachSignal` from `@blueyvatar/core/moderation` with `kind: 'scanner'` or `'label'` to open or join a case. The digest and the case view read those.
+The portal and digest read what upload screening and label enforcement (issue #207) already write: label-origin rows in `reports` become label signals on a case, and each `match` row in `upload_scan_events` becomes a scanner signal. Every screening service wired in is a known-image hash matcher for child sexual abuse material, so a match opens a Critical case about the account in the restricted child-safety queue (the upload was refused, so there is no image). The digest counts `match` and `outage_blocked` rows as upload rejections by service, and `outage_allowed` rows as uploads let through during an outage. Ask counsel whether recording a match as a case changes anything about "actual knowledge" under 18 U.S.C. 2258A.
 
 Reporter follow-up: when a case is resolved and the reporter left a valid email address, the portal sends them a one-line outcome message (no reason, no details), then deletes the stored address whether or not the send worked. The message uses the same email sender as account notices (`RESEND_API_KEY`).
 

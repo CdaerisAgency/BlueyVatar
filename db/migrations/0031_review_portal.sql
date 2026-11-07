@@ -1,4 +1,4 @@
--- Moderation review portal (issue #209, spec section 9).
+-- Moderation review portal (issue #209, spec section 9). Needs 0012, 0021, 0028, and 0030.
 -- Cases group reports, scanner results, label hits, and appeals about one image (CID) or one account (DID), so a
 -- reviewer sees one job instead of many. The audit log gains the policy cited, the case, and the notice sent.
 
@@ -30,7 +30,7 @@ CREATE INDEX review_cases_did_idx ON review_cases (subject_did);
 CREATE INDEX review_cases_cid_idx ON review_cases (subject_cid) WHERE subject_cid IS NOT NULL;
 
 -- Why a case exists. kind 'report' rows point at reports (the reporter's contact and IP hash are never read),
--- 'scanner' and 'label' rows come from upload screening and label enforcement, 'appeal' rows point at appeals, and 'manual' rows are cases a reviewer opened by hand.
+-- 'scanner' rows point at upload_scan_events matches and 'label' rows come from label-origin reports (migration 0030), 'appeal' rows point at appeals, and 'manual' rows are cases a reviewer opened by hand.
 -- source: the scanner service or label value (for example 'photodna' or 'porn'); null for reports and appeals.
 CREATE TABLE case_signals (
   id          bigserial PRIMARY KEY,
@@ -40,6 +40,7 @@ CREATE TABLE case_signals (
   source      text,
   report_id   bigint UNIQUE,
   appeal_id   bigint UNIQUE,
+  scan_event_id bigint UNIQUE,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX case_signals_case_idx ON case_signals (case_id);
@@ -71,16 +72,6 @@ CREATE TABLE rating_overrides (
   lifted_at    timestamptz,
   PRIMARY KEY (did, cid)
 );
-
--- One row per upload the screening step rejected. Written by upload screening, read by the daily digest (counts only).
-CREATE TABLE IF NOT EXISTS upload_rejections (
-  id          bigserial PRIMARY KEY,
-  did         text,
-  service     text NOT NULL,
-  reason      text NOT NULL,
-  created_at  timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS upload_rejections_created_idx ON upload_rejections (created_at);
 
 -- One row per day the digest job ran, so a restart or a second instance does not send it twice.
 CREATE TABLE moderation_digest_runs (
