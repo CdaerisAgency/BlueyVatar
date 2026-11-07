@@ -7,6 +7,7 @@ import { PgIndexWrites } from './pg-writes.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
+const migrations = ['0002_web_auth', '0006_email_md5', '0007_email_ownership'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
 const schema = `t_indexer_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 
@@ -20,6 +21,7 @@ describe.skipIf(!url)('postgres index writes', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
+    for (const m of migrations) await pool.query(m)
   })
 
   afterAll(async () => {
@@ -59,5 +61,15 @@ describe.skipIf(!url)('postgres index writes', () => {
     await db.deleteClaim(DID, 'c1')
     expect((await pool.query('SELECT 1 FROM profiles')).rowCount).toBe(0)
     expect((await pool.query('SELECT 1 FROM claims')).rowCount).toBe(0)
+  })
+
+  it('turns email links into 30-day holds when the account is deleted', async () => {
+    const db = new PgIndexWrites(pool)
+    await pool.query(`INSERT INTO email_links (email_hash, did, method, is_primary) VALUES ($1, $2, 'code', true), ($3, $2, 'code', false)`, ['1'.repeat(64), 'did:plc:gone', '2'.repeat(64)])
+    await db.setRepoStatus('did:plc:gone', null, false, 'takendown')
+    expect((await pool.query('SELECT 1 FROM email_links WHERE did = $1', ['did:plc:gone'])).rowCount).toBe(2)
+    await db.setRepoStatus('did:plc:gone', null, false, 'deleted')
+    expect((await pool.query('SELECT 1 FROM email_links WHERE did = $1', ['did:plc:gone'])).rowCount).toBe(0)
+    expect((await pool.query('SELECT reason FROM email_holds WHERE did = $1', ['did:plc:gone'])).rows).toEqual([{ reason: 'account_deleted' }, { reason: 'account_deleted' }])
   })
 })

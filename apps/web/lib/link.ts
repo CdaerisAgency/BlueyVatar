@@ -1,11 +1,12 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import { PUBLIC_URL } from './oauth'
 import { emailHash, emailMd5 } from '@blueyvatar/core'
-import { generateCode, newPending, RESEND_GAP_MS } from './codes'
-import { emailSender } from './email'
+import { generateCode, newPending, RESEND_GAP_MS, type PendingCode } from './codes'
+import { emailSender, type EmailSender } from './email'
+import { decideLink, linkErrorMessage, movedNotice } from './email-policy'
 import { looksLikeEmail, maskEmail } from './mask'
 import { linkMethod, parseTrustedHosts, pdsHost } from './pds'
-import { getStore } from './store'
+import { getStore, type Store } from './store'
 
 export type LinkOutcome =
   | { kind: 'linked'; masked: string }
@@ -13,9 +14,18 @@ export type LinkOutcome =
   | { kind: 'error'; message: string }
 
 /** Mail a one-time code. Keeps only hashes; the raw address lives in this call. */
-export async function sendCode(did: string, email: string): Promise<LinkOutcome> {
+export async function sendCode(
+  did: string,
+  email: string,
+  store: Store = getStore(),
+  sender: EmailSender = emailSender(),
+): Promise<LinkOutcome> {
   if (!looksLikeEmail(email)) return { kind: 'error', message: 'That does not look like an email address.' }
-  const store = getStore()
+  const hash = emailHash(email)
+  // Fail before mailing a code the link could never accept. Whether another account holds the hash is not revealed.
+  const facts = await store.links.inspect(did, hash)
+  const verdict = decideLink(facts)
+  if (!verdict.ok) return { kind: 'error', message: linkErrorMessage(verdict) }
   const now = Date.now()
   const existing = await store.codes.get(did)
   if (existing && now - existing.createdAt < RESEND_GAP_MS) {
@@ -23,13 +33,34 @@ export async function sendCode(did: string, email: string): Promise<LinkOutcome>
   }
   const code = generateCode()
   const masked = maskEmail(email)
-  await emailSender().send({
+  await sender.send({
     to: email.trim(),
     subject: 'Your blueyvatar verification code',
     text: `Your code is ${code}. It expires in 15 minutes.\n\nIf you did not ask to link this address on ${PUBLIC_URL}, ignore this message.`,
   })
-  await store.codes.put(newPending(did, emailHash(email), masked, code, now, emailMd5(email)))
+  // Keep the raw address, for at most the life of this code, only when confirming would move the link
+  // from another account: it is the only way to tell the previous owner.
+  const notifyTo = facts.owner === 'other' ? email.trim() : undefined
+  await store.codes.put(newPending(did, hash, masked, code, now, emailMd5(email), notifyTo))
   return { kind: 'code_sent', masked }
+}
+
+/** Applies a confirmed code: links under the ownership policy and, on a move, mails the previous owner. */
+export async function confirmLink(
+  did: string,
+  pending: PendingCode,
+  store: Store = getStore(),
+  sender: EmailSender = emailSender(),
+): Promise<LinkOutcome> {
+  const d = await store.links.link(pending.emailHash, did, 'code', pending.emailMd5)
+  await store.codes.delete(did)
+  if (!d.ok) return { kind: 'error', message: linkErrorMessage(d) }
+  if (d.moved && pending.notifyTo) {
+    // Best effort: the move already happened and the notice must not undo it.
+    const n = movedNotice(PUBLIC_URL)
+    await sender.send({ to: pending.notifyTo, ...n }).catch((err) => console.error('move notice failed', err instanceof Error ? err.message : 'unknown'))
+  }
+  return { kind: 'linked', masked: pending.masked }
 }
 
 /** Reads the PDS email through the email-scoped OAuth session and links or mails a code. */
@@ -47,8 +78,14 @@ export async function linkFromSession(session: OAuthSession): Promise<LinkOutcom
     trusted: parseTrustedHosts(process.env.TRUSTED_PDS_HOSTS),
   })
   if (method === 'trusted_pds') {
-    await getStore().links.upsert(emailHash(email), did, method, emailMd5(email))
-    return { kind: 'linked', masked: maskEmail(email) }
+    const store = getStore()
+    const facts = await store.links.inspect(did, emailHash(email))
+    // A trusted host vouches for its own users, but taking a hash from another account always needs the mailed code.
+    if (facts.owner !== 'other') {
+      const d = await store.links.link(emailHash(email), did, method, emailMd5(email))
+      if (!d.ok) return { kind: 'error', message: linkErrorMessage(d) }
+      return { kind: 'linked', masked: maskEmail(email) }
+    }
   }
   return sendCode(did, email)
 }

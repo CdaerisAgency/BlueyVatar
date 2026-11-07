@@ -11,6 +11,8 @@ export type PendingCode = {
   emailHash: string
   /** MD5 of the same normalized email. Absent for codes sent before migration 0006. */
   emailMd5?: string
+  /** Raw address, kept only when confirming would move the hash from another account (for the move notice). */
+  notifyTo?: string
   codeHash: string
   masked: string
   attempts: number
@@ -27,11 +29,12 @@ export function hashCode(did: string, emailHash: string, code: string): string {
   return createHash('sha256').update(`${did}\n${emailHash}\n${code}`).digest('hex')
 }
 
-export function newPending(did: string, emailHash: string, masked: string, code: string, now: number, emailMd5?: string): PendingCode {
+export function newPending(did: string, emailHash: string, masked: string, code: string, now: number, emailMd5?: string, notifyTo?: string): PendingCode {
   return {
     did,
     emailHash,
     emailMd5,
+    notifyTo,
     codeHash: hashCode(did, emailHash, code),
     masked,
     attempts: 0,

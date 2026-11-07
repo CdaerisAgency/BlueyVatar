@@ -166,10 +166,18 @@ Email lookup is the one Gravatar mechanic no atproto service offers, and atproto
 
 1. The user signs in with atproto OAuth. Requested scopes: `atproto`, write access to the three user-repo collections (scope forms in section 10.1), `blob:image/*`, and `account:email` for the linking step only.
 2. The service calls `com.atproto.server.getSession` and reads `email` and `emailConfirmed`.
-3. If the email is confirmed and the user's PDS host is on a trusted list, the link is created. Otherwise the service emails a one-time code and the user enters it.
-4. The service stores SHA256 of the trimmed, lowercased email (the same hash [Gravatar uses](https://docs.gravatar.com/guides/llms-txt/)) mapped to the user's DID. The raw email is discarded after verification.
+3. If the email is confirmed and the user's PDS host is on a trusted list, the link is created. Otherwise the service emails a one-time code and the user enters it. A trusted host never takes a hash that is linked to a different account: that case always needs the mailed code.
+4. The service stores SHA256 of the trimmed, lowercased email (the same hash [Gravatar uses](https://docs.gravatar.com/guides/llms-txt/)) mapped to the user's DID, plus the MD5 for older clients. The raw email is discarded after verification.
 5. Additional emails are added the same way, by one-time code.
-6. Unlinking deletes the mapping immediately.
+6. Unlinking deletes the mapping immediately and starts a 30-day hold (see ownership rules).
+
+**Ownership rules** (issues #63 and #93)
+
+- **One hash, one DID.** Every link, trusted-host or code, is checked against the rules below in one database transaction.
+- **Newest verification wins.** If the hash is already linked to another DID and the new claimant passes the mailed code, the old link is removed in the same transaction. The previous owner is emailed at that address, which says the link was moved and how to reclaim it (sign in and add the address again by code). The raw address is kept only for that case, in the pending code row, and is deleted when the code is confirmed, replaced, or expires.
+- **Cap.** An account links at most 10 emails. The account page and the code request reject the 11th with a clear error before any code is mailed, and the database enforces it too. Re-verifying an email the account already has does not count. Accounts over 10 before this rule keep their links but cannot add more.
+- **Primary.** One email per account is primary. The first one linked is primary by default, the user can change it on the account page, and it is listed first. Unlinking the primary promotes the oldest remaining email.
+- **30-day hold.** When a user unlinks an email, or the indexer sees the account as deleted, the hash moves to the `email_holds` table. No other DID can link it for 30 days. The same DID can reclaim it during the hold. Held hashes are not in `email_links`, so delivery lookups never resolve them. The hold applies to released hashes only: a hash that is still linked can be moved by a verified code, as above.
 
 **Design rules**
 
@@ -460,7 +468,7 @@ Thirteen items in the table below need a decision or an answer before build, and
 | 2 | Support MD5 hashes? | Older Gravatar integrations send MD5. [Libravatar](https://wiki.libravatar.org/api/) and [Unavatar](https://github.com/microlinkhq/unavatar) accept it, but MD5 is weaker | Decision needed |
 | 3 | Which verification method for each outside account? | Verified accounts depend on it | Gravatar's methods are not documented in the pages I read |
 | 4 | Which Gravatar details are missing? | Multiple emails per account, upload limits, cropping, abuse flow | Not confirmed in sources; can be pulled from Gravatar support docs |
-| 5 | Two DIDs claim the same email hash | Wrong owner would receive the avatar | Policy needed, for example both must pass a mailed code and the newest verification wins |
+| 5 | Two DIDs claim the same email hash | Wrong owner would receive the avatar | Decided (issues #63 and #93, section 6): one hash maps to one DID, a mailed code is required to take a hash from another DID, the newest verification wins and the previous owner is emailed, 10 emails per account, one primary, 30-day hold after unlink or account deletion |
 | 6 | Hash lookups reveal whether an email has a linked account | Anyone can test a list of known addresses | Mitigate with rate limits and a user opt-out of email lookup |
 | 7 | Honor the `!no-unauthenticated` self-label? | It could serve as a privacy signal | Semantics confirmed: the atproto labels guide says it [makes the content inaccessible to logged-out users in applications which respect the label](https://atproto.com/guides/labels), lists it as a global value usable as a self-label, and leaves enforcement to applications. The [label spec](https://atproto.com/specs/label) does not mention it. Decision needed: avatar requests carry no viewer session, so honoring it would mean refusing delivery for that account (my inference) |
 | 8 | Atproto spaces timing | Real access control for avatars depends on it | [Alpha since August 20, 2026, not for production, launch targeted later this year](https://atproto.com/blog/atproto-spaces-alpha) |
