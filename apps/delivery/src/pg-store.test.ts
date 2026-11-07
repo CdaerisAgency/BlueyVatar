@@ -7,7 +7,9 @@ import { hashApiKey, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter,
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
 const migration3 = readFileSync(new URL('../../../db/migrations/0003_usage_alerts.sql', import.meta.url), 'utf8')
-const schema = `t_delivery_${process.pid}_${Date.now()}`
+const migration2 = readFileSync(new URL('../../../db/migrations/0002_web_auth.sql', import.meta.url), 'utf8')
+const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
+const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 const HASH = 'a'.repeat(64)
 
@@ -21,7 +23,9 @@ describe.skipIf(!url)('postgres stores', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(migration)
+    await pool.query(migration2)
     await pool.query(migration3)
+    await pool.query(migration6)
   })
 
   afterAll(async () => {
@@ -37,6 +41,30 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(`INSERT INTO visibility_rules (did, domain_allowlist, email_lookup_opt_out) VALUES ($1, '{example.com}', true)`, [DID])
     expect(await index.didForEmailHash(HASH)).toBeNull()
     expect((await index.visibility(DID)).domainAllowlist).toEqual(['example.com'])
+  })
+
+  it('looks up MD5 hashes only for links that stored one, with the same opt-out', async () => {
+    const index = new PgIndexStore(pool)
+    const sha = 'b'.repeat(64)
+    const md5 = 'c'.repeat(32)
+    const did = 'did:plc:bob'
+    await pool.query(`INSERT INTO email_links (email_hash, did, method) VALUES ($1, $2, 'code')`, [sha, did])
+    // A link made before migration 0006 has no MD5, so only its SHA256 resolves.
+    expect(await index.didForEmailHash(md5)).toBeNull()
+    expect(await index.didForEmailHash(sha)).toBe(did)
+    await pool.query(`UPDATE email_links SET email_md5 = $2 WHERE email_hash = $1`, [sha, md5])
+    expect(await index.didForEmailHash(md5)).toBe(did)
+    expect(await index.didForEmailHash(md5.toUpperCase())).toBe(did)
+    await pool.query(`INSERT INTO visibility_rules (did, email_lookup_opt_out) VALUES ($1, true)`, [did])
+    expect(await index.didForEmailHash(md5)).toBeNull()
+    expect(await index.didForEmailHash(sha)).toBeNull()
+  })
+
+  it('applies migration 0006 twice and rejects a malformed or duplicate MD5', async () => {
+    await pool.query(migration6)
+    await expect(pool.query(`INSERT INTO email_links (email_hash, did, method, email_md5) VALUES ($1, 'did:plc:x', 'code', 'nothex')`, ['d'.repeat(64)])).rejects.toThrow()
+    await pool.query(`INSERT INTO email_links (email_hash, did, method, email_md5) VALUES ($1, 'did:plc:x', 'code', $2)`, ['d'.repeat(64), 'e'.repeat(32)])
+    await expect(pool.query(`INSERT INTO email_links (email_hash, did, method, email_md5) VALUES ($1, 'did:plc:y', 'code', $2)`, ['f'.repeat(64), 'e'.repeat(32)])).rejects.toThrow()
   })
 
   it('reads images, repo status, and blocks', async () => {

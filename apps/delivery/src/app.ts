@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isSha256Hex, parseAvatarParams,
+  DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex, isSha256Hex, parseAvatarParams,
   parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
@@ -168,10 +168,11 @@ export function createApp(deps: AppDeps) {
 
   app.get('/healthz', (c) => c.text('ok'))
 
-  // Gravatar-compatible route. Hash only; raw email is never accepted (spec section 6).
+  // Gravatar-compatible route. Hash only (SHA256 or MD5); raw email is never accepted (spec section 6).
   app.get('/avatar/:hash', async (c) => {
     const hash = c.req.param('hash').toLowerCase().replace(/\.(png|jpe?g|webp)$/, '')
-    if (!isSha256Hex(hash)) return fail(c, 400, 'invalid_identifier', 'Expected a SHA256 hex hash of the email')
+    // MD5 is accepted for older Gravatar clients and takes the same path as SHA256.
+    if (!isSha256Hex(hash) && !isMd5Hex(hash)) return fail(c, 400, 'invalid_identifier', 'Expected a SHA256 (64 hex) or MD5 (32 hex) hash of the email')
     return serveAvatar(c, async () => {
       const did = await deps.index.didForEmailHash(hash)
       return did ? deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
