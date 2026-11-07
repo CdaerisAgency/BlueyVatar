@@ -37,21 +37,23 @@ export const COPY = {
   },
   pricing: {
     title: 'Free for people. Fair for apps.',
-    lead: 'Users never pay to be seen. Developers pay only when their traffic grows.',
+    lead: 'Being seen is always free. Plus adds extras for people who want them, and developers pay only when their traffic grows.',
     badge: 'Most popular',
     perMonth: '/mo',
     tiers: {
       free: { body: '1,000 requests a day. Enough for a personal site or a side project.', cta: 'Get a key' },
+      plus: { body: '20 avatar images, a profile gallery, a custom profile domain, and up to 20 verified accounts.', cta: 'Start Plus' },
       pro: { body: '50,000 requests a month, hovercards, and priority cache warming.', cta: 'Start Pro' },
       business: { body: '1 million requests a month, custom domains, and a support contact.', cta: 'Start Business' },
     },
   },
-  // Only destinations that exist today. Add Docs, Status, Privacy, and Terms here when those pages ship.
+  // Only destinations that exist today. Add Docs, Status, and Terms here when those pages ship.
   footer: {
     tagline: 'blueyvatar. Built on atproto.',
     links: [
       { label: 'Developers', href: '/#dev' },
       { label: 'Pricing', href: '/#pricing' },
+      { label: 'Privacy', href: '/privacy' },
       { label: 'Sign in', href: '/login' },
     ],
   },

@@ -3,7 +3,7 @@ import AvatarRing from '../components/AvatarRing'
 import { ButtonLink } from '../components/Button'
 import { Eyebrow, SectionTitle } from '../components/Type'
 import { COPY } from '../lib/copy'
-import { PRICING } from '../lib/pricing'
+import { PRICING, formatPrice } from '../lib/pricing'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
@@ -96,7 +96,7 @@ export default function Home() {
             {COPY.pricing.title}
           </SectionTitle>
           <p className="mb-10 max-w-[560px]">{COPY.pricing.lead}</p>
-          <ul className="m-0 grid list-none grid-cols-1 gap-8 p-0 md:grid-cols-3 md:gap-6">
+          <ul className="m-0 grid list-none grid-cols-1 gap-8 p-0 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
             {PRICING.map((t) => (
               <li
                 key={t.id}
@@ -109,7 +109,7 @@ export default function Home() {
                 )}
                 <h3 className="m-0 font-sans text-sm tracking-[0.08em] text-bv-ink-3 uppercase">{t.name}</h3>
                 <span className="font-display text-[44px] leading-none font-semibold">
-                  ${t.amount}
+                  {formatPrice(t.amount)}
                   {t.per && <small className="font-sans text-lg font-normal text-bv-ink-3">{COPY.pricing.perMonth}</small>}
                 </span>
                 <p className="m-0">{COPY.pricing.tiers[t.id].body}</p>

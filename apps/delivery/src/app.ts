@@ -43,7 +43,7 @@ export interface AppDeps {
   warmSecret?: string
   /** HMAC secret for /img paths (IMG_SIGNING_SECRET). The redirect routes sign, /img verifies. */
   imgSigningSecret: string
-  /** PLUS_DIDS comma list: the user plan gate (spec section 11.2). Gallery images ship in profile JSON only for these DIDs. */
+  /** PLUS_DIDS comma list: manual Plus grants (spec section 11.2). Gallery images ship in profile JSON for these DIDs and for DIDs with a Plus subscription. */
   plusDids?: string
   /** Clock for the restricted-scope day bucket. Tests override it. */
   now?: () => number
@@ -312,7 +312,7 @@ export function createApp(deps: AppDeps) {
     // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:
     // the rating filter is the avatar default (g), blocked images never come back, and URLs
     // are signed /img paths. The page shows at most GALLERY_MAX.
-    const gallery = isPlusDid(identity.did, deps.plusDids)
+    const gallery = isPlusDid(identity.did, deps.plusDids) || (await deps.index.hasPlusSubscription(identity.did, new Date(deps.now?.() ?? Date.now())))
       ? (await deps.resolver.galleryItems(identity))
           .filter((g) => ratingAllowed(g.rating, 'g'))
           .slice(0, GALLERY_MAX)

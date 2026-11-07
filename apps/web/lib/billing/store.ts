@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { ENTITLEMENTS, type PaidTier, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
+import { ENTITLEMENTS, plusEntitled, type PaidPlan, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
 import { getPool } from '../store'
 
@@ -9,7 +9,7 @@ export interface SubscriptionRow {
   did: string
   licenseId: string
   priceId: string
-  tier: PaidTier
+  tier: PaidPlan
   status: SubscriptionStatus
   currentPeriodEnd: Date | null
   cancelAtPeriodEnd: boolean
@@ -49,8 +49,14 @@ export interface BillingStore {
    */
   process(eventId: string, type: string, fn: (tx: BillingTx) => Promise<void>): Promise<'processed' | 'duplicate'>
   customerFor(did: string): Promise<string | null>
-  subscriptionFor(did: string): Promise<SubscriptionRow | null>
+  /** The newest entitled subscription of one kind: a developer tier (Pro or Business, the default) or Plus. */
+  subscriptionFor(did: string, kind?: SubKind): Promise<SubscriptionRow | null>
+  /** True when the DID holds a Plus subscription that entitles Plus at `now` (active, trialing, or past due inside the grace period). */
+  hasPlus(did: string, now?: Date): Promise<boolean>
 }
+
+export type SubKind = 'developer' | 'plus'
+const kindOf = (tier: string): SubKind => (tier === 'plus' ? 'plus' : 'developer')
 
 const newLicenseId = () => `lic_${randomUUID()}`
 const ENTITLED = new Set(['active', 'trialing', 'past_due'])
@@ -107,8 +113,11 @@ export function memoryBillingStore() {
     async customerFor(did) {
       return customers.get(did) ?? null
     },
-    async subscriptionFor(did) {
-      return [...subs.values()].filter((s) => s.did === did && ENTITLED.has(s.status)).sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())[0] ?? null
+    async subscriptionFor(did, kind = 'developer') {
+      return [...subs.values()].filter((s) => s.did === did && kindOf(s.tier) === kind && ENTITLED.has(s.status)).sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())[0] ?? null
+    },
+    async hasPlus(did, now = new Date()) {
+      return plusEntitled([...subs.values()].filter((s) => s.did === did), now)
     },
     licenseOf: (did) => [...licenses.values()].find((x) => x.owner === did),
     seedLicense(did, tier) {
@@ -128,7 +137,7 @@ const toSub = (r: Record<string, unknown>): SubscriptionRow => ({
   did: r.did as string,
   licenseId: r.license_id as string,
   priceId: r.price_id as string,
-  tier: r.tier as PaidTier,
+  tier: r.tier as PaidPlan,
   status: r.status as SubscriptionStatus,
   currentPeriodEnd: (r.current_period_end as Date | null) ?? null,
   cancelAtPeriodEnd: r.cancel_at_period_end as boolean,
@@ -216,12 +225,16 @@ export function postgresBillingStore(pool: pg.Pool): BillingStore {
     async customerFor(did) {
       return (await pool.query('SELECT stripe_customer_id FROM billing_customers WHERE did = $1', [did])).rows[0]?.stripe_customer_id ?? null
     },
-    async subscriptionFor(did) {
+    async subscriptionFor(did, kind = 'developer') {
       const r = await pool.query(
-        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND status IN ('active', 'trialing', 'past_due') ORDER BY last_event_at DESC LIMIT 1`,
-        [did],
+        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND (tier = 'plus') = ($2 = 'plus') AND status IN ('active', 'trialing', 'past_due') ORDER BY last_event_at DESC LIMIT 1`,
+        [did, kind],
       )
       return r.rows[0] ? toSub(r.rows[0]) : null
+    },
+    async hasPlus(did, now = new Date()) {
+      const r = await pool.query(`SELECT ${subCols} FROM subscriptions WHERE did = $1 AND tier = 'plus' AND status IN ('active', 'trialing', 'past_due')`, [did])
+      return plusEntitled(r.rows.map(toSub), now)
     },
   }
 }

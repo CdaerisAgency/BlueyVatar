@@ -2,10 +2,11 @@ import { PAST_DUE_GRACE_DAYS, effectiveTier } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { PageMain } from '../../../components/Page'
 import { currentDid } from '../../../lib/auth'
-import { billingEnabled } from '../../../lib/billing/config'
+import { billingEnabled, plusEnabled } from '../../../lib/billing/config'
 import { getBillingStore } from '../../../lib/billing/store'
 import { getDashboardStore } from '../../../lib/dashboard-store'
-import { PRICING } from '../../../lib/pricing'
+import { PRICING, formatPrice } from '../../../lib/pricing'
+import { resolvePlan } from '../../../lib/plan'
 import AccountNav from '../AccountNav'
 import { openPortal, startCheckout } from './actions'
 
@@ -22,8 +23,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const q = await searchParams
   const license = await getDashboardStore().ensureLicense(did)
   const billing = getBillingStore()
-  const [customer, sub] = await Promise.all([billing.customerFor(did), billing.subscriptionFor(did)])
+  const [customer, sub, plusSub, plan] = await Promise.all([billing.customerFor(did), billing.subscriptionFor(did), billing.subscriptionFor(did, 'plus'), resolvePlan(did)])
   const enabled = billingEnabled()
+  const plusOn = plusEnabled()
   const now = new Date()
   const tier = effectiveTier(license, now)
   const pastDue = license.status === 'past_due' && license.graceEndsAt
@@ -39,7 +41,9 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
       <h2>Your plan</h2>
       <ul>
+        <li>Plan: {plan === 'plus' ? 'Plus' : 'Free'}</li>
         <li>Developer tier: {tier}</li>
+        {plusSub && <li>Plus subscription: {plusSub.status.replace('_', ' ')}{plusSub.currentPeriodEnd ? `, ${plusSub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateText(plusSub.currentPeriodEnd)}` : ''}</li>}
         {sub && <li>Subscription: {sub.status.replace('_', ' ')}{sub.currentPeriodEnd ? `, ${sub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateText(sub.currentPeriodEnd)}` : ''}</li>}
         {pastDue && (
           <li>
@@ -55,9 +59,15 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <ul>
         {PRICING.map((p) => (
           <li key={p.id}>
-            <strong>{p.name}</strong>: {p.amount === 0 ? '$0' : `$${p.amount} per ${p.per === 'mo' ? 'month' : p.per}`}
-            {p.id === tier && ' (current)'}
-            {enabled && p.id !== 'free' && !sub && license.tier !== 'enterprise' && (
+            <strong>{p.name}</strong>: {p.amount === 0 ? '$0' : `${formatPrice(p.amount)} per ${p.per === 'mo' ? 'month' : p.per}`}
+            {(p.id === 'plus' ? plan === 'plus' : p.id === tier) && ' (current)'}
+            {p.id === 'plus' && plusOn && !plusSub && plan !== 'plus' && (
+              <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
+                <input type="hidden" name="tier" value="plus" />
+                <button type="submit">Subscribe to Plus</button>
+              </form>
+            )}
+            {enabled && p.id !== 'free' && p.id !== 'plus' && !sub && license.tier !== 'enterprise' && (
               <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
                 <input type="hidden" name="tier" value={p.id} />
                 <button type="submit">Subscribe to {p.name}</button>
@@ -68,7 +78,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </ul>
       <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout based on your billing address.</p>
 
-      {enabled && (customer || sub) && (
+      {enabled && (customer || sub || plusSub) && (
         <form action={openPortal}>
           <p>Update your card, switch plans, download invoices, or cancel in the Stripe customer portal.</p>
           <button type="submit">Manage billing</button>

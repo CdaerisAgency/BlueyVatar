@@ -1,4 +1,4 @@
-import { resolveLicenseBilling, type SubscriptionStatus } from '@blueyvatar/core'
+import { isPaidTier, resolveLicenseBilling, type SubscriptionFacts, type SubscriptionStatus } from '@blueyvatar/core'
 import Stripe from 'stripe'
 import { missingForWebhook, tierForPrice, webhookSecret, type Env } from './config'
 import type { BillingStore, BillingTx, SubscriptionRow } from './store'
@@ -53,7 +53,8 @@ interface InvoiceObject {
 }
 
 async function recompute(tx: BillingTx, licenseId: string, now: Date): Promise<void> {
-  const subs = await tx.subscriptionsForLicense(licenseId)
+  // Plus is a user plan and never changes the license. Only developer-tier subscriptions count here.
+  const subs = (await tx.subscriptionsForLicense(licenseId)).filter((s): s is SubscriptionRow & SubscriptionFacts => isPaidTier(s.tier))
   await tx.applyLicense(licenseId, resolveLicenseBilling(subs, now))
 }
 

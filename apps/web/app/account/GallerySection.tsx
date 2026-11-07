@@ -8,7 +8,7 @@ import { moveGallery, removeGalleryImage, uploadGalleryImage } from './galleryAc
 
 /** Account page Gallery section. Non-Plus users see one upsell line. */
 export default async function GallerySection({ did, error, done }: { did: string; error?: string; done?: string }) {
-  if (!isPlus(did)) {
+  if (!(await isPlus(did))) {
     return (
       <section id="gallery">
         <h2>Gallery</h2>

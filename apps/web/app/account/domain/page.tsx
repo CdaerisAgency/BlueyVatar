@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { cfSaasConfig, fallbackOrigin, getHostname, type HostnameState } from '../../../lib/cf-saas'
 import { getDomainStore } from '../../../lib/domain-store'
-import { planFor } from '../../../lib/records'
+import { resolvePlan } from '../../../lib/plan'
 import AccountNav from '../AccountNav'
 import { addDomain, removeDomain } from './actions'
 import { PollRefresh } from './PollRefresh'
@@ -17,7 +17,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
   const { error } = await searchParams
   const cfg = cfSaasConfig()
   const target = fallbackOrigin()
-  const plus = planFor(did) === 'plus'
+  const plus = (await resolvePlan(did)) === 'plus'
   const store = getDomainStore()
   let row = await store.get(did)
 

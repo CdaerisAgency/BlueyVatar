@@ -4,7 +4,8 @@ import { ratingFromLabels } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, blobUrl, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
-import { LICENSES, canAddImage, imageLimit, planFor } from '../../../lib/records'
+import { LICENSES, canAddImage, imageLimit } from '../../../lib/records'
+import { resolvePlan } from '../../../lib/plan'
 import { getStore } from '../../../lib/store'
 import AccountNav from '../AccountNav'
 import ImageFileInput from './ImageFileInput'
@@ -16,7 +17,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   const did = await currentDid()
   if (!did) redirect('/login')
   const { error, done } = await searchParams
-  const plan = planFor(did)
+  const plan = await resolvePlan(did)
   let images: StoredImage[] = []
   let pds = ''
   let loadError: string | null = null

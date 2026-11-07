@@ -2,7 +2,7 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import AvatarRing from '../../../components/AvatarRing'
 import { PageMain } from '../../../components/Page'
-import { planFor } from '../../../lib/records'
+import { resolvePlan } from '../../../lib/plan'
 import { pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
@@ -31,7 +31,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
   const links = pageLinks(p)
   const interests = pageInterests(p)
-  const gallery = pageGallery(p, planFor(p.did) === 'plus')
+  const gallery = pageGallery(p, (await resolvePlan(p.did)) === 'plus')
   const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
   return (
     <PageMain narrow>
