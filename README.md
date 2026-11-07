@@ -89,3 +89,7 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [x] Adapters: Tangled profile avatar field confirmed against live repos; `org.tangled.actor.profile` enabled, with `sh.tangled.actor.profile` as a fallback (`docs/research/tangled-collection-v1.md`).
 - [ ] Lexicons: name cleared, validator, permission set, publish script, and the `OAUTH_USE_PERMISSION_SET` flag are in place. Remaining at deploy: run the publish and create the `_lexicon.blueyvatar.com` TXT record (docs/deploy.md).
 - [x] Billing: Stripe Checkout, Customer Portal, and a signed webhook (spec section 12.1). Follow-up: a Plus price, the overage rate, and the Stripe dashboard setup in docs/deploy.md.
+
+## License
+
+Licensed per component: AGPL-3.0 for the apps and `packages/core`, Apache-2.0 for `lexicons/com/blueyvatar`. See [docs/licensing-v1.md](docs/licensing-v1.md) and the `LICENSE` file in each directory.
