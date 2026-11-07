@@ -21,6 +21,21 @@ describe('indexer handlers', () => {
     }, db)
     expect(db.upsertImage).toHaveBeenCalledWith(expect.objectContaining({ cid: 'bafyimg', rating: 'pg', isDefault: true }))
   })
+  it('indexes purpose, caption, and sort, and treats a missing purpose as avatar', async () => {
+    const db = fakeDb()
+    const image = { $type: 'blob', ref: { $link: 'bafygal' }, mimeType: 'image/png', size: 100 }
+    await handleRecord({
+      did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'g1', action: 'create',
+      record: { image, purpose: 'gallery', caption: 'Hello', sort: 2, createdAt: '2026-11-03T00:00:00Z' },
+    }, db)
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: 'gallery', caption: 'Hello', sort: 2 }))
+    await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'a1', action: 'create', record: { image, createdAt: '2026-11-03T00:00:00Z' } }, db)
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: 'avatar', caption: null, sort: null }))
+    await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'g2', action: 'create', record: { image, purpose: 'gallery', caption: 'x'.repeat(200), sort: 1.5, createdAt: '2026-11-03T00:00:00Z' } }, db)
+    const last = (db.upsertImage as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0]
+    expect(last.caption).toHaveLength(140)
+    expect(last.sort).toBeNull()
+  })
   it('deletes and purges on image delete', async () => {
     const db = fakeDb()
     await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: '3k', action: 'delete' }, db)

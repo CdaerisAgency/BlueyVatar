@@ -7,7 +7,7 @@ import { PgIndexWrites } from './pg-writes.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
-const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
+const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
 const schema = `t_indexer_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 
@@ -47,6 +47,19 @@ describe.skipIf(!url)('postgres index writes', () => {
     await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'r1', action: 'delete' }, db)
     expect((await pool.query('SELECT 1 FROM images')).rowCount).toBe(0)
     expect(purged).toEqual([[DID, 'bafyimg']])
+  })
+
+  it('stores gallery fields and defaults existing rows to avatar', async () => {
+    const db = new PgIndexWrites(pool)
+    const image = { $type: 'blob', ref: { $link: 'bafygal1' }, mimeType: 'image/png', size: 10 }
+    await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'g1', action: 'create', record: { image, purpose: 'gallery', caption: 'Beach', sort: 3, createdAt: '2026-01-01T00:00:00Z' } }, db)
+    await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'a1', action: 'create', record: { image: { ...image, ref: { $link: 'bafyav1' } }, createdAt: '2026-01-02T00:00:00Z' } }, db)
+    const { rows } = await pool.query('SELECT rkey, purpose, caption, sort FROM images WHERE did = $1 ORDER BY rkey', [DID])
+    expect(rows).toEqual([
+      { rkey: 'a1', purpose: 'avatar', caption: null, sort: null },
+      { rkey: 'g1', purpose: 'gallery', caption: 'Beach', sort: 3 },
+    ])
+    await pool.query('DELETE FROM images WHERE did = $1', [DID])
   })
 
   it('stores profiles, claims, and repo status', async () => {

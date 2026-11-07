@@ -35,11 +35,20 @@ export class PgIndexStore implements IndexStore {
   }
 
   async serviceImages(did: string): Promise<IndexedImage[]> {
+    return this.images(did, `purpose = 'avatar'`, 'created_at DESC')
+  }
+
+  async galleryImages(did: string): Promise<IndexedImage[]> {
+    return this.images(did, `purpose = 'gallery'`, 'sort ASC NULLS LAST, created_at DESC')
+  }
+
+  private async images(did: string, where: string, order: string): Promise<IndexedImage[]> {
     const { rows } = await this.pool.query<{
-      rkey: string; cid: string; mime_type: string; rating: string; is_default: boolean; created_at: Date
+      rkey: string; cid: string; mime_type: string; rating: string; is_default: boolean; purpose: string
+      caption: string | null; sort: number | null; created_at: Date
     }>(
-      `SELECT rkey, cid, mime_type, rating, is_default, created_at
-         FROM images WHERE did = $1 ORDER BY created_at DESC`,
+      `SELECT rkey, cid, mime_type, rating, is_default, purpose, caption, sort, created_at
+         FROM images WHERE did = $1 AND ${where} ORDER BY ${order}`,
       [did],
     )
     return rows.map((r) => ({
@@ -49,6 +58,9 @@ export class PgIndexStore implements IndexStore {
       // The column has a CHECK constraint; fall back to the strictest rating if it ever drifts.
       rating: isRating(r.rating) ? r.rating : 'x',
       isDefault: r.is_default,
+      purpose: r.purpose,
+      caption: r.caption,
+      sort: r.sort,
       createdAt: r.created_at.toISOString(),
     }))
   }

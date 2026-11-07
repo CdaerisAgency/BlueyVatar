@@ -9,6 +9,7 @@ const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', i
 const migration3 = readFileSync(new URL('../../../db/migrations/0003_usage_alerts.sql', import.meta.url), 'utf8')
 const migration2 = readFileSync(new URL('../../../db/migrations/0002_web_auth.sql', import.meta.url), 'utf8')
 const migration7 = readFileSync(new URL('../../../db/migrations/0008_blocked_images.sql', import.meta.url), 'utf8')
+const migration14 = readFileSync(new URL('../../../db/migrations/0014_gallery.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -28,6 +29,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration3)
     await pool.query(migration6)
     await pool.query(migration7)
+    await pool.query(migration14)
   }, 60_000)
 
   afterAll(async () => {
@@ -77,7 +79,7 @@ describe.skipIf(!url)('postgres stores', () => {
       [DID],
     )
     expect(await index.serviceImages(DID)).toEqual([
-      { rkey: 'r1', cid: 'bafyone', mimeType: 'image/png', rating: 'pg', isDefault: true, createdAt: '2026-01-01T00:00:00.000Z' },
+      { rkey: 'r1', cid: 'bafyone', mimeType: 'image/png', rating: 'pg', isDefault: true, purpose: 'avatar', caption: null, sort: null, createdAt: '2026-01-01T00:00:00.000Z' },
     ])
     expect(await index.isRepoActive(DID)).toBe(true)
     await pool.query(`INSERT INTO repos (did, active, status) VALUES ($1, false, 'takendown')`, [DID])
@@ -87,6 +89,25 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await index.isBlocked(DID, 'bafyone')).toBe(true)
     await pool.query(`UPDATE blocked_images SET unblocked_at = now() WHERE did = $1`, [DID])
     expect(await index.isBlocked(DID, 'bafyone')).toBe(false)
+  })
+
+  it('keeps gallery images out of avatar reads and orders them by sort, unset last, then newest', async () => {
+    const index = new PgIndexStore(pool)
+    const did = 'did:plc:gal'
+    const ins = (rkey: string, purpose: string, sort: number | null, at: string) =>
+      pool.query(
+        `INSERT INTO images (did, rkey, cid, mime_type, rating, purpose, caption, sort, created_at)
+              VALUES ($1, $2, $3, 'image/png', 'g', $4, $5, $6, $7)`,
+        [did, rkey, `cid-${rkey}`, purpose, `cap ${rkey}`, sort, at],
+      )
+    await ins('av', 'avatar', null, '2026-01-01T00:00:00Z')
+    await ins('g-old', 'gallery', null, '2026-01-02T00:00:00Z')
+    await ins('g-new', 'gallery', null, '2026-01-03T00:00:00Z')
+    await ins('g-two', 'gallery', 2, '2026-01-01T00:00:00Z')
+    await ins('g-one', 'gallery', 1, '2026-01-01T00:00:00Z')
+    expect((await index.serviceImages(did)).map((i) => i.rkey)).toEqual(['av'])
+    expect((await index.galleryImages(did)).map((i) => i.rkey)).toEqual(['g-one', 'g-two', 'g-new', 'g-old'])
+    expect((await index.galleryImages(did))[0]).toMatchObject({ caption: 'cap g-one', sort: 1, purpose: 'gallery' })
   })
 
   it('finds keys by SHA256 and ignores revoked keys', async () => {

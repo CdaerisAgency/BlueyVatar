@@ -20,13 +20,14 @@ export class PgIndexWrites implements IndexWrites {
 
   async upsertImage(r: Parameters<IndexWrites['upsertImage']>[0]): Promise<void> {
     await this.pool.query(
-      `INSERT INTO images (did, rkey, cid, mime_type, rating, is_default, license, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO images (did, rkey, cid, mime_type, rating, is_default, license, purpose, caption, sort, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT (did, rkey) DO UPDATE SET
             cid = EXCLUDED.cid, mime_type = EXCLUDED.mime_type, rating = EXCLUDED.rating,
             is_default = EXCLUDED.is_default, license = EXCLUDED.license,
+            purpose = EXCLUDED.purpose, caption = EXCLUDED.caption, sort = EXCLUDED.sort,
             created_at = EXCLUDED.created_at, indexed_at = now()`,
-      [r.did, r.rkey, r.cid, r.mimeType, r.rating, r.isDefault, r.license, r.createdAt],
+      [r.did, r.rkey, r.cid, r.mimeType, r.rating, r.isDefault, r.license, r.purpose, r.caption, r.sort, r.createdAt],
     )
     this.opts.onImageUpserted?.(r.did, r.cid).catch((err) => console.warn('image upsert hook failed', err))
   }

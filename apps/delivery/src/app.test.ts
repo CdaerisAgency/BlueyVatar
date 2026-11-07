@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailHash, emailMd5, imagePath, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
+import { GALLERY_MAX, emailHash, emailMd5, imagePath, restrictedScope, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -23,6 +23,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   const resolver: AvatarResolver = {
     resolveIdentity: async (id) => (id.value === DID || id.value === 'alice.test' ? ident : null),
     candidates: async () => candidates,
+    galleryItems: async () => [],
     getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ uri: `at://${DID}/app.bsky.actor.link/l1`, cid: 'cl1' }, { uri: `at://${DID}/app.bsky.actor.link/l2`, cid: 'cl2' }, { uri: `at://${DID}/app.bsky.actor.link/l3`, cid: 'stale' }] } : null),
     getBlob: async () => new Uint8Array([1, 2, 3]),
   }
@@ -772,5 +773,50 @@ describe('origin lockdown wiring', () => {
       expect(restricted.status).toBe(404)
       expect(await restricted.json()).toEqual(await unlinked.json())
     })
+  })
+})
+
+describe('profile gallery (F21)', () => {
+  const items = (n: number, rating: 'g' | 'pg' | 'r' | 'x' = 'g') => Array.from({ length: n }, (_, i) => ({ cid: `bafygal${i}`, rating, caption: i === 0 ? 'First' : null }))
+  function galleryApp(list: ReturnType<typeof items>, plusDids: string | undefined) {
+    const { deps } = setup()
+    deps.resolver = { ...deps.resolver, galleryItems: async () => list }
+    deps.plusDids = plusDids
+    return createApp(deps)
+  }
+  const gal = async (app: ReturnType<typeof createApp>) => (await (await app.request('/profile/alice.test')).json()).gallery
+
+  it('returns an empty gallery for Free users', async () => {
+    expect(await gal(galleryApp(items(3), undefined))).toEqual([])
+    expect(await gal(galleryApp(items(3), 'did:plc:someoneelse'))).toEqual([])
+  })
+
+  it('returns signed /img paths and captions for Plus users', async () => {
+    const g = await gal(galleryApp(items(2), `did:plc:x, ${DID}`))
+    expect(g).toEqual([
+      { url: imagePath(SECRET, DID, 'bafygal0', 512, 'png', undefined, ''), caption: 'First' },
+      { url: imagePath(SECRET, DID, 'bafygal1', 512, 'png', undefined, ''), caption: null },
+    ])
+    expect(g.every((x: { url: string }) => x.url.startsWith('/img/'))).toBe(true)
+  })
+
+  it('applies the avatar rating filter', async () => {
+    const list = [...items(1, 'g'), { cid: 'bafypg', rating: 'pg' as const, caption: null }, { cid: 'bafyr', rating: 'r' as const, caption: null }, { cid: 'bafyx', rating: 'x' as const, caption: null }]
+    expect(await gal(galleryApp(list, DID))).toHaveLength(1)
+  })
+
+  it('caps the gallery at 12', async () => {
+    expect(GALLERY_MAX).toBe(12)
+    expect(await gal(galleryApp(items(20), DID))).toHaveLength(12)
+  })
+
+  it('signs restricted galleries with the caller scope, like avatars', async () => {
+    const { deps, index } = (() => { const s = setup(); return { deps: s.deps, index: s.index } })()
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+    deps.resolver = { ...deps.resolver, galleryItems: async () => items(1) }
+    deps.plusDids = DID
+    const app = createApp({ ...deps, now: () => 0 })
+    const res = await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_test' } })
+    expect((await res.json()).gallery[0].url).toBe(imagePath(SECRET, DID, 'bafygal0', 512, 'png', undefined, restrictedScope('k:L1', 0)))
   })
 })

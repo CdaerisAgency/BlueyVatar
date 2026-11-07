@@ -47,3 +47,5 @@ This page describes v1, the only version today.
 - The response does not carry a version field. Requests without `v` receive v1.
 
 `/profile/{id}` returns a separate JSON document with its own shape. It follows the same version policy.
+
+The `/profile/{id}` document includes `gallery`, an array of `{ "url": string, "caption": string or null }` with at most 12 entries. It is `[]` unless the profile owner is on the Plus plan. Each `url` is a signed `/img` path (512 pixel PNG) and follows the same visibility, rating, and blocklist rules as the avatar. Gallery images are never returned by the avatar routes.
