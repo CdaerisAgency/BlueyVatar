@@ -122,7 +122,7 @@ Each wait times out after 90 seconds (`TAP_LIVE_TIMEOUT_MS`). A timeout message 
 
 ## Cloudflare
 
-DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing else from Cloudflare is used.
+DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1), plus Email Routing (see Email routing below).
 
 1. Add the zone. Point the web hostname and the delivery hostname at their Fly apps with proxied (orange cloud) CNAME records: `blueyvatar-web.fly.dev` and `blueyvatar-delivery.fly.dev`. Set SSL/TLS mode to Full (strict). Approved hostnames: `blueyvatar.com` (web), `img.blueyvatar.com` (delivery), `profiles.blueyvatar.com` (SaaS fallback origin).
 2. Fly certificates. Add each hostname to its app: `fly certs add <hostname> --app <app>`, then `fly certs show` to read the records Fly needs. For a Cloudflare-proxied hostname, Fly's docs say to add the `_fly-ownership` TXT record, after which Fly can issue the certificate through the proxy with the HTTP-01 challenge (this can still fail, depending on configuration). If the HTTP-01 challenge is blocked, add the `_acme-challenge` CNAME shown by `fly certs setup` for DNS-01, or import a Cloudflare Origin Certificate. Use Full or Full (strict); Flexible can cause redirect loops. Source: <https://docs.fly.io/networking/custom-domain>.
@@ -139,6 +139,16 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing
    Findings (checked 2026-11-03): Transform Rules, including request header rules, are available to all plans, with 10 active rules and no regex on Free (<https://developers.cloudflare.com/rules/transform/>). A rule can set a static header; names starting with `cf-` or `x-cf-` are reserved (<https://developers.cloudflare.com/rules/transform/request-header-modification/>). Dashboard steps: <https://developers.cloudflare.com/rules/transform/request-header-modification/create-dashboard/>. Authenticated Origin Pulls is listed as available on Free (<https://developers.cloudflare.com/ssl/origin-configuration/authenticated-origin-pull/>), but it was not evaluated against Fly's proxy, so the header is used.
 6. Cloudflare for SaaS (custom profile domains, Plus plan). Set the fallback origin to the web app's hostname, `profiles.blueyvatar.com`, proxied to `blueyvatar-web.fly.dev`, and give it a Fly certificate (step 2). Set `CF_SAAS_FALLBACK_ORIGIN` to that hostname. See `docs/research/decisions-phase2-v1.md` (Decision 2).
 7. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
+
+## Email routing
+
+Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It receives and forwards only; it does not send mail.
+
+- Addresses: `security@blueyvatar.com` (the vulnerability contact in `SECURITY.md`) and `alerts@blueyvatar.com`. Each has its own routing rule.
+- Destination: `chris@cdaeris.com`. Cloudflare sends a verification email to a new destination address, and rules cannot forward to it until that link is clicked.
+- DNS: Email Routing adds the MX records (`route1`, `route2`, `route3.mx.cloudflare.net`), the SPF TXT record `v=spf1 include:_spf.mx.cloudflare.net ~all`, and a DKIM record at `cf2024-1._domainkey`. Do not add other MX records or a second SPF record for the apex; a domain can publish only one SPF record.
+- Token: the API token used for setup is in Infisical project `blueyvatar`, environment `dev`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
+- To add an address: `POST /zones/{zone_id}/email/routing/rules` with a `literal` matcher on `to` and a `forward` action. To add a destination: `POST /accounts/{account_id}/email/routing/addresses`. Docs: <https://developers.cloudflare.com/email-routing/>.
 
 ## CDN cache warming
 
