@@ -4,7 +4,7 @@ import type { Plan } from './records'
 
 /**
  * Profile view statistics (issue #173). Only aggregate daily counters are kept, one row per DID per UTC day
- * (migration 0024). The user agent is read once to skip crawlers and is never stored; no IP or cookie is read.
+ * (migration 0025). The user agent is read once to skip crawlers and is never stored; no IP or cookie is read.
  */
 
 /** Days shown on /account/stats. */
