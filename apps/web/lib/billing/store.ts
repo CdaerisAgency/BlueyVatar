@@ -35,6 +35,8 @@ export interface BillingTx {
   ensureLicense(did: string): Promise<LicenseRef>
   linkCustomer(did: string, licenseId: string, customerId: string): Promise<void>
   didForCustomer(customerId: string): Promise<string | null>
+  /** True when the DID deleted their data and has not started a new checkout since (issue #140). Their late events must not rebuild a license. */
+  isDeleted(did: string): Promise<boolean>
   getSubscription(id: string): Promise<SubscriptionRow | null>
   putSubscription(row: SubscriptionRow): Promise<void>
   subscriptionsForLicense(licenseId: string): Promise<SubscriptionRow[]>
@@ -81,6 +83,9 @@ export function memoryBillingStore() {
     },
     async didForCustomer(customerId) {
       return [...customers].find(([, c]) => c === customerId)?.[0] ?? null
+    },
+    async isDeleted() {
+      return false
     },
     async getSubscription(id) {
       return subs.get(id) ?? null
@@ -163,12 +168,15 @@ function pgTx(c: pg.PoolClient): BillingTx {
     async linkCustomer(did, licenseId, customerId) {
       await c.query(
         `INSERT INTO billing_customers (did, license_id, stripe_customer_id) VALUES ($1, $2, $3)
-         ON CONFLICT (did) DO UPDATE SET stripe_customer_id = EXCLUDED.stripe_customer_id, license_id = EXCLUDED.license_id`,
+         ON CONFLICT (did) DO UPDATE SET stripe_customer_id = EXCLUDED.stripe_customer_id, license_id = EXCLUDED.license_id, deleted_at = NULL`,
         [did, licenseId, customerId],
       )
     },
     async didForCustomer(customerId) {
       return (await c.query('SELECT did FROM billing_customers WHERE stripe_customer_id = $1', [customerId])).rows[0]?.did ?? null
+    },
+    async isDeleted(did) {
+      return ((await c.query('SELECT 1 FROM billing_customers WHERE did = $1 AND deleted_at IS NOT NULL', [did])).rowCount ?? 0) > 0
     },
     async getSubscription(id) {
       const r = await c.query(`SELECT ${subCols} FROM subscriptions WHERE stripe_subscription_id = $1 FOR UPDATE`, [id])
