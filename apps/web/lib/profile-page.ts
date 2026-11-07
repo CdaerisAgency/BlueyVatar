@@ -1,5 +1,6 @@
 /** Pure helpers for /p/[handle]: link-preview metadata and the fields the page shows. */
 import { GALLERY_MAX, sanitizeProfileLinks, type ProfileLink } from '@blueyvatar/core'
+import { defaultOgImage } from './site'
 
 export interface PublicProfile {
   did: string
@@ -61,18 +62,20 @@ export function pageGallery(p: PublicProfile, plus: boolean): GalleryImage[] {
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}...` : s)
 
-/** Open Graph and Twitter card fields. `imageBase` is the public delivery origin. */
-export function profileMetadata(p: PublicProfile, handle: string, imageBase: string) {
+/** Open Graph and Twitter card fields. `imageBase` is the public delivery origin, `canonical` the page's canonical URL, `siteBase` the public site origin for the default image. */
+export function profileMetadata(p: PublicProfile, handle: string, imageBase: string, canonical?: string, siteBase?: string) {
   const title = p.displayName ?? p.handle ?? handle
   const description = clip(
     p.description?.trim() || [[p.jobTitle, p.company].filter(Boolean).join(', '), p.location].filter(Boolean).join(' | ') || `${title} on BlueyVatar`,
     200,
   )
-  const images = p.avatar ? [`${imageBase.replace(/\/+$/, '')}${p.avatar.url}`] : []
+  // Profiles without an avatar fall back to the site's default image.
+  const images = p.avatar ? [`${imageBase.replace(/\/+$/, '')}${p.avatar.url}`] : [defaultOgImage(siteBase)]
   return {
     title,
     description,
-    openGraph: { title, description, type: 'profile' as const, images },
+    ...(canonical ? { alternates: { canonical } } : {}),
+    openGraph: { title, description, type: 'profile' as const, siteName: 'blueyvatar', ...(canonical ? { url: canonical } : {}), images },
     twitter: { card: 'summary' as const, title, description, images },
   }
 }

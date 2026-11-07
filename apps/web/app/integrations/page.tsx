@@ -1,10 +1,12 @@
 import { PageMain } from '../../components/Page'
+import { pageMetadata } from '../../lib/site'
 import { ATPROTO_APP_LIST, PROOF_METHODS, signInEntries } from '../../lib/integrations'
 
-export const metadata = {
-  title: 'Integrations',
-  description: 'Accounts and apps blueyvatar links to your profile: atproto apps, sign-in platforms, and proof checks.',
-}
+export const metadata = pageMetadata(
+  '/integrations',
+  'Integrations',
+  'Accounts and apps blueyvatar links to your profile: atproto apps, sign-in platforms, and proof checks.',
+)
 // Which sign-in platforms are on depends on runtime settings.
 export const dynamic = 'force-dynamic'
 

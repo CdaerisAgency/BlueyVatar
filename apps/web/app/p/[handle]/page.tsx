@@ -1,9 +1,12 @@
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import AvatarRing from '../../../components/AvatarRing'
+import { siteUrl } from '../../../lib/site'
 import { PageMain } from '../../../components/Page'
 import { PLATFORM_LABELS } from '../../../lib/claims'
 import { resolvePlan } from '../../../lib/plan'
+import { getDomainStore } from '../../../lib/domain-store'
+import { jsonLdString, personJsonLd, profileCanonical } from '../../../lib/seo'
 import { pageAtprotoApps, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
@@ -16,11 +19,23 @@ const load = cache(async (handle: string): Promise<PublicProfile | null> => {
   return res.ok ? ((await res.json()) as PublicProfile) : null
 })
 
+/** A verified custom domain wins as the canonical host. A lookup failure falls back to the site URL. */
+const customHostname = cache(async (did: string): Promise<string | null> => {
+  try {
+    const row = await getDomainStore().get(did)
+    return row?.status === 'active' ? row.hostname : null
+  } catch {
+    return null
+  }
+})
+
+const canonicalFor = async (p: PublicProfile, handle: string) => profileCanonical(p.handle ?? handle, await customHostname(p.did))
+
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
   const { handle } = await params
   const p = await load(handle)
   if (!p) return { title: 'Profile not found', robots: { index: false } }
-  return profileMetadata(p, handle, PUBLIC_DELIVERY_URL)
+  return profileMetadata(p, handle, PUBLIC_DELIVERY_URL, await canonicalFor(p, handle), siteUrl())
 }
 
 export default async function ProfilePage({ params, searchParams }: { params: Promise<{ handle: string }>; searchParams: Promise<{ report?: string }> }) {
@@ -34,9 +49,11 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const apps = pageAtprotoApps(p)
   const interests = pageInterests(p)
   const gallery = pageGallery(p, (await resolvePlan(p.did)) === 'plus')
+  const jsonLd = jsonLdString(personJsonLd(p, await canonicalFor(p, handle), PUBLIC_DELIVERY_URL))
   const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
   return (
     <PageMain narrow>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <div className="flex flex-col items-center text-center [&_p]:mb-2">
         {p.avatar && <AvatarRing src={`${DELIVERY_URL}${p.avatar.url}`} alt="" size={380} referrerPolicy="no-referrer" />}
         <h1 className="mt-5 mb-2">{p.displayName ?? p.handle}</h1>

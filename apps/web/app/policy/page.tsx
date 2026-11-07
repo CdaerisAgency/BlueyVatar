@@ -1,5 +1,6 @@
 import { PageMain } from '../../components/Page'
-export const metadata = { title: 'Content policy' }
+import { pageMetadata } from '../../lib/site'
+export const metadata = pageMetadata('/policy', 'Content policy | blueyvatar', 'What blueyvatar does not allow, how to report content, and what we can and cannot remove.')
 
 export default function PolicyPage() {
   return (
