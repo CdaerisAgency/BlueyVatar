@@ -7,8 +7,8 @@ export async function cleanupRateWindows(pool: pg.Pool): Promise<number> {
   return res.rowCount ?? 0
 }
 
-/** Runs the cleanup on an interval (default hourly). Failures are logged and retried on the next tick. */
-export function scheduleRateWindowCleanup(pool: pg.Pool, everyMs = 3_600_000): NodeJS.Timeout {
+/** Runs the cleanup on an interval (default daily; expired rows are reset on next use, so this only reclaims space). Failures are logged and retried on the next tick. */
+export function scheduleRateWindowCleanup(pool: pg.Pool, everyMs = 86_400_000): NodeJS.Timeout {
   const timer = setInterval(() => {
     cleanupRateWindows(pool).catch((err) => {
       log.error('rate window cleanup failed', { err })
