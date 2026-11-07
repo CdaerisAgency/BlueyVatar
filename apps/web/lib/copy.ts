@@ -54,6 +54,7 @@ export const COPY = {
       { label: 'Developers', href: '/#dev' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'Integrations', href: '/integrations' },
+      { label: 'Changelog', href: '/changelog' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Sign in', href: '/login' },
     ],
