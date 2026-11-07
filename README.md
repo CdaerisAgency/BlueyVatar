@@ -18,6 +18,12 @@ This code follows the product spec at [docs/spec/blueyvatar-product-spec-v6.md](
 | `tools/migrate` | Migration runner (`pnpm db:migrate`). |
 | `Dockerfile`, `fly/` | One image and per-app Fly.io config. See [docs/deploy.md](docs/deploy.md). |
 
+## More documentation
+
+- [docs/self-hosting-v1.md](docs/self-hosting-v1.md): components, environment variables, migrations, and a Docker Compose example for running your own instance.
+- [CONTRIBUTING.md](CONTRIBUTING.md): setup, commands, tests, and pull request conventions.
+- [SECURITY.md](SECURITY.md): how to report a vulnerability.
+
 ## Local development
 
 Requirements: Node 22 and pnpm 10.28.0 (`corepack enable` picks up the version from `package.json`).
