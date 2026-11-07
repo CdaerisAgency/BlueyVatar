@@ -1,4 +1,4 @@
-import { createLogger, Metrics } from '@blueyvatar/core'
+import { createLogger, Metrics, normalizeBackgroundColor } from '@blueyvatar/core'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
@@ -411,6 +411,8 @@ export function createApp(deps: AppDeps) {
       pronunciation: own?.pronunciation ?? null,
       timezone: own?.timezone ?? null,
       interests: own?.interests ?? [],
+      // #rrggbb or null. A stored value that is not exactly that shape is treated as unset.
+      backgroundColor: normalizeBackgroundColor(own?.backgroundColor),
       gallery,
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
       atprotoApps,

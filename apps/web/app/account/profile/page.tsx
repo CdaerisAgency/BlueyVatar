@@ -1,3 +1,4 @@
+import { normalizeBackgroundColor } from '@blueyvatar/core'
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
@@ -42,6 +43,14 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           Interests (up to {MAX_INTERESTS}, separated by commas or new lines)
           <textarea name="interests" rows={3} defaultValue={(p.interests ?? []).join(', ')} />
         </label>
+        <label>
+          Page background color
+          <input type="color" name="backgroundColor" defaultValue={normalizeBackgroundColor(p.backgroundColor) ?? '#ffffff'} />
+        </label>
+        <label>
+          <input type="checkbox" name="clearBackgroundColor" defaultChecked={!normalizeBackgroundColor(p.backgroundColor)} /> Use the default colors (clears the background color)
+        </label>
+        <p>Text on your profile page switches between dark and white to stay readable. A color that works with neither is ignored and the default colors show.</p>
         <Button type="submit" variant="primary" disabled={loadError !== null}>
           Save profile
         </Button>

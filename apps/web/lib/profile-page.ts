@@ -1,5 +1,5 @@
 /** Pure helpers for /p/[handle]: link-preview metadata and the fields the page shows. */
-import { GALLERY_MAX, sanitizeProfileLinks, type ProfileLink } from '@blueyvatar/core'
+import { GALLERY_MAX, profileColors, sanitizeProfileLinks, type ProfileLink } from '@blueyvatar/core'
 import { defaultOgImage } from './site'
 
 export interface PublicProfile {
@@ -15,6 +15,8 @@ export interface PublicProfile {
   pronouns: string | null
   timezone?: string | null
   interests?: unknown
+  /** `#rrggbb` or null. Checked again by `pageColors` before it reaches a style attribute. */
+  backgroundColor?: string | null
   gallery?: unknown
   verifiedAccounts?: { platform: string; uri: string; hidden: boolean }[]
   atprotoApps?: unknown
@@ -33,6 +35,12 @@ export function pageAtprotoApps(p: PublicProfile): string[] {
   }
   return names
 }
+
+/**
+ * Background and text colors for the profile card. Null means the default palette: no color set,
+ * a malformed value, or a color where neither dark nor white text reaches 4.5 to 1.
+ */
+export const pageColors = (p: PublicProfile): { background: string; text: string } | null => profileColors(p.backgroundColor)
 
 /** Links come from the delivery JSON, but are checked again here so the page never renders a non-https href. */
 export const pageLinks = (p: PublicProfile): ProfileLink[] => sanitizeProfileLinks(p.links)
