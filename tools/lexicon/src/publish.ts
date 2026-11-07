@@ -68,6 +68,32 @@ export function dnsLines(planned: PlannedRecord[], did: string): string[] {
   return lines
 }
 
+export const PERMISSION_SET_NSID = 'com.blueyvatar.authFull'
+
+/**
+ * Checks the planned records before anything is written: each is a `com.atproto.lexicon.schema`
+ * record (lexicon 1, id, non-empty defs), its record key equals its NSID, keys are unique, and the
+ * permission set is among them with a permission-set main def.
+ */
+export function checkPlan(planned: PlannedRecord[]): string[] {
+  const problems: string[] = []
+  const seen = new Set<string>()
+  for (const p of planned) {
+    const r = p.record as Partial<SchemaRecord>
+    if (r.$type !== SCHEMA_COLLECTION) problems.push(`${p.nsid}: $type must be ${SCHEMA_COLLECTION}`)
+    if (r.lexicon !== 1) problems.push(`${p.nsid}: lexicon must be 1`)
+    if (r.id !== p.nsid) problems.push(`${p.nsid}: record id "${String(r.id)}" does not match the NSID`)
+    if (p.rkey !== p.nsid) problems.push(`${p.nsid}: record key "${p.rkey}" must equal the NSID`)
+    if (!r.defs || typeof r.defs !== 'object' || Object.keys(r.defs).length === 0) problems.push(`${p.nsid}: defs is empty`)
+    if (seen.has(p.rkey)) problems.push(`${p.nsid}: duplicate record key`)
+    seen.add(p.rkey)
+  }
+  const set = planned.find((p) => p.nsid === PERMISSION_SET_NSID)
+  if (!set) problems.push(`${PERMISSION_SET_NSID} (the permission set) is not in the records to publish`)
+  else if ((set.record.defs.main as { type?: string } | undefined)?.type !== 'permission-set') problems.push(`${PERMISSION_SET_NSID}: main def must be a permission-set`)
+  return problems
+}
+
 export const DID_PLACEHOLDER = '<DID of the publishing account>'
 
 /** Output of `publish --dry-run`: no network, no credentials. */
@@ -75,6 +101,11 @@ export function dryRunLines(planned: PlannedRecord[], did: string | undefined): 
   return [
     'dry run: nothing is written',
     ...planned.map((p) => `  would write at://<did>/${SCHEMA_COLLECTION}/${p.rkey}`),
+    '',
+    'records (each is the exact putRecord body):',
+    ...planned.map((p) => JSON.stringify({ repo: did || DID_PLACEHOLDER, collection: SCHEMA_COLLECTION, rkey: p.rkey, record: p.record })),
+    '',
+    `checks passed: ${planned.length} schema record(s), record keys equal NSIDs, ${PERMISSION_SET_NSID} included`,
     '',
     ...dnsLines(planned, did || DID_PLACEHOLDER),
   ]
