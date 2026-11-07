@@ -7,7 +7,7 @@ import { currentDid } from '../../../lib/auth'
 import { getDashboardStore, type KeyRow } from '../../../lib/dashboard-store'
 import { getNotifier } from '../../../lib/notify'
 import { PUBLIC_URL } from '../../../lib/oauth'
-import { keyRevokedNotice } from '@blueyvatar/core/verification'
+import { keyRevokedNotice, validateAttributionSite } from '@blueyvatar/core/verification'
 import { limited } from '../../../lib/rate-guard'
 import { checkKeyLimit, cleanLabel, displayPrefix, generateKey, hashKey, parseDomainList, type KeyKind } from '../../../lib/keys'
 
@@ -32,7 +32,7 @@ const guardFor = (tier: Parameters<typeof checkKeyLimit>[0], kind: KeyKind, repl
   return r.ok ? null : r.error
 }
 
-async function issue(kind: KeyKind, label: string | null, domains: string[], replace?: string): Promise<KeyState> {
+async function issue(kind: KeyKind, label: string | null, domains: string[], replace?: string, attributionSite: string | null = null): Promise<KeyState> {
   const { did, store, license } = await ctx()
   const wait = await limited(['key.did', 'key.ip'], did)
   if (wait) return { error: wait }
@@ -40,7 +40,7 @@ async function issue(kind: KeyKind, label: string | null, domains: string[], rep
   const key = generateKey(kind)
   const err = await store.createKey(
     license.licenseId,
-    { kind, label, hash: hashKey(key), prefix: displayPrefix(key), domains },
+    { kind, label, hash: hashKey(key), prefix: displayPrefix(key), domains, attributionSite },
     guardFor(license.tier, kind, replace),
     replace,
   )
@@ -61,7 +61,7 @@ export async function rotateKey(_prev: KeyState, form: FormData): Promise<KeySta
   const hash = String(form.get('hash') ?? '')
   const old = (await store.listKeys(license.licenseId)).find((k) => k.hash === hash && !k.revokedAt)
   if (!old) return { error: 'That key is already revoked or does not exist.' }
-  return issue(old.kind, old.label, old.domains, hash)
+  return issue(old.kind, old.label, old.domains, hash, old.attributionSite)
 }
 
 export async function revokeKey(form: FormData): Promise<void> {
@@ -73,6 +73,22 @@ export async function revokeKey(form: FormData): Promise<void> {
     await getNotifier().send(license.owner, 'security', keyRevokedNotice({ did: license.owner, prefix: key.prefix, label: key.label, publicUrl: PUBLIC_URL }))
   }
   revalidatePath('/account/keys')
+}
+
+/** Declares the production site checked for the Free-tier attribution link. An empty value clears it. */
+export async function saveAttributionSite(_prev: KeyState, form: FormData): Promise<KeyState> {
+  const { did, store, license } = await ctx()
+  if (!ENTITLEMENTS[license.tier].attributionRequired) return { error: 'Attribution is not required on your tier.' }
+  const wait = await limited(['key.did', 'key.ip'], did)
+  if (wait) return { error: wait }
+  const raw = String(form.get('site') ?? '').trim()
+  const parsed = raw === '' ? null : validateAttributionSite(raw)
+  if (parsed && !parsed.ok) return { error: parsed.error }
+  const site = parsed?.value ?? null
+  const ok = await store.setAttributionSite(license.licenseId, String(form.get('hash') ?? ''), site)
+  if (!ok) return { error: 'Only active publishable keys can declare a site.' }
+  revalidatePath('/account/keys')
+  return { message: site ? 'Site saved. We check it within a day.' : 'Site cleared. No attribution check will run for this key.' }
 }
 
 export async function saveDomains(_prev: KeyState, form: FormData): Promise<KeyState> {

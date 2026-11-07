@@ -98,6 +98,19 @@ export function keyRevokedNotice(i: { did: string; prefix: string; label?: strin
   return { subject: 'A blueyvatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
+/** Sent once when the Free-tier attribution check fails for a declared site (issue #182). Report only: nothing is revoked. */
+export function attributionNotice(i: { did: string; site: string; result: 'nofollow' | 'missing'; publicUrl: string }): Notice {
+  const what =
+    i.result === 'nofollow'
+      ? 'The link to blueyvatar.com carries a nofollow, ugc, or sponsored marker, so it does not count as followable.'
+      : 'We did not find a link to blueyvatar.com on that page.'
+  const body =
+    `The Free tier asks for a public, followable link to blueyvatar.com on your production site. We checked ${i.site}.\n\n${what}\n\n` +
+    `Add the link, or declare a different page, at ${base(i.publicUrl)}/account/keys. The copy-ready snippet is on that page. We check again each day and will not send this message again until the link has been found and then goes missing. ` +
+    `Nothing was turned off. Paid plans do not need the link.`
+  return { subject: 'Your blueyvatar attribution link was not found', text: frame(i.did, i.publicUrl, body, 'billing') }
+}
+
 /**
  * One-line outcome for someone who filed a report and left an address (issue #145). The reporter has no
  * account, so there is no preferences link. The admin's internal reason is never included.

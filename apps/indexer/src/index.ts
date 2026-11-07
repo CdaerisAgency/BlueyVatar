@@ -1,5 +1,7 @@
 import { Tap } from '@atproto/tap'
 import pg from 'pg'
+import { emailSender, Notifier, pgNoticeDirectory } from '@blueyvatar/core/verification'
+import { attributionFromEnv, checkAttributionDue, notifyWith, pgAttributionStore, scheduleAttribution } from './attribution.js'
 import { scheduleBillingPurge } from './billing-retention.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
@@ -34,6 +36,14 @@ function writes(): IndexWrites {
     const rv = reverifyFromEnv(pool)
     const store = pgReverifyStore(pool)
     scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
+    // Free-tier attribution: checks each declared production site for a followable blueyvatar.com link. Report only.
+    const at = attributionFromEnv()
+    const publicUrl = process.env.PUBLIC_URL ?? 'https://blueyvatar.com'
+    const notifier = new Notifier(emailSender(), pgNoticeDirectory(pool))
+    scheduleAttribution(
+      () => checkAttributionDue({ store: pgAttributionStore(pool), check: at.check, notify: notifyWith(notifier, publicUrl) }, { minGapMs: at.everyMs * 0.8 }),
+      at.everyMs,
+    )
     // Deletes Stripe billing rows 7 years after their owner deleted their data.
     scheduleBillingPurge(pool)
     const warm = warmerFromEnv()

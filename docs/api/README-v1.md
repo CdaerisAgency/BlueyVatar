@@ -10,5 +10,6 @@ The delivery API serves avatars and profile JSON. The proposed delivery host is 
 | [cache-ttl-v1.md](cache-ttl-v1.md) | The `ttl` parameter, tier limits, and CDN interaction |
 | [gravatar-differences-v1.md](gravatar-differences-v1.md) | Where the API matches Gravatar and where it departs on purpose |
 | [errors-v1.md](errors-v1.md) | Error codes, rate limit headers, and other response headers |
+| [attribution-v1.md](attribution-v1.md) | The Free-tier attribution link: snippet, what counts, and the daily check |
 
 Source of truth: `apps/delivery/src/app.ts`, `apps/delivery/src/errors.ts`, `packages/core/src/params.ts`, `packages/core/src/tiers.ts`, and `packages/core/src/hash.ts`.

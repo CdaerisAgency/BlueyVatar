@@ -15,16 +15,25 @@ const decode = (s: string): string =>
     return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ''
   })
 
-/** Absolute hrefs of every a or link element whose rel token list contains "me". */
-export function extractRelMe(html: string, base: string): string[] {
+/** Attributes (lowercased names, decoded values) of every a and link element, with comments, scripts, and styles removed. */
+export function tagAttributes(html: string): { tag: string; attrs: Record<string, string> }[] {
   const clean = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<(script|style)\b[\s\S]*?<\/\1\s*>/gi, '')
-  const out: string[] = []
+  const out: { tag: string; attrs: Record<string, string> }[] = []
   for (const m of clean.matchAll(TAG)) {
     const attrs: Record<string, string> = {}
     for (const a of (m[2] ?? '').matchAll(ATTR)) {
       const name = (a[1] ?? '').toLowerCase()
       if (!(name in attrs)) attrs[name] = decode(a[2] ?? a[3] ?? a[4] ?? '')
     }
+    out.push({ tag: (m[1] ?? '').toLowerCase(), attrs })
+  }
+  return out
+}
+
+/** Absolute hrefs of every a or link element whose rel token list contains "me". */
+export function extractRelMe(html: string, base: string): string[] {
+  const out: string[] = []
+  for (const { attrs } of tagAttributes(html)) {
     if (!attrs.rel || !attrs.href) continue
     if (!attrs.rel.toLowerCase().split(/\s+/).includes('me')) continue
     try {

@@ -2,7 +2,8 @@
 import { Button } from '../../../components/Button'
 
 import { useActionState } from 'react'
-import { createKey, revokeKey, rotateKey, saveDomains, type KeyState } from './actions'
+import { createKey, revokeKey, rotateKey, saveAttributionSite, saveDomains, type KeyState } from './actions'
+import { COPY } from '../../../lib/copy'
 
 const none: KeyState = {}
 
@@ -51,9 +52,10 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason }:
   )
 }
 
-export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: string; kind: 'secret' | 'publishable'; domains: string[]; domainsEnabled: boolean }) {
+export function KeyActions({ hash, kind, domains, domainsEnabled, attribution }: { hash: string; kind: 'secret' | 'publishable'; domains: string[]; domainsEnabled: boolean; attribution?: { site: string | null } }) {
   const [rot, rotate, rotating] = useActionState(rotateKey, none)
   const [dom, saveDom, saving] = useActionState(saveDomains, none)
+  const [att, saveAtt, savingAtt] = useActionState(saveAttributionSite, none)
   return (
     <div>
       {kind === 'publishable' &&
@@ -74,6 +76,21 @@ export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: stri
         ) : (
           <p>Domain restrictions are not included in the Free tier.</p>
         ))}
+      {kind === 'publishable' && attribution && (
+        <form action={saveAtt}>
+          <input type="hidden" name="hash" value={hash} />
+          <label>
+            {COPY.attribution.siteLabel}
+            <br />
+            <input name="site" type="url" inputMode="url" size={40} maxLength={300} placeholder={COPY.attribution.sitePlaceholder} defaultValue={attribution.site ?? ''} />
+          </label>
+          <br />
+          <Button type="submit" disabled={savingAtt}>
+            {COPY.attribution.siteSave}
+          </Button>
+          <Result s={att} />
+        </form>
+      )}
       <form action={rotate} className="inline">
         <input type="hidden" name="hash" value={hash} />
         <Button type="submit" disabled={rotating}>

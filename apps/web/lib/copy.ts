@@ -65,6 +65,26 @@ export const COPY = {
     placeholder: 'alice.bsky.social',
     submit: 'Continue',
   },
+  // Free-tier attribution (issue #182). PLACEHOLDER wording, pending the owner's approval.
+  attribution: {
+    title: 'Attribution link',
+    why: 'The Free tier is paid for by the people who see your link. A small credit on your production site keeps blueyvatar free for everyone.',
+    how: 'Add this link where your visitors can see it, for example in the footer. It must be public, followable (no rel nofollow, ugc, or sponsored), and on your production site. Then enter that site below, and we check it once a day.',
+    snippetLabel: 'Copy this snippet',
+    paid: 'Your plan does not require the link.',
+    siteLabel: 'Production site that shows the link',
+    sitePlaceholder: 'https://example.com/',
+    siteSave: 'Save site',
+    siteNone: 'No site declared yet.',
+    note: 'We only report the result here and by email. Nothing is turned off by a failed check.',
+    results: {
+      found: 'Link found.',
+      nofollow: 'A link was found, but it is marked nofollow, ugc, or sponsored.',
+      missing: 'No link to blueyvatar.com was found on that page.',
+      unreachable: 'The page could not be read. We will try again.',
+      pending: 'Not checked yet.',
+    },
+  },
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const

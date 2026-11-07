@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { ENTITLEMENTS, effectiveTier, type Tier } from '@blueyvatar/core'
+import type { AttributionResult } from '@blueyvatar/core/verification'
 import type pg from 'pg'
 import type { KeyKind } from './keys'
 import { getPool } from './store'
@@ -23,6 +24,10 @@ export interface KeyRow {
   domains: string[]
   createdAt: Date
   revokedAt: Date | null
+  /** Production URL declared for the Free-tier attribution check (publishable keys only). */
+  attributionSite: string | null
+  attributionCheckedAt: Date | null
+  attributionResult: AttributionResult | null
 }
 
 export interface NewKey {
@@ -31,6 +36,8 @@ export interface NewKey {
   hash: string
   prefix: string
   domains: string[]
+  /** Carried over when a key is rotated, so the declared site keeps being checked. */
+  attributionSite?: string | null
 }
 
 /** Runs inside the same lock as the insert so two requests cannot both pass the limit. */
@@ -47,6 +54,8 @@ export interface DashboardStore {
   createKey(licenseId: string, key: NewKey, guard: KeyGuard, replace?: string): Promise<string | null>
   revokeKey(licenseId: string, hash: string): Promise<boolean>
   setDomains(licenseId: string, hash: string, domains: string[]): Promise<boolean>
+  /** Declares (or clears, with null) the production site for the attribution check. Resets the last result so the next pass checks it. */
+  setAttributionSite(licenseId: string, hash: string, site: string | null): Promise<boolean>
   getRules(did: string): Promise<VisibilityRules>
   /** True once the owner has saved visibility rules, even if they match the public defaults. */
   rulesSaved(did: string): Promise<boolean>
@@ -81,7 +90,7 @@ function memory(): DashboardStore {
     async createKey(id, key, guard, replace) {
       const err = guard(active(id))
       if (err) return err
-      keys.set(key.hash, { ...key, licenseId: id, createdAt: new Date(), revokedAt: null })
+      keys.set(key.hash, { ...key, licenseId: id, createdAt: new Date(), revokedAt: null, attributionSite: key.attributionSite ?? null, attributionCheckedAt: null, attributionResult: null })
       const old = replace ? keys.get(replace) : undefined
       if (old && old.licenseId === id) old.revokedAt = new Date()
       return null
@@ -98,6 +107,14 @@ function memory(): DashboardStore {
       k.domains = domains
       return true
     },
+    async setAttributionSite(id, hash, site) {
+      const k = keys.get(hash)
+      if (!k || k.licenseId !== id || k.revokedAt || k.kind !== 'publishable') return false
+      k.attributionSite = site
+      k.attributionCheckedAt = null
+      k.attributionResult = null
+      return true
+    },
     async getRules(did) {
       return rules.get(did) ?? PUBLIC_RULES
     },
@@ -110,7 +127,7 @@ function memory(): DashboardStore {
   }
 }
 
-const keyCols = 'key_hash, prefix, kind, label, domains, created_at, revoked_at'
+const keyCols = 'key_hash, prefix, kind, label, domains, created_at, revoked_at, attribution_site, attribution_checked_at, attribution_result'
 const toKey = (r: Record<string, unknown>): KeyRow => ({
   hash: r.key_hash as string,
   prefix: r.prefix as string,
@@ -119,6 +136,9 @@ const toKey = (r: Record<string, unknown>): KeyRow => ({
   domains: r.domains as string[],
   createdAt: r.created_at as Date,
   revokedAt: (r.revoked_at as Date | null) ?? null,
+  attributionSite: (r.attribution_site as string | null) ?? null,
+  attributionCheckedAt: (r.attribution_checked_at as Date | null) ?? null,
+  attributionResult: (r.attribution_result as AttributionResult | null) ?? null,
 })
 
 async function inTx<T>(pool: pg.Pool, did: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
@@ -187,8 +207,8 @@ function postgres(pool: pg.Pool): DashboardStore {
         const err = guard(cur.rows.map(toKey))
         if (err) return err
         await c.query(
-          'INSERT INTO api_keys (key_hash, prefix, license_id, kind, label, domains) VALUES ($1, $2, $3, $4, $5, $6)',
-          [key.hash, key.prefix, id, key.kind, key.label, key.domains],
+          'INSERT INTO api_keys (key_hash, prefix, license_id, kind, label, domains, attribution_site) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [key.hash, key.prefix, id, key.kind, key.label, key.domains, key.attributionSite ?? null],
         )
         if (replace) await c.query('UPDATE api_keys SET revoked_at = now() WHERE license_id = $1 AND key_hash = $2 AND revoked_at IS NULL', [id, replace])
         return null
@@ -202,6 +222,14 @@ function postgres(pool: pg.Pool): DashboardStore {
       const r = await pool.query(
         "UPDATE api_keys SET domains = $3 WHERE license_id = $1 AND key_hash = $2 AND revoked_at IS NULL AND kind = 'publishable'",
         [id, hash, domains],
+      )
+      return (r.rowCount ?? 0) > 0
+    },
+    async setAttributionSite(id, hash, site) {
+      const r = await pool.query(
+        `UPDATE api_keys SET attribution_site = $3, attribution_checked_at = NULL, attribution_result = NULL, attribution_notified_at = NULL
+          WHERE license_id = $1 AND key_hash = $2 AND revoked_at IS NULL AND kind = 'publishable'`,
+        [id, hash, site],
       )
       return (r.rowCount ?? 0) > 0
     },

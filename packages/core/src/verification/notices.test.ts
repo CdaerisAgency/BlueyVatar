@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  keyRevokedNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  attributionNotice, keyRevokedNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -14,6 +14,8 @@ describe('templates', () => {
     usageNotice({ did: DID, threshold: 100, used: 50_000, included: 50_000, period: '2026-11-01', publicUrl: URL + '/' }),
     paymentFailedNotice({ did: DID, graceEnds: new Date('2026-11-08T00:00:00Z'), publicUrl: URL }),
     keyRevokedNotice({ did: DID, prefix: 'bv_pub_ab12', label: 'site', publicUrl: URL }),
+    attributionNotice({ did: DID, site: 'https://site.example/', result: 'missing', publicUrl: URL }),
+    attributionNotice({ did: DID, site: 'https://site.example/', result: 'nofollow', publicUrl: URL }),
   ]
   it('carry the DID and the preferences link, in plain text', () => {
     for (const n of all) {
@@ -31,6 +33,9 @@ describe('templates', () => {
     expect(all[2]!.text).toContain('2026-11-08')
     expect(all[3]!.text).toContain('site (bv_pub_ab12)')
     expect(all[3]!.text).toContain('always sent')
+    expect(all[4]!.text).toContain('did not find a link')
+    expect(all[4]!.text).toContain('https://site.example/')
+    expect(all[5]!.text).toContain('nofollow')
   })
 })
 

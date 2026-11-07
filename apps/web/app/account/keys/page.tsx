@@ -1,6 +1,8 @@
 import { PageMain, TableBox } from '../../../components/Page'
 import { ENTITLEMENTS, TIERS, type Tier } from '@blueyvatar/core'
+import { ATTRIBUTION_SNIPPET } from '@blueyvatar/core/verification'
 import Link from 'next/link'
+import { COPY } from '../../../lib/copy'
 import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
@@ -86,6 +88,23 @@ export default async function KeysPage() {
         </>
       )}
 
+      <h2>{COPY.attribution.title}</h2>
+      {ent.attributionRequired ? (
+        <section>
+          <p>{COPY.attribution.why}</p>
+          <p>{COPY.attribution.how}</p>
+          <p id="attribution-snippet-label">{COPY.attribution.snippetLabel}</p>
+          <pre tabIndex={0} aria-labelledby="attribution-snippet-label">
+            <code>{ATTRIBUTION_SNIPPET}</code>
+          </pre>
+          <p>
+            {COPY.attribution.note} See <Link href="/policy#attribution">what counts</Link>.
+          </p>
+        </section>
+      ) : (
+        <p>{COPY.attribution.paid}</p>
+      )}
+
       <h2>Keys ({active.length}{ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)</h2>
       {keys.length === 0 && <p>You have no keys yet. Create a publishable key below to use blueyvatar from a website or app. Secret keys are for servers.</p>}
       <ul>
@@ -94,7 +113,27 @@ export default async function KeysPage() {
             <code>{k.prefix}...</code> {k.kind} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
             {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : ''}
             {k.kind === 'publishable' && !k.revokedAt && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
-            {!k.revokedAt && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} />}
+            {k.kind === 'publishable' && !k.revokedAt && ent.attributionRequired && (
+              <p>
+                Attribution site: {k.attributionSite ?? COPY.attribution.siteNone}
+                {k.attributionSite && (
+                  <>
+                    {' '}
+                    {COPY.attribution.results[k.attributionResult ?? 'pending']}
+                    {k.attributionCheckedAt ? ` Last checked ${k.attributionCheckedAt.toISOString().slice(0, 10)}.` : ''}
+                  </>
+                )}
+              </p>
+            )}
+            {!k.revokedAt && (
+              <KeyActions
+                hash={k.hash}
+                kind={k.kind}
+                domains={k.domains}
+                domainsEnabled={ent.domainRestrictions}
+                attribution={ent.attributionRequired ? { site: k.attributionSite } : undefined}
+              />
+            )}
           </li>
         ))}
       </ul>
