@@ -2,7 +2,7 @@
 
 blueyvatar is a Gravatar-style avatar service built on atproto. Users keep their avatar images and profile records in their own repository on their own PDS. The service indexes those records, links verified email hashes to atproto identities, and serves resized avatars through Cloudflare's free CDN at Gravatar-compatible URLs (`/avatar/{sha256}`, or `/avatar/{md5}` for older Gravatar clients), with atproto identities as a second route (`/u/{handle-or-did}`).
 
-This code follows the product spec at [docs/spec/blueyvatar-product-spec-v7.md](docs/spec/blueyvatar-product-spec-v7.md). Section numbers in code comments refer to spec v7.
+This code follows the product spec at [docs/spec/blueyvatar-product-spec-v8.md](docs/spec/blueyvatar-product-spec-v8.md). Section numbers in code comments refer to spec v8.
 
 ## Layout
 

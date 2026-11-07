@@ -1,10 +1,10 @@
-# blueyvatar handoff for the local agent (v1)
+# blueyvatar handoff for the local agent (v5)
 
 Written November 4, 2026, from the cloud session that built phases 1 and 2. The step-by-step commands are in `docs/deploy.md`, and that runbook wins if anything here conflicts with it. This file explains where things stand, what you are expected to do, and the rules the owner has set.
 
 ## 1. What the project is
 
-blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v7.md`.
+blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v8.md`.
 
 - Repository: `CdaerisAgency/BlueyVatar` (the old lowercase URL redirects; set your remote to `https://github.com/CdaerisAgency/BlueyVatar.git`)
 - Local path: `C:\Users\super\OneDrive\Documents\GitHub\BlueyVatar`
@@ -18,6 +18,7 @@ blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built
 4. **Versioning:** put a version number on every new document and on each revision (v1, v2, and so on).
 5. **Sources:** take facts from vendor documentation. If nothing is published on a point, say so instead of guessing, and mark the item **unconfirmed** in the docs.
 6. **Secrets** live in Infisical. Never commit a secret value.
+7. **Low-resource mode (owner decision, November 7, 2026):** "because we have no user adoption right now, all services, fly, neon, etc, should be configured for the lowest resource use and uptime acceptable." Web and delivery scale to zero; indexer and Tap stay at one small always-on machine each; Tap's volume is 1 GB; Neon uses the minimum compute and the shortest scale-to-zero the plan allows. Details, sources, and how to scale up are in the "Low-resource mode" section of `docs/deploy.md`. Do not add keepalive pings or raise sizes without the owner's say.
 
 ## 3. Current state
 
@@ -28,7 +29,7 @@ Everything that could be built without live credentials is merged to `main`. Tha
 | Monorepo | pnpm 10.28.0, Node 22, TypeScript 5.9.3. Apps: `apps/web` (Next.js 16, OAuth login, account pages, public profiles), `apps/delivery` (Hono image and redirect API), `apps/indexer` (Tap consumer). Packages: `packages/core`, `tools/migrate`. Lexicons are under `lexicons/` |
 | Database | Five migrations in `db/migrations` (0001 to 0005). They have not been applied to Neon yet. The first Fly deploy of delivery applies them through `release_command` |
 | Hosting choice | Fly.io (region `iad`) plus Neon Postgres. Railway was dropped |
-| Neon | Project `rough-heart-79040132` in `aws-us-east-1`, Postgres 16. Branch `production` has 0.25 to 1 CU autoscaling and suspends when idle. Branch `staging` has 0.25 to 1 CU and suspends after 5 minutes. Database `blueyvatar`, role `blueyvatar_app` |
+| Neon | Project `rough-heart-79040132` in `aws-us-east-1`, Postgres 16. Branch `production` has 0.25 to 1 CU autoscaling and suspends when idle. Branch `staging` has 0.25 to 1 CU and suspends after 5 minutes. Under low-resource mode, set both branches to the minimum compute and the shortest scale-to-zero the plan allows (`docs/deploy.md`). Database `blueyvatar`, role `blueyvatar_app` |
 | Fly | Nothing created yet. Configs are `fly/web.toml`, `fly/delivery.toml`, `fly/indexer.toml`, `fly/tap.toml` |
 | Cloudflare | Nothing configured yet. The plan is the Free plan: DNS, proxy, cache, one Transform Rule, and Cloudflare for SaaS for custom profile domains |
 | CI deploy | `.github/workflows/deploy.yml` is opt-in. It stays off until the repository variable `FLY_DEPLOY_ENABLED` is `true` and the secret `FLY_API_TOKEN` exists |
