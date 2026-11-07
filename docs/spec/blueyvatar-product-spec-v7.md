@@ -162,7 +162,7 @@ Gallery rules follow the avatar rules. The gallery is a Plus user feature (secti
 
 **Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
 
-- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified. A crop box in the web editor is a later addition.
+- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified by delivery. The web editor adds a square crop box for non-square images (drag, zoom, and keyboard operable, default is this same center crop). The chosen region is rendered in the browser and uploaded as the image, so for a cropped upload the stored file is the cropped square. A square image, an image the browser cannot decode, and any upload through the API are stored as given and cropped at delivery.
 - **Minimum size.** Sources must be at least 80 pixels on both sides. The web editor rejects smaller images with a clear message, and delivery treats a smaller source as an invalid image rather than upscaling it.
 - **Client resize.** Before upload, the web editor downscales images in the browser with a canvas to at most 2048 pixels on the long side, then re-encodes toward the 1,000,000 byte cap: JPEG at quality 0.92, 0.85, then 0.75, with a PNG kept as PNG if it fits. This is best effort, so phone photos usually pass but the result is not guaranteed. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
 
