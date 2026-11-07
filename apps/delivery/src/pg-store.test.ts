@@ -14,6 +14,7 @@ const migration14 = readFileSync(new URL('../../../db/migrations/0014_gallery.sq
 const migration15 = readFileSync(new URL('../../../db/migrations/0015_billing.sql', import.meta.url), 'utf8')
 const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_domain.sql', import.meta.url), 'utf8')
 const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
+const migration24 = readFileSync(new URL('../../../db/migrations/0024_usage_daily.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -37,6 +38,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration15)
     await pool.query(migration16)
     await pool.query(migration17)
+    await pool.query(migration24)
   }, 60_000)
 
   afterAll(async () => {
@@ -190,6 +192,23 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await usage.add('lic1', 'origin_resolution', 4)).toBe(5)
     const { rows } = await pool.query(`SELECT count FROM usage_counters WHERE license_id = 'lic1' AND meter = 'origin_resolution'`)
     expect(rows.map((r) => Number(r.count))).toEqual([5])
+  })
+
+  it('records day rows for origin resolutions and profile JSON, and reads them back', async () => {
+    const usage = new PgUsageMeter(pool)
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('licd', 'did:plc:d', 'pro')`)
+    await usage.add('licd', 'origin_resolution', 2)
+    await usage.add('licd', 'origin_resolution')
+    await usage.add('licd', 'profile_json')
+    await usage.add('licd', 'transform', 5)
+    const today = new Date().toISOString().slice(0, 10)
+    const period = `${today.slice(0, 7)}-01`
+    const snap = await usage.read('licd', [period], [today, '2000-01-01'])
+    expect(Object.fromEntries(snap.monthly)).toEqual({ [`${period}|origin_resolution`]: 3, [`${period}|profile_json`]: 1, [`${period}|transform`]: 5 })
+    expect(Object.fromEntries(snap.daily)).toEqual({ [`${today}|origin_resolution`]: 3, [`${today}|profile_json`]: 1 })
+    expect(await usage.read('licd', [], [])).toEqual({ monthly: new Map(), daily: new Map() })
+    await pool.query(`DELETE FROM licenses WHERE license_id = 'licd'`)
+    expect((await pool.query(`SELECT count(*)::int AS c FROM usage_daily WHERE license_id = 'licd'`)).rows[0].c).toBe(0)
   })
 
   it('tracks service costs per DID and claims each alert once', async () => {

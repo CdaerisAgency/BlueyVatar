@@ -33,6 +33,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
 | `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
+| `secret_key_required` | 403 | `GET /usage` was called with a publishable key. Use a secret key in the `x-api-key` header. See [usage-v1.md](usage-v1.md). |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |
 | `not_found` | 404 | No such image, profile, or route target. Also returned for `d=404` with no avatar, for hidden profiles, and on `/img` when the user's PDS answers 404 for the original blob. |
 | `rate_limited` | 429 | Anonymous daily limit (100 per IP) or Free keyed daily limit (1,000) reached. |

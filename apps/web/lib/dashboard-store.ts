@@ -42,6 +42,8 @@ export interface DashboardStore {
   listKeys(licenseId: string): Promise<KeyRow[]>
   /** Counter totals keyed by `${period}|${meter}`. */
   usage(licenseId: string, periods: string[]): Promise<Map<string, number>>
+  /** Daily counters keyed `<YYYY-MM-DD>|<meter>`, for the given days. */
+  usageDaily(licenseId: string, days: string[]): Promise<Map<string, number>>
   alertsSent(licenseId: string, period: string): Promise<number[]>
   /** Inserts a key, and revokes `replace` in the same step. Returns an error message on a guard failure. */
   createKey(licenseId: string, key: NewKey, guard: KeyGuard, replace?: string): Promise<string | null>
@@ -73,6 +75,9 @@ function memory(): DashboardStore {
       return [...keys.values()].filter((k) => k.licenseId === id).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     },
     async usage() {
+      return new Map()
+    },
+    async usageDaily() {
       return new Map()
     },
     async alertsSent() {
@@ -173,6 +178,16 @@ function postgres(pool: pg.Pool): DashboardStore {
         [id, periods],
       )
       for (const x of r.rows) out.set(`${x.period}|${x.meter}`, Number(x.count))
+      return out
+    },
+    async usageDaily(id, days) {
+      const out = new Map<string, number>()
+      if (days.length === 0) return out
+      const r = await pool.query(
+        'SELECT meter, day::text AS day, count FROM usage_daily WHERE license_id = $1 AND day = ANY($2::date[])',
+        [id, days],
+      )
+      for (const x of r.rows) out.set(`${x.day}|${x.meter}`, Number(x.count))
       return out
     },
     async alertsSent(id, period) {

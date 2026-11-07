@@ -9,6 +9,7 @@ The delivery API serves avatars and profile JSON. The proposed delivery host is 
 | [format-quality-v1.md](format-quality-v1.md) | The `fmt` and `q` parameters, tier limits, image path format, and the square-only size decision |
 | [cache-ttl-v1.md](cache-ttl-v1.md) | The `ttl` parameter, tier limits, and CDN interaction |
 | [gravatar-differences-v1.md](gravatar-differences-v1.md) | Where the API matches Gravatar and where it departs on purpose |
+| [usage-v1.md](usage-v1.md) | `GET /usage`: current period, per-meter counts, and history for a secret key |
 | [errors-v1.md](errors-v1.md) | Error codes, rate limit headers, and other response headers |
 
 Source of truth: `apps/delivery/src/app.ts`, `apps/delivery/src/errors.ts`, `packages/core/src/params.ts`, `packages/core/src/tiers.ts`, and `packages/core/src/hash.ts`.
