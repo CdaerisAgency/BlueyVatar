@@ -62,8 +62,14 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
       else await db.upsertClaim(evt.did, evt.rkey, evt.record)
       return
     case COLLECTIONS.bskyProfile:
-      // Read live by the delivery API; a change only needs cache purging.
+      // Read live by the delivery API; a change only needs cache purging. A label change
+      // (such as !no-unauthenticated) takes effect through the same purge. The Bluesky avatar
+      // is not in the images table, so its CID is purged explicitly.
       await db.purgeImages(evt.did)
+      if (evt.record) {
+        const avatar = readBlobRef(getPath(evt.record, 'avatar'))
+        if (avatar) await db.purgeImages(evt.did, [avatar.cid])
+      }
       return
   }
 }

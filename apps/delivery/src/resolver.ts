@@ -1,10 +1,13 @@
 import { IdResolver } from '@atproto/identity'
 import {
-  activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
+  BLUESKY_PROFILE_ADAPTER, activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
   type Candidate, type ProfileAdapter,
 } from '@blueyvatar/core'
 import { bytesMatchCid } from './cid.js'
 import type { IndexStore } from './store.js'
+
+/** Self-label that asks apps to hide an account from logged-out viewers (spec section 9). */
+const NO_UNAUTHENTICATED_LABEL = '!no-unauthenticated'
 
 export interface Identity {
   did: string
@@ -85,6 +88,18 @@ export class AtprotoResolver implements AvatarResolver {
   }
 
   async candidates(identity: Identity): Promise<Candidate[]> {
+    // The label covers the whole account, so it is read before any source is consulted.
+    // A failed read hides everything: serving the avatar could reveal a labeled account.
+    const bsky = BLUESKY_PROFILE_ADAPTER
+    let bskyRecord: Record<string, unknown> | null
+    try {
+      bskyRecord = await this.getRecord(identity, bsky.collection, bsky.rkey)
+    } catch (err) {
+      this.log('profile label read failed', { did: identity.did, err: String(err) })
+      return []
+    }
+    if (selfLabelValues(getPath(bskyRecord, bsky.labelsPath)).includes(NO_UNAUTHENTICATED_LABEL)) return []
+
     const out: Candidate[] = []
     const images = await this.opts.index.serviceImages(identity.did)
     const sorted = [...images].sort((a, b) =>
@@ -100,7 +115,9 @@ export class AtprotoResolver implements AvatarResolver {
     }
     for (const adapter of activeAdapters(this.opts.adapters)) {
       try {
-        const record = await this.getRecord(identity, adapter.collection, adapter.rkey)
+        const record = adapter.collection === bsky.collection && adapter.rkey === bsky.rkey
+          ? bskyRecord
+          : await this.getRecord(identity, adapter.collection, adapter.rkey)
         if (!record) continue
         const blob = readBlobRef(getPath(record, adapter.avatarPath))
         if (!blob || !adapter.accept.includes(blob.mimeType)) continue
