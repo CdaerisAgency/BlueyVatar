@@ -36,7 +36,7 @@ export function DocsView({ page }: { page: DocPage }) {
           </nav>
         )}
       </aside>
-      <main className="docs min-w-0 max-w-[780px] flex-auto">
+      <main id="main" tabIndex={-1} className="docs focus:outline-none min-w-0 max-w-[780px] flex-auto">
         <div dangerouslySetInnerHTML={{ __html: page.html }} />
       </main>
     </div>
