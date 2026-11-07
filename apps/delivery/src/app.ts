@@ -12,6 +12,7 @@ import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock, secretsEqual } from './origin.js'
+import { openApiDocument } from './openapi.js'
 import { BlobError } from './blob.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -244,6 +245,12 @@ export function createApp(deps: AppDeps) {
   })
 
   app.get('/healthz', (c) => c.text('ok'))
+
+  // Machine-readable API description (issue #142). Public, no key, no metering.
+  app.get('/openapi.json', (c) => {
+    c.header('cache-control', 'public, max-age=3600')
+    return c.json(openApiDocument)
+  })
 
   // Gravatar-compatible route. Hash only (SHA256 or MD5); raw email is never accepted (spec section 6).
   app.get('/avatar/:hash', async (c) => {
