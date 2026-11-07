@@ -82,7 +82,30 @@ export class PgIndexWrites implements IndexWrites {
             handle = EXCLUDED.handle, active = EXCLUDED.active, status = EXCLUDED.status, updated_at = now()`,
       [did, handle, active, status ?? (active ? 'active' : null)],
     )
+    if (status === 'deleted') await this.releaseEmails(did)
     if (!active) await this.purgeImages(did)
+  }
+
+  /** Account deleted: its email links become 30-day holds so no other DID can claim them at once (spec section 6). */
+  private async releaseEmails(did: string): Promise<void> {
+    const c = await this.pool.connect()
+    try {
+      await c.query('BEGIN')
+      await c.query(
+        `INSERT INTO email_holds (email_hash, did, reason)
+              SELECT email_hash, did, 'account_deleted' FROM email_links WHERE did = $1
+         ON CONFLICT (email_hash) DO UPDATE SET did = EXCLUDED.did, released_at = now(), reason = EXCLUDED.reason`,
+        [did],
+      )
+      await c.query('DELETE FROM email_links WHERE did = $1', [did])
+      await c.query('DELETE FROM email_codes WHERE did = $1', [did])
+      await c.query('COMMIT')
+    } catch (err) {
+      await c.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      c.release()
+    }
   }
 
   async purgeImages(did: string, cids?: string[]): Promise<void> {
