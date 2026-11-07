@@ -8,6 +8,8 @@ import { ladderPaths, WARM_SIZES } from '@blueyvatar/core'
  */
 export interface WarmOptions {
   publicUrl: string
+  /** Delivery's IMG_SIGNING_SECRET; /img serves only signed paths. */
+  signingSecret: string
   concurrency?: number
   timeoutMs?: number
   fetch?: typeof fetch
@@ -16,7 +18,7 @@ export interface WarmOptions {
 
 export async function warmImage(did: string, cid: string, o: WarmOptions): Promise<void> {
   const base = o.publicUrl.replace(/\/$/, '')
-  const queue = ladderPaths(did, cid, WARM_SIZES, ['png']).map((p) => base + p)
+  const queue = ladderPaths(o.signingSecret, did, cid, WARM_SIZES, ['png']).map((p) => base + p)
   const doFetch = o.fetch ?? fetch
   const log = o.log ?? console.warn
   const worker = async () => {
@@ -33,9 +35,9 @@ export async function warmImage(did: string, cid: string, o: WarmOptions): Promi
   await Promise.all(Array.from({ length: o.concurrency ?? 2 }, worker))
 }
 
-/** Warm hook, or undefined when PUBLIC_DELIVERY_URL is unset. */
+/** Warm hook, or undefined when PUBLIC_DELIVERY_URL or IMG_SIGNING_SECRET is unset. */
 export function warmerFromEnv(env = process.env): ((did: string, cid: string) => Promise<void>) | undefined {
-  const publicUrl = env.PUBLIC_DELIVERY_URL
-  if (!publicUrl) return undefined
-  return (did, cid) => warmImage(did, cid, { publicUrl })
+  const { PUBLIC_DELIVERY_URL: publicUrl, IMG_SIGNING_SECRET: signingSecret } = env
+  if (!publicUrl || !signingSecret) return undefined
+  return (did, cid) => warmImage(did, cid, { publicUrl, signingSecret })
 }

@@ -6,6 +6,7 @@ export type ErrorCode =
   | 'invalid_rating' | 'invalid_format' | 'invalid_quality' | 'invalid_ttl'
   | 'invalid_key' | 'license_inactive' | 'origin_not_allowed' | 'rate_limited'
   | 'tier_required' | 'origin_forbidden' | 'not_found' | 'profile_hidden' | 'access_denied' | 'upstream_error'
+  | 'invalid_signature' | 'signature_expired'
 
 export function errorBody(code: ErrorCode | string, message: string) {
   return { error: { code, message, docs: `${DOCS_BASE}#${code}` } }
