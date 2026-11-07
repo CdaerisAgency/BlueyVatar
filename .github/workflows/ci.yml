@@ -78,6 +78,22 @@ jobs:
       - name: Accessibility (axe-core and hovercard keyboard)
         run: pnpm --filter @blueyvatar/web a11y
 
+  # PHP lint and unit test for the WordPress plugin in integrations/wordpress.
+  wordpress-plugin:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure PHP is installed
+        run: command -v php >/dev/null || (sudo apt-get update && sudo apt-get install -y php-cli)
+
+      - name: Lint
+        run: find integrations/wordpress -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Unit test
+        run: php integrations/wordpress/tests/test-url.php
+
   # Warns (never fails) when a pull request touches apps/ without a changelog line.
   changelog:
     if: github.event_name == 'pull_request'

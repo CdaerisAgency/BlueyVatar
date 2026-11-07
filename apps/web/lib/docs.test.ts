@@ -9,11 +9,26 @@ const ERR_CODES = ['invalid_identifier', 'invalid_ttl', 'rate_limited', 'upstrea
 describe('rendered docs', () => {
   it('has a page for every docs/api markdown file', () => {
     const files = readdirSync(new URL('../../../docs/api/', import.meta.url)).filter((f) => f.endsWith('-v1.md'))
-    expect(docPages()).toHaveLength(files.length)
+    expect(docPages().filter((p) => p.group === 'api')).toHaveLength(files.length)
     expect(docPage('')?.title).toBe('API reference')
     for (const slug of ['errors', 'examples', 'hashing', 'json-mode', 'format-quality', 'cache-ttl', 'gravatar-differences']) {
       expect(docPage(slug), slug).toBeDefined()
     }
+  })
+
+  it('has a guide for every docs/integrations markdown file, with the required embed advice', () => {
+    const files = readdirSync(new URL('../../../docs/integrations/', import.meta.url)).filter((f) => f.endsWith('-v1.md'))
+    const guides = docPages().filter((p) => p.group === 'integrations')
+    expect(guides.map((g) => g.slug).sort()).toEqual(['integrations-discourse', 'integrations-ghost', 'integrations-html', 'integrations-wordpress'])
+    expect(guides).toHaveLength(files.length)
+    for (const slug of ['integrations-html', 'integrations-ghost']) {
+      const html = docPage(slug)!.html
+      expect(html, slug).toContain('referrerpolicy')
+      expect(html, slug).toContain('d=identicon')
+    }
+    expect(docPage('integrations-html')!.html).toContain('SHA-256')
+    expect(docPage('integrations-html')!.html).toContain('href="/docs/hashing"')
+    expect(docPage('')!.html).toContain('href="/docs/integrations-wordpress"')
   })
 
   it('rewrites cross-page .md links to /docs routes', () => {
