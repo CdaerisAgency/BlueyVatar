@@ -272,7 +272,7 @@ async function promotePg(c: Q, did: string): Promise<void> {
 }
 
 /** The indexer runs the same statements when Tap reports an account as deleted (apps/indexer/src/pg-writes.ts). */
-async function releaseAllPg(c: Q, did: string): Promise<number> {
+export async function releaseAllPg(c: Q, did: string): Promise<number> {
   await c.query(
     `INSERT INTO email_holds (email_hash, did, reason)
           SELECT email_hash, did, 'account_deleted' FROM email_links WHERE did = $1

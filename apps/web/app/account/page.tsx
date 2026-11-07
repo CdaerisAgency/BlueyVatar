@@ -133,7 +133,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <p>
         We keep a hash of each linked email. For your primary email we also keep the address itself, encrypted, so we can tell you
         if a claim is removed or your email moves to another account. It is deleted when you unlink or replace it, or delete your
-        account.
+        data.
       </p>
       <form action={linkEmail}>
         <Button type="submit" variant="primary">Link the email from my PDS</Button>
@@ -189,6 +189,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       ) : (
         <p>Your QR code is unavailable until your handle can be loaded.</p>
       )}
+      <h2>Your data</h2>
+      <p>
+        <Link href="/account/data">Download your data or delete it</Link>. Deleting removes what blueyvatar holds about you, except
+        billing records, which we keep for 7 years. Records in your own atproto repository stay on your PDS.
+      </p>
       <form action="/logout" method="post">
         <Button type="submit">Sign out</Button>
       </form>

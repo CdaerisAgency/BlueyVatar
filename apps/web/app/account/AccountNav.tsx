@@ -14,6 +14,7 @@ const LINKS = [
   ['/account/claims', 'Claims'],
   ['/account/visibility', 'Visibility'],
   ['/account/domain', 'Domain'],
+  ['/account/data', 'Your data'],
   ['/account/notifications', 'Notifications'],
 ] as const
 
