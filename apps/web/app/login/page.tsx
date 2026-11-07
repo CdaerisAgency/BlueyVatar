@@ -13,11 +13,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <PageMain narrow>
       <h1>{COPY.login.title}</h1>
       <p>{COPY.login.lead}</p>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" id="login-error">{error}</p>}
       <form action={login}>
         <input type="hidden" name="next" value={safeNext(next)} />
         <label>
-          {COPY.login.label} <input name="handle" placeholder={COPY.login.placeholder} required autoComplete="username" />
+          {COPY.login.label} <input name="handle" aria-invalid={error ? true : undefined} aria-describedby={error ? 'login-error' : undefined} placeholder={COPY.login.placeholder} required autoComplete="username" />
         </label>
         <Button type="submit" variant="primary">
           {COPY.login.submit}

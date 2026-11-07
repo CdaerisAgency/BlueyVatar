@@ -5,6 +5,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ## 2026-11-07
 
 ### Added
+- Skip link, accessibility statement at /accessibility, and an automated axe-core check in CI (#171).
 - Web admin page with an audit log for moderation (#165).
 - Self-serve data export and deletion (#166).
 - First-run checklist, settings hub, and signed-in sessions (#168).

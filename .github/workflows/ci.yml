@@ -72,6 +72,12 @@ jobs:
       - name: Build web
         run: pnpm --filter @blueyvatar/web build
 
+      - name: Install Chromium for accessibility checks
+        run: pnpm --filter @blueyvatar/web exec playwright install --with-deps chromium
+
+      - name: Accessibility (axe-core and hovercard keyboard)
+        run: pnpm --filter @blueyvatar/web a11y
+
   # Warns (never fails) when a pull request touches apps/ without a changelog line.
   changelog:
     if: github.event_name == 'pull_request'

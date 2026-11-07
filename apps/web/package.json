@@ -12,6 +12,8 @@
     "gen-jwk": "node --experimental-strip-types scripts/gen-jwk.ts",
     "test": "node scripts/build-docs.mjs && vitest run",
     "build:embed": "node scripts/build-embed.mjs",
+    "a11y": "node scripts/build-embed.mjs && node a11y/hovercards.mjs && node a11y/axe.mjs",
+    "a11y:hovercards": "node scripts/build-embed.mjs && node a11y/hovercards.mjs",
     "build:docs": "node scripts/build-docs.mjs",
     "e2e": "playwright test"
   },
@@ -33,11 +35,14 @@
     "tldts": "7.4.19"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.63.0",
     "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "axe-core": "4.14.0",
     "esbuild": "0.28.2",
+    "playwright": "1.63.0",
     "vitest": "3.2.7"
   }
 }
