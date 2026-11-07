@@ -109,11 +109,43 @@ export function sniffImageMime(bytes: Uint8Array): ImageMime | null {
   return null
 }
 
+export const MIN_IMAGE_PX = 80
+
+/** Read width and height from the PNG IHDR or the first JPEG SOF marker, with no decoder. */
+export function readImageSize(bytes: Uint8Array): { width: number; height: number } | null {
+  const mime = sniffImageMime(bytes)
+  if (mime === 'image/png') {
+    if (bytes.length < 24) return null
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    return { width: v.getUint32(16), height: v.getUint32(20) }
+  }
+  if (mime === 'image/jpeg') {
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    let i = 2
+    while (i + 9 < bytes.length) {
+      if (bytes[i] !== 0xff) { i++; continue }
+      const marker = bytes[i + 1]!
+      if (marker === 0xff) { i++; continue }
+      if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { i += 2; continue }
+      const len = v.getUint16(i + 2)
+      const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc
+      if (isSof) return { height: v.getUint16(i + 5), width: v.getUint16(i + 7) }
+      i += 2 + len
+    }
+  }
+  return null
+}
+
+export const TOO_SMALL_MESSAGE = `The image is smaller than ${MIN_IMAGE_PX} by ${MIN_IMAGE_PX} pixels. Choose a larger image.`
+
 export function validateImageBytes(bytes: Uint8Array): Check<{ mime: ImageMime; size: number }> {
   if (bytes.length === 0) return fail('Choose an image file.')
   if (bytes.length > MAX_BLOB_BYTES) return fail('The image is larger than 1,000,000 bytes. Resize or compress it and try again.')
   const mime = sniffImageMime(bytes)
   if (!mime) return fail('Only PNG and JPEG images are supported.')
+  const dim = readImageSize(bytes)
+  if (!dim) return fail('The image could not be read. Choose a valid PNG or JPEG.')
+  if (Math.min(dim.width, dim.height) < MIN_IMAGE_PX) return fail(TOO_SMALL_MESSAGE)
   return ok({ mime, size: bytes.length })
 }
 
