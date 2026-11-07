@@ -12,6 +12,7 @@ import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock, secretsEqual } from './origin.js'
+import { BlobError } from './blob.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore, Visibility } from './store.js'
@@ -462,7 +463,8 @@ export function createApp(deps: AppDeps) {
     try {
       const original = await deps.resolver.getBlob(identity, cid)
       bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
-    } catch {
+    } catch (err) {
+      if (err instanceof BlobError && err.kind === 'not_found') return fail(c, 404, 'not_found', 'Original image not found')
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
     }
     // /img has no key: a resize on a CDN miss is a service cost against the DID, not a license charge.

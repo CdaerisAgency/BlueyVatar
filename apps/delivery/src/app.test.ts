@@ -1,3 +1,4 @@
+import { BlobError } from './blob.js'
 import { describe, expect, it } from 'vitest'
 import { emailHash, emailMd5, imagePath, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
@@ -55,6 +56,18 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
 function setupDeps() { const { deps } = setup(); return { deps } }
 
 describe('delivery API', () => {
+  it('maps a missing blob to 404 and other blob failures to 502 on /img', async () => {
+    const { app, deps } = setup()
+    deps.resolver.getBlob = async () => { throw new BlobError('not_found', 'x', 404) }
+    const missing = await app.request(img(80))
+    expect(missing.status).toBe(404)
+    expect((await missing.json()).error.code).toBe('not_found')
+    deps.resolver.getBlob = async () => { throw new BlobError('upstream', 'x') }
+    expect((await app.request(img(80))).status).toBe(502)
+    deps.resolver.getBlob = async () => { throw new BlobError('invalid_endpoint', 'x') }
+    expect((await app.request(img(80))).status).toBe(502)
+  })
+
   it('answers 404 for a blocked image on /img and skips it in redirects', async () => {
     const { app, index } = setup()
     index.blocked.add(`${DID}/bafyreiabc123`)
