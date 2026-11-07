@@ -185,6 +185,15 @@ export class PgUsageMeter implements UsageMeter {
     return Number(rows[0]!.count)
   }
 
+  async addProfileCall(did: string): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO profile_view_counters (did, day, json_calls)
+            VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 1)
+       ON CONFLICT (did, day) DO UPDATE SET json_calls = profile_view_counters.json_calls + 1`,
+      [did],
+    )
+  }
+
   async addService(did: string, meter: ServiceMeter, n = 1): Promise<void> {
     await this.pool.query(
       `INSERT INTO service_usage_counters (did, meter, period_start, count)
