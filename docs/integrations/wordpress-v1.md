@@ -27,7 +27,7 @@ Sources: the [`pre_get_avatar_data` reference](https://developer.wordpress.org/r
 ## Limits
 
 - A person sees their image only when they have a BlueyVatar profile with a verified email. Everyone else sees the default style.
-- Lowercasing uses `mb_strtolower` when PHP has mbstring, which matches JavaScript for ordinary addresses. Rare special-case letters can differ between the two languages.
+- Lowercasing uses `mb_strtolower` when PHP has mbstring. Without mbstring only ASCII letters are lowercased, so an address with non-ASCII capitals can hash differently from the JavaScript package. Rare special-case letters can differ between the two languages.
 - Publishable keys (`token=`) are not supported in this version.
 
 ## License

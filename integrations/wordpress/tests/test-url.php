@@ -20,7 +20,11 @@ function check( string $name, $actual, $expected ): void {
 $ada = hash( 'sha256', 'ada@example.com' );
 check( 'hash normalizes case and whitespace', blueyvatar_email_hash( "  Ada@Example.COM \n" ), $ada );
 check( 'hash is 64 lowercase hex', 1 === preg_match( '/^[0-9a-f]{64}$/', $ada ), true );
-check( 'unicode lowercase', blueyvatar_normalize_email( ' ÉLISE@Example.com ' ), 'élise@example.com' );
+// Non-ASCII lowercasing needs mbstring. Without it the plugin lowercases ASCII only, as documented.
+if ( function_exists( 'mb_strtolower' ) ) {
+	check( 'unicode lowercase', blueyvatar_normalize_email( ' ÉLISE@Example.com ' ), 'élise@example.com' );
+}
+check( 'ascii lowercase and trim', blueyvatar_normalize_email( " \tAda@Example.COM\n" ), 'ada@example.com' );
 
 check( 'bare url', blueyvatar_avatar_url( 'https://img.blueyvatar.com', $ada ), "https://img.blueyvatar.com/avatar/$ada" );
 check(
