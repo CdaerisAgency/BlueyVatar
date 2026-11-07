@@ -15,16 +15,19 @@ export interface PgWritesOptions {
   onImageUpserted?: (did: string, cid: string) => Promise<void>
 }
 
+const RATING = `COALESCE((SELECT o.rating FROM rating_overrides o WHERE o.did = $1 AND o.cid = $3 AND o.lifted_at IS NULL), $5)`
+
 /** Postgres implementation of IndexWrites against db/migrations/0001_init.sql. */
 export class PgIndexWrites implements IndexWrites {
   constructor(private pool: pg.Pool, private opts: PgWritesOptions = {}) {}
 
   async upsertImage(r: Parameters<IndexWrites['upsertImage']>[0]): Promise<void> {
     await this.pool.query(
+      // An active reviewer rating change (migration 0031) wins over the rating in the user's record.
       `INSERT INTO images (did, rkey, cid, mime_type, rating, is_default, license, purpose, caption, sort, created_at, crop_x, crop_y, crop_size)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, ${RATING}, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT (did, rkey) DO UPDATE SET
-            cid = EXCLUDED.cid, mime_type = EXCLUDED.mime_type, rating = EXCLUDED.rating,
+            cid = EXCLUDED.cid, mime_type = EXCLUDED.mime_type, rating = ${RATING},
             is_default = EXCLUDED.is_default, license = EXCLUDED.license,
             purpose = EXCLUDED.purpose, caption = EXCLUDED.caption, sort = EXCLUDED.sort,
             created_at = EXCLUDED.created_at, crop_x = EXCLUDED.crop_x, crop_y = EXCLUDED.crop_y,

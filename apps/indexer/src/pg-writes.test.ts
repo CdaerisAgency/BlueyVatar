@@ -7,7 +7,7 @@ import { PgIndexWrites } from './pg-writes.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
-const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery', '0019_notification_prefs', '0029_image_crop'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
+const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery', '0012_reports', '0019_notification_prefs', '0021_admin', '0028_appeals', '0029_image_crop', '0031_review_portal'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
 const schema = `t_indexer_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 
@@ -47,6 +47,21 @@ describe.skipIf(!url)('postgres index writes', () => {
     await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'r1', action: 'delete' }, db)
     expect((await pool.query('SELECT 1 FROM images')).rowCount).toBe(0)
     expect(purged).toEqual([[DID, 'bafyimg']])
+  })
+
+  it('keeps a reviewer rating change over a re-index of the image record', async () => {
+    const db = new PgIndexWrites(pool)
+    const record = { image: { $type: 'blob', ref: { $link: 'bafyrated' }, mimeType: 'image/png', size: 10 }, isDefault: false, createdAt: '2026-01-01T00:00:00Z' }
+    await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'rated', action: 'create', record }, db)
+    const rating = async () => (await pool.query('SELECT rating FROM images WHERE rkey = $1', ['rated'])).rows[0].rating
+    expect(await rating()).toBe('g')
+    await pool.query("INSERT INTO rating_overrides (did, cid, rating, prior_rating, set_by) VALUES ($1, 'bafyrated', 'x', 'g', 'did:plc:rev')", [DID])
+    await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'rated', action: 'update', record }, db)
+    expect(await rating()).toBe('x')
+    await pool.query("UPDATE rating_overrides SET lifted_at = now() WHERE did = $1", [DID])
+    await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'rated', action: 'update', record }, db)
+    expect(await rating()).toBe('g')
+    await handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey: 'rated', action: 'delete' }, db)
   })
 
   it('stores gallery fields and defaults existing rows to avatar', async () => {

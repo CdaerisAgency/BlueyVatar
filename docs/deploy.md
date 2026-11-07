@@ -234,11 +234,11 @@ The indexer connects to each labeler's `com.atproto.label.subscribeLabels` endpo
 
 ### Upload scan events and the daily digest
 
-`upload_scan_events` holds one row per match or outage: account, service, outcome, flags, time. It holds no image and no hash, and no page reads it. `scanCounts()` in `apps/web/lib/upload-screen.ts` returns counts per outcome and service for a digest; no digest job exists yet. The metric `web_upload_screen_total{outcome}` counts the same events.
+`upload_scan_events` holds one row per match or outage: account, service, outcome, flags, time. It holds no image and no hash, and no page reads it. `scanCounts()` in `apps/web/lib/upload-screen.ts` returns the same counts; the indexer's daily moderation digest (see Web admin page) now reads the table directly. The metric `web_upload_screen_total{outcome}` counts the same events.
 
 ## Blocking an image
 
-Reports from the public form land in the `reports` table (status `open`). Moderators work them in the web admin page at `/admin` (issue #145). `pnpm ops:block` and `pnpm ops:block-did` still work for emergencies, and they write to the same audit log.
+Reports from the public form land in the `reports` table (status `open`). Moderators work them as cases in the web admin page at `/admin` (issues #145 and #209). `pnpm ops:block` and `pnpm ops:block-did` still work for emergencies, and they write to the same audit log.
 
 ### Web admin page
 
@@ -252,12 +252,30 @@ Admin access is off until both variables are set on the web app, and then `/admi
 
 Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin session ends after 30 minutes and can be ended earlier from the page. Wrong codes lock the account for 15 minutes after 5 failures. Every action asks for a reason and is recorded in the `admin_actions` table, which the page shows under "Audit log". Run migration 0021 before the first deploy. `/admin` is disallowed in `robots.txt`, answers `X-Robots-Tag: noindex`, and is not listed in the sitemap.
 
-Actions on the page:
+The page is a review portal with queues, cases, and a daily digest. How reviewers use it is in `docs/moderation-v1.md`. Run migration 0031 before deploying (it needs 0012, 0021, 0028, and 0030). It adds the case tables, reviewer wellness settings, rating overrides, new audit log columns, and an append-only trigger on `admin_actions`.
 
-- Dismiss a report, or take down the account: this blocks every indexed image, purges the cache, and marks the reports actioned.
-- Reporter follow-up: when a report is dismissed or actioned and the reporter left a valid email address, the page sends them a one-line outcome message (no reason, no details), then deletes the stored address whether or not the send worked. Reports with no address, or with something that is not an email, send nothing. The message uses the same email sender as account notices (`RESEND_API_KEY`).
-- Suspend an account: a reversible hold. Images indexed after the suspension are not blocked until the suspension is renewed. Lifting it restores only the images the suspension blocked.
-- Unblock one image, for example after an appeal.
+Review portal settings (all optional). The web app reads the first three. The indexer reads `MODERATION_SLA_HOURS` too, to count SLA breaches in the digest, so set the same value on both.
+
+| Variable | Value |
+| --- | --- |
+| `MODERATION_SLA_HOURS` | Hours to first resolution per severity, as `critical=4,high=24,moderate=72,low=168` (these are the defaults). Missing or invalid entries keep the default. |
+| `MODERATION_POLICIES` | The policy list reviewers cite, as `id=Label;id2=Label two`. Ids are lowercase letters, digits, and hyphens. Replaces the built-in list (child safety, illegal content, adult content rating, copyright, impersonation, harassment, private information, spam and abuse, no violation found). |
+| `MODERATION_CHILD_SAFETY_DIDS` | When set, only these admin DIDs can open the child-safety queue or act on its cases. Unset means every admin can. Ask counsel who should have access. |
+
+Daily moderation digest (runs in the indexer, which is always on; the web and delivery apps scale to zero). It sends counts only, never images:
+
+| Variable | Value |
+| --- | --- |
+| `MODERATION_DIGEST_TO` | Address or addresses (comma or space separated) that get the digest. If unset, the indexer uses the primary email on file for the first `ADMIN_DIDS` account that has one, so also set `ADMIN_DIDS` on the indexer. With neither, nothing is sent and the indexer logs a warning. |
+| `MODERATION_DIGEST_HOUR_UTC` | Hour of day (UTC, default 13) from which the day's digest may send. It sends once per UTC day. |
+| `MODERATION_DIGEST_ALWAYS` | Set to `1` or `true` to send even when every count is zero. Default: skip the email on a quiet day. |
+| `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `TOKEN_ENCRYPTION_KEY` | Already set on the indexer for re-verification notices. The digest uses them for the portal link, sending, and decrypting the admin address. |
+
+The digest has no Cloudflare data. Cloudflare's CSAM Scanning Tool sends its own daily email to the address set in the dashboard (Caching, Configuration, CSAM Scanning Tool), and the digest links to the dashboard so it stays on your checklist.
+
+The portal and digest read what upload screening and label enforcement (issue #207) already write: label-origin rows in `reports` become label signals on a case, and each `match` row in `upload_scan_events` becomes a scanner signal. Every screening service wired in is a known-image hash matcher for child sexual abuse material, so a match opens a Critical case about the account in the restricted child-safety queue (the upload was refused, so there is no image). The digest counts `match` and `outage_blocked` rows as upload rejections by service, and `outage_allowed` rows as uploads let through during an outage. Ask counsel whether recording a match as a case changes anything about "actual knowledge" under 18 U.S.C. 2258A.
+
+Reporter follow-up: when a case is resolved and the reporter left a valid email address, the portal sends them a one-line outcome message (no reason, no details), then deletes the stored address whether or not the send worked. The message uses the same email sender as account notices (`RESEND_API_KEY`).
 
 To block one image from a shell, use the steps below. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. To take down a whole account from a shell, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
 
@@ -319,8 +337,8 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | App | Secrets (Fly secrets) |
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `IMG_MAX_CONCURRENT`, `IMG_QUEUE_MAX`, `IMG_QUEUE_WAIT_MS`, `RATE_BATCH_MS`, `SENTRY_DSN`, `METRICS_TOKEN` |
-| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
+| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); moderation digest (optional `MODERATION_DIGEST_TO`, `MODERATION_DIGEST_HOUR_UTC`, `MODERATION_DIGEST_ALWAYS`, `MODERATION_SLA_HOURS`; `ADMIN_DIDS` as the default recipient source); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `ADMIN_DIDS` and `ADMIN_TOTP_SECRET` (review portal; see Web admin page), optional `MODERATION_SLA_HOURS`, `MODERATION_POLICIES`, `MODERATION_CHILD_SAFETY_DIDS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `SENTRY_DSN` and `METRICS_TOKEN` are new secrets (see Observability). `SENTRY_DSN` can be the same project DSN on all three apps, since events are tagged with `app`. `METRICS_TOKEN` should differ per app. Staging uses `STAGING_SENTRY_DSN` and `STAGING_METRICS_TOKEN`, ideally pointing at a separate Sentry project or environment. Non-secret tuning values (`LOG_LEVEL`, `READY_TIMEOUT_MS`, `INDEXER_STALL_SECONDS`, `TAP_PROBE_INTERVAL_SECONDS`, `HEALTH_PORT`) are listed in `.env.example` and can go in `fly/*.toml` `[env]`.

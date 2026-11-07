@@ -4,19 +4,22 @@ export const MAX_STATEMENT = 2000
 
 type Q = Pick<pg.Pool, 'query'>
 
-export type AppealableAction = { id: number; action: 'takedown' | 'suspend'; created_at: Date; appeal: { status: string } | null }
+export type AppealableAction = { id: number; action: 'takedown' | 'suspend' | 'block_image' | 'warn' | 'rating_change'; created_at: Date; appeal: { status: string } | null }
 
 /**
- * Takedowns and suspensions of this account that are still in effect, newest first. A takedown counts while any image it
- * blocked is still blocked; a suspension counts while it is the current, unlifted one. Each action shows its appeal, if any,
+ * Takedowns (all images or one), suspensions, warnings, and rating changes of this account that are still in effect, newest first.
+ * A takedown counts while any image it blocked is still blocked; a suspension counts while it is the current, unlifted one;
+ * a rating change counts while an override is active; a warning always counts, since it has no end. Each action shows its appeal, if any,
  * because only one appeal is allowed per action.
  */
 export async function appealableActions(pool: Q, did: string): Promise<AppealableAction[]> {
   const { rows } = await pool.query<AppealableAction>(
     `SELECT a.id::int AS id, a.action, a.created_at, CASE WHEN p.id IS NULL THEN NULL ELSE json_build_object('status', p.status) END AS appeal
        FROM admin_actions a LEFT JOIN appeals p ON p.action_id = a.id
-      WHERE a.target_did = $1 AND a.action IN ('takedown', 'suspend') AND (
-        (a.action = 'takedown' AND EXISTS (SELECT 1 FROM blocked_images b WHERE b.did = $1 AND b.kind = 'takedown' AND b.unblocked_at IS NULL))
+      WHERE a.target_did = $1 AND a.action IN ('takedown', 'suspend', 'block_image', 'warn', 'rating_change') AND (
+        (a.action IN ('takedown', 'block_image') AND EXISTS (SELECT 1 FROM blocked_images b WHERE b.did = $1 AND b.kind = 'takedown' AND b.unblocked_at IS NULL))
+        OR a.action = 'warn'
+        OR (a.action = 'rating_change' AND EXISTS (SELECT 1 FROM rating_overrides o WHERE o.did = $1 AND o.lifted_at IS NULL))
         OR (a.action = 'suspend' AND EXISTS (SELECT 1 FROM account_suspensions s WHERE s.did = $1 AND s.lifted_at IS NULL)
             AND a.id = (SELECT max(x.id) FROM admin_actions x WHERE x.target_did = $1 AND x.action = 'suspend')))
       ORDER BY a.id DESC`,

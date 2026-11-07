@@ -1,12 +1,13 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { appealOutcomeNotice, emailSender, suspensionNotice, takedownNotice } from '@blueyvatar/core/verification'
+import { appealOutcomeNotice, emailSender } from '@blueyvatar/core/verification'
+import { canViewChildSafety } from '@blueyvatar/core/moderation'
 import { adminToken, clearAdminCookie, requireAdmin, requireAdminDid, setAdminCookie } from '../../lib/admin/guard'
 import { totpSecret } from '../../lib/admin/config'
-import { cleanReason, dismissReport, suspend, takedown, unblockImage, unsuspend, type Result } from '../../lib/admin/moderation'
+import { DID_RE } from '../../lib/admin/moderation'
+import { CASE_ACTIONS, getCase, isQueue, logReveal, nextCase, openManualCase, performCaseAction, recordNotice, releaseCase, saveWellness, skipCase, type CaseAction } from '../../lib/admin/review'
 import { PUBLIC_URL } from '../../lib/oauth'
-import { decideAppeal } from '../../lib/admin/appeals'
 import { getNotifier } from '../../lib/notify'
 import { notifyReporters } from '../../lib/admin/followup'
 import { purgerFromEnv } from '../../lib/admin/purge'
@@ -37,76 +38,85 @@ export async function adminLogout(): Promise<void> {
   return redirect('/')
 }
 
-const note = (r: Result & { warn?: string }, ok: string): string =>
-  !r.ok ? r.error : (r.purged ? ok : `${ok} Cache purge did not run: purge /img/ for this account in Cloudflare.`) + (r.warn ?? '')
+const casePath = (id: number) => `/admin/cases/${id}`
 
-/** Tells the account owner, with the appeal link. The notice is a security notice, so it cannot be switched off. */
-async function tellOwner(did: string, n: ReturnType<typeof takedownNotice>): Promise<string> {
-  return (await getNotifier().send(did, 'security', n)) === 'sent' ? '' : ' The owner was not emailed (no address on file or send failed).'
-}
-
-async function run(back: string, fn: (a: { did: string; pool: import('pg').Pool }, reason: string) => Promise<Result & { warn?: string }>, ok: string, form: FormData): Promise<void> {
+/** Runs a reviewer action from the case page, then does what must happen after the commit: cache purge, owner notice, reporter notices. */
+export async function caseAction(form: FormData): Promise<void> {
   const a = await requireAdmin()
+  const id = Number(form.get('case'))
+  const action = String(form.get('action') ?? '') as CaseAction
+  if (!Number.isSafeInteger(id) || !CASE_ACTIONS.includes(action)) return to('/admin', 'msg', 'Unknown action.')
+  const back = casePath(id)
   const wait = await limited(['adminAction.did', 'adminAction.ip'], a.did)
   if (wait) return to(back, 'msg', wait)
-  const reason = cleanReason(form.get('reason'))
-  if (!reason) return to(back, 'msg', 'Enter a reason (up to 500 characters).')
-  return to(back, 'msg', note(await fn(a, reason), ok))
+  const text = (k: string) => String(form.get(k) ?? '')
+  const out = await performCaseAction(a.pool, a.did, {
+    caseId: id, action, reason: form.get('reason'), policy: form.get('policy'), scope: text('scope'), cid: text('cid') || undefined,
+    rating: text('rating'), tag: text('tag'), what: text('what'), facts: text('facts'), explanation: text('explanation'), childSafety: form.get('childSafety') === 'on',
+  }, { publicUrl: PUBLIC_URL }, purgerFromEnv())
+  if (!out.ok) return to(back, 'msg', out.error)
+  let msg = out.message
+  if (out.purge && !(await purgerFromEnv()(out.purge.did, out.purge.cids))) msg += ' Cache purge did not run: purge /img/ for this account in Cloudflare.'
+  if (out.notice) {
+    const result = await getNotifier().send(out.notice.did, 'security', out.notice.notice)
+    await recordNotice(a.pool, a.did, id, out.notice.did, out.notice.template, result)
+    if (result !== 'sent') msg += ' The owner was not emailed (no address on file or send failed).'
+  }
+  if (out.appeal) {
+    const sent = await getNotifier().send(out.appeal.did, 'security', appealOutcomeNotice({ did: out.appeal.did, appealId: out.appeal.appealId, outcome: out.appeal.outcome, publicUrl: PUBLIC_URL }))
+    if (sent !== 'sent') msg += ' The appellant was not emailed (no address on file or send failed).'
+  }
+  if (out.reportIds.length) await notifyReporters(a.pool, emailSender(), out.reportIds, out.reportOutcome, PUBLIC_URL)
+  return to(back, 'msg', msg)
 }
 
-const didOf = (form: FormData) => String(form.get('did') ?? '')
-const accountPath = (did: string) => `/admin/account?did=${encodeURIComponent(did)}`
-
-export async function dismissAction(form: FormData): Promise<void> {
-  const id = Number(form.get('report'))
-  return run('/admin', async ({ did, pool }, reason) => {
-    const r = await dismissReport(pool, did, id, reason)
-    if (r.ok) await notifyReporters(pool, emailSender(), [id], 'dismissed', PUBLIC_URL)
-    return r
-  }, `Report ${id} dismissed.`, form)
+/** Opens the next case in a queue for this reviewer, locked to them. */
+export async function nextCaseAction(form: FormData): Promise<void> {
+  const { did, pool } = await requireAdmin()
+  const queue = form.get('queue')
+  if (!isQueue(queue)) return to('/admin', 'msg', 'Unknown queue.')
+  if (queue === 'child_safety' && !canViewChildSafety(did)) return to('/admin', 'msg', 'That queue is restricted.')
+  const id = await nextCase(pool, queue, did)
+  return id === null ? to(`/admin/queue/${queue}`, 'msg', 'No case is waiting for you in this queue.') : redirect(casePath(id))
 }
 
-export async function takedownAction(form: FormData): Promise<void> {
-  const target = didOf(form)
-  const report = Number(form.get('report')) || undefined
-  return run(report ? `/admin/reports/${report}` : accountPath(target), async ({ did, pool }, reason) => {
-    const r = await takedown(pool, purgerFromEnv(), did, target, reason, report)
-    if (!r.ok) return r
-    await notifyReporters(pool, emailSender(), r.reportIds, 'actioned', PUBLIC_URL)
-    const warn = r.blocked > 0 ? await tellOwner(target, takedownNotice({ did: target, actionId: r.actionId, publicUrl: PUBLIC_URL })) : ''
-    return { ...r, warn }
-  }, 'Takedown recorded.', form)
+/** Gives the case back and moves to the next one. The skipped case stays out of this reviewer's picks for a few hours. */
+export async function skipCaseAction(form: FormData): Promise<void> {
+  const { did, pool } = await requireAdmin()
+  const id = Number(form.get('case'))
+  const c = Number.isSafeInteger(id) ? await getCase(pool, id) : null
+  if (!c) return to('/admin', 'msg', 'Case not found.')
+  await skipCase(pool, id, did)
+  const queue = c.child_safety ? 'child_safety' : c.status === 'escalated' ? 'escalated' : c.status === 'appeal' ? 'appeals' : 'unreviewed'
+  const next = c.status === 'resolved' ? null : await nextCase(pool, queue, did)
+  return next === null ? to(`/admin/queue/${queue}`, 'msg', 'Skipped. No other case is waiting for you.') : redirect(casePath(next))
 }
 
-export async function suspendAction(form: FormData): Promise<void> {
-  const target = didOf(form)
-  return run(accountPath(target), async ({ did, pool }, reason) => {
-    const r = await suspend(pool, purgerFromEnv(), did, target, reason)
-    if (!r.ok) return r
-    return { ...r, warn: await tellOwner(target, suspensionNotice({ did: target, actionId: r.actionId, publicUrl: PUBLIC_URL })) }
-  }, 'Account suspended.', form)
+export async function releaseCaseAction(form: FormData): Promise<void> {
+  const { did, pool } = await requireAdmin()
+  const id = Number(form.get('case'))
+  if (Number.isSafeInteger(id)) await releaseCase(pool, id, did)
+  return redirect('/admin')
 }
 
-export async function unsuspendAction(form: FormData): Promise<void> {
-  const target = didOf(form)
-  return run(accountPath(target), ({ did, pool }, reason) => unsuspend(pool, purgerFromEnv(), did, target, reason), 'Suspension lifted.', form)
+/** Called when the reviewer clicks Reveal. The click is logged before the image is shown. */
+export async function revealAction(caseId: number, cid: string): Promise<boolean> {
+  const { did, pool } = await requireAdmin()
+  if (!Number.isSafeInteger(caseId) || !/^[A-Za-z0-9]{10,200}$/.test(cid)) return false
+  return logReveal(pool, did, caseId, cid)
 }
 
-export async function unblockAction(form: FormData): Promise<void> {
-  const target = didOf(form)
-  const cid = String(form.get('cid') ?? '')
-  return run(accountPath(target), ({ did, pool }, reason) => unblockImage(pool, purgerFromEnv(), did, target, cid, reason), 'Image unblocked.', form)
+export async function saveWellnessAction(form: FormData): Promise<void> {
+  const { did, pool } = await requireAdmin()
+  await saveWellness(pool, did, { blurPx: form.get('blur'), grayscale: form.get('grayscale') })
+  const back = String(form.get('back') ?? '')
+  return to(/^\/admin(\/|$)/.test(back) ? back : '/admin', 'msg', 'Wellness settings saved.')
 }
 
-/** Decides an appeal from the queue on /admin, then emails the appellant the outcome (without the internal note). */
-export async function decideAppealAction(form: FormData): Promise<void> {
-  const id = Number(form.get('appeal'))
-  const outcome = form.get('decision') === 'overturn' ? 'overturned' : form.get('decision') === 'uphold' ? 'upheld' : null
-  if (!outcome || !Number.isSafeInteger(id)) return to('/admin', 'msg', 'Choose uphold or overturn.')
-  return run('/admin', async ({ did, pool }, reason) => {
-    const r = await decideAppeal(pool, purgerFromEnv(), did, id, outcome, reason)
-    if (!r.ok) return r
-    const sent = await getNotifier().send(r.did, 'security', appealOutcomeNotice({ did: r.did, appealId: id, outcome, publicUrl: PUBLIC_URL }))
-    return { ...r, warn: sent === 'sent' ? '' : ' The appellant was not emailed (no address on file or send failed).' }
-  }, `Appeal ${id} ${outcome}.`, form)
+/** Opens (or finds) the case for an account, from the account page. */
+export async function openCaseAction(form: FormData): Promise<void> {
+  const { pool } = await requireAdmin()
+  const did = String(form.get('did') ?? '')
+  if (!DID_RE.test(did)) return to('/admin', 'msg', 'Unknown account.')
+  return redirect(casePath(await openManualCase(pool, did)))
 }

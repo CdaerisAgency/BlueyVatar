@@ -9,6 +9,7 @@
   "exports": {
     "./crop": { "types": "./dist/crop.d.ts", "default": "./dist/crop.js" },
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./moderation": { "types": "./dist/moderation/index.d.ts", "default": "./dist/moderation/index.js" },
     "./verification": { "types": "./dist/verification/index.d.ts", "default": "./dist/verification/index.js" }
   },
   "scripts": {

@@ -1,18 +1,25 @@
 import type pg from 'pg'
 import type { Purge } from './purge'
 
-export type AdminAction = 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report' | 'appeal_upheld' | 'appeal_overturned'
+export type AdminAction =
+  | 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report' | 'appeal_upheld' | 'appeal_overturned'
+  | 'acknowledge' | 'rating_change' | 'warn' | 'escalate' | 'reverse' | 'comment' | 'tag' | 'reveal_image' | 'divert' | 'notice_sent'
 export const DID_RE = /^did:(plc|web):[A-Za-z0-9._:%-]{1,200}$/
 export const MAX_REASON = 500
 
 type Q = Pick<pg.Pool, 'query'>
 
+/** Extra audit fields from the review portal (migration 0031): the case, the policy cited, values behind the action, and a notice record. */
+export type AuditMeta = { caseId?: number | null; policy?: string | null; detail?: Record<string, unknown> | null; noticeTemplate?: string | null; noticeResult?: string | null }
+
 export async function recordAction(
-  q: Q, actor: string, action: AdminAction, t: { did?: string | null; cid?: string | null; reportId?: number | null; reason?: string | null },
+  q: Q, actor: string, action: AdminAction, t: { did?: string | null; cid?: string | null; reportId?: number | null; reason?: string | null } & AuditMeta,
 ): Promise<number> {
   const { rows } = await q.query<{ id: number }>(
-    'INSERT INTO admin_actions (actor, action, target_did, target_cid, report_id, reason) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id::int AS id',
-    [actor, action, t.did ?? null, t.cid ?? null, t.reportId ?? null, t.reason ?? null],
+    `INSERT INTO admin_actions (actor, action, target_did, target_cid, report_id, reason, case_id, policy, detail, notice_template, notice_result)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id::int AS id`,
+    [actor, action, t.did ?? null, t.cid ?? null, t.reportId ?? null, t.reason ?? null, t.caseId ?? null, t.policy ?? null,
+      t.detail ? JSON.stringify(t.detail) : null, t.noticeTemplate ?? null, t.noticeResult ?? null],
   )
   return rows[0]!.id
 }
@@ -41,7 +48,7 @@ export async function inTx<T>(pool: pg.Pool, fn: (c: pg.PoolClient) => Promise<T
 }
 
 /** Blocks every indexed image of the DID with the given kind. A takedown is never downgraded by a later suspension. */
-async function blockAll(c: Q, did: string, reason: string, by: string, kind: 'takedown' | 'suspension'): Promise<string[]> {
+export async function blockAll(c: Q, did: string, reason: string, by: string, kind: 'takedown' | 'suspension'): Promise<string[]> {
   const { rows } = await c.query<{ cid: string }>('SELECT DISTINCT cid FROM images WHERE did = $1', [did])
   for (const { cid } of rows) {
     await c.query(
@@ -156,13 +163,16 @@ export async function getReport(pool: pg.Pool, id: number): Promise<ReportRow | 
   return rows[0] ?? null
 }
 
-export type ActionRow = { id: number; actor: string; action: string; target_did: string | null; target_cid: string | null; report_id: number | null; reason: string | null; created_at: Date }
+export type ActionRow = {
+  id: number; actor: string; action: string; target_did: string | null; target_cid: string | null; report_id: number | null; reason: string | null; created_at: Date
+  case_id: number | null; policy: string | null; notice_template: string | null; notice_result: string | null
+}
 
-export async function listActions(pool: pg.Pool, opts: { did?: string; limit?: number } = {}): Promise<ActionRow[]> {
+export async function listActions(pool: pg.Pool, opts: { did?: string; limit?: number; caseId?: number } = {}): Promise<ActionRow[]> {
   const { rows } = await pool.query<ActionRow>(
-    `SELECT id::int AS id, actor, action, target_did, target_cid, report_id::int AS report_id, reason, created_at
-       FROM admin_actions WHERE ($1::text IS NULL OR target_did = $1) ORDER BY created_at DESC, id DESC LIMIT $2`,
-    [opts.did ?? null, opts.limit ?? 100],
+    `SELECT id::int AS id, actor, action, target_did, target_cid, report_id::int AS report_id, reason, created_at, case_id::int AS case_id, policy, notice_template, notice_result
+       FROM admin_actions WHERE ($1::text IS NULL OR target_did = $1) AND ($3::bigint IS NULL OR case_id = $3) ORDER BY created_at DESC, id DESC LIMIT $2`,
+    [opts.did ?? null, opts.limit ?? 100, opts.caseId ?? null],
   )
   return rows
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  appealOutcomeNotice, keyRevokedNotice, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -112,5 +112,42 @@ describe('appeal notices', () => {
     expect(o.subject).toContain('#3')
     expect(o.text).toContain('reversed')
     expect(u.text).toContain('kept the decision')
+  })
+})
+
+describe('statement of reasons (DSA Art 17)', () => {
+  const vars = {
+    scope: 'all images of your account', duration: 'Indefinite, until a reviewer reverses it', facts: 'Two users reported the image and a reviewer confirmed it.',
+    source: 'A notice from 2 users', automated: 'No. A person made this decision.', policy: 'Illegal content', policy_url: 'https://blueyvatar.com/policy',
+    explanation: 'The image shows content we do not allow.', appeal_link: 'https://blueyvatar.com/account/appeal?action=7',
+  }
+  it('includes every 17(3) field and the redress options when filled', () => {
+    const r = statementOfReasonsNotice({ did: DID, action: 'remove_image', vars, publicUrl: URL })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.template).toBe('sor-remove-image-v1')
+    for (const part of ['Indefinite, until a reviewer reverses it', 'Two users reported', 'A notice from 2 users', 'Automated means: No.', 'Illegal content', 'account/appeal?action=7', 'Article 21']) {
+      expect(r.notice.text).toContain(part)
+    }
+    expect(unfilledPlaceholders(r.notice.text)).toEqual([])
+    expect(r.notice.text + r.notice.subject).not.toContain(String.fromCharCode(0x2014))
+  })
+  it.each(['remove_image', 'suspend', 'warn', 'rating_change'] as const)('blocks %s when a placeholder is unfilled', (action) => {
+    for (const key of ['facts', 'explanation', 'duration', 'automated', 'appeal_link'] as const) {
+      const r = statementOfReasonsNotice({ did: DID, action, vars: { ...vars, [key]: '  ' }, publicUrl: URL })
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.missing).toContain(key)
+    }
+  })
+  it('blocks a value that smuggles in a placeholder, and reports every missing name', () => {
+    const r = statementOfReasonsNotice({ did: DID, action: 'suspend', vars: { ...vars, facts: 'see {{appeal_link}}' }, publicUrl: URL })
+    expect(r).toEqual({ ok: false, missing: expect.arrayContaining(['facts']) })
+    const none = statementOfReasonsNotice({ did: DID, action: 'warn', vars: {}, publicUrl: URL })
+    expect(none.ok).toBe(false)
+    if (!none.ok) expect(none.missing.length).toBeGreaterThan(5)
+  })
+  it('lists placeholders left in text', () => {
+    expect(unfilledPlaceholders('a {{facts}} b {{ policy }} c {{facts}}')).toEqual(['facts', 'policy'])
+    expect(unfilledPlaceholders('nothing here')).toEqual([])
   })
 })

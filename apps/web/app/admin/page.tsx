@@ -1,58 +1,58 @@
+import { fmtHours, moderationMetrics, QUEUES, slaHours, syncCases, SEVERITIES, SEVERITY_LABELS, canViewChildSafety, WELLNESS_DEFAULTS } from '@blueyvatar/core/moderation'
 import { PageMain } from '../../components/Page'
-import { REASON_LABELS, type Reason } from '../../lib/reports'
 import { requireAdmin } from '../../lib/admin/guard'
-import { listReports } from '../../lib/admin/moderation'
-import { listAppeals } from '../../lib/admin/appeals'
+import { getWellness, queueCounts } from '../../lib/admin/review'
 import { Button } from '../../components/Button'
-import { decideAppealAction } from './actions'
-import { AdminNav, fmt, Msg } from './AdminBits'
+import { saveWellnessAction } from './actions'
+import { AdminNav, Msg } from './AdminBits'
 
-const STATUSES = ['open', 'actioned', 'dismissed', 'all'] as const
+const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : 'none yet')
 
-export default async function AdminHome({ searchParams }: { searchParams: Promise<{ status?: string; msg?: string }> }) {
-  const { pool } = await requireAdmin()
+export default async function AdminHome({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
+  const { did, pool } = await requireAdmin()
   const sp = await searchParams
-  const status = STATUSES.find((s) => s === sp.status) ?? 'open'
-  const [reports, appeals] = await Promise.all([listReports(pool, status), listAppeals(pool, 'open')])
+  await syncCases(pool)
+  const sla = slaHours()
+  const [counts, m, well] = await Promise.all([queueCounts(pool), moderationMetrics(pool, sla), getWellness(pool, did)])
   return (
     <PageMain>
-      <AdminNav />
+      <AdminNav did={did} />
       <h1>Moderation</h1>
       <Msg text={sp.msg} />
-      <h2 id="appeals">Appeals ({appeals.length} open)</h2>
-      {appeals.length === 0 ? <p>No open appeals.</p> : (
+      <section aria-label="Queues">
+        <h2>Queues</h2>
         <ul>
-          {appeals.map((a) => (
-            <li key={a.id}>
-              Appeal #{a.id} by <a href={`/admin/account?did=${encodeURIComponent(a.did)}`}><code>{a.did}</code></a>, {fmt(a.created_at)}
-              <br />Against {a.action} #{a.action_id} by {a.action_by}, {fmt(a.action_at)}: {a.action_reason}
-              <br />Statement: {a.statement}
-              <form action={decideAppealAction}>
-                <input type="hidden" name="appeal" value={a.id} />
-                <label>Reason (recorded in the audit log){' '}<input name="reason" required maxLength={480} autoComplete="off" /></label>
-                <Button type="submit" name="decision" value="uphold">Uphold decision</Button>
-                <Button type="submit" name="decision" value="overturn">Overturn decision</Button>
-              </form>
-            </li>
+          {QUEUES.filter((q) => q.name !== 'child_safety' || canViewChildSafety(did)).map((q) => (
+            <li key={q.name}><a href={`/admin/queue/${q.name}`}>{q.label}</a>: {counts[q.name]}</li>
           ))}
         </ul>
-      )}
-      <h2>Reports</h2>
-      <p>{STATUSES.map((s) => (s === status ? <strong key={s}>{s} </strong> : <a key={s} href={`/admin?status=${s}`}>{s} </a>))}</p>
-      <form action="/admin/account" method="get">
-        <label>Look up an account <input name="did" placeholder="did:plc:..." required /></label>
-        <button type="submit">Open</button>
-      </form>
-      {reports.length === 0 ? <p>No {status === 'all' ? '' : status} reports.</p> : (
+        <form action="/admin/account" method="get">
+          <label>Look up an account <input name="did" placeholder="did:plc:..." required /></label>
+          <button type="submit">Open</button>
+        </form>
+      </section>
+      <section aria-label="Metrics">
+        <h2>Metrics, last {m.windowDays} days</h2>
         <ul>
-          {reports.map((r) => (
-            <li key={r.id}>
-              <a href={`/admin/reports/${r.id}`}>#{r.id}</a> {REASON_LABELS[r.reason as Reason] ?? r.reason} on {r.source}, {fmt(r.created_at)}, {r.status}
-              <br /><code>{r.target_did}</code> ({r.target_report_count} report{r.target_report_count === 1 ? '' : 's'} on this account)
-            </li>
-          ))}
+          <li>Time to first action: median {fmtHours(m.firstAction.medianHours)} ({m.firstAction.count} cases)</li>
+          <li>
+            Time to resolve: median {fmtHours(m.resolve.medianHours)} ({m.resolve.count} cases). Resolved within SLA: {pct(m.resolve.withinSla, m.resolve.count)}
+            <br />{SEVERITIES.map((s) => `${SEVERITY_LABELS[s]} ${sla[s]}h target: ${pct(m.resolve.bySeverity[s].withinSla, m.resolve.bySeverity[s].count)}`).join('; ')}
+          </li>
+          <li>Backlog: {m.backlog.open} open, oldest {fmtHours(m.backlog.oldestHours)}, median age {fmtHours(m.backlog.medianHours)}</li>
+          <li>Overturn rate on appeal: {m.overturn.rate === null ? 'no decided appeals' : `${Math.round(m.overturn.rate * 100)}% (${m.overturn.overturned} of ${m.overturn.decided})`}</li>
         </ul>
-      )}
+      </section>
+      <section aria-label="Wellness">
+        <h2>Your wellness settings</h2>
+        <p>Images start blurred and grayscale. Change how strong the blur is here or while reviewing. Default: {WELLNESS_DEFAULTS.blurPx} px blur, grayscale on.</p>
+        <form action={saveWellnessAction}>
+          <input type="hidden" name="back" value="/admin" />
+          <label>Blur strength (0 to 40 px) <input type="number" name="blur" min={0} max={40} defaultValue={well.blurPx} /></label>
+          <label><input type="checkbox" name="grayscale" defaultChecked={well.grayscale} /> Grayscale</label>
+          <Button type="submit">Save</Button>
+        </form>
+      </section>
     </PageMain>
   )
 }
