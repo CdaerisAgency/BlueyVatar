@@ -151,6 +151,12 @@ The service defines three record types in the user's repository and keeps everyt
 }
 ```
 
+**Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
+
+- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified. A crop box in the web editor is a later addition.
+- **Minimum size.** Sources must be at least 80 pixels on both sides. The web editor rejects smaller images with a clear message, and delivery treats a smaller source as an invalid image rather than upscaling it.
+- **Client resize.** Before upload, the web editor downscales images in the browser with a canvas to at most 2048 pixels on the long side, then re-encodes toward the 1,000,000 byte cap: JPEG at quality 0.92, 0.85, then 0.75, with a PNG kept as PNG if it fits. This is best effort, so phone photos usually pass but the result is not guaranteed. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
+
 The blob limits copy the Bluesky avatar field so a user can reuse one file in both places. The license values are placeholders for the user-declared license in section 10.
 
 **Two constraints shape this model.**
@@ -273,12 +279,14 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 
 Gravatar's four ratings map onto atproto's existing self-label values, so ratings travel with the image and other apps can read them. The mapping below is a proposal. The values atproto supports for self-labeling are [`!no-unauthenticated`, `porn`, `sexual`, `nudity`, and `graphic-media`](https://docs.bsky.app/docs/advanced-guides/moderation).
 
-| Rating | Meaning | Self-label on the image record |
-| --- | --- | --- |
-| G | Suitable for all audiences | No label |
-| PG | Non-sexual nudity or mild content | `nudity` |
-| R | Sexually suggestive or graphic media | `sexual` or `graphic-media` |
-| X | Adult content | `porn` |
+| Rating | Meaning | Example | Self-label on the image record |
+| --- | --- | --- | --- |
+| G | Suitable for all audiences | A portrait, a pet, a logo, or a landscape | No label |
+| PG | Non-sexual nudity or mild content | A classical statue, a breastfeeding photo, or a beach photo with bare skin and no sexual context | `nudity` |
+| R | Sexually suggestive or graphic media | Lingerie or provocative posing without explicit acts, or a medical image with graphic injury | `sexual` or `graphic-media` |
+| X | Adult content | Explicit sexual imagery | `porn` |
+
+**Difference from Gravatar's R.** Gravatar's R rating [includes nudity](https://docs.gravatar.com/api/images/) alongside violence and strong language. blueyvatar rates non-sexual nudity PG, following Bluesky's `nudity` label, and reserves R for sexually suggestive or graphic content. An image Gravatar rates R for non-sexual nudity may therefore be PG here, and a G-only request still excludes it.
 
 Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to ignore](https://docs.bsky.app/docs/advanced-guides/moderation), which is why it sits at PG. Gravatar shows [only G-rated images unless the caller asks for more](https://docs.gravatar.com/api/images/), and the service keeps that default.
 

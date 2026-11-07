@@ -5,6 +5,7 @@ import { RepoError, blobUrl, imageLabels, listImages, pdsUrl, repoSession, type 
 import { LICENSES, canAddImage, imageLimit, planFor } from '../../../lib/records'
 import { getStore } from '../../../lib/store'
 import AccountNav from '../AccountNav'
+import ImageFileInput from './ImageFileInput'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -98,9 +99,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       </p>
       {canAdd ? (
         <form action={uploadImage} encType="multipart/form-data" style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
-          <label>
-            Image (PNG or JPEG, up to 1,000,000 bytes) <input name="file" type="file" accept="image/png,image/jpeg" required />
-          </label>
+          <ImageFileInput />
           <label>
             Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
           </label>
