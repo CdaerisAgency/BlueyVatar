@@ -1,4 +1,5 @@
 import { ladderPaths } from '@blueyvatar/core'
+import { errors, log } from './obs.js'
 
 /**
  * Purges cached `/img` URLs from Cloudflare (spec sections 9 and 14.1).
@@ -79,8 +80,8 @@ export function purgerFromEnv(env = process.env): (did: string, cids: string[]) 
   const { CF_ZONE_ID: zoneId, CF_API_TOKEN: apiToken, PUBLIC_DELIVERY_URL: publicUrl, IMG_SIGNING_SECRET: signingSecret } = env
   const mode: PurgeMode = env.CF_PURGE_MODE === 'prefix' ? 'prefix' : 'files'
   if (!zoneId || !apiToken || !publicUrl || (mode === 'files' && !signingSecret)) {
-    console.warn('CF_ZONE_ID, CF_API_TOKEN, PUBLIC_DELIVERY_URL, or IMG_SIGNING_SECRET (files mode) is not set; Cloudflare purges are logged only')
-    return async (did, cids) => console.log('purge (no-op)', did, cids)
+    log.warn('CF_ZONE_ID, CF_API_TOKEN, PUBLIC_DELIVERY_URL, or IMG_SIGNING_SECRET (files mode) is not set; Cloudflare purges are logged only')
+    return async (did, cids) => log.info('purge (no-op)', { did, cids })
   }
   const purger = new CloudflarePurger({ zoneId, apiToken, publicUrl, signingSecret, mode })
   return (did, cids) => purger.purge(did, cids)

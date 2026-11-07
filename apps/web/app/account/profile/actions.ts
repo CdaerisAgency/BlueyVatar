@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, getProfile, putProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { validateProfile } from '../../../lib/records'
+import { reportError } from '../../../lib/obs'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/profile?${key}=${encodeURIComponent(value)}`)
 
@@ -22,7 +23,7 @@ export async function saveProfile(form: FormData): Promise<void> {
     for (const k of FIELDS) delete kept[k]
     await putProfile(session, { ...kept, ...checked.value }, existing?.cid)
   } catch (err) {
-    console.error('profile save failed', err instanceof Error ? err.message : 'unknown')
+    reportError('profile save failed', err)
     return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
   }
   return back('done', 'Profile saved.')

@@ -6,6 +6,7 @@ import { loadImport } from '../../../../lib/import-load'
 import { RepoError, listImages, repoSession, saveNewImage } from '../../../../lib/repo'
 import { canAddImage, limitMessage, validateNewImage } from '../../../../lib/records'
 import { resolvePlan } from '../../../../lib/plan'
+import { reportError } from '../../../../lib/obs'
 import { limited } from '../../../../lib/rate-guard'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
@@ -31,7 +32,7 @@ export async function confirmImport(form: FormData): Promise<void> {
     const img = await loadImport(did, source)
     await saveNewImage(session, img.bytes, img.mime, fields.value)
   } catch (err) {
-    console.error('import failed', err instanceof Error ? err.message : 'unknown')
+    reportError('import failed', err)
     return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
   }
   return back('done', 'Image imported.')

@@ -16,11 +16,11 @@ export function secretsEqual(a: string, b: string): boolean {
 /**
  * Rejects requests that did not pass through Cloudflare. A Cloudflare request header
  * transform rule adds `x-origin-auth` at the edge; anything without it is refused.
- * GET /healthz is exempt so the platform health check keeps working.
+ * GET /healthz and GET /readyz are exempt so the platform health check keeps working.
  */
 export function originLock(secret: string): MiddlewareHandler {
   return async (c, next) => {
-    if (c.req.method === 'GET' && c.req.path === '/healthz') return next()
+    if (c.req.method === 'GET' && (c.req.path === '/healthz' || c.req.path === '/readyz')) return next()
     const got = c.req.header(ORIGIN_AUTH_HEADER)
     if (!got || !secretsEqual(got, secret)) {
       return c.json(errorBody('origin_forbidden', 'Requests must come through the CDN'), 403)

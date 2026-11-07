@@ -1,5 +1,6 @@
 import type { Pool } from 'pg'
 import type { VerifyOutcome } from '@blueyvatar/core/verification'
+import { errors, log } from './obs.js'
 
 /** Consecutive failed re-checks that revoke an attestation. */
 export const MAX_FAILS = 3
@@ -75,7 +76,8 @@ export async function reverifyDue(deps: ReverifyDeps, opts: Partial<ReverifyOpti
         await checkOne(c, deps, o, out)
       } catch (err) {
         stuck++
-        console.error('reverify failed for one claim', err instanceof Error ? err.message : 'unknown')
+        log.error('reverify failed for one claim', { err })
+        errors.captureException(err, { tags: { task: 'reverify_claim' } })
       }
     }
     // Rows that threw were not stamped. Stop rather than loop on them forever.
@@ -106,7 +108,7 @@ async function checkOne(c: DueClaim, d: ReverifyDeps, o: ReverifyOptions, out: R
   await d.remove(c.uri)
   await d.store.markRevoked(c.uri)
   out.revoked++
-  await d.onRevoked(c, r.reason).catch((e) => console.error('revocation notice failed', e instanceof Error ? e.message : 'unknown'))
+  await d.onRevoked(c, r.reason).catch((e) => log.error('revocation notice failed', { err: e }))
 }
 
 export function pgReverifyStore(pool: Pool): ReverifyStore {
@@ -155,8 +157,8 @@ export function scheduleReverify(run: () => Promise<ReverifyResult>, everyMs: nu
     if (running) return
     running = true
     run()
-      .then((r) => r.checked > 0 && console.log('reverify pass', JSON.stringify(r)))
-      .catch((err) => console.error('reverify pass failed', err instanceof Error ? err.message : 'unknown'))
+      .then((r) => r.checked > 0 && log.info('reverify pass', { ...r }))
+      .catch((err) => { log.error('reverify pass failed', { err }); errors.captureException(err, { tags: { task: 'reverify_pass' } }) })
       .finally(() => { running = false })
   }, everyMs)
   timer.unref()
