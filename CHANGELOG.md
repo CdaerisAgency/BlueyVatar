@@ -5,6 +5,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ## 2026-11-07
 
 ### Added
+- Delivery caps concurrent image resizes (default 2 for the 512 MB VM), queues briefly, and answers 503 with Retry-After when full; metrics for in flight, queued, and shed (#198).
 - Skip link, accessibility statement at /accessibility, and an automated axe-core check in CI (#171).
 - Web admin page with an audit log for moderation (#165).
 - Self-serve data export and deletion (#166).
@@ -27,6 +28,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 - The web app has a new look based on the Chrysalis design with the monarch palette (#109).
 
 ### Changed
+- Delivery batches rate-window and usage counter writes in memory and flushes them every second (#198).
 - Web routes are rate limited and each account has abuse caps (#156).
 - Server logs are kept for 90 days or until a size cap is reached (#164).
 - Faster Tangled adapters (#135).

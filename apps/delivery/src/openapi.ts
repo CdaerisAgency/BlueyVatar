@@ -111,6 +111,7 @@ export const openApiDocument = {
           '403': errRef('invalid_signature, signature_expired, or access_denied.'),
           '404': errRef('not_found, invalid_size (size outside 1 to 2048), or invalid_quality (quality outside 1 to 100).'),
           '502': errRef('upstream_error'),
+          '503': { ...errRef('overloaded: the resize queue is full. Retry after the delay in the retry-after header.'), headers: { 'retry-after': { schema: { type: 'integer' } } } },
           '500': errors['500'],
         },
       },

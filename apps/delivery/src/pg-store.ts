@@ -154,15 +154,15 @@ export class PgLicenseStore implements LicenseStore {
 export class PgRateLimiter implements RateLimiter {
   constructor(private pool: pg.Pool) {}
 
-  async hit(bucket: string, limit: number, windowSeconds: number): Promise<RateWindow> {
+  async hit(bucket: string, limit: number, windowSeconds: number, n = 1): Promise<RateWindow> {
     const { rows } = await this.pool.query<{ count: number; reset: string }>(
       `INSERT INTO rate_windows AS w (bucket, count, reset_at)
-            VALUES ($1, 1, now() + make_interval(secs => $2))
+            VALUES ($1, $3::int, now() + make_interval(secs => $2))
        ON CONFLICT (bucket) DO UPDATE SET
-            count    = CASE WHEN w.reset_at <= now() THEN 1 ELSE w.count + 1 END,
+            count    = CASE WHEN w.reset_at <= now() THEN $3::int ELSE w.count + $3::int END,
             reset_at = CASE WHEN w.reset_at <= now() THEN now() + make_interval(secs => $2) ELSE w.reset_at END
        RETURNING count, floor(extract(epoch FROM reset_at))::bigint AS reset`,
-      [bucket, windowSeconds],
+      [bucket, windowSeconds, n],
     )
     const r = rows[0]!
     const count = Number(r.count)
@@ -185,12 +185,12 @@ export class PgUsageMeter implements UsageMeter {
     return Number(rows[0]!.count)
   }
 
-  async addProfileCall(did: string): Promise<void> {
+  async addProfileCall(did: string, n = 1): Promise<void> {
     await this.pool.query(
       `INSERT INTO profile_view_counters (did, day, json_calls)
-            VALUES ($1, (now() AT TIME ZONE 'UTC')::date, 1)
-       ON CONFLICT (did, day) DO UPDATE SET json_calls = profile_view_counters.json_calls + 1`,
-      [did],
+            VALUES ($1, (now() AT TIME ZONE 'UTC')::date, $2)
+       ON CONFLICT (did, day) DO UPDATE SET json_calls = profile_view_counters.json_calls + EXCLUDED.json_calls`,
+      [did, n],
     )
   }
 

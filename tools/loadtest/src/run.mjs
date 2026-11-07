@@ -152,14 +152,16 @@ async function runOne(name, rps, durationS, pgPool) {
 
   const ok = [...status].filter(([s]) => s >= 200 && s < 400).reduce((n, [, c]) => n + c, 0)
   const limited = status.get(429) ?? 0
-  const errors = sent - ok - limited
+  // 503 is the origin shedding on purpose (resize queue full, issue #198). It is reported apart from real errors.
+  const overloaded = status.get(503) ?? 0
+  const errors = sent - ok - limited - overloaded
   const agg = (k, f) => { const v = samples.map((s) => s[k]).filter((x) => x !== undefined); return v.length ? f(v) : null }
   const avg = (v) => v.reduce((x, y) => x + y, 0) / v.length
   const r1 = (x) => (x === null ? null : Math.round(x * 10) / 10)
   const l = summarize(lat)
   return {
     scenario: name, targetRps: rps, durationS, sent, dropped, offeredRps: r1((sent + dropped) / dispatchS), sentRps: r1(sent / dispatchS),
-    ok, rateLimited: limited, errors, errorRate: r1((errors / Math.max(1, sent)) * 100),
+    ok, rateLimited: limited, overloaded503: overloaded, errors, errorRate: r1((errors / Math.max(1, sent)) * 100),
     status: Object.fromEntries(status),
     p50: r1(l.p50), p95: r1(l.p95), p99: r1(l.p99), max: r1(l.max),
     mbPerS: r1(bytes / 1e6 / dispatchS),

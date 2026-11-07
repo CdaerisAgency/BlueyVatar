@@ -1,6 +1,6 @@
 # Load test results, version 1
 
-Issue: #149 (part of #9). Status: **local numbers only. No staging deployment exists yet, so nothing below describes Fly or Neon.** Every figure in this file is labeled LOCAL and must not be used to size production until the staging run in the last section replaces it.
+Issue: #149 (part of #9). Revision 2 (issue #198) adds the section "Re-run after the resize cap and counter batching (LOCAL)" below; the sections before it are the original run and are kept for comparison. Status: **local numbers only. No staging deployment exists yet, so nothing below describes Fly or Neon.** Every figure in this file is labeled LOCAL and must not be used to size production until the staging run in the last section replaces it.
 
 ## What was measured
 
@@ -51,6 +51,65 @@ Notes on the columns. Shed is requests the generator did not send because 100 we
 3. **A single hot key costs more than many keys at 200 rps.** `avatar-keyed-hot` p95 was 91 ms against 14 ms for `avatar-keyed-spread` at 200 rps in the final run. Earlier runs on a busier machine showed the same direction (p95 above one second once). It is the rate-window row plus the usage-counter row for one license being updated by every request, and it matches the micro-benchmark below.
 4. **`/img` with a cold variant cache is where capacity ends, and memory is the first limit.** At 10 rps it was fine (p50 157 ms, p99 198 ms, 1.6 cores, one child at a time). At 50 rps the machine was out of CPU (3.6 to 3.8 of 4 cores) and latency went to seconds. The server forks one sharp child per request with no concurrency cap, so children piled up: 37 children and 2.5 GB at 50 rps, 88 children and 6.3 GB at 200 rps. Production delivery runs `shared-cpu-1x` with 1 GB (`fly/delivery.toml`), so on that size roughly a dozen concurrent resizes would be enough to run it out of memory. Each child here is about 65 to 70 MB. CPU per transform was about 150 to 160 ms at 10 rps. In production the CDN absorbs repeats, so the origin only sees variant misses, but a burst of distinct variants (a new user's ladder being warmed, or a crawler) has no brake today.
 
+## Re-run after the resize cap and counter batching (LOCAL)
+
+Issue #198 (part of #9). Same harness, same machine class, same seed (20,000 identities, 200 keys), 20 seconds per step at 10, 50, and 200 rps, counters truncated and the server restarted before the run. **LOCAL numbers; nothing here describes Fly or Neon, and the 512 MB VM was not simulated.** The machine was quiet this time (load average 0.3 before the run), so these tail latencies are cleaner than the first run's and not directly comparable to it.
+
+What changed in the server under test (`tools/loadtest/src/local-server.mjs` now wires the same pieces as `apps/delivery/src/server.ts`):
+
+- Concurrent resizes capped at `IMG_MAX_CONCURRENT=2` (sized for the 512 MB VM in `fly/delivery.toml`, see docs/deploy.md "Resize concurrency cap"), queue of 8, 3 second wait, then `503` with `Retry-After: 2`.
+- Rate windows and usage counters counted in memory and flushed every 1000 ms (`RATE_BATCH_MS`).
+- The generator now reports `503` separately from errors (the "503 from origin" column), because shedding is intended behavior.
+
+### Results at 10, 50, and 200 rps (LOCAL, after the fix)
+
+| Scenario | Target rps | Sent | Shed by generator | 503 from origin | Error % | p50 ms | p95 ms | p99 ms | Server cores avg/max | Server RSS MB | Resize children RSS MB (count) | Postgres cores avg/max | PG conns max |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| avatar-anon | 10 | 200 | 0 | 0 | 0 | 4.4 | 7.3 | 10.1 | 0/0 | 102.4 | 0 (0) | 0/0 | 2 |
+| avatar-anon | 50 | 1000 | 0 | 0 | 0 | 2.7 | 4.5 | 7 | 0.1/0.1 | 104.7 | 0 (0) | 0.1/0.1 | 2 |
+| avatar-anon | 200 | 4000 | 0 | 0 | 0 | 2 | 3.5 | 6.5 | 0.2/0.2 | 108.1 | 0 (0) | 0.2/0.2 | 7 |
+| avatar-keyed-hot | 10 | 200 | 0 | 0 | 0 | 3.4 | 4.9 | 6.5 | 0/0 | 110.2 | 0 (0) | 0/0 | 7 |
+| avatar-keyed-hot | 50 | 1000 | 0 | 0 | 0 | 1.7 | 2.8 | 5 | 0/0.1 | 110.9 | 0 (0) | 0/0.1 | 4 |
+| avatar-keyed-hot | 200 | 4000 | 0 | 0 | 0 | 0.9 | 2.2 | 2.8 | 0.1/0.1 | 110.9 | 0 (0) | 0.1/0.1 | 3 |
+| avatar-keyed-spread | 10 | 200 | 0 | 0 | 0 | 3.8 | 6 | 10.5 | 0/0 | 111 | 0 (0) | 0/0 | 11 |
+| avatar-keyed-spread | 50 | 1000 | 0 | 0 | 0 | 1.7 | 4 | 9.9 | 0.1/0.1 | 103.5 | 0 (0) | 0.1/0.1 | 11 |
+| avatar-keyed-spread | 200 | 4000 | 0 | 0 | 0 | 1.2 | 2.5 | 14.6 | 0.1/0.1 | 111.9 | 0 (0) | 0.2/0.2 | 11 |
+| u-warm | 10 | 200 | 0 | 0 | 0 | 2.8 | 5.1 | 5.8 | 0/0 | 111.9 | 0 (0) | 0/0 | 11 |
+| u-warm | 50 | 1000 | 0 | 0 | 0 | 2.3 | 4.1 | 6.1 | 0/0.1 | 111.9 | 0 (0) | 0/0 | 3 |
+| u-warm | 200 | 4000 | 0 | 0 | 0 | 1.5 | 2.8 | 5.8 | 0.1/0.2 | 112.9 | 0 (0) | 0.1/0.2 | 11 |
+| u-cold | 10 | 200 | 0 | 0 | 0 | 28.6 | 31.1 | 33.9 | 0/0 | 112.9 | 0 (0) | 0/0 | 11 |
+| u-cold | 50 | 1000 | 0 | 0 | 0 | 27 | 28.7 | 30.2 | 0/0.1 | 103.9 | 0 (0) | 0/0.1 | 2 |
+| u-cold | 200 | 4000 | 0 | 0 | 0 | 26.4 | 28.1 | 31.8 | 0.1/0.2 | 114.6 | 0 (0) | 0.1/0.2 | 11 |
+| img-cold | 10 | 200 | 0 | 0 | 0 | 157.6 | 181.8 | 194.4 | 1.7/1.9 | 139.3 | 60.6 (1) | 0/0 | 11 |
+| img-cold | 50 | 1000 | 0 | 693 | 0 | 53.3 | 766.1 | 797.2 | 2.6/2.7 | 147.8 | 147.7 (3) | 0/0.1 | 11 |
+| img-cold | 200 | 4000 | 0 | 3677 | 0 | 70.7 | 666.9 | 800.5 | 2.6/2.7 | 153.4 | 152.8 (3) | 0.1/0.1 | 11 |
+| profile | 10 | 200 | 0 | 0 | 0 | 3.5 | 5.4 | 7.6 | 0/0 | 145 | 0 (0) | 0/0 | 11 |
+| profile | 50 | 1000 | 0 | 0 | 0 | 2.3 | 3.4 | 5 | 0.1/0.1 | 146.5 | 0 (0) | 0/0.1 | 3 |
+| profile | 200 | 4000 | 0 | 0 | 0 | 2 | 3.7 | 5.5 | 0.2/0.2 | 147.8 | 0 (0) | 0.2/0.2 | 5 |
+
+Notes: "Shed by generator" is the generator's own 100-in-flight guard and was 0 everywhere, because the origin now answers excess work with a fast 503 instead of letting it pile up. Error % excludes 2xx, 3xx, 429, and 503; it was 0 in every step. The children count peaks at 3 with a cap of 2 because the sampler can catch a finished worker that has replied but not yet exited while its successor has already forked.
+
+### Before and after (LOCAL)
+
+| Check | Before (first run) | After (cap 2, batching 1 s) |
+|---|---|---|
+| `/img` cold, 50 rps: resize children at peak | 37 children, 2,469 MB | 3 children, 148 MB |
+| `/img` cold, 200 rps: resize children at peak | 88 children, 6,289 MB | 3 children, 153 MB |
+| `/img` cold, 200 rps: server RSS | 272 MB | 153 MB |
+| `/img` cold, 50 rps: p50 / p95 | 4,214 / 6,390 ms | 53 / 766 ms (requests that were served; 693 of 1,000 got a 503) |
+| `/img` cold, 200 rps: served / shed | 429 sent, 3,571 shed by the generator, p50 4,942 ms | 323 served, 3,677 answered 503, p50 71 ms |
+| `/img` cold, 10 rps (under the cap) | p50 157 ms, p99 198 ms | p50 158 ms, p99 194 ms, no 503 |
+| `avatar-keyed-hot`, 200 rps: p95 / p99 | 91.4 / 169.1 ms | 2.2 / 2.8 ms |
+| `avatar-keyed-hot`, 200 rps: Postgres cores avg | 0.4 | 0.1 |
+| `avatar-keyed-spread`, 200 rps: p95 | 13.9 ms | 2.5 ms |
+
+How to read it:
+
+1. **Memory is bounded.** With the cap, resize memory stays near 150 MB at any offered rate, against 6.3 GB uncapped. That is about 50 MB per child, below the 65 to 70 MB seen before, because a worker's peak RSS depends on how many run in parallel and on the 1024 px source here. Plan on 65 to 70 MB per worker for sizing and treat the lower number as local. Throughput on `/img` cold is about 15 served per second at cap 2 (307 and 323 served in 20 seconds), which is the machine's cap-limited transform rate, so a burst past that is shed rather than queued without bound.
+2. **The 503s are fast.** A shed request costs the origin almost nothing, so served-request latency in the overloaded steps stays under one second (p95 667 to 766 ms, which is roughly a full queue of 8 at about 65 ms per slot) instead of climbing to 6 seconds.
+3. **The hot-license gap is gone locally.** One license at 200 rps went from p95 91 ms to 2.2 ms, with Postgres CPU down from 0.4 to 0.1 cores, because the per-request rate-window and usage upserts became one flush per second. The other routes were unchanged within noise (the first run was on a busier machine, so do not read the small differences as gains). `bench-rate.mjs` measures `PgRateLimiter` and `PgUsageMeter` directly and was not re-run, since neither store's single-write cost changed; its numbers above are now the cost of one flush, not one request.
+4. **Still unmeasured:** behavior on a real 512 MB Fly VM (the local server process was not memory limited), the Neon commit latency that sets the flush cost, and several machines flushing the same hot key. The accuracy tradeoff for several machines is described in docs/deploy.md.
+
 ## Rate-window and usage upsert cost (LOCAL)
 
 Measured with `PgRateLimiter` and `PgUsageMeter` directly (`tools/loadtest/src/bench-rate.mjs`), 20,000 operations per row, pool of 10 connections, no HTTP:
@@ -81,7 +140,7 @@ Reading it:
 
 In the HTTP run, Postgres CPU stayed near 0.2 to 0.5 cores at 200 rps, and the per-request database work (visibility, repo status, key lookup, rate upsert, usage upsert) was small next to the redirect itself. Writes become the limiter for one license at roughly 3,000 requests per second on this machine, and for the whole database at roughly 9,000 rate-window upserts per second through a 10-connection pool. Neither is near the 200 rps tested here. The point to re-measure on Neon is the hot-license ceiling, because Neon commit latency is higher than local disk, and it directly sets that number.
 
-Proposed fixes if staging confirms it (a follow-up issue is filed with these numbers): an in-memory first tier that counts per license and flushes batched increments every second or so, and batching usage-counter increments the same way. Exact limits inside a window are already approximate across machines, so the accuracy loss is small. The image-resize memory finding is separate and more urgent: cap concurrent resize children (a small queue or a pool of long-lived workers) before any traffic reaches `/img` at volume.
+Proposed fixes if staging confirms it (a follow-up issue is filed with these numbers): an in-memory first tier that counts per license and flushes batched increments every second or so, and batching usage-counter increments the same way. Exact limits inside a window are already approximate across machines, so the accuracy loss is small. The image-resize memory finding is separate and more urgent: cap concurrent resize children (a small queue or a pool of long-lived workers) before any traffic reaches `/img` at volume. Both fixes shipped in #198; see the re-run section above.
 
 ## Cost note (LOCAL inputs, formula for staging)
 

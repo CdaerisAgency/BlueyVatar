@@ -186,6 +186,14 @@ describe.skipIf(!url)('postgres stores', () => {
     expect((await limiter.hit('ip:1', 2, 60)).remaining).toBe(1)
   })
 
+  it('adds a batched increment to a rate window in one write', async () => {
+    const limiter = new PgRateLimiter(pool)
+    expect((await limiter.hit('ip:batch', 10, 60, 4)).remaining).toBe(6)
+    expect((await limiter.hit('ip:batch', 10, 60, 7)).exceeded).toBe(true)
+    await pool.query(`UPDATE rate_windows SET reset_at = now() - interval '1 second'`)
+    expect((await limiter.hit('ip:batch', 10, 60, 3)).remaining).toBe(7)
+  })
+
   it('adds to monthly usage counters', async () => {
     const usage = new PgUsageMeter(pool)
     expect(await usage.add('lic1', 'origin_resolution')).toBe(1)
