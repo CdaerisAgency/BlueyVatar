@@ -46,6 +46,8 @@ export const BUCKETS = {
   'adminFail.ip': { limit: 10, windowSec: 15 * MIN },
   'adminAction.did': { limit: 120, windowSec: 10 * MIN },
   'adminAction.ip': { limit: 240, windowSec: 10 * MIN },
+  'appeal.did': { limit: 5, windowSec: HOUR },
+  'appeal.ip': { limit: 20, windowSec: HOUR },
   'export.did': { limit: 5, windowSec: HOUR },
   'export.ip': { limit: 20, windowSec: HOUR },
   'profileSave.did': { limit: 60, windowSec: HOUR },

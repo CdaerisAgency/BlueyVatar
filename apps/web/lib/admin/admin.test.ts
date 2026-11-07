@@ -3,6 +3,8 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ADMIN_SESSION_TTL_MS, adminDids, adminEnabled, isAdminDid } from './config'
 import { accountSummary, cleanReason, dismissReport, listActions, listReports, suspend, takedown, unblockImage, unsuspend } from './moderation'
+import { decideAppeal, listAppeals } from './appeals'
+import { appealableActions, submitAppeal } from '../appeals'
 import { notifyReporters } from './followup'
 import { purgerFromEnv } from './purge'
 import { consumeTotp, createAdminSession, readAdminSession, revokeAdminSession } from './session'
@@ -126,7 +128,7 @@ describe.skipIf(!url)('admin database operations', () => {
 
   it('suspend blocks images, lifts only suspension blocks, and keeps takedowns', async () => {
     purge.mockClear()
-    expect(await suspend(pool, purge, A, T, 'investigating')).toEqual({ ok: true, purged: true, blocked: 2 })
+    expect(await suspend(pool, purge, A, T, 'investigating')).toEqual({ ok: true, purged: true, blocked: 2, actionId: expect.any(Number) })
     expect(purge).toHaveBeenCalledWith(T, expect.arrayContaining(['bafyaaaaaaaaaa', 'bafybbbbbbbbbb']))
     expect((await suspend(pool, purge, A, T, 'twice')).ok).toBe(false)
     expect((await accountSummary(pool, T)).suspension?.reason).toBe('investigating')
@@ -149,7 +151,7 @@ describe.skipIf(!url)('admin database operations', () => {
   it('takedown blocks all images, actions the report, and audits; failed purge is reported', async () => {
     const id = await report()
     const failing = vi.fn(async () => false)
-    expect(await takedown(pool, failing, A, T, 'illegal', id)).toEqual({ ok: true, purged: false, blocked: 2, reportIds: [id] })
+    expect(await takedown(pool, failing, A, T, 'illegal', id)).toEqual({ ok: true, purged: false, blocked: 2, reportIds: [id], actionId: expect.any(Number) })
     expect((await pool.query('SELECT status FROM reports WHERE id = $1', [id])).rows[0].status).toBe('actioned')
     const acts = await listActions(pool, { did: T })
     expect(acts[0]).toMatchObject({ action: 'takedown', report_id: id, actor: A })
@@ -205,5 +207,42 @@ describe.skipIf(!url)('admin database operations', () => {
     expect(s.reports.total).toBeGreaterThanOrEqual(2)
     expect(s.actions.length).toBeGreaterThan(3)
     expect((await accountSummary(pool, 'did:plc:nobody')).repo).toBeNull()
+  })
+
+  it('appeals: owner files one per action, a different admin decides, overturn reverses, all audited', async () => {
+    const O = 'did:plc:appellant'
+    const M2 = 'did:plc:admin2'
+    await pool.query(`INSERT INTO images (did, rkey, cid, mime_type, rating, created_at) VALUES ($1, 'a', 'bafyccccccccccc', 'image/png', 'g', now())`, [O])
+    expect(await submitAppeal(pool, O, 1, 'x')).toEqual({ ok: false, error: 'not_eligible' })
+    const td = await takedown(pool, purge, A, O, 'bad image')
+    if (!td.ok) throw new Error('takedown')
+    expect((await appealableActions(pool, O)).map((a) => a.id)).toEqual([td.actionId])
+    expect(await appealableActions(pool, 'did:plc:other')).toEqual([])
+    expect(await submitAppeal(pool, 'did:plc:other', td.actionId, 'not mine')).toEqual({ ok: false, error: 'not_eligible' })
+    expect(await submitAppeal(pool, O, td.actionId, '   ')).toEqual({ ok: false, error: 'invalid' })
+    expect(await submitAppeal(pool, O, td.actionId, 'x'.repeat(2001))).toEqual({ ok: false, error: 'invalid' })
+    const first = await submitAppeal(pool, O, td.actionId, 'It was mine.')
+    expect(first.ok).toBe(true)
+    expect(await submitAppeal(pool, O, td.actionId, 'again')).toEqual({ ok: false, error: 'duplicate' })
+    const q = await listAppeals(pool, 'open')
+    expect(q.find((a) => a.did === O)).toMatchObject({ statement: 'It was mine.', action: 'takedown', action_by: A })
+    const id = first.ok ? first.id : 0
+    expect((await decideAppeal(pool, purge, A, id, 'overturned', 'same admin')).ok).toBe(false)
+    purge.mockClear()
+    expect(await decideAppeal(pool, purge, M2, id, 'overturned', 'verified owner')).toEqual({ ok: true, purged: true, did: O, appealId: id, outcome: 'overturned' })
+    expect(purge).toHaveBeenCalledWith(O, ['bafyccccccccccc'])
+    expect((await pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL', [O])).rowCount).toBe(0)
+    expect((await decideAppeal(pool, purge, M2, id, 'upheld', 'twice')).ok).toBe(false)
+    expect((await listActions(pool, { did: O }))[0]).toMatchObject({ actor: M2, action: 'appeal_overturned', reason: 'appeal #' + id + ': verified owner' })
+    expect(await appealableActions(pool, O)).toEqual([])
+    // Suspension: upheld keeps it, and the one appeal is spent.
+    const sp = await suspend(pool, purge, A, O, 'spam')
+    if (!sp.ok) throw new Error('suspend')
+    const second = await submitAppeal(pool, O, sp.actionId, 'Not spam.')
+    if (!second.ok) throw new Error('appeal')
+    expect((await decideAppeal(pool, purge, M2, second.id, 'upheld', 'it was spam')).ok).toBe(true)
+    expect((await accountSummary(pool, O)).suspension).not.toBeNull()
+    expect((await listActions(pool, { did: O }))[0]).toMatchObject({ action: 'appeal_upheld' })
+    expect((await listAppeals(pool, 'decided')).map((a) => a.status)).toEqual(expect.arrayContaining(['overturned', 'upheld']))
   })
 })

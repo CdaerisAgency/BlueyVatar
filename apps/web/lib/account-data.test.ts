@@ -78,6 +78,8 @@ describe.skipIf(!url)('account data export and deletion', () => {
     await q("INSERT INTO billing_customers (did, license_id, stripe_customer_id) VALUES ($1, $2, $3)", [did, `lic_${tag}`, `cus_${tag}`])
     await q("INSERT INTO subscriptions (stripe_subscription_id, stripe_customer_id, did, license_id, price_id, tier, status, last_event_at) VALUES ($1, $2, $3, $4, 'price', 'pro', 'active', now())", [`sub_${tag}`, `cus_${tag}`, did, `lic_${tag}`])
     await q("INSERT INTO stripe_events (event_id, type) VALUES ($1, 'x')", [`evt_${tag}`])
+    const act = await pool.query("INSERT INTO admin_actions (actor, action, target_did, reason) VALUES ('did:plc:mod', 'takedown', $1, 'internal reason') RETURNING id", [did])
+    await q("INSERT INTO appeals (did, action_id, statement, status, decided_by, decision_note, decided_at) VALUES ($1, $2, 'my statement', 'upheld', 'did:plc:mod2', 'internal note', now())", [did, act.rows[0].id])
   }
 
   it('exports every section for the DID only, masked and without secrets', async () => {
@@ -106,6 +108,10 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(text).not.toContain(HB)
     expect(text).not.toContain('spam')
     expect(text).not.toContain('secretblob')
+    expect(out.appeals).toEqual([expect.objectContaining({ appealed_action: 'takedown', statement: 'my statement', status: 'upheld' })])
+    expect(text).not.toContain('internal note')
+    expect(text).not.toContain('internal reason')
+    expect(text).not.toContain('did:plc:mod')
   })
 
   it('deletes every table for the DID, keeps billing rows marked, and leaves other users alone', async () => {
@@ -128,7 +134,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     for (const [t, col] of [
       ['email_links', 'did'], ['email_codes', 'did'], ['notice_emails', 'did'], ['oauth_session', 'sub'], ['web_session', 'did'], ['session_floor', 'did'], ['profile_links', 'did'],
       ['visibility_rules', 'did'], ['verification_state', 'did'], ['custom_domains', 'did'], ['images', 'did'], ['profiles', 'did'],
-      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'],
+      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'], ['appeals', 'did'],
     ] as const) expect(await count(t, col, A), t).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM api_keys WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM usage_counters WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
@@ -142,7 +148,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(sub.deleted_at).toBeInstanceOf(Date)
     expect(await count('stripe_events', 'event_id', 'evt_a')).toBe(1)
 
-    for (const [t, col] of [['email_links', 'did'], ['images', 'did'], ['licenses', 'owner'], ['claims', 'did'], ['custom_domains', 'did'], ['visibility_rules', 'did']] as const) expect(await count(t, col, B), t).toBeGreaterThan(0)
+    for (const [t, col] of [['email_links', 'did'], ['images', 'did'], ['licenses', 'owner'], ['claims', 'did'], ['custom_domains', 'did'], ['visibility_rules', 'did'], ['appeals', 'did']] as const) expect(await count(t, col, B), t).toBeGreaterThan(0)
     expect((await pool.query('SELECT deleted_at FROM subscriptions WHERE did = $1', [B])).rows[0].deleted_at).toBeNull()
   })
 

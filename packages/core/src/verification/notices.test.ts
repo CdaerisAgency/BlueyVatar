@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  keyRevokedNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  appealOutcomeNotice, keyRevokedNotice, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -95,5 +95,22 @@ describe('reportOutcomeNotice', () => {
       expect(n.text).not.toContain('Account:')
       expect(n.text + n.subject).not.toContain(String.fromCharCode(0x2014))
     }
+  })
+})
+
+describe('appeal notices', () => {
+  it('takedown and suspension notices link the appeal form for the action and are security notices', () => {
+    for (const n of [takedownNotice({ did: DID, actionId: 42, publicUrl: URL + '/' }), suspensionNotice({ did: DID, actionId: 42, publicUrl: URL })]) {
+      expect(n.text).toContain('https://blueyvatar.com/account/appeal?action=42')
+      expect(n.text).toContain('always sent')
+      expect(n.text + n.subject).not.toContain(String.fromCharCode(0x2014))
+    }
+  })
+  it('the outcome says reversed or kept and names no internal reason', () => {
+    const o = appealOutcomeNotice({ did: DID, appealId: 3, outcome: 'overturned', publicUrl: URL })
+    const u = appealOutcomeNotice({ did: DID, appealId: 4, outcome: 'upheld', publicUrl: URL })
+    expect(o.subject).toContain('#3')
+    expect(o.text).toContain('reversed')
+    expect(u.text).toContain('kept the decision')
   })
 })
