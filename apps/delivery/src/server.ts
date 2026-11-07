@@ -2,12 +2,13 @@ import { randomBytes } from 'node:crypto'
 import { serve } from '@hono/node-server'
 import type pg from 'pg'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
-import { ConsoleAlertSink, MemoryAlertLedger, UsageAlerts, type AlertLedger } from './alerts.js'
+import { emailSender, Notifier, pgNoticeDirectory } from '@blueyvatar/core/verification'
+import { ConsoleAlertSink, EmailAlertSink, MemoryAlertLedger, UsageAlerts, type AlertLedger } from './alerts.js'
 import { createApp } from './app.js'
 import { originLockWarning } from './origin.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
 import { scheduleRateWindowCleanup } from './rate-cleanup.js'
-import { createPool, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
+import { createPool, PgAlertLedger, pgLicenseOwner, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
 import { sandboxedResizer } from './resize.js'
 import { AtprotoResolver } from './resolver.js'
 import { MemoryIndexStore, type IndexStore } from './store.js'
@@ -29,6 +30,10 @@ function stores(): Stores {
 
 const { pool, index, licenses, limiter, usage, ledger } = stores()
 if (pool) scheduleRateWindowCleanup(pool)
+// Usage alerts go to the owner's primary email when a database is configured; otherwise they are logged.
+const alertSink = pool
+  ? new EmailAlertSink(new Notifier(emailSender(), pgNoticeDirectory(pool)), pgLicenseOwner(pool), process.env.PUBLIC_URL ?? 'https://blueyvatar.com')
+  : new ConsoleAlertSink()
 const originWarning = originLockWarning(process.env)
 if (originWarning) console.warn(originWarning)
 // Without a configured secret, /img URLs only work for this process's lifetime (local dev).
@@ -43,7 +48,7 @@ const app = createApp({
   licenses,
   limiter,
   usage,
-  alerts: new UsageAlerts(new ConsoleAlertSink(), ledger),
+  alerts: new UsageAlerts(alertSink, ledger),
   resize: sandboxedResizer(),
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
   profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,

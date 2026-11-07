@@ -1,4 +1,5 @@
 import { ENTITLEMENTS, type Tier } from '@blueyvatar/core'
+import { usageNotice, type Notifier } from '@blueyvatar/core/verification'
 import { periodStart } from './usage.js'
 
 /** Percent of included volume that triggers an alert (spec section 12). */
@@ -20,6 +21,36 @@ export interface AlertSink {
 export class ConsoleAlertSink implements AlertSink {
   async send(a: UsageAlert) {
     console.warn(`usage alert: license ${a.licenseId} reached ${a.threshold}% (${a.used}/${a.included}) for ${a.period}`)
+  }
+}
+
+/** Resolves a license to the DID that owns it, or null. */
+export type LicenseOwnerLookup = (licenseId: string) => Promise<string | null>
+
+/**
+ * Emails the license owner's primary address (spec section 12). When the owner has no address on file, or the
+ * lookup finds no owner, falls back to `fallback` (the console sink) so the alert is still logged.
+ * An owner who switched usage alerts off gets nothing.
+ */
+export class EmailAlertSink implements AlertSink {
+  constructor(
+    private notifier: Notifier,
+    private owner: LicenseOwnerLookup,
+    private publicUrl: string,
+    private fallback: AlertSink = new ConsoleAlertSink(),
+  ) {}
+
+  async send(a: UsageAlert) {
+    const did = await this.owner(a.licenseId)
+    if (!did) {
+      console.warn(`usage alert: license ${a.licenseId} has no owner on file; logging instead`)
+      return this.fallback.send(a)
+    }
+    const r = await this.notifier.send(did, 'usage', usageNotice({ did, threshold: a.threshold, used: a.used, included: a.included, period: a.period, publicUrl: this.publicUrl }))
+    if (r === 'no_address' || r === 'failed') {
+      console.warn(`usage alert: no email sent for license ${a.licenseId} (${r}); logging instead`)
+      await this.fallback.send(a)
+    }
   }
 }
 

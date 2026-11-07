@@ -103,6 +103,7 @@ export class PgIndexWrites implements IndexWrites {
       await c.query('DELETE FROM email_links WHERE did = $1', [did])
       await c.query('DELETE FROM email_codes WHERE did = $1', [did])
       await c.query('DELETE FROM notice_emails WHERE did = $1', [did])
+      await c.query('DELETE FROM notification_prefs WHERE did = $1', [did])
       await c.query('COMMIT')
     } catch (err) {
       await c.query('ROLLBACK').catch(() => {})

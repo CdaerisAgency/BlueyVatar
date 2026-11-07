@@ -5,6 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getDashboardStore, type KeyRow } from '../../../lib/dashboard-store'
+import { getNotifier } from '../../../lib/notify'
+import { PUBLIC_URL } from '../../../lib/oauth'
+import { keyRevokedNotice } from '@blueyvatar/core/verification'
 import { checkKeyLimit, cleanLabel, displayPrefix, generateKey, hashKey, parseDomainList, type KeyKind } from '../../../lib/keys'
 
 export interface KeyState {
@@ -60,7 +63,12 @@ export async function rotateKey(_prev: KeyState, form: FormData): Promise<KeySta
 
 export async function revokeKey(form: FormData): Promise<void> {
   const { store, license } = await ctx()
-  await store.revokeKey(license.licenseId, String(form.get('hash') ?? ''))
+  const hash = String(form.get('hash') ?? '')
+  const key = (await store.listKeys(license.licenseId)).find((k) => k.hash === hash && !k.revokedAt)
+  // revokeKey is true only for the call that revoked it, so a repeated submit sends one notice.
+  if ((await store.revokeKey(license.licenseId, hash)) && key) {
+    await getNotifier().send(license.owner, 'security', keyRevokedNotice({ did: license.owner, prefix: key.prefix, label: key.label, publicUrl: PUBLIC_URL }))
+  }
   revalidatePath('/account/keys')
 }
 
