@@ -1,9 +1,10 @@
 import { IdResolver } from '@atproto/identity'
 import {
-  BLUESKY_PROFILE_ADAPTER, detectAtprotoAppsForRepo, activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
+  BLUESKY_PROFILE_ADAPTER, LabelView, detectAtprotoAppsForRepo, activeAdapters, getPath, ratingFromLabels, readBlobRef, selfLabelValues,
   type Candidate, type ProfileAdapter, type Rating,
 } from '@blueyvatar/core'
 import { bytesMatchCid } from './cid.js'
+import { imageUri } from './label-block.js'
 import { BlobError, ByteLru, NegativeCache, normalizePdsEndpoint, parseMb } from './blob.js'
 import type { IndexStore } from './store.js'
 
@@ -204,9 +205,12 @@ export class AtprotoResolver implements AvatarResolver {
     // Same account-level label rule as avatars. Gallery images are never avatar candidates.
     if ((await this.readAccountLabels(identity)).hidden) return []
     const out: GalleryItem[] = []
+    const view = new LabelView(identity.did, await this.opts.index.labelsFor(identity.did))
     for (const img of await this.opts.index.galleryImages(identity.did)) {
       if (await this.opts.index.isBlocked(identity.did, img.cid)) continue
-      out.push({ cid: img.cid, rating: img.rating, caption: img.caption ?? null })
+      const uri = imageUri(identity.did, img.rkey)
+      if (view.recordRemoved(uri)) continue
+      out.push({ cid: img.cid, rating: view.effectiveRating(img.rating, uri), caption: img.caption ?? null })
     }
     return out
   }
@@ -244,16 +248,20 @@ export class AtprotoResolver implements AvatarResolver {
     const bskyRecord = labels.record
 
     const out: Candidate[] = []
+    const view = new LabelView(identity.did, await this.opts.index.labelsFor(identity.did))
+    if (view.accountRemoved()) return []
     const images = await this.opts.index.serviceImages(identity.did)
     const sorted = [...images].sort((a, b) =>
       a.isDefault === b.isDefault ? b.createdAt.localeCompare(a.createdAt) : a.isDefault ? -1 : 1)
     for (const img of sorted) {
       if (await this.opts.index.isBlocked(identity.did, img.cid)) continue
+      const uri = imageUri(identity.did, img.rkey)
+      if (view.recordRemoved(uri)) continue
       out.push({
         source: img.isDefault ? 'blueyvatar-default' : 'blueyvatar',
         did: identity.did,
         blob: { cid: img.cid, mimeType: img.mimeType },
-        rating: img.rating,
+        rating: view.effectiveRating(img.rating, uri),
         updatedAt: img.createdAt,
       })
     }
@@ -291,7 +299,9 @@ export class AtprotoResolver implements AvatarResolver {
         }
         if (await this.opts.index.isBlocked(identity.did, blob.cid)) continue
         // On app.bsky.actor.profile these labels cover the whole account (spec section 9).
-        const rating = ratingFromLabels(selfLabelValues(getPath(record, adapter.labelsPath)))
+        const recordUri = `at://${identity.did}/${adapter.collection}/${adapter.rkey}`
+        if (view.recordRemoved(recordUri)) continue
+        const rating = view.effectiveRating(ratingFromLabels(selfLabelValues(getPath(record, adapter.labelsPath))), recordUri)
         out.push({ source: `adapter:${adapter.id}`, did: identity.did, blob, rating })
       } catch (err) {
         this.log('adapter failed', { adapter: adapter.id, did: identity.did, err: String(err) })

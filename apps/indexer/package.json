@@ -15,11 +15,15 @@
     "ops:unblock": "tsc -p tsconfig.json && node dist/ops-block.js unblock"
   },
   "dependencies": {
+    "@atproto/common": "0.8.7",
+    "@atproto/identity": "0.5.20",
     "@atproto/tap": "0.4.17",
     "@blueyvatar/core": "workspace:*",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "ws": "8.22.1"
   },
   "devDependencies": {
-    "@types/pg": "8.23.1"
+    "@types/pg": "8.23.1",
+    "@types/ws": "^8.18.2"
   }
 }

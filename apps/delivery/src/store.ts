@@ -1,4 +1,4 @@
-import type { CropParams, IndexedLinkRecord, Rating } from '@blueyvatar/core'
+import type { CropParams, IndexedLinkRecord, Rating, SubjectLabel } from '@blueyvatar/core'
 
 /** Visibility rules a user sets for viewers (spec section 10.2). */
 export interface Visibility {
@@ -51,6 +51,8 @@ export interface IndexStore {
   imageCrop(did: string, cid: string): Promise<CropParams | null>
   /** Images removed from delivery after a report, keyed by blob CID. */
   isBlocked(did: string, cid: string): Promise<boolean>
+  /** Active enforced labels (not expired) on the DID and on its records, from the configured labelers. Issue #207. */
+  labelsFor(did: string): Promise<SubjectLabel[]>
   /** Claims whose latest attestation is verified and still matches the claim's uri, oldest first. */
   verifiedAccounts(did: string): Promise<VerifiedAccount[]>
   /** Indexed app.bsky.actor.link records of a repo, for resolving the profile's links strongRefs. */
@@ -68,6 +70,7 @@ export class MemoryIndexStore implements IndexStore {
   inactive = new Set<string>()
   blocked = new Set<string>()
   accounts = new Map<string, VerifiedAccount[]>()
+  labels = new Map<string, SubjectLabel[]>()
   linkRecords = new Map<string, IndexedLinkRecord[]>()
   /** DIDs with an entitling Plus subscription. */
   plusSubscribers = new Set<string>()
@@ -82,6 +85,7 @@ export class MemoryIndexStore implements IndexStore {
   async visibility(did: string) { return this.rules.get(did) ?? PUBLIC_VISIBILITY }
   async isRepoActive(did: string) { return !this.inactive.has(did) }
   async isBlocked(did: string, cid: string) { return this.blocked.has(`${did}/${cid}`) }
+  async labelsFor(did: string) { return this.labels.get(did) ?? [] }
   async verifiedAccounts(did: string) { return this.accounts.get(did) ?? [] }
   async profileLinks(did: string) { return this.linkRecords.get(did) ?? [] }
   async hasPlusSubscription(did: string) { return this.plusSubscribers.has(did) }

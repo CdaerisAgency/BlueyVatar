@@ -17,6 +17,7 @@ import { openApiDocument } from './openapi.js'
 import { BlobError } from './blob.js'
 import { ResizeBusyError, type Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
+import { labelBlocksBlob } from './label-block.js'
 import type { IndexStore, Visibility } from './store.js'
 import type { UsageMeter } from './usage.js'
 
@@ -586,7 +587,7 @@ export function createApp(deps: AppDeps) {
       c.header('cache-control', 'public, max-age=3600')
       return c.redirect(canonical, 302)
     }
-    if (!(await deps.index.isRepoActive(did)) || (await deps.index.isBlocked(did, cid))) {
+    if (!(await deps.index.isRepoActive(did)) || (await deps.index.isBlocked(did, cid)) || (await labelBlocksBlob(deps.index, did, cid))) {
       return fail(c, 404, 'not_found', 'Image unavailable')
     }
     // A public URL issued before the user switched to keyed only or a domain allowlist stays

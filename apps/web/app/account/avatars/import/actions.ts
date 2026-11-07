@@ -9,6 +9,7 @@ import { canAddImage, limitMessage, validateNewImage } from '../../../../lib/rec
 import { resolvePlan } from '../../../../lib/plan'
 import { reportError } from '../../../../lib/obs'
 import { limited } from '../../../../lib/rate-guard'
+import { screenUpload } from '../../../../lib/upload-screen'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -33,6 +34,8 @@ export async function confirmImport(form: FormData): Promise<void> {
     const img = await loadImport(did, source)
     const ready = await prepareUpload(img.bytes)
     if (!ready.ok) throw new RepoError(ready.error)
+    const screened = await screenUpload(did, ready.value.bytes, ready.value.mime) // after downscaling, before the PDS write
+    if (!screened.ok) throw new RepoError(screened.error)
     await saveNewImage(session, ready.value.bytes, ready.value.mime, fields.value)
   } catch (err) {
     reportError('import failed', err)

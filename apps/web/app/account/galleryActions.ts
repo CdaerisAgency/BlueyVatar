@@ -6,6 +6,7 @@ import { RepoError, repoSession } from '../../lib/repo'
 import { limited } from '../../lib/rate-guard'
 import { prepareUpload } from '../../lib/server-resize'
 import { checkUploadForm } from '../../lib/upload-caps'
+import { screenUpload } from '../../lib/upload-screen'
 import { GALLERY_PLUS_MESSAGE, addGalleryImage, deleteGalleryImage, isPlus, moveGalleryImage, validateGalleryFields } from '../../lib/gallery'
 import { reportError } from '../../lib/obs'
 
@@ -32,6 +33,8 @@ export async function uploadGalleryImage(form: FormData): Promise<void> {
   const bytes = new Uint8Array(await file.arrayBuffer())
   const img = await prepareUpload(bytes) // downscales above 4096 px; rejects only above the byte cap
   if (!img.ok) return back('galleryError', img.error)
+  const screened = await screenUpload(did, img.value.bytes, img.value.mime) // after downscaling, before the PDS write
+  if (!screened.ok) return back('galleryError', screened.error)
   const input = {
     alt: String(form.get('alt') ?? ''),
     caption: String(form.get('caption') ?? ''),
