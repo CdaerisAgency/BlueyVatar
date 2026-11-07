@@ -117,7 +117,7 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])
     await c.query('DELETE FROM attestations WHERE claim_did = $1', [did])
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
-    // Cascades to api_keys, usage_counters, and usage_alerts. Billing rows no longer depend on the license (migration 0019).
+    // Cascades to api_keys, usage_counters, and usage_alerts. Billing rows no longer depend on the license (migration 0021).
     await c.query('DELETE FROM licenses WHERE owner = $1', [did])
     await c.query('UPDATE billing_customers SET deleted_at = coalesce(deleted_at, now()) WHERE did = $1', [did])
     await c.query("UPDATE subscriptions SET deleted_at = coalesce(deleted_at, now()), status = CASE WHEN status = 'incomplete' THEN 'incomplete_expired' ELSE 'canceled' END WHERE did = $1", [did])

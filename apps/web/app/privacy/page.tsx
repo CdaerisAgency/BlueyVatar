@@ -1,5 +1,6 @@
 import { PageMain } from '../../components/Page'
-export const metadata = { title: 'Privacy' }
+import { pageMetadata } from '../../lib/site'
+export const metadata = pageMetadata('/privacy', 'Privacy | blueyvatar', 'What blueyvatar keeps about you on its own servers, including how we store email hashes.')
 
 export default function PrivacyPage() {
   return (

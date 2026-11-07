@@ -8,6 +8,7 @@ import { confirmLink, sendCode } from '../lib/link'
 import { emailLinkScope, signInScope } from '../lib/oauth'
 import { failed, limited, lockedOut } from '../lib/rate-guard'
 import { getStore } from '../lib/store'
+import { reportError } from '../lib/obs'
 
 const to = (path: string, key: string, value: string): never => redirect(`${path}?${key}=${encodeURIComponent(value)}`)
 
@@ -16,7 +17,7 @@ async function authorize(input: string, scope: string, state: 'login' | 'link'):
   try {
     url = await (await oauthClient()).authorize(input, { scope, state })
   } catch (err) {
-    console.error('oauth authorize failed', err instanceof Error ? err.message : 'unknown')
+    reportError('oauth authorize failed', err)
     if (state === 'login') await failed('loginFail.ip')
     return to(state === 'login' ? '/login' : '/account', 'error', 'Could not start sign-in. Check the handle and try again.')
   }
