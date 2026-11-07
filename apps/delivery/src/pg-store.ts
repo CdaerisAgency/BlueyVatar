@@ -78,7 +78,7 @@ export class PgIndexStore implements IndexStore {
   }
 
   async isBlocked(did: string, cid: string): Promise<boolean> {
-    const { rowCount } = await this.pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND cid = $2', [did, cid])
+    const { rowCount } = await this.pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND cid = $2 AND unblocked_at IS NULL', [did, cid])
     return (rowCount ?? 0) > 0
   }
 
