@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../../lib/auth'
 import { loadImport } from '../../../../lib/import-load'
 import { RepoError, listImages, repoSession, saveNewImage } from '../../../../lib/repo'
+import { prepareUpload } from '../../../../lib/server-resize'
 import { canAddImage, limitMessage, validateNewImage } from '../../../../lib/records'
 import { resolvePlan } from '../../../../lib/plan'
 import { reportError } from '../../../../lib/obs'
@@ -30,7 +31,9 @@ export async function confirmImport(form: FormData): Promise<void> {
     const plan = await resolvePlan(did)
     if (!canAddImage((await listImages(session)).length, plan)) return back('error', limitMessage(plan))
     const img = await loadImport(did, source)
-    await saveNewImage(session, img.bytes, img.mime, fields.value)
+    const ready = await prepareUpload(img.bytes)
+    if (!ready.ok) throw new RepoError(ready.error)
+    await saveNewImage(session, ready.value.bytes, ready.value.mime, fields.value)
   } catch (err) {
     reportError('import failed', err)
     return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')

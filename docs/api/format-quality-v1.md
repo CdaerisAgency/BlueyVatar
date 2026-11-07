@@ -41,8 +41,16 @@ There is no `w` or `h` parameter. Only `s`, which sets both sides.
 
 Why:
 
-- Avatars are square and are center-cropped to a square at upload, so a non-square output would need a second crop with no good default.
+- Avatars are square. Delivery crops the stored original to a square before resizing, using the crop saved on the image record when there is one and the center square otherwise (see "Crop and original size" below), so a non-square output would need a second crop with no good default.
 - Every new width and height pair would add its own cached object per CID, multiplying cache variants and purge cost. The size ladder keeps that set small and fixed.
 - Gravatar uses a single square `s`. Staying square keeps drop-in parity with Gravatar clients (see [gravatar-differences-v1.md](gravatar-differences-v1.md)).
 
 Callers who need a non-square box should request a square size and crop or fit it with CSS. This decision can be revisited if a concrete use case appears.
+
+## Crop and original size
+
+The image record keeps the full original. Delivery makes the square.
+
+- **Crop.** A `com.blueyvatar.image` record may carry `crop`, with integers `x`, `y`, and `size`, each in units of 1/10000 of the image. `x` is the left edge as a fraction of the width, `y` is the top edge as a fraction of the height, and `size` is the side as a fraction of the shorter side. Delivery applies it before it resizes to `s`. With no `crop`, delivery takes the center square. The values are measured on the image as displayed, with any EXIF orientation applied. A square that would leave the image is moved back inside it, and a `crop` with a missing or out-of-range value is ignored. The record format is in spec section 5.
+- **Same URL, same crop.** An `/img` path is keyed by blob CID, so a crop is part of the cached image for that blob. The web editor writes the crop with the new record, and changing the crop of an existing record takes a new upload.
+- **Upload size.** Any resolution is accepted. Images above 4096 pixels on the long side are shrunk to 4096 before they are stored, in the browser first and by the server as a fallback. The upload limit is 5 MiB (5,242,880 bytes). A larger file is rejected with an error that names the limit.

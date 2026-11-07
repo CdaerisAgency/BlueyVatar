@@ -1,4 +1,4 @@
-# blueyvatar - Product Spec v8
+# blueyvatar - Product Spec v9
 
 Nov 3, 2026 by @Chris Duncan
 
@@ -25,6 +25,11 @@ Build instructions live in the repository README at the repo root, and this spec
 **Scope of this version**
 
 This is a product spec. It defines what the service does and why, and leaves build sequencing to the implementation work. Items with no published answer are listed as open in section 13.
+
+## Changes in v9
+
+- The record keeps the full original image. The web editor no longer uploads a cropped square. A new optional `crop` field on `com.blueyvatar.image` holds the square the user chose, and delivery applies it before resizing (section 5).
+- Uploads of any resolution are accepted. The browser, and the server as a fallback, shrink an image whose long edge is above 4096 pixels. The byte cap rises from 1,000,000 to 5 MiB (5,242,880 bytes), the reference PDS default (section 5).
 
 ## Changes in v6
 
@@ -90,7 +95,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 29 | Custom profile domains | G | Paid tier feature | v2 |
 | 30 | Open source and self-hosting | L, A | Publish the delivery layer under an open license | Later |
 
-Note on row 13: width and height are not added. Avatars are square and center-cropped at upload, non-square outputs would multiply cache variants, and a single square `s` keeps parity with Gravatar. `fmt` (png, jpeg, webp) and `q` (1 to 100, default 85) are the transforms. The image path encodes both. Details are in `docs/api/format-quality-v1.md`.
+Note on row 13: width and height are not added. Avatars are square and cropped to a square at delivery, non-square outputs would multiply cache variants, and a single square `s` keeps parity with Gravatar. `fmt` (png, jpeg, webp) and `q` (1 to 100, default 85) are the transforms. The image path encodes both. Details are in `docs/api/format-quality-v1.md`.
 
 ## 4. atproto architecture
 
@@ -140,16 +145,26 @@ The service defines three record types in the user's repository and keeps everyt
         "type": "object",
         "required": ["image", "createdAt"],
         "properties": {
-          "image": { "type": "blob", "accept": ["image/png", "image/jpeg"], "maxSize": 1000000 },
+          "image": { "type": "blob", "accept": ["image/png", "image/jpeg"], "maxSize": 5242880 },
           "alt": { "type": "string", "maxGraphemes": 300 },
           "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
           "license": { "type": "string", "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"] },
+          "crop": { "type": "ref", "ref": "#crop" },
           "isDefault": { "type": "boolean" },
           "purpose": { "type": "string", "knownValues": ["avatar", "gallery"], "maxLength": 32 },
           "caption": { "type": "string", "maxGraphemes": 140, "maxLength": 1400 },
           "sort": { "type": "integer" },
           "createdAt": { "type": "string", "format": "datetime" }
         }
+      }
+    },
+    "crop": {
+      "type": "object",
+      "required": ["x", "y", "size"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "y": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "size": { "type": "integer", "minimum": 1, "maximum": 10000 }
       }
     }
   }
@@ -160,13 +175,17 @@ The service defines three record types in the user's repository and keeps everyt
 
 Gallery rules follow the avatar rules. The gallery is a Plus user feature (section 11.2), gated by the same plan check as other Plus features (a Plus subscription, or a `PLUS_DIDS` manual grant). The profile JSON carries `gallery`, an array of `{ url, caption }`, and it is empty for Free users. The profile page renders it for Plus users only. Each image passes the same filters as an avatar: the account-level `!no-unauthenticated` label hides the gallery, blocked images (section 9) never appear, and only rating `g` images show. URLs are signed `/img` paths (512 pixel PNG) under the visibility rules of section 10, never PDS URLs. A profile shows at most 12 gallery images (`GALLERY_MAX`). The web avatar editor lists avatar records only.
 
-**Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
+**Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and any resolution, keeps the full original, and crops at delivery instead.
 
-- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified by delivery. The web editor adds a square crop box for non-square images (drag, zoom, and keyboard operable, default is this same center crop). The chosen region is rendered in the browser and uploaded as the image, so for a cropped upload the stored file is the cropped square. A square image, an image the browser cannot decode, and any upload through the API are stored as given and cropped at delivery.
+- **Full original.** The blob in the record is the image as the user chose it, not a cropped copy. The web editor never crops the file. This reverses the earlier behavior where the editor uploaded only the cropped square (PR #187). Keeping the whole image means a later change to the crop, or a new output size, never needs pixels that were thrown away.
+- **Crop parameters.** The optional `crop` field says which square of the original to show. It has three integers, `x`, `y`, and `size`, each in units of 1/10000 of the image, because atproto records cannot hold floating-point numbers. `x` is the left edge as a fraction of the width, `y` is the top edge as a fraction of the height, and `size` is the side as a fraction of the shorter side, so `{ "x": 0, "y": 0, "size": 10000 }` is the top-left square of the whole short side. Fractions of the same image stay valid when a copy is downscaled. They are measured on the image as displayed, with any EXIF orientation applied, which is what a browser decodes. `x`, `y`, and `size` must all be present and in range, or the field is ignored. A square that would leave the image is moved back inside it.
+- **Square crop at delivery.** Delivery applies the record's `crop` to the original, then resizes (`fit: cover`). With no `crop`, it center-crops a non-square source to a square (centered position). Both are deterministic and not content-aware, and the stored original is never modified by delivery. The indexer stores the three values on the `images` row (migration 0029) and the `/img` route reads them for the blob it serves. If two records in one repo point at the same blob (a PDS stores identical bytes once) with different crops, the newest record's crop wins. The web editor adds a square crop box for non-square images (drag, zoom, and keyboard operable, default is the same center crop). The box fills the crop fields and does not change the file. A box left at the center crop sends no `crop`. A square image, an image the browser cannot decode, and any upload through the API are stored as given and take the center crop unless a `crop` is written.
 - **Minimum size.** Sources must be at least 80 pixels on both sides. The web editor rejects smaller images with a clear message, and delivery treats a smaller source as an invalid image rather than upscaling it.
-- **Client resize.** Before upload, the web editor downscales images in the browser with a canvas to at most 2048 pixels on the long side, then re-encodes toward the 1,000,000 byte cap: JPEG at quality 0.92, 0.85, then 0.75, with a PNG kept as PNG if it fits. This is best effort, so phone photos usually pass but the result is not guaranteed. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
+- **Any resolution, shrunk automatically.** Uploads are accepted at any resolution and are shrunk, not rejected. The long edge is capped at 4096 pixels. The upload byte cap is 5 MiB (5,242,880 bytes), which is the reference PDS default `blobUploadLimit` (`5 * 1024 * 1024` in [`packages/pds/src/config/config.ts`](https://github.com/bluesky-social/atproto/blob/main/packages/pds/src/config/config.ts)). The only rejection for size is a file above the byte cap, with an error that says so.
+- **Client resize.** Before upload, the web editor decodes the image, and if the long edge is above 4096 pixels or the file is above the byte cap, it draws the whole frame to a canvas at no more than 4096 pixels on the long side (aspect ratio kept, no crop) and re-encodes under the cap: a PNG stays PNG if it fits, otherwise JPEG at quality 0.92, 0.85, then 0.75, then smaller sizes in a few steps. An image within 4096 pixels and under the cap is uploaded untouched. This is best effort, so the result is not guaranteed. Because an untouched file is uploaded as is, its metadata, such as location, stays in the public blob. The editor says so next to the file input.
+- **Server fallback.** For uploads that skipped the browser step (API or direct uploads, the Gravatar and Libravatar imports, a browser that cannot decode the file), the web server downscales an image whose long edge is above 4096 pixels with sharp. It keeps the whole frame, applies the EXIF orientation (so a crop measured on the displayed image still lines up), and re-encodes under the byte cap. Concurrency goes through the same limiter as delivery resizes (issue #198, IMG_MAX_CONCURRENT, IMG_QUEUE_MAX, and IMG_QUEUE_WAIT_MS), with defaults of one at a time and a queue of four in the web process, and a busy answer asks the user to retry. Input is limited to 48,000,000 pixels with `failOn` set to `warning`. This resize runs inside the web process with no forked child, a trade-off that keeps the fallback small. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
 
-The blob limits copy the Bluesky avatar field so a user can reuse one file in both places. The license values are placeholders for the user-declared license in section 10.
+The blob size limit is the reference PDS default. It is higher than the Bluesky avatar limit, so a file above 1,000,000 bytes is accepted here but cannot be reused as a Bluesky avatar as it is. The license values are placeholders for the user-declared license in section 10.
 
 **Two constraints shape this model.**
 

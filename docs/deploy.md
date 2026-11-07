@@ -168,7 +168,7 @@ When a limit is hit, server actions show "Too many requests. Try again in N minu
 
 The per-code cap of 5 attempts and the 60 second resend gap still apply. Report submissions keep their own limit of 5 per IP per hour.
 
-Per-account caps, enforced on the server: images by plan (Free 3, Plus 20), gallery images (`GALLERY_MAX`), 10 linked emails, 10 profile links, claims (`MAX_CLAIMS`, checked against both the repo and the database), one custom domain, and active keys by tier. Uploads must carry exactly one file of at most 1,000,000 bytes, checked before the file is read, whatever the browser resized. Server actions accept bodies up to 2 MB.
+Per-account caps, enforced on the server: images by plan (Free 3, Plus 20), gallery images (`GALLERY_MAX`), 10 linked emails, 10 profile links, claims (`MAX_CLAIMS`, checked against both the repo and the database), one custom domain, and active keys by tier. Uploads must carry exactly one file of at most 5 MiB (5,242,880 bytes, the reference PDS default), checked before the file is read, whatever the browser resized. An image above 4096 pixels on the long side is downscaled by the web server with sharp if the browser did not already do it (spec section 5). Server actions accept bodies up to 6 MB.
 ## Email routing
 
 Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It receives and forwards only; it does not send mail.
@@ -576,6 +576,8 @@ Every cold `/img` variant, `/default` avatar, and QR PNG forks one sharp worker.
 | `IMG_QUEUE_MAX` | `8` | Jobs allowed to wait for a slot. A request past this is shed at once. |
 | `IMG_QUEUE_WAIT_MS` | `3000` | Longest a job waits for a slot before it is shed. |
 | `RATE_BATCH_MS` | `1000` | Flush period for the in-memory rate-window and usage counters (see below). `0` writes through on every request. |
+
+The web app reads the same three variables for the server-side upload downscale (issue #203), with its own defaults of `1`, `4`, and `5000`.
 
 Sizing for 512 MB: the Node parent measured 92 to 272 MB resident in the local runs (the 32 MB blob cache included), which leaves about 240 MB. Two workers at 65 to 70 MB is 130 to 140 MB, with the rest as headroom for a larger source image (the worker accepts up to 40 megapixels, which decodes to far more than a 1024 px avatar) and for the OS. Three would fit a typical avatar and not a large one, so the default is 2. Not measured on Fly: if `fly logs` shows no out-of-memory kills under a burst of cold variants, raise it; on a 1 GB VM use 4. A shed request gets `503` with `Retry-After: 2`, `Cache-Control: no-store`, and error code `overloaded`, so Cloudflare does not cache it and the client retries.
 

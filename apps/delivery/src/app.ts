@@ -600,7 +600,9 @@ export function createApp(deps: AppDeps) {
     let bytes: Uint8Array
     try {
       const original = await deps.resolver.getBlob(identity, cid)
-      bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
+      // The record's crop picks the square before the resize (spec section 5); none means the center crop.
+      const crop = (await deps.index.imageCrop(did, cid)) ?? undefined
+      bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY, ...(crop ? { crop } : {}) })
     } catch (err) {
       if (err instanceof ResizeBusyError) return overloaded(c, err)
       logger.warn('image fetch or resize failed', { requestId: c.get('requestId' as never), did, kind: err instanceof BlobError ? err.kind : 'resize', err })

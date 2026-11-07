@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { bskyAvatarBlob, fetchRemoteImage, gravatarUrl, isAllowedImportUrl, libravatarUrl, parseImportSource, readCapped, suggestedRating } from './import'
 import { parseSourceParam } from './import-load'
+import { MAX_BLOB_BYTES } from './upload-limits'
 
 const H = 'a'.repeat(64)
 const PNG = (() => {
@@ -60,7 +61,8 @@ describe('bskyAvatarBlob', () => {
   it('explains each rejection', () => {
     expect(bskyAvatarBlob({})).toMatchObject({ ok: false, error: expect.stringContaining('no avatar') })
     expect(bskyAvatarBlob(rec({ mimeType: 'image/webp', size: 5 }))).toMatchObject({ ok: false, error: expect.stringContaining('PNG and JPEG') })
-    expect(bskyAvatarBlob(rec({ mimeType: 'image/png', size: 1_000_001 }))).toMatchObject({ ok: false, error: expect.stringContaining('1,000,000') })
+    expect(bskyAvatarBlob(rec({ mimeType: 'image/png', size: MAX_BLOB_BYTES + 1 }))).toMatchObject({ ok: false, error: expect.stringContaining('5,242,880') })
+    expect(bskyAvatarBlob(rec({ mimeType: 'image/png', size: MAX_BLOB_BYTES }))).toMatchObject({ ok: true })
   })
 })
 
@@ -81,8 +83,8 @@ describe('capped fetch', () => {
   })
   it('rejects non-image bytes and oversize bodies', async () => {
     expect(await fetchRemoteImage(libravatarUrl(H), 'Libravatar', (async () => res(new TextEncoder().encode('GIF89a..'))) as typeof fetch)).toMatchObject({ ok: false, error: expect.stringContaining('PNG and JPEG') })
-    const big = await fetchRemoteImage(libravatarUrl(H), 'Libravatar', (async () => res(new Uint8Array(1_000_001))) as typeof fetch)
-    expect(big).toMatchObject({ ok: false, error: expect.stringContaining('1,000,000') })
+    const big = await fetchRemoteImage(libravatarUrl(H), 'Libravatar', (async () => res(new Uint8Array(MAX_BLOB_BYTES + 1))) as typeof fetch)
+    expect(big).toMatchObject({ ok: false, error: expect.stringContaining('5,242,880') })
   })
   it('follows redirects only to allowed hosts', async () => {
     const ok = vi.fn()

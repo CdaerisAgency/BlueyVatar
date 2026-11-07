@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_BLOB_BYTES,
+  MAX_LONG_EDGE,
   canAddImage,
+  parseCropFields,
   imageLimit,
   isValidTimezone,
   labelValues,
@@ -73,6 +75,14 @@ describe('image bytes', () => {
     expect(validateImageBytes(pngBytes(80, 80)).ok).toBe(true)
     expect(validateImageBytes(pngBytes(79, 500))).toMatchObject({ ok: false, error: expect.stringContaining('80 by 80') })
     expect(validateImageBytes(pngBytes(500, 79)).ok).toBe(false)
+  })
+  it('uses the reference PDS blob limit of 5 MiB', () => {
+    expect(MAX_BLOB_BYTES).toBe(5 * 1024 * 1024)
+    expect(validateImageBytes(pngBytes(100, 100, MAX_BLOB_BYTES))).toMatchObject({ ok: false, error: expect.stringContaining('5 MB') })
+  })
+  it('accepts a long edge above 4096 and reports the size, so the server can downscale instead of rejecting', () => {
+    expect(MAX_LONG_EDGE).toBe(4096)
+    expect(validateImageBytes(pngBytes(8000, 6000))).toMatchObject({ ok: true, value: { width: 8000, height: 6000 } })
   })
   it('rejects empty and unsupported files', () => {
     expect(validateImageBytes(new Uint8Array(0)).ok).toBe(false)
@@ -156,5 +166,30 @@ describe('validateProfile', () => {
     expect(validateProfile({ ...blank, pronouns: 'x'.repeat(41) }).ok).toBe(false)
     expect(validateProfile({ ...blank, company: 'x'.repeat(101) }).ok).toBe(false)
     expect(validateProfile({ ...blank, timezone: 'Nope/Nope' }).ok).toBe(false)
+  })
+})
+
+describe('crop fields', () => {
+  it('treats blank fields as no crop', () => {
+    expect(parseCropFields({})).toEqual({ ok: true, value: undefined })
+    expect(parseCropFields({ cropX: '', cropY: ' ', cropSize: '' })).toEqual({ ok: true, value: undefined })
+  })
+  it('reads three integers in 1/10000 units', () => {
+    expect(parseCropFields({ cropX: '2500', cropY: '0', cropSize: '5000' })).toEqual({ ok: true, value: { x: 2500, y: 0, size: 5000 } })
+  })
+  it.each([
+    [{ cropX: '1', cropY: '2' }],
+    [{ cropX: '1.5', cropY: '0', cropSize: '5' }],
+    [{ cropX: '-1', cropY: '0', cropSize: '5' }],
+    [{ cropX: '0', cropY: '0', cropSize: '0' }],
+    [{ cropX: '0', cropY: '0', cropSize: '10001' }],
+    [{ cropX: 'a', cropY: '0', cropSize: '5' }],
+  ])('rejects %j', (input) => expect(parseCropFields(input)).toMatchObject({ ok: false, error: expect.stringContaining('crop') }))
+  it('puts the crop in the new image fields only when given', () => {
+    const base = { alt: '', rating: 'g', license: 'personal', isDefault: false }
+    expect(validateNewImage(base)).toMatchObject({ ok: true, value: { license: 'personal' } })
+    expect((validateNewImage(base) as { value: object }).value).not.toHaveProperty('crop')
+    expect(validateNewImage({ ...base, cropX: '1000', cropY: '2000', cropSize: '6000' })).toMatchObject({ ok: true, value: { crop: { x: 1000, y: 2000, size: 6000 } } })
+    expect(validateNewImage({ ...base, cropX: '1000' })).toMatchObject({ ok: false })
   })
 })

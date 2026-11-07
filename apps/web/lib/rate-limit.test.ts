@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { checkUploadForm } from './upload-caps'
+import { MAX_BLOB_BYTES } from './upload-limits'
 import {
   BUCKETS, checkLimits, clientIp, formatRetry, isLockedOut, limitedMessage, limitedResponse, memoryRateStore, pgRateStore, recordFailure,
   type BucketName, type RateStore,
@@ -128,8 +129,14 @@ describe('upload caps', () => {
     empty.append('file', file(0))
     expect(checkUploadForm(empty).ok).toBe(false)
     const big = new FormData()
-    big.append('file', file(1_000_001))
-    expect(checkUploadForm(big)).toMatchObject({ ok: false })
+    big.append('file', file(MAX_BLOB_BYTES + 1))
+    expect(checkUploadForm(big)).toMatchObject({ ok: false, error: expect.stringContaining('5 MB') })
+    const atCap = new FormData()
+    atCap.append('file', file(MAX_BLOB_BYTES))
+    expect(checkUploadForm(atCap).ok).toBe(true)
+    const oldCap = new FormData()
+    oldCap.append('file', file(1_000_001)) // the old 1 MB cap no longer rejects
+    expect(checkUploadForm(oldCap).ok).toBe(true)
     const two = new FormData()
     two.append('file', file(5))
     two.append('file', file(5))

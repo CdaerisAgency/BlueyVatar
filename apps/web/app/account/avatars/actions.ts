@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, deleteImage, listImages, repoSession, saveNewImage, setDefaultImage } from '../../../lib/repo'
 import { limited } from '../../../lib/rate-guard'
-import { validateImageBytes, validateNewImage } from '../../../lib/records'
+import { validateNewImage } from '../../../lib/records'
+import { prepareUpload } from '../../../lib/server-resize'
 import { reportError } from '../../../lib/obs'
 import { checkUploadForm } from '../../../lib/upload-caps'
 
@@ -24,12 +25,12 @@ export async function uploadImage(form: FormData): Promise<void> {
   const did = await signedIn()
   const wait = await limited(['upload.did', 'upload.ip'], did)
   if (wait) return back('error', wait)
-  // Count and size are checked here whatever the browser resized; dimensions are checked in validateImageBytes below.
+  // Count and size are checked here whatever the browser resized; prepareUpload checks the type and dimensions and downscales.
   const picked = checkUploadForm(form)
   if (!picked.ok) return back('error', picked.error)
   const file = picked.value
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const img = validateImageBytes(bytes)
+  const img = await prepareUpload(bytes) // downscales above 4096 px; rejects only above the byte cap
   if (!img.ok) return back('error', img.error)
   const fields = validateNewImage({
     alt: String(form.get('alt') ?? ''),
@@ -37,11 +38,14 @@ export async function uploadImage(form: FormData): Promise<void> {
     rLabel: String(form.get('rLabel') ?? ''),
     license: String(form.get('license') ?? ''),
     isDefault: form.get('isDefault') === 'on',
+    cropX: String(form.get('cropX') ?? ''),
+    cropY: String(form.get('cropY') ?? ''),
+    cropSize: String(form.get('cropSize') ?? ''),
   })
   if (!fields.ok) return back('error', fields.error)
 
   try {
-    await saveNewImage(await repoSession(did), bytes, img.value.mime, fields.value)
+    await saveNewImage(await repoSession(did), img.value.bytes, img.value.mime, fields.value)
   } catch (err) {
     return fail(err)
   }

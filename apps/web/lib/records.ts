@@ -2,13 +2,14 @@
  * Pure validation and mapping for the record editor (spec sections 5, 9, 11.2).
  * Limits mirror lexicons/com/blueyvatar/*.json.
  */
-import { RATINGS, isPlusDid, normalizeBackgroundColor, type Rating } from '@blueyvatar/core'
+import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE } from './upload-limits'
+import { RATINGS, isPlusDid, normalizeBackgroundColor, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
 
 export const IMAGE_COLLECTION = 'com.blueyvatar.image'
 export const PROFILE_COLLECTION = 'com.blueyvatar.profile'
 export const SELF_LABELS_TYPE = 'com.atproto.label.defs#selfLabels'
 
-export const MAX_BLOB_BYTES = 1_000_000
+export { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE }
 export const LICENSES = ['personal', 'cc-by', 'cc-by-nc', 'all-rights-reserved'] as const
 export type License = (typeof LICENSES)[number]
 export const DEFAULT_LICENSE: License = 'personal'
@@ -132,15 +133,16 @@ export function readImageSize(bytes: Uint8Array): { width: number; height: numbe
 
 export const TOO_SMALL_MESSAGE = `The image is smaller than ${MIN_IMAGE_PX} by ${MIN_IMAGE_PX} pixels. Choose a larger image.`
 
-export function validateImageBytes(bytes: Uint8Array): Check<{ mime: ImageMime; size: number }> {
+/** Checks the type, the byte cap, and the 80 pixel minimum. A long edge above MAX_LONG_EDGE is not an error: the server downscales it (lib/server-resize.ts). */
+export function validateImageBytes(bytes: Uint8Array): Check<{ mime: ImageMime; size: number; width: number; height: number }> {
   if (bytes.length === 0) return fail('Choose an image file.')
-  if (bytes.length > MAX_BLOB_BYTES) return fail('The image is larger than 1,000,000 bytes. Resize or compress it and try again.')
+  if (bytes.length > MAX_BLOB_BYTES) return fail(MAX_BLOB_MESSAGE)
   const mime = sniffImageMime(bytes)
   if (!mime) return fail('Only PNG and JPEG images are supported.')
   const dim = readImageSize(bytes)
   if (!dim) return fail('The image could not be read. Choose a valid PNG or JPEG.')
   if (Math.min(dim.width, dim.height) < MIN_IMAGE_PX) return fail(TOO_SMALL_MESSAGE)
-  return ok({ mime, size: bytes.length })
+  return ok({ mime, size: bytes.length, width: dim.width, height: dim.height })
 }
 
 export function validateAlt(raw: string): Check<string> {
@@ -159,7 +161,17 @@ export function limitMessage(plan: Plan): string {
   return `The ${plan === 'free' ? 'Free' : 'Plus'} plan allows ${imageLimit(plan)} images. Delete one to add another.`
 }
 
-export type NewImageInput = {
+/** The three crop form fields (integers in 1/10000 of the image, see CROP_SCALE). All blank means no crop, so delivery centers. */
+export type CropInput = { cropX?: string; cropY?: string; cropSize?: string }
+
+export function parseCropFields(input: CropInput): Check<CropParams | undefined> {
+  const raw = [input.cropX, input.cropY, input.cropSize].map((v) => (v ?? '').trim())
+  if (raw.every((v) => v === '')) return ok(undefined)
+  const crop = raw.every((v) => /^\d{1,5}$/.test(v)) ? parseCrop({ x: Number(raw[0]), y: Number(raw[1]), size: Number(raw[2]) }) : null
+  return crop ? ok(crop) : fail('The crop could not be read. Adjust it and try again.')
+}
+
+export type NewImageInput = CropInput & {
   alt: string
   rating: string
   rLabel?: string
@@ -169,6 +181,8 @@ export type NewImageInput = {
 
 export type NewImageFields = {
   alt?: string
+  /** Square region of the full original to show. Absent means the center crop. */
+  crop?: CropParams
   labels?: ReturnType<typeof selfLabels>
   license: License
   isDefault: boolean
@@ -188,9 +202,12 @@ export function validateNewImage(input: NewImageInput): Check<NewImageFields> {
   }
   const license = parseLicense(input.license)
   if (!license.ok) return license
+  const crop = parseCropFields(input)
+  if (!crop.ok) return crop
   const labels = selfLabels(rating.value, rLabel)
   return ok({
     ...(alt.value ? { alt: alt.value } : {}),
+    ...(crop.value ? { crop: crop.value } : {}),
     ...(labels ? { labels } : {}),
     license: license.value,
     isDefault: input.isDefault,

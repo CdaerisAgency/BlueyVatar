@@ -11,6 +11,7 @@ const migration3 = readFileSync(new URL('../../../db/migrations/0003_usage_alert
 const migration2 = readFileSync(new URL('../../../db/migrations/0002_web_auth.sql', import.meta.url), 'utf8')
 const migration7 = readFileSync(new URL('../../../db/migrations/0008_blocked_images.sql', import.meta.url), 'utf8')
 const migration14 = readFileSync(new URL('../../../db/migrations/0014_gallery.sql', import.meta.url), 'utf8')
+const migration29 = readFileSync(new URL('../../../db/migrations/0029_image_crop.sql', import.meta.url), 'utf8')
 const migration15 = readFileSync(new URL('../../../db/migrations/0015_billing.sql', import.meta.url), 'utf8')
 const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_domain.sql', import.meta.url), 'utf8')
 const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
@@ -36,6 +37,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration6)
     await pool.query(migration7)
     await pool.query(migration14)
+    await pool.query(migration29)
     await pool.query(migration15)
     await pool.query(migration16)
     await pool.query(migration17)
@@ -90,7 +92,7 @@ describe.skipIf(!url)('postgres stores', () => {
       [DID],
     )
     expect(await index.serviceImages(DID)).toEqual([
-      { rkey: 'r1', cid: 'bafyone', mimeType: 'image/png', rating: 'pg', isDefault: true, purpose: 'avatar', caption: null, sort: null, createdAt: '2026-01-01T00:00:00.000Z' },
+      { rkey: 'r1', cid: 'bafyone', mimeType: 'image/png', rating: 'pg', isDefault: true, purpose: 'avatar', caption: null, sort: null, crop: null, createdAt: '2026-01-01T00:00:00.000Z' },
     ])
     expect(await index.isRepoActive(DID)).toBe(true)
     await pool.query(`INSERT INTO repos (did, active, status) VALUES ($1, false, 'takendown')`, [DID])
@@ -100,6 +102,24 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await index.isBlocked(DID, 'bafyone')).toBe(true)
     await pool.query(`UPDATE blocked_images SET unblocked_at = now() WHERE did = $1`, [DID])
     expect(await index.isBlocked(DID, 'bafyone')).toBe(false)
+  })
+
+  it('reads the crop saved with an image and treats a missing or partial crop as the center crop', async () => {
+    const index = new PgIndexStore(pool)
+    const did = 'did:plc:cropper'
+    const ins = (rkey: string, cid: string, crop: [number | null, number | null, number | null]) =>
+      pool.query(
+        `INSERT INTO images (did, rkey, cid, mime_type, rating, created_at, crop_x, crop_y, crop_size) VALUES ($1, $2, $3, 'image/png', 'g', now(), $4, $5, $6)`,
+        [did, rkey, cid, ...crop],
+      )
+    await ins('c1', 'bafycropped', [1000, 2500, 6000])
+    await ins('c2', 'bafyplain', [null, null, null])
+    expect(await index.imageCrop(did, 'bafycropped')).toEqual({ x: 1000, y: 2500, size: 6000 })
+    expect((await index.serviceImages(did)).find((i) => i.cid === 'bafycropped')?.crop).toEqual({ x: 1000, y: 2500, size: 6000 })
+    expect(await index.imageCrop(did, 'bafyplain')).toBeNull()
+    expect(await index.imageCrop(did, 'bafyunknown')).toBeNull()
+    await expect(ins('c3', 'bafybad', [1, null, 5])).rejects.toThrow()
+    await expect(ins('c4', 'bafybad2', [0, 0, 10001])).rejects.toThrow()
   })
 
   it('hasPlusSubscription follows status and the past-due grace period', async () => {

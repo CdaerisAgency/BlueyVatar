@@ -7,6 +7,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./crop": { "types": "./dist/crop.d.ts", "default": "./dist/crop.js" },
     ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
     "./verification": { "types": "./dist/verification/index.d.ts", "default": "./dist/verification/index.js" }
   },

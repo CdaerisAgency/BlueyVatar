@@ -2,23 +2,19 @@
 
 import { useState, type ReactNode } from 'react'
 
-/** Wraps the file input in a form that reports the file it would post instead of posting it. */
+/** Wraps the file input in a form that reports the file and the crop fields it would post instead of posting them. */
 export default function Report({ children }: { children: ReactNode }) {
   const [out, setOut] = useState('')
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault()
-        const file = new FormData(e.currentTarget).get('file') as File
+        const data = new FormData(e.currentTarget)
+        const file = data.get('file') as File
         const bmp = await createImageBitmap(file)
-        const c = document.createElement('canvas')
-        c.width = bmp.width
-        c.height = bmp.height
-        const ctx = c.getContext('2d')!
-        ctx.drawImage(bmp, 0, 0)
-        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data
-        const top = r! > 200 ? 'red' : g! > 200 ? 'green' : b! > 200 ? 'blue' : 'other'
-        setOut(`${file.type} ${bmp.width}x${bmp.height} ${file.size <= 1_000_000 ? 'under-cap' : 'over-cap'} top-left=${top}`)
+        const crop = ['cropX', 'cropY', 'cropSize'].map((k) => String(data.get(k) ?? ''))
+        const cropText = crop.every((v) => v === '') ? 'none' : crop.join(',')
+        setOut(`${file.type} ${bmp.width}x${bmp.height} ${file.size <= 5 * 1024 * 1024 ? 'under-cap' : 'over-cap'} crop=${cropText}`)
         bmp.close()
       }}
     >

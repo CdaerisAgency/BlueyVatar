@@ -1,4 +1,4 @@
-import { MAX_BLOB_BYTES } from './records'
+import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE } from './records'
 
 /** Files accepted in one upload request. The client sends one; anything more is refused. */
 export const MAX_FILES_PER_UPLOAD = 1
@@ -12,6 +12,6 @@ export function checkUploadForm(form: FormData): { ok: true; value: File } | { o
   const files = form.getAll('file').filter((f): f is File => f instanceof File)
   if (files.length === 0 || files[0]!.size === 0) return { ok: false, error: 'Choose an image file.' }
   if (files.length > MAX_FILES_PER_UPLOAD) return { ok: false, error: 'Upload one image at a time.' }
-  if (files[0]!.size > MAX_BLOB_BYTES) return { ok: false, error: 'The image is larger than 1,000,000 bytes. Resize or compress it and try again.' }
+  if (files[0]!.size > MAX_BLOB_BYTES) return { ok: false, error: MAX_BLOB_MESSAGE }
   return { ok: true, value: files[0]! }
 }
