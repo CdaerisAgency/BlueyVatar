@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailHash, emailMd5, isMd5Hex, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
-  parseAvatarParams, ParamError, pickCandidate, imagePath, snapSize, ladderPaths, IMAGE_SIZE_LADDER, readBlobRef, selfLabelValues,
+  parseAvatarParams, ParamError, pickCandidate, imagePath, imageFile, imageSig, verifyImageSig, scopeExpired, snapSize, ladderPaths, IMAGE_SIZE_LADDER, readBlobRef, selfLabelValues,
   activeAdapters, DEFAULT_ADAPTERS, sanitizeProfileLinks, resolveProfileLinks, type Candidate,
 } from './index.js'
 
@@ -83,32 +83,40 @@ describe('resolution', () => {
     expect(pickCandidate([c('g', 'blueyvatar')], 'g', true)).toEqual({ kind: 'default' })
   })
   it('builds an immutable path with a file extension', () => {
-    expect(imagePath('did:plc:x', 'bafy', 80, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/80.png')
-    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 60)).toBe('/img/did%3Aplc%3Ax/bafy/80-q60.webp')
+    const sig = imageSig('s3cret', 'did:plc:x', 'bafy', '80.png')
+    expect(imagePath('s3cret', 'did:plc:x', 'bafy', 80, 'png')).toBe(`/img/did%3Aplc%3Ax/bafy/${sig}/80.png`)
+    expect(imagePath('s3cret', 'did:plc:x', 'bafy', 80, 'webp', 70)).toMatch(/^\/img\/did%3Aplc%3Ax\/bafy\/[A-Za-z0-9_-]{22}\/80-q60\.webp$/)
+    expect(verifyImageSig('s3cret', 'did:plc:x', 'bafy', '80.png', sig)).toBe('')
+    expect(verifyImageSig('other', 'did:plc:x', 'bafy', '80.png', sig)).toBeNull()
+    const scoped = imageSig('s3cret', 'did:plc:x', 'bafy', '80.png', 'k:L1:20000')
+    expect(verifyImageSig('s3cret', 'did:plc:x', 'bafy', '80.png', scoped)).toBe('k:L1:20000')
+    expect(scopeExpired('k:L1:20000', 20001 * 86_400_000)).toBe(false)
+    expect(scopeExpired('k:L1:20000', 20002 * 86_400_000)).toBe(true)
   })
-  it('builds one canonical path per variant', () => {
+  it('builds one canonical file name per variant', () => {
     // Off-ladder sizes snap up, off-set qualities snap to the nearest allowed one.
-    expect(imagePath('did:plc:x', 'bafy', 100, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/128.png')
-    expect(imagePath('did:plc:x', 'bafy', 2048, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/2048.png')
-    expect(imagePath('did:plc:x', 'bafy', 3000, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/2048.png')
-    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 70)).toBe('/img/did%3Aplc%3Ax/bafy/80-q60.webp')
-    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 100)).toBe('/img/did%3Aplc%3Ax/bafy/80.webp')
+    expect(imageFile(100, 'png')).toBe('128.png')
+    expect(imageFile(2048, 'png')).toBe('2048.png')
+    expect(imageFile(3000, 'png')).toBe('2048.png')
+    expect(imageFile(80, 'webp', 70)).toBe('80-q60.webp')
+    expect(imageFile(80, 'webp', 100)).toBe('80.webp')
     // PNG ignores quality, and the default quality has no suffix.
-    expect(imagePath('did:plc:x', 'bafy', 80, 'png', 60)).toBe('/img/did%3Aplc%3Ax/bafy/80.png')
-    expect(imagePath('did:plc:x', 'bafy', 80, 'jpeg', 85)).toBe('/img/did%3Aplc%3Ax/bafy/80.jpeg')
+    expect(imageFile(80, 'png', 60)).toBe('80.png')
+    expect(imageFile(80, 'jpeg', 85)).toBe('80.jpeg')
+    expect(imagePath('s3cret', 'did:plc:x', 'bafy', 100, 'webp', 70)).toMatch(/\/128-q60\.webp$/)
   })
   it('snaps sizes up to the ladder and keeps every tier cap on a ladder step', () => {
     expect(snapSize(1)).toBe(16)
     expect(snapSize(81)).toBe(96)
     for (const cap of [512, 1024, 2048]) expect(snapSize(cap)).toBe(cap)
   })
-  it('lists every canonical path for purge', () => {
-    const paths = ladderPaths('did:plc:x', 'bafy')
+  it('lists every canonical signed path for purge', () => {
+    const paths = ladderPaths('s3cret', 'did:plc:x', 'bafy')
     expect(paths).toHaveLength(IMAGE_SIZE_LADDER.length * 5)
     expect(new Set(paths).size).toBe(paths.length)
-    expect(paths).toContain('/img/did%3Aplc%3Ax/bafy/512.png')
-    expect(paths).toContain('/img/did%3Aplc%3Ax/bafy/512-q60.jpeg')
-    expect(paths).toContain('/img/did%3Aplc%3Ax/bafy/512.webp')
+    expect(paths).toContain(imagePath('s3cret', 'did:plc:x', 'bafy', 512, 'png'))
+    expect(paths).toContain(imagePath('s3cret', 'did:plc:x', 'bafy', 512, 'jpeg', 60))
+    expect(paths).toContain(imagePath('s3cret', 'did:plc:x', 'bafy', 512, 'webp'))
     expect(paths.some((x) => x.includes('-q85') || x.endsWith('-q60.png'))).toBe(false)
   })
 })

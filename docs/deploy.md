@@ -45,7 +45,7 @@ fly apps create blueyvatar-tap
 fly volumes create tap_data --app blueyvatar-tap --region iad --size 10
 
 # Secrets (see the per-app list below; values come from Infisical)
-fly secrets set --app blueyvatar-delivery DATABASE_URL=... DATABASE_URL_DIRECT=... ORIGIN_SECRET=...
+fly secrets set --app blueyvatar-delivery DATABASE_URL=... DATABASE_URL_DIRECT=... ORIGIN_SECRET=... IMG_SIGNING_SECRET=...
 fly secrets set --app blueyvatar-tap TAP_ADMIN_PASSWORD=...
 
 # Deploy. Tap first, delivery before web and indexer.
@@ -97,7 +97,7 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing
 
 1. Add the zone. Point the web hostname and the delivery hostname at their Fly apps with proxied (orange cloud) CNAME records: `blueyvatar-web.fly.dev` and `blueyvatar-delivery.fly.dev`. Set SSL/TLS mode to Full (strict). Exact record names depend on how web and delivery are split across hostnames and are not decided.
 2. Fly certificates. Add each hostname to its app: `fly certs add <hostname> --app <app>`, then `fly certs show` to read the records Fly needs. For a Cloudflare-proxied hostname, Fly's docs say to add the `_fly-ownership` TXT record, after which Fly can issue the certificate through the proxy with the HTTP-01 challenge (this can still fail, depending on configuration). If the HTTP-01 challenge is blocked, add the `_acme-challenge` CNAME shown by `fly certs setup` for DNS-01, or import a Cloudflare Origin Certificate. Use Full or Full (strict); Flexible can cause redirect loops. Source: <https://docs.fly.io/networking/custom-domain>.
-3. Caching: `/img/*` responses end in `.png`, `.jpeg`, or `.webp` and send `Cache-Control: public, max-age=31536000, immutable`, so the default cache rules cache them. The `/avatar` and `/u` redirects send `private`, so they are not cached. Confirm after deploy with `curl -sI https://<host>/img/...` and check `CF-Cache-Status` goes from `MISS` to `HIT`, and that redirects show no `HIT`. Do not add a Cache Everything rule.
+3. Caching: `/img/*` responses end in `.png`, `.jpeg`, or `.webp` (the path is `/img/{did}/{cid}/{signature}/{size}.{ext}`, signed with `IMG_SIGNING_SECRET`; an unsigned or edited path gets 403 `invalid_signature`) and send `Cache-Control: public, max-age=31536000, immutable`, so the default cache rules cache them. The `/avatar` and `/u` redirects send `private`, so they are not cached. Confirm after deploy with `curl -sI https://<host>/img/...` and check `CF-Cache-Status` goes from `MISS` to `HIT`, and that redirects show no `HIT`. Do not add a Cache Everything rule.
 4. delivery sets `TRUST_CLOUDFLARE=true` (in `fly/delivery.toml`) so rate limits read `CF-Connecting-IP`.
 5. Origin lockdown (acceptance item in issue 53): `TRUST_CLOUDFLARE=true` makes `CF-Connecting-IP` spoofable by anyone who reaches `blueyvatar-delivery.fly.dev` directly, so the origin rejects requests that skip Cloudflare using a shared secret header. Set `ORIGIN_SECRET` on delivery (generate with `openssl rand -hex 32`, store in Infisical). When it is set, every request except `GET /healthz` must carry `x-origin-auth` with that value, or delivery answers 403 with error code `origin_forbidden`. When it is unset, delivery accepts all requests and logs a startup warning if `TRUST_CLOUDFLARE=true`. Fly's own health checks reach `/healthz` directly, which the exemption allows. Add the header at the edge:
    1. In the Cloudflare dashboard, select the zone and open Rules, Overview.
@@ -121,8 +121,8 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 
 | App | Secrets (Fly secrets) |
 | --- | --- |
-| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`; optional `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
-| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`; re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`); optional `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
+| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
+| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`); optional `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
 | web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; `DATABASE_URL` (pooled) if web reads the database |
 | tap | `TAP_ADMIN_PASSWORD` |
 
