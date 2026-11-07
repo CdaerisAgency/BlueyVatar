@@ -7,6 +7,7 @@ import { RepoError, listImages, repoSession, saveNewImage } from '../../../../li
 import { canAddImage, limitMessage, validateNewImage } from '../../../../lib/records'
 import { resolvePlan } from '../../../../lib/plan'
 import { reportError } from '../../../../lib/obs'
+import { limited } from '../../../../lib/rate-guard'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -22,6 +23,8 @@ export async function confirmImport(form: FormData): Promise<void> {
     isDefault: form.get('isDefault') === 'on',
   })
   if (!fields.ok) return redirect(`/account/avatars/import?source=${encodeURIComponent(source)}&error=${encodeURIComponent(fields.error)}`)
+  const wait = await limited(['import.did', 'import.ip'], did)
+  if (wait) return back('error', wait)
   try {
     const session = await repoSession(did)
     const plan = await resolvePlan(did)

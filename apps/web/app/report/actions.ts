@@ -3,6 +3,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getPool } from '../../lib/store'
+import { clientIp } from '../../lib/rate-limit'
 import { hashIp, parseReport, submitReport } from '../../lib/reports'
 import { reportError } from '../../lib/obs'
 
@@ -17,7 +18,7 @@ export async function submitReportAction(form: FormData): Promise<void> {
   const pool = getPool()
   if (!pool) return redirect(dest('error'))
   const h = await headers()
-  const ip = h.get('cf-connecting-ip') ?? h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const ip = clientIp(h)
   let status = 'sent'
   try {
     const res = await submitReport(pool, parsed.value, hashIp(ip, process.env.REPORT_IP_SECRET ?? process.env.SESSION_SECRET ?? 'blueyvatar'))

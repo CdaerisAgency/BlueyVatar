@@ -6,6 +6,7 @@ import { checkCode, MAX_ATTEMPTS } from '../lib/codes'
 import { currentDid, oauthClient } from '../lib/auth'
 import { confirmLink, sendCode } from '../lib/link'
 import { emailLinkScope, signInScope } from '../lib/oauth'
+import { failed, limited, lockedOut } from '../lib/rate-guard'
 import { getStore } from '../lib/store'
 import { reportError } from '../lib/obs'
 
@@ -17,14 +18,20 @@ async function authorize(input: string, scope: string, state: 'login' | 'link'):
     url = await (await oauthClient()).authorize(input, { scope, state })
   } catch (err) {
     reportError('oauth authorize failed', err)
+    if (state === 'login') await failed('loginFail.ip')
     return to(state === 'login' ? '/login' : '/account', 'error', 'Could not start sign-in. Check the handle and try again.')
   }
   return redirect(url.toString())
 }
 
 export async function login(form: FormData): Promise<void> {
+  const wait = (await lockedOut('loginFail.ip')) ?? (await limited(['login.ip']))
+  if (wait) return to('/login', 'error', wait)
   const id = parseIdentifier(String(form.get('handle') ?? ''))
-  if (!id || id.kind === 'hash') return to('/login', 'error', 'Enter a valid handle such as alice.bsky.social.')
+  if (!id || id.kind === 'hash') {
+    await failed('loginFail.ip')
+    return to('/login', 'error', 'Enter a valid handle such as alice.bsky.social.')
+  }
   await authorize(id.value, signInScope(), 'login')
 }
 
@@ -32,12 +39,16 @@ export async function login(form: FormData): Promise<void> {
 export async function linkEmail(): Promise<void> {
   const did = await currentDid()
   if (!did) return redirect('/login')
+  const wait = await limited(['login.did', 'login.ip'], did)
+  if (wait) return to('/account', 'error', wait)
   await authorize(did, emailLinkScope(), 'link')
 }
 
 export async function addEmail(form: FormData): Promise<void> {
   const did = await currentDid()
   if (!did) return redirect('/login')
+  const wait = await limited(['addEmail.did', 'addEmail.ip'], did)
+  if (wait) return to('/account', 'error', wait)
   let outcome
   try {
     outcome = await sendCode(did, String(form.get('email') ?? ''))
@@ -51,6 +62,9 @@ export async function addEmail(form: FormData): Promise<void> {
 export async function verifyCode(form: FormData): Promise<void> {
   const did = await currentDid()
   if (!did) return redirect('/login')
+  // Failures count per account across codes, so asking for a fresh code does not reset the guess budget.
+  const locked = await lockedOut('codeFail.did', did)
+  if (locked) return to('/account', 'error', locked)
   const store = getStore()
   const pending = await store.codes.get(did)
   if (!pending) return to('/account', 'error', 'No code is pending. Request a new one.')
@@ -65,6 +79,7 @@ export async function verifyCode(form: FormData): Promise<void> {
     return to('/account', 'error', 'That code expired. Request a new one.')
   }
   if (result.reason === 'locked') return to('/account', 'error', `Too many attempts (max ${MAX_ATTEMPTS}). Request a new code.`)
+  await failed('codeFail.did', did)
   await store.codes.setAttempts(did, result.attempts)
   return to('/account/verify', 'error', 'That code is not right.')
 }

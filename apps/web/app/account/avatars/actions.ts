@@ -3,8 +3,10 @@
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, deleteImage, listImages, repoSession, saveNewImage, setDefaultImage } from '../../../lib/repo'
+import { limited } from '../../../lib/rate-guard'
 import { validateImageBytes, validateNewImage } from '../../../lib/records'
 import { reportError } from '../../../lib/obs'
+import { checkUploadForm } from '../../../lib/upload-caps'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -20,11 +22,12 @@ function fail(err: unknown): never {
 
 export async function uploadImage(form: FormData): Promise<void> {
   const did = await signedIn()
-  const file = form.get('file')
-  if (!(file instanceof File) || file.size === 0) return back('error', 'Choose an image file.')
-  // Reject oversized files before reading them into memory.
-  if (file.size > 1_000_000) return back('error', 'The image is larger than 1,000,000 bytes. Resize or compress it and try again.')
-  // Size and minimum dimension (80px) are checked in validateImageBytes below.
+  const wait = await limited(['upload.did', 'upload.ip'], did)
+  if (wait) return back('error', wait)
+  // Count and size are checked here whatever the browser resized; dimensions are checked in validateImageBytes below.
+  const picked = checkUploadForm(form)
+  if (!picked.ok) return back('error', picked.error)
+  const file = picked.value
   const bytes = new Uint8Array(await file.arrayBuffer())
   const img = validateImageBytes(bytes)
   if (!img.ok) return back('error', img.error)
