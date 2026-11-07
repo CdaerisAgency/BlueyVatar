@@ -27,4 +27,21 @@ describe('indexer handlers', () => {
     expect(db.deleteImage).toHaveBeenCalledWith('did:plc:a', '3k')
     expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined)
   })
+  it('purges indexed images and the Bluesky avatar when the profile changes, so a label change takes effect', async () => {
+    const db = fakeDb()
+    await handleRecord({
+      did: 'did:plc:a', collection: 'app.bsky.actor.profile', rkey: 'self', action: 'update',
+      record: {
+        avatar: { $type: 'blob', ref: { $link: 'bafyavatar' }, mimeType: 'image/jpeg', size: 10 },
+        labels: { $type: 'com.atproto.label.defs#selfLabels', values: [{ val: '!no-unauthenticated' }] },
+      },
+    }, db)
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a')
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafyavatar'])
+  })
+  it('purges once when the Bluesky profile is deleted', async () => {
+    const db = fakeDb()
+    await handleRecord({ did: 'did:plc:a', collection: 'app.bsky.actor.profile', rkey: 'self', action: 'delete' }, db)
+    expect(db.purgeImages).toHaveBeenCalledTimes(1)
+  })
 })

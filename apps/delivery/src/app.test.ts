@@ -162,6 +162,22 @@ describe('delivery API', () => {
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
   })
 
+  it('treats a profile with no candidates, as a labeled one yields, like any default response', async () => {
+    const withAvatar = setup()
+    const labeled = setup([])
+    for (const path of ['/u/alice.test?d=identicon', `/avatar/${emailHash('alice@example.com')}?d=identicon`]) {
+      const a = await withAvatar.app.request(path)
+      const b = await labeled.app.request(path)
+      expect(b.status).toBe(302)
+      expect(b.headers.get('location')).toMatch(/^\/default\/identicon\/80\.png/)
+      expect(b.headers.get('cache-control')).toBe('private, max-age=86400')
+      expect(a.headers.get('location')).toMatch(/^\/img\//)
+    }
+    const json = await (await labeled.app.request('/u/alice.test?json=true')).json()
+    expect(json).toMatchObject({ found: false, source: 'default', rating: null, url: null })
+    expect((await (await labeled.app.request('/profile/alice.test')).json()).avatar).toBeNull()
+  })
+
   it('returns profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
