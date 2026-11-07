@@ -23,6 +23,7 @@ describe('severity', () => {
 describe('SLA', () => {
   it('is configurable and ignores bad entries', () => {
     expect(slaHours({})).toEqual(DEFAULT_SLA_HOURS)
+    expect(DEFAULT_SLA_HOURS).toEqual({ critical: 72, high: 72, moderate: 72, low: 72 })
     expect(slaHours({ MODERATION_SLA_HOURS: 'critical=1, high=12,bogus=3,low=-4,moderate=abc' })).toEqual({ ...DEFAULT_SLA_HOURS, critical: 1, high: 12 })
   })
   it('computes due time, breach, and a readable timer', () => {

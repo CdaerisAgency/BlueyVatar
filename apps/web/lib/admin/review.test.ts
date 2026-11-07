@@ -124,13 +124,14 @@ describe.skipIf(!url)('review portal', () => {
     const now = new Date()
     const [x, y] = await Promise.all([nextCase(pool, 'unreviewed', A, now), nextCase(pool, 'unreviewed', B, now)])
     expect(new Set([x, y])).toEqual(new Set([a, b]))
-    expect(x).toBe(a)
-    expect(await nextCase(pool, 'unreviewed', A, now)).toBe(a)
+    // The two requests race, so either reviewer may get either case. Assert on what each one got.
+    expect(await nextCase(pool, 'unreviewed', A, now)).toBe(x)
     expect(await nextCase(pool, 'unreviewed', 'did:plc:third', now)).toBeNull()
-    await skipCase(pool, a, A)
+    await skipCase(pool, x!, A)
     expect(await nextCase(pool, 'unreviewed', A, now)).toBeNull()
-    expect(await nextCase(pool, 'unreviewed', B, now)).toBe(b)
-    await releaseCase(pool, b, B)
+    expect(await nextCase(pool, 'unreviewed', B, now)).toBe(y)
+    await releaseCase(pool, y!, B)
+    // Both cases are free for B now, so the higher severity one (a) comes first whichever reviewer held it before.
     expect(await nextCase(pool, 'unreviewed', B, now)).toBe(a)
   })
 
@@ -338,7 +339,7 @@ describe.skipIf(!url)('review portal', () => {
     await ins('critical', '2026-12-01T00:00:00Z', '2026-12-01T01:00:00Z', '2026-12-01T03:00:00Z')
     await ins('critical', '2026-12-01T00:00:00Z', '2026-12-01T03:00:00Z', '2026-12-01T09:00:00Z')
     await ins('low', '2026-11-30T00:00:00Z', null, null)
-    const m = await moderationMetrics(pool, slaHours({}), now)
+    const m = await moderationMetrics(pool, slaHours({ MODERATION_SLA_HOURS: 'critical=4' }), now)
     expect(m.firstAction).toEqual({ count: 2, medianHours: 2 })
     expect(m.resolve).toMatchObject({ count: 2, medianHours: 6, withinSla: 1, bySeverity: { critical: { count: 2, withinSla: 1 } } })
     expect(m.backlog).toMatchObject({ open: 1, oldestHours: 36, medianHours: 36 })

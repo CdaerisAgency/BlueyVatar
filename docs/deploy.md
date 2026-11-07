@@ -258,7 +258,7 @@ Review portal settings (all optional). The web app reads the first three. The in
 
 | Variable | Value |
 | --- | --- |
-| `MODERATION_SLA_HOURS` | Hours to first resolution per severity, as `critical=4,high=24,moderate=72,low=168` (these are the defaults). Missing or invalid entries keep the default. |
+| `MODERATION_SLA_HOURS` | Hours to first resolution per severity, as `critical=72,high=72,moderate=72,low=72` (every severity defaults to 72 hours). Missing or invalid entries keep the default. |
 | `MODERATION_POLICIES` | The policy list reviewers cite, as `id=Label;id2=Label two`. Ids are lowercase letters, digits, and hyphens. Replaces the built-in list (child safety, illegal content, adult content rating, copyright, impersonation, harassment, private information, spam and abuse, no violation found). |
 | `MODERATION_CHILD_SAFETY_DIDS` | When set, only these admin DIDs can open the child-safety queue or act on its cases. Unset means every admin can. Ask counsel who should have access. |
 
