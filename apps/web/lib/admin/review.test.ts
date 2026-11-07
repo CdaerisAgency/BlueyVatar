@@ -131,7 +131,8 @@ describe.skipIf(!url)('review portal', () => {
     expect(await nextCase(pool, 'unreviewed', A, now)).toBeNull()
     expect(await nextCase(pool, 'unreviewed', B, now)).toBe(y)
     await releaseCase(pool, y!, B)
-    expect(await nextCase(pool, 'unreviewed', B, now)).toBe(x)
+    // Both cases are free for B now, so the higher severity one (a) comes first whichever reviewer held it before.
+    expect(await nextCase(pool, 'unreviewed', B, now)).toBe(a)
   })
 
   it('requires a reason, a configured policy, and the lock', async () => {
