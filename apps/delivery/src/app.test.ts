@@ -42,6 +42,12 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
 function setupDeps() { const { deps } = setup(); return { deps } }
 
 describe('delivery API', () => {
+  it('answers 404 for a blocked image on /img and skips it in redirects', async () => {
+    const { app, index } = setup()
+    index.blocked.add(`${DID}/bafyreiabc123`)
+    expect((await app.request('/img/did%3Aplc%3Aabc123/bafyreiabc123/80.png')).status).toBe(404)
+  })
+
   it('redirects an email hash to an immutable image path', async () => {
     const { app } = setup()
     const res = await app.request(`/avatar/${emailHash('Alice@Example.com')}?s=4000`)
