@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { currentDid, oauthClient, setSessionCookie } from '../../../lib/auth'
 import { linkFromSession, type LinkOutcome } from '../../../lib/link'
+import { PUBLIC_URL } from '../../../lib/oauth'
 
 export const dynamic = 'force-dynamic'
 
-function back(req: Request, path: string, key: string, value: string) {
-  return NextResponse.redirect(new URL(`${path}?${key}=${encodeURIComponent(value)}`, req.url), 303)
+// Redirect against PUBLIC_URL: behind the proxy, req.url carries the bind address (0.0.0.0:3000).
+function back(path: string, key: string, value: string) {
+  return NextResponse.redirect(new URL(`${path}?${key}=${encodeURIComponent(value)}`, PUBLIC_URL), 303)
 }
 
 export async function GET(req: Request) {
@@ -26,15 +28,15 @@ export async function GET(req: Request) {
     }
   } catch (err) {
     console.error('oauth callback failed', err instanceof Error ? err.message : 'unknown')
-    return back(req, '/login', 'error', 'Sign-in did not complete. Try again.')
+    return back('/login', 'error', 'Sign-in did not complete. Try again.')
   }
 
   if (result.state !== 'link') {
     await setSessionCookie(result.did)
-    return NextResponse.redirect(new URL('/account', req.url), 303)
+    return NextResponse.redirect(new URL('/account', PUBLIC_URL), 303)
   }
   const o = result.outcome!
-  if (o.kind === 'linked') return back(req, '/account', 'linked', o.masked)
-  if (o.kind === 'code_sent') return NextResponse.redirect(new URL('/account/verify', req.url), 303)
-  return back(req, '/account', 'error', o.message)
+  if (o.kind === 'linked') return back('/account', 'linked', o.masked)
+  if (o.kind === 'code_sent') return NextResponse.redirect(new URL('/account/verify', PUBLIC_URL), 303)
+  return back('/account', 'error', o.message)
 }
