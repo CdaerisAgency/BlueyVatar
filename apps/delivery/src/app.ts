@@ -367,6 +367,8 @@ export function createApp(deps: AppDeps) {
       // A hash lookup must not tell a restricted profile apart from an unlinked hash.
       return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
     }
+    // Same condition as the profile_json meter, so the keyed-call count has one source of truth. Never blocks the response.
+    if (e.licenseId) await deps.usage.addProfileCall(identity.did).catch(() => undefined)
 
     const [bsky, own] = await Promise.all([
       deps.resolver.getRecord(identity, 'app.bsky.actor.profile', 'self').catch(() => null),

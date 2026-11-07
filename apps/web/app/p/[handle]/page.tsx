@@ -4,7 +4,10 @@ import AvatarRing from '../../../components/AvatarRing'
 import { siteUrl } from '../../../lib/site'
 import { PageMain } from '../../../components/Page'
 import { PLATFORM_LABELS } from '../../../lib/claims'
+import { headers } from 'next/headers'
 import { resolvePlan } from '../../../lib/plan'
+import { recordProfileView } from '../../../lib/profile-views'
+import { getPool } from '../../../lib/store'
 import { getDomainStore } from '../../../lib/domain-store'
 import { jsonLdString, personJsonLd, profileCanonical } from '../../../lib/seo'
 import { pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
@@ -44,6 +47,8 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const p = await load(handle)
   if (!p) return <PageMain narrow><h1>Profile not found</h1></PageMain>
   // Only https links render, and accounts the user hid stay off the page.
+  // Aggregate daily counter only: no IP, user agent, or cookie is stored (issue #173).
+  await recordProfileView(getPool(), p.did, await headers())
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
   const links = pageLinks(p)
   const apps = pageAtprotoApps(p)
