@@ -3,6 +3,8 @@
 app = "blueyvatar-web"
 primary_region = "iad"
 
+# Low-resource mode (docs/deploy.md): scale to zero, smallest VM that runs Next.js, one region.
+
 [build]
   # Relative to this file (https://docs.fly.io/reference/configuration, [build] section).
   dockerfile = "../Dockerfile"
@@ -19,24 +21,19 @@ primary_region = "iad"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 0
 
+  # One cheap liveness check. The readiness route /api/health runs SELECT 1 against Postgres, so it is
+  # left out of the Fly checks: a check that touches the database every interval would keep the Neon
+  # compute awake whenever this machine is running. Call /api/health by hand or from an uptime monitor.
   # https://docs.fly.io/reference/configuration, [[http_service.checks]] section
   [[http_service.checks]]
     grace_period = "20s"
-    interval = "30s"
+    interval = "60s"
     method = "GET"
     path = "/"
     timeout = "5s"
 
-  # Readiness: SELECT 1 against Postgres (3 second budget, READY_TIMEOUT_MS).
-  [[http_service.checks]]
-    grace_period = "30s"
-    interval = "30s"
-    method = "GET"
-    path = "/api/health"
-    timeout = "5s"
-
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  memory = "512mb"

@@ -46,8 +46,8 @@ fly apps create blueyvatar-delivery
 fly apps create blueyvatar-indexer
 fly apps create blueyvatar-tap
 
-# Tap volume, single machine in iad
-fly volumes create tap_data --app blueyvatar-tap --region iad --size 10
+# Tap volume, single machine in iad (1 GB is the smallest size; see Low-resource mode)
+fly volumes create tap_data --app blueyvatar-tap --region iad --size 1
 
 # Secrets (see the per-app list below; values come from Infisical)
 fly secrets set --app blueyvatar-delivery DATABASE_URL=... DATABASE_URL_DIRECT=... ORIGIN_SECRET=... IMG_SIGNING_SECRET=...
@@ -68,7 +68,7 @@ Staging runs as a second set of Fly apps in the same organization, named `blueyv
 
 ```sh
 fly apps create blueyvatar-tap-staging   # repeat for web, delivery, indexer
-fly volumes create tap_data --app blueyvatar-tap-staging --region iad --size 10
+fly volumes create tap_data --app blueyvatar-tap-staging --region iad --size 1
 
 fly deploy --config fly/tap.toml --app blueyvatar-tap-staging
 fly deploy --config fly/delivery.toml --app blueyvatar-delivery-staging --dockerfile Dockerfile --remote-only
@@ -388,11 +388,11 @@ Delivery and web give every request an id and return it in the `x-request-id` re
 
 | App | Liveness | Readiness | Fly check |
 | --- | --- | --- | --- |
-| delivery | `GET /healthz` returns `ok` | `GET /readyz` runs `SELECT 1`, 503 `not_ready` on failure or after `READY_TIMEOUT_MS` (default 3000) | both, in `fly/delivery.toml` |
-| web | `GET /` | `GET /api/health` runs `SELECT 1` with the same budget | both, in `fly/web.toml` |
+| delivery | `GET /healthz` returns `ok` | `GET /readyz` runs `SELECT 1`, 503 `not_ready` on failure or after `READY_TIMEOUT_MS` (default 3000) | `/healthz` only, in `fly/delivery.toml` (low-resource mode) |
+| web | `GET /` | `GET /api/health` runs `SELECT 1` with the same budget | `/` only, in `fly/web.toml` (low-resource mode) |
 | indexer | `GET :8080/healthz` | `GET :8080/readyz`, 503 `stalled` (see below) | `/readyz`, in `fly/indexer.toml` |
 
-Delivery exempts `/healthz` and `/readyz` from the `ORIGIN_SECRET` lock so Fly's checker works. Without `DATABASE_URL` (local dev) readiness answers ok. Neon suspends idle computes, so the first query after idle can be slow: the 3 second budget and the 5 second Fly check timeout leave room for a wake-up, and the first check after a long idle may fail once. Fly marks a machine failing a check as unhealthy and stops routing to it. Do not rely on a restart (not confirmed from the Fly docs for these checks); the alerts below are what tell a human.
+Delivery exempts `/healthz` and `/readyz` from the `ORIGIN_SECRET` lock so Fly's checker and outside monitors work. The readiness routes are not Fly checks in low-resource mode (see Low-resource mode); call them by hand or from an uptime monitor. Without `DATABASE_URL` (local dev) readiness answers ok. Neon suspends idle computes, so the first query after idle can be slow: the 3 second budget and the 5 second Fly check timeout leave room for a wake-up, and the first check after a long idle may fail once. Fly marks a machine failing a check as unhealthy and stops routing to it. Do not rely on a restart (not confirmed from the Fly docs for these checks); the alerts below are what tell a human.
 
 **Indexer.** It had no HTTP service. It now runs a small internal HTTP server on port 8080 (`HEALTH_PORT`). `fly/indexer.toml` still has no `[http_service]`, so the port is reachable only by Fly's checker and over private networking. Two signals keep it ready:
 
@@ -528,6 +528,82 @@ The versioning policy is in `packages/avatar/README.md`.
 4. Deploy Tap by hand only when its pin changes.
 5. Log retention: confirm `LOG_RETENTION_MAX_GB` (default 5) and `LOG_RETENTION_DAYS` (default 90) match the log destination's settings, and that `/privacy` still says 90 days or the size cap, whichever comes first (see Log retention).
 
+## Low-resource mode
+
+Owner decision, November 7, 2026: "because we have no user adoption right now, all services, fly, neon, etc, should be configured for the lowest resource use and uptime acceptable." The configs in `fly/` and this runbook implement it. Raise the numbers in "Scaling up later" when traffic or paid users arrive.
+
+### Fly sizes
+
+| App | VM | Machines | Scale to zero | Why this size |
+| --- | --- | --- | --- | --- |
+| web | `shared-cpu-1x`, 512 MB | 1, region `iad` only | yes | A local `next start` of the production build used about 178 MB peak resident memory after 60 requests with no database attached (measured November 7, 2026). That leaves too little headroom for a 256 MB VM once Postgres, OAuth, and image uploads are in play. Not measured on Fly. |
+| delivery | `shared-cpu-1x`, 512 MB | 1, region `iad` only | yes | Each resize forks a worker process with a 256 MB heap cap (`apps/delivery/src/resize.ts`, `maxOldSpaceMb`) beside the parent, which also holds a 32 MB original cache (`BLOB_CACHE_MB`). Not measured under load. |
+| indexer | `shared-cpu-1x`, 256 MB | exactly 1 | no | A Node process with a small Postgres pool (`PG_POOL_MAX`, default 5). Not measured on Fly; the first out-of-memory kill in `fly logs` means move to 512 MB. |
+| tap | `shared-cpu-1x`, 512 MB | exactly 1 | no | The Tap README states no memory requirement. It does say the outbox buffers up to 1M pending events in memory and the identity cache defaults to 2,000,000 entries (`TAP_IDENT_CACHE_SIZE`). Treat 512 MB as a starting point and try 256 MB in staging first. **Unconfirmed.** |
+
+Sizes in `fly/*.toml` come from the `[[vm]]` section (<https://docs.fly.io/reference/configuration>). Fly's pricing page lists `shared-cpu-1x` at 256 MB, 512 MB, and 1 GB (<https://docs.fly.io/about/pricing>), so 256 MB is the smallest size we found a price for. The pricing page also says a stopped Machine is not charged for CPU or RAM, only its root file system.
+
+### Scale to zero (web and delivery)
+
+Both apps set `auto_stop_machines = "stop"`, `auto_start_machines = true`, and `min_machines_running = 0`. Fly documents these as follows (<https://docs.fly.io/launch/autostop-autostart>): `auto_stop_machines` accepts `"off"`, `"stop"`, or `"suspend"`; Fly Proxy stops Machines when the app has been idle for several minutes; `min_machines_running` keeps that many Machines running in the primary region and has no effect unless autostop is `"stop"` or `"suspend"`. The proxy runs its check every few minutes, and with a single Machine it stops it when there is no traffic (<https://docs.fly.io/reference/fly-proxy-autostop-autostart.md>). The first request after a stop starts the Machine, so expect a cold start. Fly publishes no latency figure. The same page warns that for a short time after a start, requests can fail until all proxy nodes know the Machine is running. A visitor can therefore see one error right after a long idle.
+
+`"suspend"` is the other documented option. Fly does not say how it differs from `"stop"` in startup speed, so the configs use `"stop"`. **Unconfirmed:** whether `"suspend"` would be faster.
+
+**Health checks.** Fly's docs do not say whether HTTP check requests count as traffic for autostop (the autostop and health check pages are silent on it), so this is **unconfirmed**. To avoid depending on it, each scaled-to-zero app has one liveness check on a 60 second interval, and the Fly checks no longer include the readiness routes (`/readyz` on delivery, `/api/health` on web). Those routes run `SELECT 1`, so a check on them every interval would wake the Neon compute for as long as the machine runs. Use them from a manual call or an uptime monitor with a long interval. If a Machine never stops on its own after a deploy, suspect the Fly check first and try removing it.
+
+The delivery `release_command` still runs the migrations on each deploy, which wakes Neon once per deploy.
+
+### Indexer and Tap cannot scale to zero
+
+The indexer holds a live connection to Tap, and Tap holds the live firehose connection. Stopping either one stops event intake, so both stay at one always-on machine with no autostop (Fly's default for `auto_stop_machines` is `"off"`). Tap is also tied to one machine by its volume.
+
+What happens if they are down anyway (for example a crash, a deploy, or a manual stop): the Tap README says Tap saves its firehose cursor (every 1 second by default, `TAP_CURSOR_SAVE_INTERVAL`) and resumes from it on restart, which "can mean replaying millions of events", and that "any repos that changed while offline will be detected and resynced automatically" (<https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>). It also says events are delivered at least once, and repos that fell behind resync when their next firehose event arrives. So short outages are caught up from the cursor. The README does not state how long a cursor stays valid at the upstream relay, so a long outage is **unconfirmed**. Do not plan on stopping Tap for days. The tradeoff we accept: roughly two always-on 256 to 512 MB machines instead of zero, because missed or very late profile and image events are worse than the small cost.
+
+### Tap volume
+
+`tap_data` is 1 GB, the default and the smallest whole-gigabyte size `fly volumes create --size` takes (<https://docs.fly.io/flyctl/volumes-create/>; no minimum is documented, and the flag is an integer). The Tap README gives no disk size guidance, so the right size is unknown (**unconfirmed**). This deployment tracks only accounts that have a `com.blueyvatar.profile` record (`TAP_SIGNAL_COLLECTION`), which keeps the database small at launch volumes, but that is our expectation, not a measurement. Fly bills the full provisioned size ($0.15 per GB per month, <https://docs.fly.io/about/pricing>). Volumes can be extended but not shrunk (<https://docs.fly.io/volumes/overview>), so starting small is the safe direction. Watch usage with `fly ssh console --app blueyvatar-tap -C "df -h /data"` and extend before it passes about 70 percent (see "Extend a volume" in <https://docs.fly.io/volumes/volume-manage>).
+
+### Neon
+
+Set both branch computes to the minimum size and the shortest scale-to-zero delay the plan allows. Neon's docs say:
+
+- The smallest size is 0.25 CU, and autoscaling supports 0.25 to 16 CU (<https://neon.com/docs/manage/computes>). Set autoscaling minimum and maximum both to 0.25 CU on production and staging for the lowest resource use, or keep a maximum of 1 CU if you want headroom for a traffic burst.
+- Scale to zero defaults to 300 seconds (5 minutes). On the Free plan it is fixed at 5 minutes and cannot be changed or disabled. On the Launch plan it is 5 minutes and can be disabled. On the Scale plan it can be set from 60 seconds to one week. Initial configuration is only supported through the Neon API (`suspend_timeout_seconds`), after which the console control appears (<https://neon.com/docs/guides/scale-to-zero-guide>).
+- A suspended compute reactivates "within a few hundred milliseconds" on the next query (<https://neon.com/docs/introduction/scale-to-zero>).
+
+The owner already chose suspend-on-idle for production, and staging suspends after 5 minutes. So: on the Scale plan set 60 seconds on both branches; on Free or Launch leave the 5 minute default. Do not run keepalive pings.
+
+What still touches Neon (these are the only in-app jobs that do):
+
+| Job | Where | Interval | Notes |
+| --- | --- | --- | --- |
+| Rate window cleanup | delivery (`apps/delivery/src/rate-cleanup.ts`) | daily (was hourly) | Expired rows reset on next use, so cleanup only reclaims space. |
+| Log retention purge | delivery (`apps/delivery/src/log-retention.ts`) | 60 seconds after start, then daily | Runs on every wake of a scaled-to-zero machine. If delivery gets no traffic, it does not run, so rows older than the 90 day retention can stay until the next wake. |
+| Billing retention purge | indexer (`apps/indexer/src/billing-retention.ts`) | at start, then daily | Already daily. |
+| Claim re-verification | indexer (`REVERIFY_INTERVAL_HOURS`) | 24 hours | Already daily. |
+| Index writes | indexer | per Tap event | The indexer writes when Tap delivers an event for a tracked account, so Neon wakes on that traffic. Cannot be deferred without losing the live stream. |
+| Page polling | web, `/account/domain` (`PollRefresh.tsx`) | 15 seconds while that page is open in a browser | Only while a user watches the page. |
+| Fly health checks | all apps | 60 seconds | None of them query Postgres now. |
+
+The indexer also probes Tap's `/health` every `TAP_PROBE_INTERVAL_SECONDS` (15), which does not touch Neon.
+
+### Staging
+
+Staging uses the same configs, so it has the same sizes. Keep it stopped when unused: `fly machine stop <id> --app blueyvatar-<app>-staging` for each app, with the id from `fly machine list --app blueyvatar-<app>-staging`. Delivery and web also stop themselves when idle. Start them again with `fly machine start` before testing, Tap first. Staging Tap on a stopped machine is not receiving events, so start it a while before you test event flow. The staging volume is still billed while stopped. Recreate it at 1 GB (it was created at 10 GB): `fly volumes destroy`, then `fly volumes create tap_data --app blueyvatar-tap-staging --region iad --size 1`.
+
+### Scaling up later
+
+- More memory: `fly scale memory 1024 --app blueyvatar-<app>` for a one-off, or change `memory` in the `[[vm]]` section of `fly/<app>.toml` (a deploy resets manual `fly scale vm` changes to the file, per the configuration reference).
+- Always warm web or delivery: set `min_machines_running = 1`, or `auto_stop_machines = "off"`, in `fly/web.toml` or `fly/delivery.toml`, and add the readiness check back (`/readyz`, `/api/health`).
+- More machines or regions: `fly scale count 2`, or add regions; keep Tap at one machine.
+- Bigger Tap volume: extend it (volumes cannot shrink).
+- Neon: raise the autoscaling maximum, disable scale to zero (Launch plan or higher), or raise the minimum CU.
+- Rate window cleanup: pass a shorter interval to `scheduleRateWindowCleanup` in `apps/delivery/src/server.ts`.
+
+### Cost
+
+No cost estimate is given here beyond Fly's published list prices: a continuously running `shared-cpu-1x` is $3.69 per month at 512 MB and $2.19 per month at 256 MB, and a 1 GB volume is $0.15 per month (<https://docs.fly.io/about/pricing>). Stopped Machines pay only for their root file system. Neon plan prices are not quoted here.
+
 ## Provisioned resources
 
 - Neon project `blueyvatar` (ID `rough-heart-79040132`), region `aws-us-east-1` (N. Virginia, near Fly `iad`), Postgres 16, created November 3, 2026.
@@ -536,7 +612,7 @@ The versioning policy is in `packages/avatar/README.md`.
   - Connection strings come from the Neon console or API and go into Infisical; they are never committed. The pooled host contains `-pooler`; the direct host (for migrations) is the same host without it.
 
 - Infisical project `blueyvatar` (ID `0851796f-0fa5-4321-9f50-3ae11e821cd9`), environments `dev`, `staging`, `prod`; only `prod` is used. It holds `STAGING_DATABASE_URL`, `STAGING_DATABASE_URL_DIRECT`, `STAGING_ORIGIN_SECRET`, `STAGING_SESSION_SECRET`, `STAGING_TAP_ADMIN_PASSWORD`, `STAGING_OAUTH_PRIVATE_JWK`, plus `RESEND_API_KEY` and `EMAIL_FROM` (shared by both). `RESEND_API_KEY` is the shared platform key also used by Muster CRM and Cadence V2. `EMAIL_FROM` uses `mail.cdaeris.com`, the only domain verified in Resend, until `blueyvatar.com` is verified. Cloudflare values are not set yet.
-- Fly staging apps in the `personal` organization, region `iad`, created November 4, 2026: `blueyvatar-tap-staging` (volume `tap_data`, ID `vol_r1jd8enn1q2dj19r`, 10 GB), `blueyvatar-delivery-staging`, `blueyvatar-indexer-staging`, `blueyvatar-web-staging`.
+- Fly staging apps in the `personal` organization, region `iad`, created November 4, 2026: `blueyvatar-tap-staging` (volume `tap_data`, ID `vol_r1jd8enn1q2dj19r`, 10 GB as created; volumes cannot shrink, so recreate it at 1 GB to match low-resource mode), `blueyvatar-delivery-staging`, `blueyvatar-indexer-staging`, `blueyvatar-web-staging`.
   - Deployed: tap (image `0.1.10`, TCP check passing), delivery (five migrations applied to the Neon `staging` branch; `/healthz` returns 200, a direct hit on `/u/x` returns 403 `origin_forbidden`), indexer (running; Cloudflare purges logged only).
   - Not deployed: web, which waits on the Cloudflare setup and the `TRUSTED_PDS_HOSTS` value.
 

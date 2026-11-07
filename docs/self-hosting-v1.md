@@ -68,7 +68,7 @@ Log retention: the hosted service keeps logs 90 days or until a 5 GB size cap, w
 - `IMG_SIGNING_SECRET`: `openssl rand -hex 32`. Delivery signs `/img` paths with it and refuses unsigned or altered paths with 403 `invalid_signature`. The indexer needs the same value to warm and purge `/img` URLs. If it is unset, delivery uses a random per-process value and logs a warning, so signed URLs break on every restart and across replicas.
 - `TOKEN_ENCRYPTION_KEY`: `openssl rand -base64 32` (32 bytes, base64 or hex). It encrypts OAuth tokens and the stored primary email in Postgres (AES-256-GCM). Web and indexer must share the same value, because the indexer decrypts the primary email to send revocation notices. Web refuses to start in production without it. Rotating it makes stored addresses unreadable, and notices are skipped until users verify again.
 - Origin auth secret (`ORIGIN_SECRET`): `openssl rand -hex 32`. When set, every delivery request except `GET /healthz` must carry the header `x-origin-auth` with this value, or delivery answers 403 `origin_forbidden`. Your proxy or CDN has to add the header. [deploy.md](deploy.md) shows the Cloudflare Request Header Transform Rule for it. Leave it unset to accept all requests.
-- `SESSION_SECRET`: random hex string (the handoff doc generates it that way, `docs/handoff/local-agent-handoff-v4.md`).
+- `SESSION_SECRET`: random hex string (the handoff doc generates it that way, `docs/handoff/local-agent-handoff-v5.md`).
 - `TAP_ADMIN_PASSWORD`: random hex string, the same on Tap and the indexer.
 - `OAUTH_PRIVATE_JWK`: `pnpm --filter @blueyvatar/web gen-jwk` (script `apps/web/scripts/gen-jwk.ts`). The output format and how to pass it are not yet documented beyond that comment in `.env.example`.
 
