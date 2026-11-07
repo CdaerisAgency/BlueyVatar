@@ -16,7 +16,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   const resolver: AvatarResolver = {
     resolveIdentity: async (id) => (id.value === DID || id.value === 'alice.test' ? ident : null),
     candidates: async () => candidates,
-    getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice' } : null),
+    getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ label: 'Site', url: 'https://alice.example/' }, { label: 'Bad', url: 'http://alice.example/' }] } : null),
     getBlob: async () => new Uint8Array([1, 2, 3]),
   }
   const usage = new MemoryUsageMeter()
@@ -181,7 +181,7 @@ describe('delivery API', () => {
   it('returns profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
-    expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [] })
+    expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
   })
 
   it('returns attested accounts only, with hidden ones flagged and the Free cap applied', async () => {

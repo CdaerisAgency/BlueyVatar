@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   emailHash, emailMd5, isMd5Hex, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
   parseAvatarParams, ParamError, pickCandidate, imagePath, readBlobRef, selfLabelValues,
-  activeAdapters, DEFAULT_ADAPTERS, type Candidate,
+  activeAdapters, DEFAULT_ADAPTERS, sanitizeProfileLinks, type Candidate,
 } from './index.js'
 
 const opts = { tier: 'free' as const, defaultUrlAllowlist: ['example.com'] }
@@ -97,5 +97,29 @@ describe('adapters', () => {
   })
   it('orders enabled adapters by priority', () => {
     expect(activeAdapters(DEFAULT_ADAPTERS).map((a) => a.id)).toEqual(['bluesky'])
+  })
+})
+
+describe('sanitizeProfileLinks', () => {
+  it('keeps https links, falls back to the host, and drops everything else', () => {
+    expect(sanitizeProfileLinks([
+      { label: 'Site', url: 'https://example.com/a' },
+      { url: 'https://blog.example.org' },
+      { label: 'Plain', url: 'http://example.com' },
+      { label: 'Script', url: 'javascript:alert(1)' },
+      { label: 'Creds', url: 'https://u:p@example.com' },
+      { label: 'Bad', url: 'not a url' },
+      { label: 'Num', url: 5 },
+      null,
+    ])).toEqual([
+      { label: 'Site', url: 'https://example.com/a' },
+      { label: 'blog.example.org', url: 'https://blog.example.org/' },
+    ])
+  })
+  it('caps at 10 and tolerates a missing field', () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({ label: `L${i}`, url: `https://e${i}.test` }))
+    expect(sanitizeProfileLinks(many)).toHaveLength(10)
+    expect(sanitizeProfileLinks(undefined)).toEqual([])
+    expect(sanitizeProfileLinks('x')).toEqual([])
   })
 })
