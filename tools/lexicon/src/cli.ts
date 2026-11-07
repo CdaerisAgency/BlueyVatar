@@ -1,6 +1,6 @@
 import { resolveTxt } from 'node:dns/promises'
 import { fileURLToPath } from 'node:url'
-import { dnsLines, dryRunLines, planRecords, publishRecords, verifyPublication } from './publish.js'
+import { checkPlan, dnsLines, dryRunLines, planRecords, publishRecords, verifyPublication } from './publish.js'
 import { loadLexiconFiles, validateLexicons } from './validate.js'
 
 // Usage:
@@ -33,6 +33,11 @@ if (result.issues.length > 0) {
   fail(`${result.issues.length} lexicon problem(s)`)
 }
 const planned = planRecords(files, result)
+const planProblems = checkPlan(planned)
+if (planProblems.length > 0) {
+  for (const p of planProblems) console.error(p)
+  fail(`${planProblems.length} publish plan problem(s)`)
+}
 console.log(`validated ${files.length} lexicon file(s); ${planned.length} to publish, ${files.length - planned.length} vendored`)
 
 switch (command) {

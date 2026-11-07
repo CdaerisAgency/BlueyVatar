@@ -1,6 +1,7 @@
 import { Lexicons, jsonToLex } from '@atproto/lexicon'
 import { describe, expect, it } from 'vitest'
 import {
+  checkPlan,
   dnsRecords,
   dryRunLines,
   pdsFromDidDoc,
@@ -214,6 +215,23 @@ describe('DNS and records', () => {
     expect(lines).toContain('  would write at://<did>/com.atproto.lexicon.schema/com.blueyvatar.authFull')
     expect(lines).toContain(`  _lexicon.blueyvatar.com  TXT  "did=${DID}"`)
     expect(dryRunLines(planned, undefined).join('\n')).toContain('did=<DID of the publishing account>')
+  })
+
+  it('dry run prints each putRecord body and the checks line', () => {
+    const out = dryRunLines(planned, DID).join('\n')
+    expect(out).toContain('checks passed: 5 schema record(s)')
+    const body = JSON.parse(dryRunLines(planned, DID).find((l) => l.includes('"rkey":"com.blueyvatar.authFull"'))!)
+    expect(body).toMatchObject({ repo: DID, collection: 'com.atproto.lexicon.schema', rkey: 'com.blueyvatar.authFull', record: { lexicon: 1, id: 'com.blueyvatar.authFull' } })
+    expect(body.record.defs.main.type).toBe('permission-set')
+  })
+
+  it('checkPlan accepts the repo plan and rejects bad shape, key mismatch, and a missing permission set', () => {
+    expect(checkPlan(planned)).toEqual([])
+    const bad = planned.map((p) => (p.nsid === 'com.blueyvatar.claim' ? { ...p, rkey: 'claim' } : p))
+    expect(checkPlan(bad).join('\n')).toMatch(/record key "claim" must equal the NSID/)
+    expect(checkPlan(planned.filter((p) => p.nsid !== 'com.blueyvatar.authFull')).join('\n')).toMatch(/permission set\) is not in the records/)
+    const wrong = planned.map((p) => (p.nsid === 'com.blueyvatar.image' ? { ...p, record: { ...p.record, id: 'com.blueyvatar.other' } } : p))
+    expect(checkPlan(wrong).join('\n')).toMatch(/does not match the NSID/)
   })
 })
 

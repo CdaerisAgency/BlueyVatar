@@ -373,7 +373,7 @@ The spec resolves an NSID through its authority, which is every segment except t
    pnpm lexicons:dry-run
    ```
 
-   The validator runs the reference parser from `@atproto/lexicon`, then checks reference resolution, union targets, record key types, blob `accept` patterns, and the permission-set rules (only `repo` and `rpc`, no wildcards, collections inside the set's namespace and present in this repo, non-empty `collection` arrays, valid `action` values). The dry run prints the records it would write and the TXT line, with a placeholder for the DID.
+   The validator runs the reference parser from `@atproto/lexicon`, then checks reference resolution, union targets, record key types, blob `accept` patterns, and the permission-set rules (only `repo` and `rpc`, no wildcards, collections inside the set's namespace and present in this repo, non-empty `collection` arrays, valid `action` values). The dry run also checks each planned record (`com.atproto.lexicon.schema` shape, record key equal to the NSID, `com.blueyvatar.authFull` included), then prints the exact `putRecord` body for each schema and the TXT line, with a placeholder for the DID unless `LEXICON_PUBLISH_DID` is set. The same checks run before a real publish.
 3. **Publish the records.** Export the variables from Infisical in your shell. Never commit them or put them in `.env.example` with values.
 
    ```sh
