@@ -7,6 +7,7 @@ import { NOT_CONFIGURED, billingEnabled, missingForCheckout, missingForWebhook, 
 import { memoryBillingStore, postgresBillingStore } from './store'
 import { checkoutParams, createCheckoutUrl, createPortalUrl } from './stripe'
 import { handleStripeWebhook } from './webhook'
+import { pgNoticeDirectory } from '@blueyvatar/core/verification'
 import { resolvePlan } from '../plan'
 import { formatPrice, PRICING } from '../pricing'
 
@@ -252,6 +253,58 @@ describe('idempotency', () => {
   })
 })
 
+describe('billing notices', () => {
+  const fail = (at: number) => ev('invoice.payment_failed', { subscription: 'sub_1' }, at)
+  function withMail() {
+    const store = memoryBillingStore()
+    const mail: Array<{ did: string; kind: string; subject: string; text: string }> = []
+    const notifier = { send: async (did: string, kind: string, n: { subject: string; text: string }) => { mail.push({ did, kind, ...n }); return 'sent' as const } }
+    const send = (e: { payload: string }) => handleStripeWebhook(e.payload, sign(e.payload), { store, env, now: () => new Date(T0), notifier: notifier as never, publicUrl: 'https://blueyvatar.com' })
+    return { mail, send }
+  }
+
+  it('mails a failed payment once with the grace end, DID, and settings link', async () => {
+    const { mail, send } = withMail()
+    await send(ev('customer.subscription.created', subObj(), T0))
+    const f = fail(T0 + DAY)
+    await send(f)
+    await send(f) // Stripe redelivery
+    await send(fail(T0 + 2 * DAY)) // a later retry of the same invoice
+    expect(mail).toHaveLength(1)
+    expect(mail[0]).toMatchObject({ did: DID, kind: 'billing', subject: 'Your blueyvatar payment failed' })
+    expect(mail[0]!.text).toContain('2026-11-09')
+    expect(mail[0]!.text).toContain(DID)
+    expect(mail[0]!.text).toContain('https://blueyvatar.com/account/notifications')
+  })
+  it('mails grace expiry when a past-due subscription ends and the license drops to Free', async () => {
+    const { mail, send } = withMail()
+    await send(ev('customer.subscription.created', subObj(), T0))
+    await send(fail(T0 + DAY))
+    mail.length = 0
+    const end = ev('customer.subscription.deleted', subObj({ status: 'canceled' }), T0 + 9 * DAY)
+    await send(end)
+    await send(end)
+    expect(mail).toHaveLength(1)
+    expect(mail[0]!.subject).toBe('Your blueyvatar Pro plan has ended')
+  })
+  it('mails cancellation once for an active subscription, and nothing for ordinary updates', async () => {
+    const { mail, send } = withMail()
+    await send(ev('customer.subscription.created', subObj(), T0))
+    await send(ev('customer.subscription.updated', subObj({ cancel_at_period_end: true }), T0 + DAY))
+    expect(mail).toEqual([])
+    await send(ev('customer.subscription.deleted', subObj({ status: 'canceled' }), T0 + 2 * DAY))
+    expect(mail.map((m) => m.subject)).toEqual(['Your blueyvatar Pro subscription was canceled'])
+  })
+  it('never fails the webhook when sending fails', async () => {
+    const store = memoryBillingStore()
+    const notifier = { send: async () => 'failed' as const }
+    const e = ev('customer.subscription.created', subObj(), T0)
+    await handleStripeWebhook(e.payload, sign(e.payload), { store, env, notifier })
+    const f = fail(T0 + DAY)
+    expect((await handleStripeWebhook(f.payload, sign(f.payload), { store, env, notifier })).status).toBe(200)
+  })
+})
+
 describe('checkout and portal', () => {
   it('builds subscription Checkout params with automatic tax and DID metadata', () => {
     const p = checkoutParams({ did: DID, licenseId: 'lic_1', price: 'price_pro', customer: null, baseUrl: 'https://blueyvatar.com' })
@@ -405,13 +458,21 @@ describe.skipIf(!url)('postgres billing store', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
+    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
     await pool?.end()
   })
 
+  it('stores notification preferences, defaulting to on', async () => {
+    const d = pgNoticeDirectory(pool)
+    expect(await d.prefs(DID)).toEqual({ usageAlerts: true, billingNotices: true })
+    await d.setPrefs(DID, { usageAlerts: false, billingNotices: true })
+    await d.setPrefs(DID, { usageAlerts: false, billingNotices: false })
+    expect(await d.prefs(DID)).toEqual({ usageAlerts: false, billingNotices: false })
+    expect(await d.prefs('did:plc:other')).toEqual({ usageAlerts: true, billingNotices: true })
+  })
   it('applies events end to end, writes the license row, and is idempotent under concurrent redelivery', async () => {
     const store = postgresBillingStore(pool)
     const send = (e: { payload: string }, at = T0) => handleStripeWebhook(e.payload, sign(e.payload), { store, env, now: () => new Date(at) })

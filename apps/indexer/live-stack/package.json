@@ -1,0 +1,12 @@
+{
+  "name": "blueyvatar-tap-live-stack",
+  "private": true,
+  "type": "module",
+  "description": "Local PLC directory and PDS for the live Tap test (issue #42). Not a pnpm workspace member, so default installs and CI never fetch it.",
+  "scripts": {
+    "start": "node start.mjs"
+  },
+  "dependencies": {
+    "@atproto/dev-env": "0.7.5"
+  }
+}

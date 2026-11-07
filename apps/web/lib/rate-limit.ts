@@ -42,6 +42,10 @@ export const BUCKETS = {
   'adminFail.ip': { limit: 10, windowSec: 15 * MIN },
   'adminAction.did': { limit: 120, windowSec: 10 * MIN },
   'adminAction.ip': { limit: 240, windowSec: 10 * MIN },
+  'export.did': { limit: 5, windowSec: HOUR },
+  'export.ip': { limit: 20, windowSec: HOUR },
+  'deleteData.did': { limit: 5, windowSec: HOUR },
+  'deleteData.ip': { limit: 20, windowSec: HOUR },
 } as const satisfies Record<string, BucketConfig>
 
 export type BucketName = keyof typeof BUCKETS
