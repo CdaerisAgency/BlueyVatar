@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { isRating, type Tier } from '@blueyvatar/core'
+import { isRating, type IndexedLinkRecord, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
@@ -51,6 +51,11 @@ export class PgIndexStore implements IndexStore {
       isDefault: r.is_default,
       createdAt: r.created_at.toISOString(),
     }))
+  }
+
+  async profileLinks(did: string): Promise<IndexedLinkRecord[]> {
+    const { rows } = await this.pool.query<IndexedLinkRecord>('SELECT rkey, cid, url, title FROM profile_links WHERE did = $1', [did])
+    return rows
   }
 
   async visibility(did: string): Promise<Visibility> {

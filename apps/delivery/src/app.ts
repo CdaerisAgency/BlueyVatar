@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
   ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
-  isSha256Hex, parseAvatarParams,
+  isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
@@ -265,6 +265,7 @@ export function createApp(deps: AppDeps) {
       handle: identity.handle,
       displayName: bsky?.displayName ?? null,
       description: bsky?.description ?? null,
+      links: resolveProfileLinks(identity.did, bsky?.links, await deps.index.profileLinks(identity.did)),
       avatar: picked.kind === 'image' ? { url: imagePath(identity.did, picked.candidate.blob.cid, 256, 'png'), source: picked.candidate.source } : null,
       jobTitle: own?.jobTitle ?? null,
       company: own?.company ?? null,

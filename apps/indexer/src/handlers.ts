@@ -6,6 +6,7 @@ export const COLLECTIONS = {
   profile: 'com.blueyvatar.profile',
   claim: 'com.blueyvatar.claim',
   bskyProfile: 'app.bsky.actor.profile',
+  bskyLink: 'app.bsky.actor.link',
 } as const
 
 export interface IndexWrites {
@@ -16,6 +17,8 @@ export interface IndexWrites {
   deleteProfile(did: string): Promise<void>
   upsertClaim(did: string, rkey: string, record: Record<string, unknown>): Promise<void>
   deleteClaim(did: string, rkey: string): Promise<void>
+  upsertProfileLink(row: { did: string; rkey: string; cid: string; url: string; title: string | null; createdAt: string }): Promise<void>
+  deleteProfileLink(did: string, rkey: string): Promise<void>
   /** `status` is Tap's account status (active, deactivated, deleted, suspended, takendown). */
   setRepoStatus(did: string, handle: string | null, active: boolean, status?: string): Promise<void>
   /** Purge cached copies after a change (spec section 9). Without `cids`, purges the repo's indexed images. */
@@ -26,6 +29,8 @@ export interface RecordEvt {
   did: string
   collection: string
   rkey: string
+  /** Record CID from Tap. Needed for link records, whose strongRefs pin a CID. */
+  cid?: string
   action: 'create' | 'update' | 'delete'
   record?: Record<string, unknown>
 }
@@ -61,6 +66,24 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
       if (del || !evt.record) await db.deleteClaim(evt.did, evt.rkey)
       else await db.upsertClaim(evt.did, evt.rkey, evt.record)
       return
+    case COLLECTIONS.bskyLink: {
+      // Which links show, and in what order, is decided by app.bsky.actor.profile#links. The
+      // profile API resolves those refs against this table at read time.
+      if (del || !evt.record) {
+        await db.deleteProfileLink(evt.did, evt.rkey)
+        return
+      }
+      if (typeof evt.record.url !== 'string' || !evt.cid) return
+      await db.upsertProfileLink({
+        did: evt.did,
+        rkey: evt.rkey,
+        cid: evt.cid,
+        url: evt.record.url,
+        title: typeof evt.record.title === 'string' ? evt.record.title : null,
+        createdAt: typeof evt.record.createdAt === 'string' ? evt.record.createdAt : new Date().toISOString(),
+      })
+      return
+    }
     case COLLECTIONS.bskyProfile:
       // Read live by the delivery API; a change only needs cache purging. A label change
       // (such as !no-unauthenticated) takes effect through the same purge. The Bluesky avatar

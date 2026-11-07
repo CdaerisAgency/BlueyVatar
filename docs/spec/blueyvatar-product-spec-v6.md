@@ -78,7 +78,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 17 | Hosted profile page | G | Rendered from the service profile record plus app.bsky.actor.profile | v1 |
 | 18 | Extended profile fields | G | Fields in the service profile lexicon (section 5) | v1 |
 | 19 | Verified accounts | G | Verification records plus service attestation (section 8) | v2 |
-| 20 | Links | G | Reuse the links field in the Bluesky profile lexicon | v1 |
+| 20 | Links | G | Reuse the links field in the Bluesky profile lexicon: strongRefs to `app.bsky.actor.link` records | v1 |
 | 21 | Image gallery | G | Extra blobs in the user repo | Later |
 | 22 | Hovercards | G | Embeddable script reading the profile API | v2 |
 | 23 | QR code | G | Endpoint returning a QR for the profile URL | v2 |
@@ -122,7 +122,7 @@ The service defines three record types in the user's repository and keeps everyt
 | Email link | none | none | Service database only | Hash of a verified email mapped to a DID (section 6) |
 | Permission rules | none in v1 | none | Service database | Who may fetch each avatar and profile field (section 10) |
 
-**Reuse the Bluesky profile where it fits.** The Bluesky profile record already holds display name, description, an avatar blob that [accepts PNG and JPEG up to 1,000,000 bytes](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json), self-labels, and a links list capped at 10 items. The service reads it as the fallback source and does not copy it.
+**Reuse the Bluesky profile where it fits.** The Bluesky profile record already holds display name, description, an avatar blob that [accepts PNG and JPEG up to 1,000,000 bytes](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json), self-labels, and a links list capped at 10 items. The links field holds strongRefs (uri and cid) to `app.bsky.actor.link` records in the same repo, each with a URL and an optional title, so the indexer also follows that collection and the profile API resolves the refs in order, dropping any whose cid no longer matches. The service reads it as the fallback source and does not copy it.
 
 **Avatar image record (draft).**
 
@@ -259,7 +259,7 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 | Field | Source | Phase |
 | --- | --- | --- |
 | Display name, description, avatar | `app.bsky.actor.profile` | v1 |
-| Links (up to 10) | Links field in `app.bsky.actor.profile` | v1 |
+| Links (up to 10) | Links field in `app.bsky.actor.profile` (strongRefs to `app.bsky.actor.link` records) | v1 |
 | Job title, company, location | `com.blueyvatar.profile` | v1 |
 | Pronouns, pronunciation, timezone, interests | `com.blueyvatar.profile` | v1 |
 | Background color | `com.blueyvatar.profile` | v2 |
