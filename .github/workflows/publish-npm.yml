@@ -1,0 +1,77 @@
+name: Publish npm packages
+
+# Runs only for a version tag such as v0.1.0. It publishes each package under packages/
+# whose package.json version equals the tag, with npm provenance. See docs/deploy.md,
+# "Publish the npm packages". Needs the NPM_TOKEN repository secret; without it the job fails
+# before publishing anything.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # npm provenance
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require the npm token
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN secret is not set. Add it before tagging (docs/deploy.md)." >&2
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and test the packages
+        run: |
+          pnpm --filter @blueyvatar/avatar --filter @blueyvatar/hovercards typecheck
+          pnpm --filter @blueyvatar/avatar --filter @blueyvatar/hovercards test
+
+      - name: Build
+        run: pnpm --filter @blueyvatar/avatar --filter @blueyvatar/hovercards build
+
+      - name: Publish packages whose version matches the tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          published=0
+          for dir in packages/avatar packages/hovercards; do
+            pkg_version="$(node -p "require('./$dir/package.json').version")"
+            name="$(node -p "require('./$dir/package.json').name")"
+            if [ "$pkg_version" != "$version" ]; then
+              echo "Skipping $name ($pkg_version does not match tag $version)"
+              continue
+            fi
+            (cd "$dir" && pnpm publish --access public --provenance --no-git-checks)
+            published=$((published + 1))
+          done
+          if [ "$published" -eq 0 ]; then
+            echo "No package version matches tag $GITHUB_REF_NAME" >&2
+            exit 1
+          fi

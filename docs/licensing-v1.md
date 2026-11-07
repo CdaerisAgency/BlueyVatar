@@ -16,6 +16,7 @@ The services and the shared core use the AGPL, so anyone who runs a modified cop
 
 ## Not yet decided
 
+- `packages/avatar` (URL builder and React component that run in customer apps) is `UNLICENSED` until the owner chooses.
 - `packages/hovercards` (script that runs on third-party pages) stays `UNLICENSED` until the owner chooses.
 - `tools/migrate` has no license yet.
 - `lexicons/vendor` holds third-party lexicons that keep their original terms.
