@@ -10,6 +10,7 @@ import { createClaim, getClaim, listClaims, putClaim, repoHandle } from '../../.
 import { githubAuthorizeUrl, githubConfig } from '../../../lib/github-oauth'
 import { authorizeUrl, registerApp } from '../../../lib/mastodon-oauth'
 import { PUBLIC_URL } from '../../../lib/oauth'
+import { limited } from '../../../lib/rate-guard'
 import { RepoError, repoSession } from '../../../lib/repo'
 import { safeFetch } from '../../../lib/safe-fetch'
 import { verifyRelMe } from '../../../lib/verify'
@@ -23,11 +24,14 @@ export async function addClaim(form: FormData): Promise<void> {
   const did = (await currentDid()) ?? redirect('/login')
   const checked = normalizeClaim(String(form.get('platform') ?? ''), String(form.get('account') ?? ''))
   if (!checked.ok) return back('error', checked.error)
+  const wait = await limited(['claimAdd.did'], did)
+  if (wait) return back('error', wait)
   if (!platformAvailable(checked.value.platform)) return back('error', `${PLATFORM_LABELS[checked.value.platform]} verification is not available yet.`)
   try {
     const session = await repoSession(did)
     const existing = await listClaims(session)
-    if (existing.length >= MAX_CLAIMS) return back('error', `You can keep up to ${MAX_CLAIMS} claims. Delete one first.`)
+    // The database count is checked too, so rows written outside the repo list cannot grow past the cap.
+    if (existing.length >= MAX_CLAIMS || (await getClaimStore().countClaims(did)) >= MAX_CLAIMS) return back('error', `You can keep up to ${MAX_CLAIMS} claims. Delete one first.`)
     if (existing.some((c) => c.value.uri === checked.value.uri)) return back('error', 'You already added that account.')
     const record: ClaimRecord = { ...checked.value, createdAt: new Date().toISOString() }
     const ref = await createClaim(session, record)
@@ -71,6 +75,8 @@ export async function setHidden(form: FormData): Promise<void> {
 export async function verifyClaim(form: FormData): Promise<void> {
   const did = (await currentDid()) ?? redirect('/login')
   const rkey = String(form.get('rkey') ?? '')
+  const wait = await limited(['claimVerify.did', 'claimVerify.ip'], did)
+  if (wait) return back('error', wait)
   let target: string
   try {
     const session = await repoSession(did)

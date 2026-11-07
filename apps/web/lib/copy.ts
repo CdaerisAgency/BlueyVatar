@@ -53,7 +53,7 @@ export const COPY = {
     links: [
       { label: 'Developers', href: '/#dev' },
       { label: 'Docs', href: '/docs' },
-      { label: 'Pricing', href: '/#pricing' },
+      { label: 'Pricing', href: '/pricing' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Sign in', href: '/login' },
     ],

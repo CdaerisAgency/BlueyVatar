@@ -24,7 +24,7 @@ export function SiteNav() {
           <Link href="/docs" className={link}>
             {COPY.nav.docs}
           </Link>
-          <Link href="/#pricing" className={link}>
+          <Link href="/pricing" className={link}>
             {COPY.nav.pricing}
           </Link>
           <ButtonLink href="/login" variant="primary">

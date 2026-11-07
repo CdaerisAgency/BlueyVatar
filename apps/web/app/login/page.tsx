@@ -2,6 +2,9 @@ import { login } from '../actions'
 import { Button } from '../../components/Button'
 import { PageMain } from '../../components/Page'
 import { COPY } from '../../lib/copy'
+import { pageMetadata } from '../../lib/site'
+
+export const metadata = pageMetadata('/login', 'Sign in | blueyvatar', COPY.login.lead)
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams
