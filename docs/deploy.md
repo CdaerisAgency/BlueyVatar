@@ -441,12 +441,25 @@ Thresholds are starting points to tune after a week of real traffic. "Page" mean
 | Rate-limit spike | `delivery_rate_limit_rejections_total` rate more than 10 times its weekly median | delivery metrics | info |
 | Any new Sentry issue | first seen in production | Sentry | notify channel |
 
+### Service status (outside Fly)
+
+Issue 179. The owner chose to watch blueyvatar from the Cdaeris uptime dashboard (`CdaerisAgency/uptime`, Gatus, `uptime.cdaeris.com`, internal) instead of a separate status page. Design and open items: `docs/research/status-page-v1.md`.
+
+| Gatus row | Probe | Green means |
+| --- | --- | --- |
+| `web /api/health` | `GET https://blueyvatar.com/api/health`, body `status` is `ok`, every 4 hours | web serves through Cloudflare and ran `SELECT 1` |
+| `delivery /readyz` | `GET https://img.blueyvatar.com/readyz`, body `status` is `ready`, every 4 hours | delivery serves through Cloudflare and its Postgres check passed |
+| `delivery /healthz` | `GET https://img.blueyvatar.com/healthz` returns 200, every 4 hours | the delivery process answers |
+
+The rows ship disabled and need `enabled: true` after the first production deploy. They send no secret, because delivery exempts `/healthz` and `/readyz` from the origin lock. At 4 hours this is a slow second opinion from outside Fly. The alert rules above are the fast signal. During an incident, read the rows together: `/healthz` red means the process is down, `/healthz` green with `/readyz` red means the database check failed, and web red with delivery green points at the web app. There is no public status page yet, so tell affected Pro and Business developers by email from `alerts@blueyvatar.com`.
+
 ### Owner checklist
 
 1. Create a Sentry (or compatible) project, copy its DSN, and `fly secrets set --app <app> SENTRY_DSN=...` on web, delivery, and indexer (staging: its own DSN). Add it to Infisical as `SENTRY_DSN` and `STAGING_SENTRY_DSN`.
 2. Generate a metrics token per app (`openssl rand -hex 32`) and set `METRICS_TOKEN` on delivery and web. Store it in Infisical.
 3. Create the alerts in the table in Sentry, Grafana, or Fly's managed Prometheus. Nothing is created automatically.
 4. After the first deploy, check `curl https://<delivery host>/readyz`, `curl https://<web host>/api/health`, and `fly ssh console --app blueyvatar-indexer -C "node -e \"fetch('http://localhost:8080/readyz').then(r=>r.text()).then(console.log)\""`, and confirm the `outboxBuffer` value in the indexer response is a number.
+5. After the first production deploy, set `enabled: true` on the three blueyvatar rows in `CdaerisAgency/uptime` `config.yaml` and redeploy that dashboard, and confirm the Trigger.dev watchdog alert exists there (see Service status above).
 
 ## Log retention
 

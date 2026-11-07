@@ -46,6 +46,10 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 
 Unhandled server faults return `500` with code `internal` in the same JSON shape. Treat 5xx as transient and retry with backoff. Hidden profiles return `not_found`, the same as an unknown profile, so a lookup cannot reveal that a profile exists.
 
+### When you see a 5xx
+
+`500 internal` and `502 upstream_error` are transient. Retry with exponential backoff and a cap. If they persist, send the `x-request-id` response header (also `request_id` in the error body) to the operator contact, which ties your report to a log line. blueyvatar does not publish a public status page yet. The service is watched from an external dashboard (see `docs/research/status-page-v1.md`), so an outage reaches the operator without your report.
+
 ### Original blob fetch (`/img`)
 
 On a CDN miss, delivery fetches the original from the user's PDS (`com.atproto.sync.getBlob`):
