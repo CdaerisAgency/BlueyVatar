@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { currentDid, oauthClient, setSessionCookie } from '../../../lib/auth'
+import { currentDid, oauthClient, setSessionCookie, takeNext } from '../../../lib/auth'
 import { linkFromSession, type LinkOutcome } from '../../../lib/link'
 import { PUBLIC_URL } from '../../../lib/oauth'
 import { reportError } from '../../../lib/obs'
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 
   if (result.state !== 'link') {
     await setSessionCookie(result.did)
-    return NextResponse.redirect(new URL('/account', PUBLIC_URL), 303)
+    return NextResponse.redirect(new URL(await takeNext(), PUBLIC_URL), 303)
   }
   const o = result.outcome!
   if (o.kind === 'linked') return back('/account', 'linked', o.masked)

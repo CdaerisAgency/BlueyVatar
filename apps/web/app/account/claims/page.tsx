@@ -1,8 +1,7 @@
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
-import { redirect } from 'next/navigation'
 import AccountNav from '../AccountNav'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
 import { DNS_PROOF_LABEL, PLATFORMS, PLATFORM_LABELS, isPlatform, profileLinkFor, proofToken } from '../../../lib/claims'
 import { methodFor, platformAvailable } from '../../../lib/claim-providers'
@@ -34,8 +33,7 @@ const checkLabel = (platform: Parameters<typeof methodFor>[0], label: string): s
 }
 
 export default async function ClaimsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/claims')
   const { error, done } = await searchParams
   let claims: StoredClaim[] = []
   let handle: string | null = null
@@ -86,7 +84,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
 
       <h2>Your claims</h2>
       {claims.length === 0 ? (
-        <p>No claims yet.</p>
+        <p>You have no claims yet. Add one below to show a verified link to your GitHub, Mastodon, website, or another account on your profile. Each claim is checked before it appears.</p>
       ) : (
         <ul>
           {claims.map((c) => {

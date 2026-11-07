@@ -1,8 +1,7 @@
 import { PageMain, TableBox } from '../../../components/Page'
 import { ENTITLEMENTS, TIERS, type Tier } from '@blueyvatar/core'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
 import AccountNav from '../AccountNav'
@@ -14,8 +13,7 @@ const n = (v: number | null) => (v === null ? 'Custom' : v.toLocaleString('en-US
 const ALERT_TEXT = { ok: 'Below 80 percent of included volume.', warn80: 'At or above 80 percent of included volume.', over100: 'Included volume reached.', 'n/a': 'No monthly alert for this tier.' }
 
 export default async function KeysPage() {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/keys')
   const store = getDashboardStore()
   const license = await store.ensureLicense(did)
   const keys = await store.listKeys(license.licenseId)
@@ -91,7 +89,7 @@ export default async function KeysPage() {
       )}
 
       <h2>Keys ({active.length}{ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)</h2>
-      {keys.length === 0 && <p>No keys yet.</p>}
+      {keys.length === 0 && <p>You have no keys yet. Create a publishable key below to use blueyvatar from a website or app. Secret keys are for servers.</p>}
       <ul>
         {keys.map((k) => (
           <li key={k.hash} className="mb-4">
