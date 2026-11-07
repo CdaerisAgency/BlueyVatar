@@ -22,7 +22,7 @@ export interface IndexWrites {
   /** `status` is Tap's account status (active, deactivated, deleted, suspended, takendown). */
   setRepoStatus(did: string, handle: string | null, active: boolean, status?: string): Promise<void>
   /** Purge cached copies after a change (spec section 9). Without `cids`, purges the repo's indexed images. */
-  purgeImages(did: string, cids?: string[]): Promise<void>
+  purgeImages(did: string, cids?: string[], opts?: { warm?: boolean }): Promise<void>
 }
 
 export interface RecordEvt {
@@ -91,10 +91,11 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
       // Read live by the delivery API; a change only needs cache purging. A label change
       // (such as !no-unauthenticated) takes effect through the same purge. The Bluesky avatar
       // is not in the images table, so its CID is purged explicitly.
-      await db.purgeImages(evt.did)
+      // The avatar changed or may have, so the purged images are warmed again afterward.
+      await db.purgeImages(evt.did, undefined, { warm: true })
       if (evt.record) {
         const avatar = readBlobRef(getPath(evt.record, 'avatar'))
-        if (avatar) await db.purgeImages(evt.did, [avatar.cid])
+        if (avatar) await db.purgeImages(evt.did, [avatar.cid], { warm: true })
       }
       return
   }

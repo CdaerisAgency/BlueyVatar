@@ -35,8 +35,12 @@ export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
 /** Sizes the service treats as common (spec section 4). `/img` serves only these. */
 export const IMAGE_SIZE_LADDER = [16, 24, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 512, 1024, 2048] as const
-/** Subset of the ladder worth warming after an avatar change. */
-export const WARM_SIZES = [48, 80, 128, 256, 512] as const
+/** Sizes warmed through the CDN after an avatar change or purge. The indexer reads WARM_SIZES to override. */
+export const WARM_SIZES = [80, 128, 256, 512] as const
+/** Formats warmed by default (the default avatar format). The indexer reads WARM_FORMATS to override. */
+export const WARM_FORMATS = ['png'] as const
+/** Header that marks a cache-warming request. Delivery honors it only with the WARM_SECRET value. */
+export const WARM_HEADER = 'x-warm-auth'
 export const IMAGE_FORMATS = ['png', 'jpeg', 'webp'] as const
 /** Qualities `/img` serves for JPEG and WebP. PNG ignores quality. */
 export const IMAGE_QUALITIES = [60, 85] as const

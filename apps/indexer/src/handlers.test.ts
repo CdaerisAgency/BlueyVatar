@@ -51,8 +51,8 @@ describe('indexer handlers', () => {
         labels: { $type: 'com.atproto.label.defs#selfLabels', values: [{ val: '!no-unauthenticated' }] },
       },
     }, db)
-    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a')
-    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafyavatar'])
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined, { warm: true })
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafyavatar'], { warm: true })
   })
   it('purges once when the Bluesky profile is deleted', async () => {
     const db = fakeDb()
