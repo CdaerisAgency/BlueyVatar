@@ -215,6 +215,7 @@ Sign in at `/login`, then open `/admin` and enter the six-digit code. The admin 
 Actions on the page:
 
 - Dismiss a report, or take down the account: this blocks every indexed image, purges the cache, and marks the reports actioned.
+- Reporter follow-up: when a report is dismissed or actioned and the reporter left a valid email address, the page sends them a one-line outcome message (no reason, no details), then deletes the stored address whether or not the send worked. Reports with no address, or with something that is not an email, send nothing. The message uses the same email sender as account notices (`RESEND_API_KEY`).
 - Suspend an account: a reversible hold. Images indexed after the suspension are not blocked until the suspension is renewed. Lifting it restores only the images the suspension blocked.
 - Unblock one image, for example after an appeal.
 

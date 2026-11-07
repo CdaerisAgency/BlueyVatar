@@ -55,19 +55,19 @@ async function blockAll(c: Q, did: string, reason: string, by: string, kind: 'ta
 }
 
 /** Takedown: blocks all images, marks the report (or all open reports for the DID) actioned, and audits it. */
-export async function takedown(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string, reportId?: number): Promise<Result<{ blocked: number }>> {
+export async function takedown(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string, reportId?: number): Promise<Result<{ blocked: number; reportIds: number[] }>> {
   if (!DID_RE.test(did)) return { ok: false, error: 'Unknown account.' }
-  const cids = await inTx(pool, async (c) => {
+  const { cids, reportIds } = await inTx(pool, async (c) => {
     const list = await blockAll(c, did, reason, actor, 'takedown')
-    await c.query(
+    const { rows } = await c.query<{ id: number }>(
       `UPDATE reports SET status = 'actioned', actioned_by = $2, action_reason = $3, actioned_at = now()
-       WHERE target_did = $1 AND status = 'open' AND ($4::bigint IS NULL OR id = $4)`,
+       WHERE target_did = $1 AND status = 'open' AND ($4::bigint IS NULL OR id = $4) RETURNING id::int AS id`,
       [did, actor, reason, reportId ?? null],
     )
     await recordAction(c, actor, 'takedown', { did, reportId, reason })
-    return list
+    return { cids: list, reportIds: rows.map((r) => r.id) }
   })
-  return { ok: true, purged: cids.length === 0 || (await purge(did, cids)), blocked: cids.length }
+  return { ok: true, purged: cids.length === 0 || (await purge(did, cids)), blocked: cids.length, reportIds }
 }
 
 export async function suspend(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string): Promise<Result<{ blocked: number }>> {
