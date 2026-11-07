@@ -16,6 +16,7 @@ The avatar routes accept the same query parameters as Gravatar, so most drop-in 
 | --- | --- | --- | --- |
 | Avatar count | Unlimited uploads | Free 3 images, Plus 20 | Caps protect storage cost. |
 | `d=<url>` | Any URL | HTTPS only, host on the service allowlist, and a Pro key or higher. Other callers get the style default and `x-adjusted-params: d`. | Prevents the redirect from being used as an open redirector. |
+| Width and height | Square `s` only | Square `s` only. No `w` or `h`. | See [format-quality-v1.md](format-quality-v1.md). |
 | Size cap | 2048 | Free 512, Pro 1024, Business and Enterprise 2048. Larger values are clamped and reported in `x-adjusted-params: s`. | Resize cost is billed by tier. |
 | `d=pagan` | Not a Gravatar value | Supported | Extra default style. |
 | `d=color` | Beta value | Not supported | Beta feature with no stable definition. |

@@ -12,11 +12,18 @@ This code follows the product spec at [docs/spec/blueyvatar-product-spec-v6.md](
 | `apps/delivery` | Delivery API (Hono on Node). Entitlement checks, rate limits, usage metering, visibility rules, and image resizing in a sandboxed child process using sharp. |
 | `apps/indexer` | Follows Tap and writes image, profile, claim, and repo status changes to Postgres. |
 | `apps/web` | Next.js app: sign-in with atproto OAuth (confidential client), profile pages, and the OAuth client metadata document. |
-| `lexicons/com/blueyvatar` | The service's own lexicons: `image`, `profile`, `claim`, `attestation`. |
+| `lexicons/com/blueyvatar` | The service's own lexicons: `image`, `profile`, `claim`, `attestation`, and the `authFull` permission set. |
+| `tools/lexicon` | Lexicon validator and publish script (`pnpm lexicons:validate`, `lexicons:dry-run`, `lexicons:publish`, `lexicons:verify`). |
 | `lexicons/vendor` | Lexicons installed with `lex install` and pinned by CID in `lexicons.json`. |
 | `db/migrations` | Postgres schema, applied in file order by `tools/migrate`. |
 | `tools/migrate` | Migration runner (`pnpm db:migrate`). |
 | `Dockerfile`, `fly/` | One image and per-app Fly.io config. See [docs/deploy.md](docs/deploy.md). |
+
+## More documentation
+
+- [docs/self-hosting-v1.md](docs/self-hosting-v1.md): components, environment variables, migrations, and a Docker Compose example for running your own instance.
+- [CONTRIBUTING.md](CONTRIBUTING.md): setup, commands, tests, and pull request conventions.
+- [SECURITY.md](SECURITY.md): how to report a vulnerability.
 
 ## Local development
 
@@ -62,6 +69,8 @@ pnpm lex:build                           # reads all of lexicons/, including ven
 
 `lex install` resolves lexicon authorities with DNS TXT lookups (`_lexicon.<authority>`), so it needs normal DNS access.
 
+`pnpm lexicons:validate` checks every lexicon file against the Lexicon and Permissions specs, and `pnpm lexicons:dry-run` prints what publishing would write plus the DNS TXT record. Publishing steps are in [docs/deploy.md](docs/deploy.md).
+
 ### Secrets
 
 Secrets (database credentials, the Tap admin password, the OAuth client signing key) live in Infisical. `.env.example` lists every variable the apps read. Never commit a filled-in `.env`.
@@ -74,12 +83,12 @@ Secrets (database credentials, the Tap admin password, the OAuth client signing 
 - [ ] Web: account and license dashboard: issue, label, rotate, and revoke `sk_` and `pk_` keys (store only the SHA256 and a display prefix), plus domain lists for publishable keys.
 - [ ] Web: visibility rule settings, with the plain-language notice that repo data stays public (spec section 10.2).
 - [x] Claims: GitHub and Mastodon OAuth, rel="me" for websites, Instagram and X, attestations (Postgres, plus the service repo when `SERVICE_REPO_DID` and `SERVICE_APP_PASSWORD` are set). Follow-up: scheduled re-verification, TikTok and Threads.
-- [ ] Indexer: deploy Tap on Fly.io with the service profile as the signal collection and the five collections as filters; implement the `onPurge` hook for cache warming.
+- [ ] Indexer: deploy Tap on Fly.io with the service profile as the signal collection and the seven collections as filters; implement the `onPurge` hook for cache warming (done: see docs/deploy.md, CDN cache warming).
 - [ ] Delivery: count the `transform` meter when a new variant is generated, and add usage alerts at 80 and 100 percent of included volume.
 - [x] Database: migration runner (`tools/migrate`) and hourly cleanup of expired `rate_windows` rows.
-- [ ] Adapters: confirm the Tangled profile avatar field before enabling that adapter.
-- [ ] Lexicons: clear the `com.blueyvatar` namespace and publish the schemas under `_lexicon.blueyvatar.com`.
-- [ ] Billing: choose the payment processor, tax handling, and invoicing (open item in spec section 13).
+- [x] Adapters: Tangled profile avatar field confirmed against live repos; `org.tangled.actor.profile` enabled, with `sh.tangled.actor.profile` as a fallback (`docs/research/tangled-collection-v1.md`).
+- [ ] Lexicons: name cleared, validator, permission set, publish script, and the `OAUTH_USE_PERMISSION_SET` flag are in place. Remaining at deploy: run the publish and create the `_lexicon.blueyvatar.com` TXT record (docs/deploy.md).
+- [x] Billing: Stripe Checkout, Customer Portal, and a signed webhook (spec section 12.1). Follow-up: a Plus price, the overage rate, and the Stripe dashboard setup in docs/deploy.md.
 
 ## License
 

@@ -1,17 +1,18 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
-  type ImageFormat,
+  type ImageFormat, WARM_HEADER,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
 import { errorBody, type ErrorCode } from './errors.js'
 import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
-import { originLock } from './origin.js'
+import { originLock, secretsEqual } from './origin.js'
+import { BlobError } from './blob.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore, Visibility } from './store.js'
@@ -34,8 +35,16 @@ export interface AppDeps {
   remoteAddress?: (c: Context) => string | undefined
   /** When set, every request except GET /healthz must carry a matching x-origin-auth header. */
   originSecret?: string
+  /**
+   * Shared secret for the indexer's cache warmer (WARM_SECRET). A request to /img carrying it in
+   * x-warm-auth is served normally but writes no usage meters (spec section 12). Without it the
+   * header is ignored.
+   */
+  warmSecret?: string
   /** HMAC secret for /img paths (IMG_SIGNING_SECRET). The redirect routes sign, /img verifies. */
   imgSigningSecret: string
+  /** PLUS_DIDS comma list: the user plan gate (spec section 11.2). Gallery images ship in profile JSON only for these DIDs. */
+  plusDids?: string
   /** Clock for the restricted-scope day bucket. Tests override it. */
   now?: () => number
 }
@@ -300,6 +309,15 @@ export function createApp(deps: AppDeps) {
     // oldest verifications are kept. Hidden accounts stay in the list with hidden: true.
     const cap = ENTITLEMENTS[e.tier].maxVerifiedAccountsInJson
     const verified = await deps.index.verifiedAccounts(identity.did)
+    // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:
+    // the rating filter is the avatar default (g), blocked images never come back, and URLs
+    // are signed /img paths. The page shows at most GALLERY_MAX.
+    const gallery = isPlusDid(identity.did, deps.plusDids)
+      ? (await deps.resolver.galleryItems(identity))
+          .filter((g) => ratingAllowed(g.rating, 'g'))
+          .slice(0, GALLERY_MAX)
+          .map((g) => ({ url: signedPath(c, e, vis, identity.did, g.cid, 512, 'png'), caption: g.caption }))
+      : []
     c.header('cache-control', 'private, max-age=300')
     return c.json({
       did: identity.did,
@@ -315,6 +333,7 @@ export function createApp(deps: AppDeps) {
       pronunciation: own?.pronunciation ?? null,
       timezone: own?.timezone ?? null,
       interests: own?.interests ?? [],
+      gallery,
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
     })
@@ -456,12 +475,18 @@ export function createApp(deps: AppDeps) {
     try {
       const original = await deps.resolver.getBlob(identity, cid)
       bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
-    } catch {
+    } catch (err) {
+      if (err instanceof BlobError && err.kind === 'not_found') return fail(c, 404, 'not_found', 'Original image not found')
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
     }
     // /img has no key: a resize on a CDN miss is a service cost against the DID, not a license charge.
-    await deps.usage.addService(did, 'transform')
-    await deps.usage.addService(did, 'bytes_delivered', bytes.byteLength)
+    // Cache warming (valid x-warm-auth) is a service cost the indexer chose to incur, so it is not metered.
+    const warm = c.req.header(WARM_HEADER)
+    const isWarm = !!deps.warmSecret && !!warm && secretsEqual(warm, deps.warmSecret)
+    if (!isWarm) {
+      await deps.usage.addService(did, 'transform')
+      await deps.usage.addService(did, 'bytes_delivered', bytes.byteLength)
+    }
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${format}`,
       'cache-control': IMMUTABLE_CACHE_CONTROL,

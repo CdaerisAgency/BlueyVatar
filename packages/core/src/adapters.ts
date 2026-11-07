@@ -11,7 +11,21 @@ export interface ProfileAdapter {
   accept: readonly string[]
   priority: number
   enabled: boolean
+  /**
+   * Id of an adapter this one backs up. The adapter is read only when that
+   * adapter is active and its record does not exist, so a user who has the
+   * primary record costs no extra PDS read.
+   */
+  fallbackFor?: string
+  /**
+   * Largest avatar blob, in bytes, that this adapter accepts. A record whose blob
+   * declares a larger size is treated as having no avatar. Unset means no limit here.
+   */
+  maxAvatarBytes?: number
 }
+
+/** Avatar size limit in the Tangled profile lexicons. */
+export const TANGLED_AVATAR_MAX_BYTES = 1_000_000
 
 export const BLUESKY_PROFILE_ADAPTER: ProfileAdapter = {
   id: 'bluesky',
@@ -27,9 +41,10 @@ export const BLUESKY_PROFILE_ADAPTER: ProfileAdapter = {
 /**
  * Tangled profile adapters. The avatar field is `avatar` (PNG or JPEG, up to
  * 1,000,000 bytes) in both collections. Tangled replaced sh.tangled.actor.profile
- * with org.tangled.actor.profile on Nov 2, 2026, and whether existing records
- * moved is unconfirmed (spec v6, section 13). Both ship disabled until checked
- * against live repos, since each enabled adapter adds a PDS read per miss.
+ * with org.tangled.actor.profile on Nov 2, 2026. A sample of live repos on
+ * Nov 7, 2026 (docs/research/tangled-collection-v1.md) found that most users
+ * still have only the legacy record, so the legacy adapter stays on as a
+ * fallback that is read only when the new record is missing.
  */
 export const TANGLED_PROFILE_ADAPTER: ProfileAdapter = {
   id: 'tangled',
@@ -39,7 +54,8 @@ export const TANGLED_PROFILE_ADAPTER: ProfileAdapter = {
   labelsPath: 'labels',
   accept: ['image/png', 'image/jpeg'],
   priority: 2,
-  enabled: false,
+  enabled: true,
+  maxAvatarBytes: TANGLED_AVATAR_MAX_BYTES,
 }
 
 export const TANGLED_LEGACY_PROFILE_ADAPTER: ProfileAdapter = {
@@ -47,6 +63,7 @@ export const TANGLED_LEGACY_PROFILE_ADAPTER: ProfileAdapter = {
   id: 'tangled-legacy',
   collection: 'sh.tangled.actor.profile',
   priority: 3,
+  fallbackFor: TANGLED_PROFILE_ADAPTER.id,
 }
 
 export const DEFAULT_ADAPTERS: readonly ProfileAdapter[] = [

@@ -62,6 +62,51 @@ describe('params', () => {
     const p = parseAvatarParams(new URLSearchParams('fmt=webp&q=70&ttl=7d&d=https://example.com/x.png'), { ...opts, tier: 'pro' })
     expect(p).toMatchObject({ format: 'webp', quality: 70, ttlSeconds: 7 * 86400, default: { kind: 'url' } })
   })
+  describe('fmt and q (F13)', () => {
+    const parse = (qs: string, tier: 'free' | 'pro' | 'business' | 'enterprise') => parseAvatarParams(new URLSearchParams(qs), { ...opts, tier })
+    const paid = ['pro', 'business', 'enterprise'] as const
+
+    it('accepts png, jpeg, and webp on every paid tier with no adjustment', () => {
+      for (const tier of paid) {
+        for (const fmt of ['png', 'jpeg', 'webp'] as const) {
+          const p = parse(`fmt=${fmt}`, tier)
+          expect(p.format).toBe(fmt)
+          expect(p.adjusted).toEqual([])
+        }
+      }
+    })
+    it('gives free PNG only and reports every ignored fmt and q', () => {
+      for (const fmt of ['jpeg', 'webp']) {
+        const p = parse(`fmt=${fmt}&q=70`, 'free')
+        expect(p).toMatchObject({ format: 'png', quality: 85 })
+        expect(p.adjusted).toEqual(['fmt', 'q'])
+      }
+      expect(parse('fmt=png', 'free').adjusted).toEqual([])
+      expect(parse('q=70', 'free').adjusted).toEqual(['q'])
+    })
+    it('accepts q from 1 to 100 on paid tiers and defaults to 85', () => {
+      for (const tier of paid) {
+        expect(parse('', tier).quality).toBe(85)
+        expect(parse('q=1', tier).quality).toBe(1)
+        expect(parse('q=100', tier).quality).toBe(100)
+        expect(parse('q=70', tier).adjusted).toEqual([])
+      }
+    })
+    it('rejects bad q on every tier', () => {
+      for (const tier of ['free', ...paid] as const) {
+        for (const q of ['0', '101', 'abc', '-5', '7.5', '']) {
+          expect(() => parse(`q=${q}`, tier), `${tier} q=${q}`).toThrow(/q must be 1 to 100/)
+        }
+      }
+    })
+    it('rejects unknown and wrongly cased fmt on every tier', () => {
+      for (const tier of ['free', ...paid] as const) {
+        for (const fmt of ['gif', 'avif', 'jpg', 'PNG', 'WEBP', 'Jpeg', '']) {
+          expect(() => parse(`fmt=${fmt}`, tier), `${tier} fmt=${fmt}`).toThrow(ParamError)
+        }
+      }
+    })
+  })
   it('rejects bad input', () => {
     expect(() => parseAvatarParams(new URLSearchParams('r=nc17'), opts)).toThrow(ParamError)
     expect(() => parseAvatarParams(new URLSearchParams('d=http://example.com/x.png'), opts)).toThrow(ParamError)
@@ -136,7 +181,17 @@ describe('adapters', () => {
     expect(selfLabelValues({ values: [{ val: 'porn' }, { val: 1 }] })).toEqual(['porn'])
   })
   it('orders enabled adapters by priority', () => {
-    expect(activeAdapters(DEFAULT_ADAPTERS).map((a) => a.id)).toEqual(['bluesky'])
+    expect(activeAdapters(DEFAULT_ADAPTERS).map((a) => a.id)).toEqual(['bluesky', 'tangled', 'tangled-legacy'])
+  })
+  it('limits Tangled avatars to the lexicon size and leaves Bluesky unlimited here', () => {
+    const limits = Object.fromEntries(DEFAULT_ADAPTERS.map((a) => [a.id, a.maxAvatarBytes]))
+    expect(limits).toEqual({ bluesky: undefined, tangled: 1_000_000, 'tangled-legacy': 1_000_000 })
+  })
+  it('marks the legacy Tangled adapter as a fallback for the new one', () => {
+    const legacy = DEFAULT_ADAPTERS.find((a) => a.id === 'tangled-legacy')
+    expect(legacy?.fallbackFor).toBe('tangled')
+    expect(legacy?.collection).toBe('sh.tangled.actor.profile')
+    expect(DEFAULT_ADAPTERS.find((a) => a.id === 'tangled')?.collection).toBe('org.tangled.actor.profile')
   })
 })
 

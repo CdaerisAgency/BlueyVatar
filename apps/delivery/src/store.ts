@@ -19,6 +19,10 @@ export interface IndexedImage {
   mimeType: string
   rating: Rating
   isDefault: boolean
+  /** `avatar` when absent. Only `avatar` images take part in avatar resolution. */
+  purpose?: string
+  caption?: string | null
+  sort?: number | null
   createdAt: string
 }
 
@@ -34,7 +38,10 @@ export interface VerifiedAccount {
 export interface IndexStore {
   /** Takes a SHA256 (64 hex) or MD5 (32 hex) email hash. Unlinked and opted-out hashes both return null. */
   didForEmailHash(hash: string): Promise<string | null>
+  /** Avatar images only. Gallery images never come back here. */
   serviceImages(did: string): Promise<IndexedImage[]>
+  /** Gallery images in display order: by sort (unset last), then newest first. */
+  galleryImages(did: string): Promise<IndexedImage[]>
   visibility(did: string): Promise<Visibility>
   /** False when the repo is taken down, suspended, or deactivated. */
   isRepoActive(did: string): Promise<boolean>
@@ -61,10 +68,17 @@ export class MemoryIndexStore implements IndexStore {
     if (did && (await this.visibility(did)).emailLookupOptOut) return null
     return did
   }
-  async serviceImages(did: string) { return this.images.get(did) ?? [] }
+  async serviceImages(did: string) { return (this.images.get(did) ?? []).filter((i) => (i.purpose ?? 'avatar') === 'avatar') }
+  async galleryImages(did: string) { return orderGallery((this.images.get(did) ?? []).filter((i) => i.purpose === 'gallery')) }
   async visibility(did: string) { return this.rules.get(did) ?? PUBLIC_VISIBILITY }
   async isRepoActive(did: string) { return !this.inactive.has(did) }
   async isBlocked(did: string, cid: string) { return this.blocked.has(`${did}/${cid}`) }
   async verifiedAccounts(did: string) { return this.accounts.get(did) ?? [] }
   async profileLinks(did: string) { return this.linkRecords.get(did) ?? [] }
+}
+
+/** Gallery order: lowest sort first, images without a sort after those, ties newest first. */
+export function orderGallery(images: IndexedImage[]): IndexedImage[] {
+  const key = (i: IndexedImage) => i.sort ?? Infinity
+  return [...images].sort((a, b) => (key(a) === key(b) ? b.createdAt.localeCompare(a.createdAt) : key(a) < key(b) ? -1 : 1))
 }

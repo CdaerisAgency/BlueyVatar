@@ -89,7 +89,7 @@ The indexer needs the `--env` override because `fly/indexer.toml` points at the 
 
 Tap is a separate app that the indexer connects to (`TAP_URL`).
 
-- Env names come from Tap's README: <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>. `fly/tap.toml` sets `TAP_BIND`, `TAP_SIGNAL_COLLECTION` (`com.blueyvatar.profile`), `TAP_COLLECTION_FILTERS` (the five collections, comma separated), `TAP_LOG_LEVEL`, and `TAP_DATABASE_URL`. The secret `TAP_ADMIN_PASSWORD` is set with `fly secrets set`. Clients use Basic auth with user `admin`.
+- Env names come from Tap's README: <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>. `fly/tap.toml` sets `TAP_BIND`, `TAP_SIGNAL_COLLECTION` (`com.blueyvatar.profile`), `TAP_COLLECTION_FILTERS` (the seven collections, comma separated: `com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile,app.bsky.actor.link,org.tangled.actor.profile,sh.tangled.actor.profile`), `TAP_LOG_LEVEL`, and `TAP_DATABASE_URL`. The secret `TAP_ADMIN_PASSWORD` is set with `fly secrets set`. Clients use Basic auth with user `admin`.
 - **Pin the image.** `fly/tap.toml` pins `ghcr.io/bluesky-social/indigo/tap` to tag `0.1.10` and digest `sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb`, the highest semver tag in the registry on November 4, 2026 (tag list read anonymously from the registry API). Upgrade by changing the pin in staging, watching for a clean backfill, then promoting.
 - **Storage.** The volume `tap_data` mounts at `/data`, so Tap runs as one machine. The README default is `sqlite://./tap.db` and does not say where that lands in the container, so the config sets `sqlite:///data/tap.db`. Confirmed in staging on November 4, 2026: Tap creates `/data/tap.db` (plus `-shm` and `-wal` files) on the `tap_data` volume. The README says `TAP_DATABASE_URL` also accepts a PostgreSQL connection string but gives no example. A Neon database for Tap is an option to test in staging.
 - **Private access.** `fly/tap.toml` has no `http_service` and no `services`, so Tap has no public address (<https://docs.fly.io/reference/configuration>). Do not allocate IPs for it. The indexer reaches it over Fly private networking at `http://blueyvatar-tap.internal:2480` (`<app>.internal` resolves to the app's 6PN addresses, <https://docs.fly.io/networking/private-networking>). Flycast (`<app>.flycast`) is the alternative when you want Fly Proxy features such as autostart for internal traffic (<https://docs.fly.io/networking/flycast>), which Tap does not need.
@@ -116,9 +116,56 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing
 6. Cloudflare for SaaS (custom profile domains, Plus plan). Set the fallback origin to the web app's hostname, `profiles.blueyvatar.com`, proxied to `blueyvatar-web.fly.dev`, and give it a Fly certificate (step 2). Set `CF_SAAS_FALLBACK_ORIGIN` to that hostname. See `docs/research/decisions-phase2-v1.md` (Decision 2).
 7. Purge token: create an API token with the Cache Purge permission scoped to the zone. Put it in Infisical as `CF_API_TOKEN` and the zone ID as `CF_ZONE_ID`. Purge limits on the Free plan (URL purge up to 100 per request and 800 URLs per second, prefix and hostname purge 5 requests per minute): <https://developers.cloudflare.com/cache/how-to/purge-cache/>. API reference: <https://developers.cloudflare.com/api/resources/cache/methods/purge/>.
 
+## CDN cache warming
+
+After an avatar changes (an image record upsert, or a Bluesky profile change, which also purges), the indexer requests a fixed list of sizes and formats through the public delivery hostname so Cloudflare caches them before the first visitor asks (issue 49, spec sections 4 and 12). It is best-effort: failures are logged and never fail indexing.
+
+- **What is warmed.** Sizes 80, 128, 256, and 512 in PNG, the default format (constants `WARM_SIZES` and `WARM_FORMATS` in `packages/core/src/resolve.ts`). Override per environment with `WARM_SIZES` (comma list of ladder sizes, such as `80,128,256`) and `WARM_FORMATS` (`png`, `jpeg`, `webp`, such as `png,webp`). Invalid entries are dropped. Each size and format is one signed canonical `/img/{did}/{cid}/{sig}/{size}.{ext}` URL, so a warm request caches the same object a real visitor gets.
+- **Where it runs.** Warming starts only when `PUBLIC_DELIVERY_URL` and `IMG_SIGNING_SECRET` are set on the indexer. With either unset it does nothing. Restricted avatars use per-caller scoped URLs and are not warmed.
+- **No metering.** Set the same random value as `WARM_SECRET` on delivery and indexer (`openssl rand -hex 32`, store in Infisical). The indexer sends it as `x-warm-auth`. Delivery compares it in constant time, the same way as `x-origin-auth`, and a matching request writes no usage meters. `/img` takes no license key and has no per-key or per-IP limit, so warm requests never touch a license meter or a rate limit either way. The header only changes the DID level service counters (`transform`, `bytes_delivered`). Without a secret on delivery the header is ignored. The request still has to carry `x-origin-auth` when `ORIGIN_SECRET` is set, which the Cloudflare transform rule adds at the edge for any request to the delivery hostname, including the indexer's.
+- **Rate limits.** `WARM_CONCURRENCY` (default 2) caps in-flight requests across all jobs. `WARM_MAX_PER_MINUTE` (default 120) is a sliding one-minute cap. Requests over the cap are dropped and counted, not queued.
+- **Measuring whether it pays off on the free plan.** Each job logs one line, `cache warm {"did":...,"cid":...,"requested":N,"dropped":N,"cacheStatus":{"miss":N,"hit":N,...}}`, built from the `cf-cache-status` of each warm response. A `miss` means the warm request populated the edge (the work warming exists to do). A `hit` means the object was already cached, so that request was wasted. `dynamic` or `none` means the response was not cacheable, which is a configuration bug to fix. To decide:
+  1. Run with warming on for a week. Sum `miss`, `hit`, and `requested` from the indexer logs. The hit share of warm requests is the waste rate. A high rate (for example above 50 percent) means purge and upsert events re-warm objects that are still cached, so warm fewer sizes.
+  2. Count first-visitor misses that warming did not prevent. In Cloudflare Analytics, Caching, compare the cache hit ratio for `/img/*` with warming on against a week with `PUBLIC_DELIVERY_URL` unset on the indexer. Optionally compare p95 time to first byte for `/img` requests.
+  3. Compare cost. Each warm miss costs one origin resize on Fly, plus one Cloudflare request. Free plan Cloudflare has no per-request charge, so the cost is origin CPU and egress. Divide warm misses by the extra visitor hits that landed as cache hits. Keep warming when the hit ratio improves enough to matter and origin resize counts do not rise. Cut `WARM_SIZES` to the sizes visitors actually request (see `transform` counts per size in delivery logs) when most warmed sizes never get a hit.
+
 ## Blocking an image
 
 Reports from the public form land in the `reports` table (status `open`). Review them with SQL, for example `SELECT id, target_did, reason, details, created_at FROM reports WHERE status = 'open' ORDER BY created_at`. Set `REPORT_IP_SECRET` on the web app so IP hashes for the rate limit use a private salt. To take down a reported account, run `pnpm ops:block-did -- <did> --reason "..." --report <id>`; it blocks all of the account's images, purges them, and records who and why on the report. To block one image, use the steps below. With `DATABASE_URL`, `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` set, run `pnpm ops:block -- <did> <cid> --reason "..."`. It upserts the row in `blocked_images`, then purges the prefix `/img/{did}/{cid}/` from Cloudflare (prefix purges share the 5 per minute limit). `pnpm ops:unblock -- <did> <cid>` marks the row `unblocked_at` and purges again. Delivery answers 404 on `/img` and skips the image in `/avatar` and `/u`, whose redirects are not cached.
+
+## Stripe billing
+
+Stripe is the payment processor (issue #67). The web app sells Pro ($9 per month) and Business ($49 per month) through Checkout and manages them through the Customer Portal. Until all four variables below are set, `/account/billing` says billing is unavailable, no Stripe call is made, and `/api/stripe/webhook` answers 503 naming the missing variables. Use a Stripe test-mode account first, then repeat the steps in live mode.
+
+### Environment variables (web app)
+
+| Variable | Value |
+| --- | --- |
+| `STRIPE_SECRET_KEY` | Secret or restricted API key (`sk_...` or `rk_...`). A restricted key needs write on Checkout Sessions, Customer portal sessions, and Customers. |
+| `STRIPE_WEBHOOK_SECRET` | Signing secret (`whsec_...`) of the webhook endpoint created in step 5. |
+| `STRIPE_PRICE_PRO` | Price id (`price_...`) of the Pro monthly price. |
+| `STRIPE_PRICE_BUSINESS` | Price id (`price_...`) of the Business monthly price. |
+
+Keep them in Infisical and push them with `fly secrets set --app <web app>`. They are never committed. `PUBLIC_URL` must be `https://blueyvatar.com` in production, since Checkout and portal return URLs are built from it.
+
+### Dashboard steps
+
+1. **Products and prices.** Create two products, "blueyvatar Pro" and "blueyvatar Business". Give each one recurring monthly price in USD: $9.00 for Pro and $49.00 for Business, with tax behavior set to Exclusive (tax is added on top). Copy each price id into `STRIPE_PRICE_PRO` and `STRIPE_PRICE_BUSINESS`. The Plus user plan has no price and is not sold.
+2. **Stripe Tax.** Settings, Tax: set the business head office address, add the registrations where tax must be collected, and set the default product tax category to "Software as a service (SaaS)" or the category counsel confirms. Checkout sends `automatic_tax` and collects the billing address and optional tax ID, so tax is computed per customer.
+3. **Invoices.** Settings, Billing, Invoices: set the business name, address, support email, and invoice footer, and turn on customer emails for receipts and invoices. Stripe Billing creates an invoice for every subscription payment, with tax shown.
+4. **Customer Portal.** Settings, Billing, Customer portal: enable payment method updates, invoice history, and subscription cancellation (at period end). Enable "Customers can switch plans" and add both products so Pro and Business can switch between each other. Set the business information and the return link to `https://blueyvatar.com/account/billing`. Save the default configuration.
+5. **Webhook endpoint.** Developers, Webhooks, Add endpoint with the URL `https://blueyvatar.com/api/stripe/webhook`. Subscribe it to exactly these events and no others: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`. For local testing, run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the secret it prints.
+6. **Payment retries.** Settings, Billing, Subscriptions and emails: use Smart Retries and email customers about failed payments. Set "If all retries for a payment fail" to cancel the subscription, and keep the retry window within the 7 day grace period below.
+7. **Migration.** Migration 0015 (billing tables and `licenses.grace_ends_at`) runs with the delivery release command. Deploy delivery first, then web.
+8. **Smoke test in test mode.** Subscribe with card 4242 4242 4242 4242, confirm the license shows Pro on `/account/keys`, cancel in the portal, and confirm it returns to Free. Use card 4000 0000 0000 0341 to see a failed renewal move the license to past due.
+
+### Behavior to know
+
+- **Webhook handling.** The endpoint verifies the signature against the raw request body (a 5 minute timestamp tolerance), then applies the event in one database transaction that also records the event id in `stripe_events`. A redelivery changes nothing. If an event cannot be applied (for example a subscription arrives before its customer is linked), the endpoint answers 500 and Stripe retries. Check Developers, Webhooks, Event deliveries for failures.
+- **Tier mapping.** `active` and `trialing` subscriptions give the price's tier. `past_due` keeps the tier during the grace period. `unpaid`, `canceled`, `incomplete`, `incomplete_expired`, and `paused` give Free. Enterprise licenses are contracts and billing never changes them. A price id that is neither `STRIPE_PRICE_PRO` nor `STRIPE_PRICE_BUSINESS` is ignored.
+- **Grace period (proposal for the owner).** `PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts` is 7. A license that goes past due keeps its paid tier for 7 days from the first failed payment, then serves at Free limits. Delivery and the dashboard evaluate the expiry on every read, so no webhook is needed. Data, avatars, and profiles are never deleted. The owner has not approved the number yet.
+- **Plus.** There is no Plus price in the spec, so Plus stays on the `PLUS_DIDS` list until one is decided.
+- **Overage.** Metered overage is not billed yet. It needs the per-miss cost measured after deploy, then a metered price and usage reporting.
 
 ## Infisical secrets
 
@@ -126,12 +173,88 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 
 | App | Secrets (Fly secrets) |
 | --- | --- |
-| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
-| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; `DATABASE_URL` (pooled) if web reads the database |
+| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX` |
+| indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`. `TAP_URL` is set in `fly/indexer.toml` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `TAP_ADMIN_PASSWORD` is the same value for tap and indexer. Which web variables are required in production was not audited against the code beyond `.env.example`.
+
+## Publish the lexicons
+
+Covers issue #54. Everything below is scripted in `tools/lexicon`; nothing has been published yet, and name clearance is closed (issue #60). The steps need a DNS zone for `blueyvatar.com` and an atproto account, so they run at deploy time. Primary sources: the [Lexicon spec](https://atproto.com/specs/lexicon) (section "Lexicon Publication and Resolution"), the [Permissions spec](https://atproto.com/specs/permission), the [permission sets guide](https://atproto.com/guides/permission-sets), and the [publishing guide](https://atproto.com/guides/publishing-lexicons).
+
+### What gets published
+
+| NSID | Kind | Record key in `com.atproto.lexicon.schema` |
+| --- | --- | --- |
+| `com.blueyvatar.image` | record | `com.blueyvatar.image` |
+| `com.blueyvatar.profile` | record | `com.blueyvatar.profile` |
+| `com.blueyvatar.claim` | record | `com.blueyvatar.claim` |
+| `com.blueyvatar.attestation` | record (written to the service repo) | `com.blueyvatar.attestation` |
+| `com.blueyvatar.authFull` | permission set, write access to image, profile, and claim | `com.blueyvatar.authFull` |
+
+The files under `lexicons/vendor` belong to other authorities (`com.atproto`, `app.bsky`) and are never published from here.
+
+The spec resolves an NSID through its authority, which is every segment except the last, reversed. All five NSIDs share the authority `com.blueyvatar`, so one DNS record covers them: `_lexicon.blueyvatar.com`. The spec says each authority needs its own TXT record and resolvers do not search parent or child names. Adding an NSID under a new group later, such as `com.blueyvatar.sub.thing`, needs `_lexicon.sub.blueyvatar.com`. The dry run prints one line per authority.
+
+### Steps
+
+1. **Pick the publishing account.** Its DID goes into the TXT record, so changing it later means a DNS change and a wait for caches. It can be the service repo account (`SERVICE_REPO_DID`) or a dedicated one. This is an owner decision. Create an app password for it in the account's settings.
+2. **Validate and dry run** (no network, no credentials):
+
+   ```sh
+   pnpm lexicons:validate
+   pnpm lexicons:dry-run
+   ```
+
+   The validator runs the reference parser from `@atproto/lexicon`, then checks reference resolution, union targets, record key types, blob `accept` patterns, and the permission-set rules (only `repo` and `rpc`, no wildcards, collections inside the set's namespace and present in this repo, non-empty `collection` arrays, valid `action` values). The dry run prints the records it would write and the TXT line, with a placeholder for the DID.
+3. **Publish the records.** Export the variables from Infisical in your shell. Never commit them or put them in `.env.example` with values.
+
+   ```sh
+   export LEXICON_PUBLISH_IDENTIFIER=...        # handle or DID
+   export LEXICON_PUBLISH_APP_PASSWORD=...      # app password
+   export LEXICON_PUBLISH_SERVICE=https://...   # the account's PDS
+   pnpm lexicons:publish
+   ```
+
+   The script logs in with `com.atproto.server.createSession`, writes each schema with `com.atproto.repo.putRecord` (collection `com.atproto.lexicon.schema`, record key equal to the NSID) to the PDS named in the DID document, and skips records that already match. It prints `created`, `updated`, or `unchanged` per schema, then the exact TXT record. Rerunning is safe.
+4. **Create the DNS record** in the `blueyvatar.com` zone: type `TXT`, name `_lexicon` (that is `_lexicon.blueyvatar.com`), value `did=did:plc:...` exactly as printed. The `did=` prefix is part of the value. Use DNS only, since TXT records are not proxied.
+5. **Verify** once DNS has propagated:
+
+   ```sh
+   LEXICON_PUBLISH_DID=did:plc:... LEXICON_PUBLISH_PDS_URL=https://... pnpm lexicons:verify
+   ```
+
+   It checks that the TXT value names the DID and that the PDS serves records identical to the local files. Without `LEXICON_PUBLISH_PDS_URL` it checks DNS only. It exits non-zero on any failure.
+6. **Switch the OAuth client.** Only after step 5 passes, set `OAUTH_USE_PERMISSION_SET=true` on the web app (`fly secrets set --app blueyvatar-web OAUTH_USE_PERMISSION_SET=true`; staging first). The client metadata and the sign-in request then ask for `atproto include:com.blueyvatar.authFull blob:image/*` (plus `account:email` while linking an email) in place of the three `repo:` scopes. The flag is read per request, so a restart is enough and no rebuild is needed. Remove the secret to roll back. Test a sign-in on staging before production.
+7. **Close issue #54** once sign-in works with the `include:` scope.
+
+### Behavior to know
+
+- The authorization server (the user's PDS) resolves the set when a session starts. If it cannot resolve the set and has no cached copy, the authorization request fails. That is why the flag defaults to off.
+- Authorization servers cache sets. The spec recommends 24 hours as the upper bound before a refresh attempt, and a refresh updates the permissions of an existing session when its tokens are renewed.
+- Editing the set later (for example adding a record type) is a republish: run step 3 again. Lexicon evolution rules apply: new fields must be optional, and types, required fields, and length limits cannot change after third parties adopt a schema.
+- `blob:image/*` and `account:email` cannot go inside a permission set, so they stay in the scope string.
+- The attestation schema is published for readers, but users never grant write access to it, because attestations live in the service repo.
+
+### Not answered by the primary sources
+
+- What a resolver does when one `_lexicon` name has more than one `did=` value. The spec does not say. `lexicons:verify` reports it as a failure, and the TXT record should hold a single value.
+- Which authorization servers other than the Bluesky PDS implementation support `include:` scopes today. The Permissions spec says authorization servers are expected to resolve sets. No list of supporting servers was found, so confirm with a staging sign-in on the PDS hosts you care about.
+- Which login server to use for an app password. This depends on where the account is hosted, so the script requires `LEXICON_PUBLISH_SERVICE` and has no default.
+- Whether a PDS validates `com.atproto.lexicon.schema` records on write. The Lexicon spec describes PDS validation as optimistic when a lexicon is unknown, and the script relies on that default.
+- The script was tested against stubbed HTTP and DNS only. No live account was available, so the first real publish is its first live run.
+
+## Original blob cache
+
+Delivery keeps recently fetched original images in memory so a burst of resize requests for one image hits the PDS once.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `BLOB_CACHE_MB` | `32` | Size cap in megabytes for the in-memory original cache, per process. `0` turns it off. Invalid values fall back to the default. |
+
+Size the cap against the machine memory, since each delivery process holds its own copy. The failing-host skip (30 seconds, up to 256 hosts) and the retry count (2) are fixed in code. Look for `getBlob` log lines with `outcome` values `ok`, `cache_hit`, `not_found`, `server_error`, `timeout`, `network_error`, `negative_cache`, and `invalid_endpoint`.
 
 ## Logging
 

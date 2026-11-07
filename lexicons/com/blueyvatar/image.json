@@ -4,7 +4,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "One avatar image. The blob limits match app.bsky.actor.profile#avatar so one file works in both places.",
+      "description": "One image. By default an avatar; see purpose for gallery images. The blob limits match app.bsky.actor.profile#avatar so one file works in both places.",
       "key": "tid",
       "record": {
         "type": "object",
@@ -19,6 +19,14 @@
             "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"]
           },
           "isDefault": { "type": "boolean" },
+          "purpose": {
+            "type": "string",
+            "description": "What the image is for. A missing value means avatar. Gallery images never resolve as an avatar.",
+            "knownValues": ["avatar", "gallery"],
+            "maxLength": 32
+          },
+          "caption": { "type": "string", "maxGraphemes": 140, "maxLength": 1400, "description": "Gallery caption." },
+          "sort": { "type": "integer", "description": "Gallery order, lowest first. Images without a value follow, newest first." },
           "createdAt": { "type": "string", "format": "datetime" }
         }
       }

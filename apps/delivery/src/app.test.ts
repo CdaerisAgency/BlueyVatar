@@ -1,5 +1,6 @@
+import { BlobError } from './blob.js'
 import { describe, expect, it } from 'vitest'
-import { emailHash, emailMd5, imagePath, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
+import { GALLERY_MAX, emailHash, emailMd5, imagePath, restrictedScope, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -23,6 +24,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   const resolver: AvatarResolver = {
     resolveIdentity: async (id) => (id.value === DID || id.value === 'alice.test' ? ident : null),
     candidates: async () => candidates,
+    galleryItems: async () => [],
     getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ uri: `at://${DID}/app.bsky.actor.link/l1`, cid: 'cl1' }, { uri: `at://${DID}/app.bsky.actor.link/l2`, cid: 'cl2' }, { uri: `at://${DID}/app.bsky.actor.link/l3`, cid: 'stale' }] } : null),
     getBlob: async () => new Uint8Array([1, 2, 3]),
   }
@@ -55,6 +57,18 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
 function setupDeps() { const { deps } = setup(); return { deps } }
 
 describe('delivery API', () => {
+  it('maps a missing blob to 404 and other blob failures to 502 on /img', async () => {
+    const { app, deps } = setup()
+    deps.resolver.getBlob = async () => { throw new BlobError('not_found', 'x', 404) }
+    const missing = await app.request(img(80))
+    expect(missing.status).toBe(404)
+    expect((await missing.json()).error.code).toBe('not_found')
+    deps.resolver.getBlob = async () => { throw new BlobError('upstream', 'x') }
+    expect((await app.request(img(80))).status).toBe(502)
+    deps.resolver.getBlob = async () => { throw new BlobError('invalid_endpoint', 'x') }
+    expect((await app.request(img(80))).status).toBe(502)
+  })
+
   it('answers 404 for a blocked image on /img and skips it in redirects', async () => {
     const { app, index } = setup()
     index.blocked.add(`${DID}/bafyreiabc123`)
@@ -290,6 +304,25 @@ describe('delivery API', () => {
     expect(usage.counts.size).toBe(0)
   })
 
+  it('writes no usage meters or rate limit hits for a request with a valid warm header', async () => {
+    const { deps, usage } = setup()
+    const app = createApp({ ...deps, warmSecret: 'ws' })
+    const warm = await app.request(img(80), { headers: { 'x-warm-auth': 'ws' } })
+    expect(warm.status).toBe(200)
+    expect(usage.service.size).toBe(0)
+    expect(usage.counts.size).toBe(0)
+    // A wrong secret is served as a normal, metered request.
+    await app.request(img(80), { headers: { 'x-warm-auth': 'nope' } })
+    expect(usage.service.get(`${DID}:transform`)).toBe(1)
+  })
+
+  it('ignores the warm header when WARM_SECRET is unset', async () => {
+    const { app, usage } = setup()
+    await app.request(img(80), { headers: { 'x-warm-auth': '' } })
+    await app.request(img(80), { headers: { 'x-warm-auth': 'anything' } })
+    expect(usage.service.get(`${DID}:transform`)).toBe(2)
+  })
+
   it('sends a usage alert when a keyed request reaches 80 percent', async () => {
     const { app, usage, sent } = setup()
     usage.counts.set('L1:origin_resolution', 39_999)
@@ -357,6 +390,34 @@ describe('delivery API', () => {
       expect((await (await app.request('/u/alice.test?fmt=avif', { headers: h })).json()).error.code).toBe('invalid_format')
       expect((await (await app.request('/u/alice.test?fmt=webp&q=0', { headers: h })).json()).error.code).toBe('invalid_quality')
       expect((await (await app.request('/u/alice.test?fmt=webp&q=101', { headers: h })).json()).error.code).toBe('invalid_quality')
+    })
+
+    it('rejects q=abc, fmt=gif, and uppercase fmt with stable codes', async () => {
+      const { app } = setup()
+      for (const [qs, code] of [['q=abc', 'invalid_quality'], ['fmt=gif', 'invalid_format'], ['fmt=WEBP', 'invalid_format'], ['fmt=PNG', 'invalid_format']] as const) {
+        for (const headers of [{ 'x-api-key': 'sk_test' }, {}]) {
+          const res = await app.request(`/u/alice.test?${qs}`, { headers })
+          expect(res.status).toBe(400)
+          expect((await res.json()).error.code).toBe(code)
+        }
+      }
+    })
+
+    it('accepts q=1 and q=100 on pro and business, snapping the path to an allowed quality', async () => {
+      const { app } = setup()
+      for (const key of ['sk_test', 'sk_biz']) {
+        const h = { 'x-api-key': key }
+        const low = await app.request('/u/alice.test?fmt=webp&q=1', { headers: h })
+        expect(low.headers.get('location')).toBe(img(80, 'webp', 60))
+        expect(low.headers.get('x-adjusted-params')).toBeNull()
+        const high = await app.request('/u/alice.test?fmt=jpeg&q=100', { headers: h })
+        expect(high.headers.get('location')).toBe(img(80, 'jpeg'))
+      }
+    })
+
+    it('gives every format its own distinct signed path', async () => {
+      const paths = new Set([img(80), img(80, 'jpeg'), img(80, 'webp'), img(80, 'jpeg', 60), img(80, 'webp', 60)])
+      expect(paths.size).toBe(5)
     })
 
     it('serves each variant path as its own object with the matching content type', async () => {
@@ -725,5 +786,50 @@ describe('origin lockdown wiring', () => {
       expect(restricted.status).toBe(404)
       expect(await restricted.json()).toEqual(await unlinked.json())
     })
+  })
+})
+
+describe('profile gallery (F21)', () => {
+  const items = (n: number, rating: 'g' | 'pg' | 'r' | 'x' = 'g') => Array.from({ length: n }, (_, i) => ({ cid: `bafygal${i}`, rating, caption: i === 0 ? 'First' : null }))
+  function galleryApp(list: ReturnType<typeof items>, plusDids: string | undefined) {
+    const { deps } = setup()
+    deps.resolver = { ...deps.resolver, galleryItems: async () => list }
+    deps.plusDids = plusDids
+    return createApp(deps)
+  }
+  const gal = async (app: ReturnType<typeof createApp>) => (await (await app.request('/profile/alice.test')).json()).gallery
+
+  it('returns an empty gallery for Free users', async () => {
+    expect(await gal(galleryApp(items(3), undefined))).toEqual([])
+    expect(await gal(galleryApp(items(3), 'did:plc:someoneelse'))).toEqual([])
+  })
+
+  it('returns signed /img paths and captions for Plus users', async () => {
+    const g = await gal(galleryApp(items(2), `did:plc:x, ${DID}`))
+    expect(g).toEqual([
+      { url: imagePath(SECRET, DID, 'bafygal0', 512, 'png', undefined, ''), caption: 'First' },
+      { url: imagePath(SECRET, DID, 'bafygal1', 512, 'png', undefined, ''), caption: null },
+    ])
+    expect(g.every((x: { url: string }) => x.url.startsWith('/img/'))).toBe(true)
+  })
+
+  it('applies the avatar rating filter', async () => {
+    const list = [...items(1, 'g'), { cid: 'bafypg', rating: 'pg' as const, caption: null }, { cid: 'bafyr', rating: 'r' as const, caption: null }, { cid: 'bafyx', rating: 'x' as const, caption: null }]
+    expect(await gal(galleryApp(list, DID))).toHaveLength(1)
+  })
+
+  it('caps the gallery at 12', async () => {
+    expect(GALLERY_MAX).toBe(12)
+    expect(await gal(galleryApp(items(20), DID))).toHaveLength(12)
+  })
+
+  it('signs restricted galleries with the caller scope, like avatars', async () => {
+    const { deps, index } = (() => { const s = setup(); return { deps: s.deps, index: s.index } })()
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+    deps.resolver = { ...deps.resolver, galleryItems: async () => items(1) }
+    deps.plusDids = DID
+    const app = createApp({ ...deps, now: () => 0 })
+    const res = await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_test' } })
+    expect((await res.json()).gallery[0].url).toBe(imagePath(SECRET, DID, 'bafygal0', 512, 'png', undefined, restrictedScope('k:L1', 0)))
   })
 })

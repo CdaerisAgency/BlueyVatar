@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { isRating, type IndexedLinkRecord, type Tier } from '@blueyvatar/core'
+import { effectiveTier, isRating, type IndexedLinkRecord, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
@@ -35,11 +35,20 @@ export class PgIndexStore implements IndexStore {
   }
 
   async serviceImages(did: string): Promise<IndexedImage[]> {
+    return this.images(did, `purpose = 'avatar'`, 'created_at DESC')
+  }
+
+  async galleryImages(did: string): Promise<IndexedImage[]> {
+    return this.images(did, `purpose = 'gallery'`, 'sort ASC NULLS LAST, created_at DESC')
+  }
+
+  private async images(did: string, where: string, order: string): Promise<IndexedImage[]> {
     const { rows } = await this.pool.query<{
-      rkey: string; cid: string; mime_type: string; rating: string; is_default: boolean; created_at: Date
+      rkey: string; cid: string; mime_type: string; rating: string; is_default: boolean; purpose: string
+      caption: string | null; sort: number | null; created_at: Date
     }>(
-      `SELECT rkey, cid, mime_type, rating, is_default, created_at
-         FROM images WHERE did = $1 ORDER BY created_at DESC`,
+      `SELECT rkey, cid, mime_type, rating, is_default, purpose, caption, sort, created_at
+         FROM images WHERE did = $1 AND ${where} ORDER BY ${order}`,
       [did],
     )
     return rows.map((r) => ({
@@ -49,6 +58,9 @@ export class PgIndexStore implements IndexStore {
       // The column has a CHECK constraint; fall back to the strictest rating if it ever drifts.
       rating: isRating(r.rating) ? r.rating : 'x',
       isDefault: r.is_default,
+      purpose: r.purpose,
+      caption: r.caption,
+      sort: r.sort,
       createdAt: r.created_at.toISOString(),
     }))
   }
@@ -113,9 +125,9 @@ export class PgLicenseStore implements LicenseStore {
 
   async findKey(key: string): Promise<{ key: ApiKey; license: License } | null> {
     const { rows } = await this.pool.query<{
-      kind: 'secret' | 'publishable'; domains: string[]; license_id: string; owner: string; tier: Tier; status: License['status']
+      kind: 'secret' | 'publishable'; domains: string[]; license_id: string; owner: string; tier: Tier; status: License['status']; grace_ends_at: Date | null
     }>(
-      `SELECT k.kind, k.domains, l.license_id, l.owner, l.tier, l.status
+      `SELECT k.kind, k.domains, l.license_id, l.owner, l.tier, l.status, l.grace_ends_at
          FROM api_keys k JOIN licenses l ON l.license_id = k.license_id
         WHERE k.key_hash = $1 AND k.revoked_at IS NULL`,
       [hashApiKey(key)],
@@ -124,7 +136,8 @@ export class PgLicenseStore implements LicenseStore {
     if (!r) return null
     return {
       key: { key, kind: r.kind, licenseId: r.license_id, domains: r.domains },
-      license: { licenseId: r.license_id, owner: r.owner, tier: r.tier, status: r.status },
+      // Past due keeps the paid tier through the grace period, then reads as Free (spec section 12). No webhook is needed to expire it.
+      license: { licenseId: r.license_id, owner: r.owner, tier: effectiveTier({ tier: r.tier, status: r.status, graceEndsAt: r.grace_ends_at }, new Date()), status: r.status },
     }
   }
 }

@@ -71,7 +71,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 10 | Default image styles | G, L, U | Generated styles, custom URL, or 404 | v1 |
 | 11 | Force default | G, L | Query parameter | v1 |
 | 12 | Content rating filter | G | Map ratings to atproto self-labels (section 9) | v1 |
-| 13 | Format and quality transforms | A | Width, height, quality, format parameters | v2 |
+| 13 | Format and quality transforms | A | Quality and format parameters. Decision: square sizes only, no width or height (see note below the table) | v2 |
 | 14 | JSON response mode | U | json parameter returns metadata | v1 |
 | 15 | Redirect to CDN-cached image | A | Immutable cached copies keyed by blob CID | v1 |
 | 16 | Cache TTL control | U | Tier-gated TTL parameter | v2 |
@@ -79,7 +79,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 18 | Extended profile fields | G | Fields in the service profile lexicon (section 5) | v1 |
 | 19 | Verified accounts | G | Verification records plus service attestation (section 8) | v2 |
 | 20 | Links | G | Reuse the links field in the Bluesky profile lexicon: strongRefs to `app.bsky.actor.link` records | v1 |
-| 21 | Image gallery | G | Extra blobs in the user repo | Later |
+| 21 | Image gallery | G | Extra `com.blueyvatar.image` records with `purpose` set to `gallery` (section 5), shown on the profile page and in profile JSON for Plus users only | v2 |
 | 22 | Hovercards | G | Embeddable script reading the profile API | v2 |
 | 23 | QR code | G | Endpoint returning a QR for the profile URL | v2 |
 | 24 | Multiple avatars with ratings | G | One record per avatar in a collection | v1 |
@@ -89,6 +89,8 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 28 | Rate limit headers and stable error codes | U | Response headers and error schema | v1 |
 | 29 | Custom profile domains | G | Paid tier feature | v2 |
 | 30 | Open source and self-hosting | L, A | Publish the delivery layer under an open license | Later |
+
+Note on row 13: width and height are not added. Avatars are square and center-cropped at upload, non-square outputs would multiply cache variants, and a single square `s` keeps parity with Gravatar. `fmt` (png, jpeg, webp) and `q` (1 to 100, default 85) are the transforms. The image path encodes both. Details are in `docs/api/format-quality-v1.md`.
 
 ## 4. atproto architecture
 
@@ -143,6 +145,9 @@ The service defines three record types in the user's repository and keeps everyt
           "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
           "license": { "type": "string", "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"] },
           "isDefault": { "type": "boolean" },
+          "purpose": { "type": "string", "knownValues": ["avatar", "gallery"], "maxLength": 32 },
+          "caption": { "type": "string", "maxGraphemes": 140, "maxLength": 1400 },
+          "sort": { "type": "integer" },
           "createdAt": { "type": "string", "format": "datetime" }
         }
       }
@@ -150,6 +155,10 @@ The service defines three record types in the user's repository and keeps everyt
   }
 }
 ```
+
+**Gallery images (feature 21).** A gallery image is another `com.blueyvatar.image` record. The optional string field `purpose` tells them apart: `avatar` (the default when the field is absent, so every existing record stays valid) or `gallery`. A gallery record may also carry `caption` (up to 140 characters) and `sort` (an integer, lowest first; images without one follow, newest first). The change is additive and the lexicons are not published yet (issue #54). The indexer stores `purpose`, `caption`, and `sort` on the `images` row (migration 0014). Avatar resolution reads `purpose = 'avatar'` rows only, so a gallery upload never becomes the avatar, whatever its date or `isDefault` value. A record with any other `purpose` is neither an avatar nor a gallery image.
+
+Gallery rules follow the avatar rules. The gallery is a Plus user feature (section 11.2), gated by the same plan check as other Plus features (`PLUS_DIDS` until plan storage exists). The profile JSON carries `gallery`, an array of `{ url, caption }`, and it is empty for Free users. The profile page renders it for Plus users only. Each image passes the same filters as an avatar: the account-level `!no-unauthenticated` label hides the gallery, blocked images (section 9) never appear, and only rating `g` images show. URLs are signed `/img` paths (512 pixel PNG) under the visibility rules of section 10, never PDS URLs. A profile shows at most 12 gallery images (`GALLERY_MAX`). The web avatar editor lists avatar records only.
 
 **Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
 
@@ -237,7 +246,7 @@ The default list combines [Libravatar's special values](https://wiki.libravatar.
 | `priority` | Order in which adapters are tried | 1 |
 | `enabled` | Switch to turn the adapter off | on |
 
-The Bluesky values come from its [profile lexicon](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json). A second adapter could cover the Tangled profile, which atp.pics [already tries as a fallback](https://graham.leaflet.pub/3mhr36lsmo222) under the collection `sh.tangled.actor.profile`. Tangled's lexicon source confirms the field name: the [`sh.tangled.actor.profile` lexicon](https://tangled.org/tangled.org/core/blob/02d9ff54fcdb96ae5665feb794aa14ba24302a79~1/lexicons/actor/profile.json) keeps the avatar in a blob field named `avatar` that accepts PNG and JPEG up to 1,000,000 bytes, matching Bluesky's limits. A [commit to Tangled's core repo dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons it describes as unused, including that file, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json) with the same `avatar` field and limits. A Tangled adapter would use `avatarPath` `avatar` and `labelsPath` `labels` (the new lexicon adds self-labels). Which collection holds users' existing Tangled profiles is an open item (section 13).
+The Bluesky values come from its [profile lexicon](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json). A second adapter could cover the Tangled profile, which atp.pics [already tries as a fallback](https://graham.leaflet.pub/3mhr36lsmo222) under the collection `sh.tangled.actor.profile`. Tangled's lexicon source confirms the field name: the [`sh.tangled.actor.profile` lexicon](https://tangled.org/tangled.org/core/blob/02d9ff54fcdb96ae5665feb794aa14ba24302a79~1/lexicons/actor/profile.json) keeps the avatar in a blob field named `avatar` that accepts PNG and JPEG up to 1,000,000 bytes, matching Bluesky's limits. A [commit to Tangled's core repo dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons it describes as unused, including that file, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json) with the same `avatar` field and limits. A Tangled adapter would use `avatarPath` `avatar` and `labelsPath` `labels` (the new lexicon adds self-labels). Live repos sampled on November 7, 2026 settled the collection question (section 13, item 13): both Tangled adapters are enabled, `org.tangled.actor.profile` first, with `sh.tangled.actor.profile` as a fallback that is read only when the new collection has no record for the account. The sample is in `docs/research/tangled-collection-v1.md`.
 
 **Adapter rules**
 
@@ -245,6 +254,7 @@ The Bluesky values come from its [profile lexicon](https://github.com/bluesky-so
 2. The first adapter that returns an image passing the rating filter wins.
 3. An adapter that errors or returns nothing is skipped and logged. It never fails the request.
 4. Each adapter ships with a test fixture, and an operator can disable one if its lexicon changes.
+5. An adapter can name another adapter it backs up (`fallbackFor`). It is read only when that adapter is active and its record does not exist, so a user who has the primary record costs no extra PDS read. A record that exists without an avatar still counts as present.
 5. User-set adapter order is a later phase. atp.pics' author is [considering a lexicon for it](https://graham.leaflet.pub/3mhr36lsmo222), and it would add a field to the profile record in section 5.
 
 **Delivery behavior**
@@ -273,7 +283,7 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 | Background color | `com.blueyvatar.profile` | v2 |
 | Verified accounts | Claim and attestation records | v2 |
 | Contact info, payment and wallet links | `com.blueyvatar.profile` with visibility rules | Later |
-| Gallery images | Extra `com.blueyvatar.image` records | Later |
+| Gallery images (Plus) | Extra `com.blueyvatar.image` records with `purpose: "gallery"`, plus optional `caption` and `sort` | v2 |
 
 **Verified accounts.** Gravatar lets users [link and verify accounts such as Instagram, GitHub, TikTok, and Threads](https://www.sqlservercentral.com/blogs/beyond-avatars-how-gravatar-is-transforming-online-identity), and its API [caps unauthenticated responses at four](https://docs.gravatar.com/rest-api). The v2 design is a claim record in the user repo and an attestation record in the service repo that points at the claim. The profile API returns only claims that have an attestation. No source I read documents how Gravatar performs each verification, so the verification methods per platform are an open item (section 13).
 
@@ -387,13 +397,13 @@ Each image record carries a `license` value the user picks. The values in sectio
 
 ## 11. Service tiers
 
-The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. Every number below is a proposed placeholder to validate with cost modeling. No published data exists for what this product costs to run, and prices are left open.
+The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. The owner approved the Pro ($9 per month) and Business ($49 per month) prices (issue #67). Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run. The Plus user plan has no price yet.
 
 ### 11.1 Developer tiers
 
 | Capability | Free | Pro | Business | Enterprise |
 | --- | --- | --- | --- | --- |
-| Price | $0 | TBD per month | TBD per month | Contract |
+| Price | $0 | $9 per month | $49 per month | Contract |
 | Intended for | Individuals, side projects | Indie developers, small sites | Companies, SaaS products | Platforms, white-label |
 | Lookup by email hash, handle, DID | Yes | Yes | Yes | Yes |
 | Anonymous requests | 100 per day per IP | 100 per day per IP | 100 per day per IP | Custom |
@@ -470,7 +480,16 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 - A past-due license gets a grace period, then drops to Free limits. A downgrade changes limits only and never deletes user data, user avatars, or profiles.
 - Free-tier attribution is checked on the developer's production site. Unavatar requires the link to be [public, followable, and on a production site](https://github.com/microlinkhq/unavatar), and reserves the right to revoke free access when it is missing.
 - Keys can be rotated and revoked at any time, with usage alerts at 80 and 100 percent of included volume.
-- The payment processor, tax handling, and invoicing are not chosen and are listed in section 13.
+- The payment processor is Stripe, decided by the owner on 2026-11-07 (issue #67). Tax is computed by Stripe Tax, and invoices come from Stripe Billing. Both are configured in the Stripe dashboard at deploy (docs/deploy.md, Stripe billing). The overage rate stays open until per-miss cost is measured.
+
+### 12.1 Stripe billing
+
+- **Checkout and portal.** Pro and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PRO` and `STRIPE_PRICE_BUSINESS`. With any Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
+- **Webhook.** One endpoint verifies the Stripe signature against the raw body and handles `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`. Each event id is stored in the same transaction as its effects, so a redelivered event changes nothing, and a failed event leaves no trace so Stripe's retry applies it. An event older than the stored subscription state is ignored.
+- **Data.** Migration 0015 adds `billing_customers` (DID to Stripe customer), `subscriptions` (a mirror of each Stripe subscription, keyed to the DID and the license), `stripe_events`, and `licenses.grace_ends_at`.
+- **Tier resolution.** A license's tier is derived from all of its subscriptions: the highest tier among `active`, `trialing`, and in-grace `past_due` subscriptions, else Free. The derived tier is written to `licenses` on every event. Enterprise licenses are contracts and are never changed by billing.
+- **Past due.** A past-due license keeps its paid tier for a grace period, then serves at Free limits. The grace period is a proposal of 7 days from the first failed payment (`PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts`), pending owner approval. Expiry is evaluated when a license is read (`effectiveTier`), so it needs no webhook and a missed event cannot extend paid limits. Recovery to `active` clears the grace period. A downgrade changes limits only, as stated above.
+- **Plus.** The Plus user plan has no price in this spec, so billing does not sell it and Plus stays on the `PLUS_DIDS` list until a price is decided.
 
 ## 13. Open questions and risks
 
@@ -488,9 +507,9 @@ Thirteen items in the table below need a decision or an answer before build, and
 | 8 | Atproto spaces timing | Real access control for avatars depends on it | [Alpha since August 20, 2026, not for production, launch targeted later this year](https://atproto.com/blog/atproto-spaces-alpha) |
 | 9 | Name clearance for blueyvatar and blueyvatar.com | Lexicon IDs are hard to change once other apps depend on them | Name chosen. Clear it and confirm the domain before publishing lexicons (see the note below this table). Also consider proposing the profile lexicon to community standards efforts, since the atp.pics author [wants one](https://graham.leaflet.pub/3mhr36lsmo222) |
 | 10 | Legal review | Terms of service, privacy policy, image licenses, treatment of hashed emails | Needs a lawyer; I am not one |
-| 11 | Payment processor, taxes, invoicing, pricing | Section 12 depends on them | Not chosen; no cost data available |
+| 11 | Payment processor, taxes, invoicing, pricing | Section 12 depends on them | Decided (issue #67): Stripe, with Stripe Tax and Stripe invoices, and Pro $9 and Business $49 per month (section 12.1). Open: the past-due grace period (7 days proposed), a Plus price, and the overage rate, which needs the per-miss cost measured after deploy |
 | 12 | `/img` bypasses tier size caps | `/img` URLs carry no key and accept any size up to 2048 (section 7), so a Free caller can build a 2048 URL and skip the 512 cap in section 11 | Open risk. Mitigation ideas: sign image paths at the redirect route, or restrict `/img` to a fixed size ladder so tier caps map to a few cacheable sizes |
-| 13 | Which Tangled collection to read | A [Tangled core commit dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json). Both use an `avatar` blob field | No published answer found on whether existing user records were migrated. Proposal: one adapter per collection, `org.tangled.actor.profile` first |
+| 13 | Which Tangled collection to read | A [Tangled core commit dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json). Both use an `avatar` blob field | Decided (issues #69 and #55, section 7): enable `org.tangled.actor.profile` and keep `sh.tangled.actor.profile` as a fallback read only when the new record is missing. A sample of 44 live repos on November 7, 2026, plus relay counts (3,000 repos with the new collection, 16,056 with the legacy one, 14,079 with only the legacy one), showed that most users have not migrated. Avatars in both collections are typed blobs that the adapter reads as is. The extra read costs one `getRecord` per miss for a migrated user and two for everyone else, about 0.12 s each at p50 from one container ([research](../research/tangled-collection-v1.md)). Tangled maintainers were not asked |
 
 **Name clearance for blueyvatar.** One search found no existing product with this name, which does not prove it is free. Two checks are needed before launch. First, Bluesky's [trademark policy](https://bsky.social/about/support/trademarks) prohibits using Bluesky, bsky, or any confusingly similar variation in a domain name or a product name without written authorization. Whether blueyvatar counts is a legal judgment, and trademarks@blueskyweb.xyz is the contact for permission questions. Second, Bluey is the name of a well-known children's series [produced by Ludo Studio for the ABC and BBC Studios](https://whatsondisneyplus.com/bluey-profile-avatars-added-to-disney/), so a clearance search for Bluey-based names is prudent. I have not checked whether blueyvatar.com is available to register. The [atproto trademark policy](https://atproto.com/about/trademarks/atproto-trademark-policy) covers the atproto marks separately and does not restrict ordinary use of domain names as NSIDs.
 

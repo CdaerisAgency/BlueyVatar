@@ -1,4 +1,4 @@
-import { getPath, ratingFromLabels, readBlobRef, selfLabelValues } from '@blueyvatar/core'
+import { GALLERY_CAPTION_MAX, getPath, purposeOf, ratingFromLabels, readBlobRef, selfLabelValues } from '@blueyvatar/core'
 
 /** Collections the indexer cares about (spec section 4). */
 export const COLLECTIONS = {
@@ -7,10 +7,12 @@ export const COLLECTIONS = {
   claim: 'com.blueyvatar.claim',
   bskyProfile: 'app.bsky.actor.profile',
   bskyLink: 'app.bsky.actor.link',
+  tangledProfile: 'org.tangled.actor.profile',
+  tangledLegacyProfile: 'sh.tangled.actor.profile',
 } as const
 
 export interface IndexWrites {
-  upsertImage(row: { did: string; rkey: string; cid: string; mimeType: string; rating: string; isDefault: boolean; license: string | null; createdAt: string }): Promise<void>
+  upsertImage(row: { did: string; rkey: string; cid: string; mimeType: string; rating: string; isDefault: boolean; license: string | null; purpose: string; caption: string | null; sort: number | null; createdAt: string }): Promise<void>
   /** Returns the blob CID of the deleted record, when known, so its cached URLs can be purged. */
   deleteImage(did: string, rkey: string): Promise<string | undefined | void>
   upsertProfile(did: string, record: Record<string, unknown>): Promise<void>
@@ -22,7 +24,7 @@ export interface IndexWrites {
   /** `status` is Tap's account status (active, deactivated, deleted, suspended, takendown). */
   setRepoStatus(did: string, handle: string | null, active: boolean, status?: string): Promise<void>
   /** Purge cached copies after a change (spec section 9). Without `cids`, purges the repo's indexed images. */
-  purgeImages(did: string, cids?: string[]): Promise<void>
+  purgeImages(did: string, cids?: string[], opts?: { warm?: boolean }): Promise<void>
 }
 
 export interface RecordEvt {
@@ -54,6 +56,9 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
         rating: ratingFromLabels(selfLabelValues(getPath(evt.record, 'labels'))),
         isDefault: getPath(evt.record, 'isDefault') === true,
         license: typeof evt.record.license === 'string' ? evt.record.license : null,
+        purpose: purposeOf(evt.record.purpose),
+        caption: typeof evt.record.caption === 'string' && evt.record.caption.trim() !== '' ? [...evt.record.caption].slice(0, GALLERY_CAPTION_MAX).join('') : null,
+        sort: Number.isSafeInteger(evt.record.sort) && Math.abs(evt.record.sort as number) < 2 ** 31 ? (evt.record.sort as number) : null,
         createdAt: typeof evt.record.createdAt === 'string' ? evt.record.createdAt : new Date().toISOString(),
       })
       return
@@ -84,14 +89,18 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
       })
       return
     }
+    case COLLECTIONS.tangledProfile:
+    case COLLECTIONS.tangledLegacyProfile:
     case COLLECTIONS.bskyProfile:
+      // Tangled profiles use the same path: the avatar is read live and only the cache changes.
       // Read live by the delivery API; a change only needs cache purging. A label change
       // (such as !no-unauthenticated) takes effect through the same purge. The Bluesky avatar
       // is not in the images table, so its CID is purged explicitly.
-      await db.purgeImages(evt.did)
+      // The avatar changed or may have, so the purged images are warmed again afterward.
+      await db.purgeImages(evt.did, undefined, { warm: true })
       if (evt.record) {
         const avatar = readBlobRef(getPath(evt.record, 'avatar'))
-        if (avatar) await db.purgeImages(evt.did, [avatar.cid])
+        if (avatar) await db.purgeImages(evt.did, [avatar.cid], { warm: true })
       }
       return
   }

@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 import { checkCode, MAX_ATTEMPTS } from '../lib/codes'
 import { currentDid, oauthClient } from '../lib/auth'
 import { confirmLink, sendCode } from '../lib/link'
-import { EMAIL_LINK_SCOPE, SIGN_IN_SCOPE } from '../lib/oauth'
+import { emailLinkScope, signInScope } from '../lib/oauth'
 import { getStore } from '../lib/store'
 
 const to = (path: string, key: string, value: string): never => redirect(`${path}?${key}=${encodeURIComponent(value)}`)
@@ -24,14 +24,14 @@ async function authorize(input: string, scope: string, state: 'login' | 'link'):
 export async function login(form: FormData): Promise<void> {
   const id = parseIdentifier(String(form.get('handle') ?? ''))
   if (!id || id.kind === 'hash') return to('/login', 'error', 'Enter a valid handle such as alice.bsky.social.')
-  await authorize(id.value, SIGN_IN_SCOPE, 'login')
+  await authorize(id.value, signInScope(), 'login')
 }
 
 /** Re-authorizes with account:email. The email session is discarded right after linking. */
 export async function linkEmail(): Promise<void> {
   const did = await currentDid()
   if (!did) return redirect('/login')
-  await authorize(did, EMAIL_LINK_SCOPE, 'link')
+  await authorize(did, emailLinkScope(), 'link')
 }
 
 export async function addEmail(form: FormData): Promise<void> {

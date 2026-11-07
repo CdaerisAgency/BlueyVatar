@@ -12,6 +12,10 @@ export type ImageRecord = {
   labels?: unknown
   license?: string
   isDefault?: boolean
+  /** `gallery` for gallery images. Absent means avatar. */
+  purpose?: string
+  caption?: string
+  sort?: number
   createdAt: string
 }
 export type ProfileRecord = {
@@ -54,7 +58,7 @@ export async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsi
 
 export const rkeyOf = (uri: string): string => uri.slice(uri.lastIndexOf('/') + 1)
 
-export async function listImages(session: OAuthSession): Promise<StoredImage[]> {
+async function listImageRecords(session: OAuthSession): Promise<StoredImage[]> {
   const out: StoredImage[] = []
   let cursor: string | undefined
   for (let page = 0; page < 5; page++) {
@@ -66,6 +70,16 @@ export async function listImages(session: OAuthSession): Promise<StoredImage[]> 
     if (!cursor) break
   }
   return out
+}
+
+/** Avatar records only. Gallery images stay out of the avatar list, its limit, and the default toggle. */
+export async function listImages(session: OAuthSession): Promise<StoredImage[]> {
+  return (await listImageRecords(session)).filter((x) => (x.value.purpose ?? 'avatar') === 'avatar')
+}
+
+/** Gallery records only, in no particular order. See lib/gallery.ts for ordering. */
+export async function listGalleryRecords(session: OAuthSession): Promise<StoredImage[]> {
+  return (await listImageRecords(session)).filter((x) => x.value.purpose === 'gallery')
 }
 
 export async function getProfile(session: OAuthSession): Promise<{ cid: string; value: ProfileRecord } | null> {

@@ -1,0 +1,19 @@
+{
+  "name": "@blueyvatar/lexicon-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "validate": "tsc -p tsconfig.json && node dist/cli.js validate",
+    "dry-run": "tsc -p tsconfig.json && node dist/cli.js publish --dry-run",
+    "publish-schemas": "tsc -p tsconfig.json && node dist/cli.js publish",
+    "verify": "tsc -p tsconfig.json && node dist/cli.js verify",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@atproto/lexicon": "0.7.17",
+    "@atproto/syntax": "0.7.7"
+  }
+}

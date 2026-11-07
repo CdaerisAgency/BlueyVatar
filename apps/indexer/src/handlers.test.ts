@@ -21,6 +21,21 @@ describe('indexer handlers', () => {
     }, db)
     expect(db.upsertImage).toHaveBeenCalledWith(expect.objectContaining({ cid: 'bafyimg', rating: 'pg', isDefault: true }))
   })
+  it('indexes purpose, caption, and sort, and treats a missing purpose as avatar', async () => {
+    const db = fakeDb()
+    const image = { $type: 'blob', ref: { $link: 'bafygal' }, mimeType: 'image/png', size: 100 }
+    await handleRecord({
+      did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'g1', action: 'create',
+      record: { image, purpose: 'gallery', caption: 'Hello', sort: 2, createdAt: '2026-11-03T00:00:00Z' },
+    }, db)
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: 'gallery', caption: 'Hello', sort: 2 }))
+    await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'a1', action: 'create', record: { image, createdAt: '2026-11-03T00:00:00Z' } }, db)
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: 'avatar', caption: null, sort: null }))
+    await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'g2', action: 'create', record: { image, purpose: 'gallery', caption: 'x'.repeat(200), sort: 1.5, createdAt: '2026-11-03T00:00:00Z' } }, db)
+    const last = (db.upsertImage as ReturnType<typeof vi.fn>).mock.calls.at(-1)![0]
+    expect(last.caption).toHaveLength(140)
+    expect(last.sort).toBeNull()
+  })
   it('deletes and purges on image delete', async () => {
     const db = fakeDb()
     await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: '3k', action: 'delete' }, db)
@@ -36,8 +51,23 @@ describe('indexer handlers', () => {
         labels: { $type: 'com.atproto.label.defs#selfLabels', values: [{ val: '!no-unauthenticated' }] },
       },
     }, db)
-    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a')
-    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafyavatar'])
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined, { warm: true })
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafyavatar'], { warm: true })
+  })
+  it.each(['org.tangled.actor.profile', 'sh.tangled.actor.profile'])('purges and warms the avatar when %s changes', async (collection) => {
+    const db = fakeDb()
+    await handleRecord({
+      did: 'did:plc:a', collection, rkey: 'self', action: 'update',
+      record: { avatar: { $type: 'blob', ref: { $link: 'bafytangled' }, mimeType: 'image/png', size: 10 } },
+    }, db)
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined, { warm: true })
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafytangled'], { warm: true })
+    expect(db.upsertProfile).not.toHaveBeenCalled()
+  })
+  it.each(['org.tangled.actor.profile', 'sh.tangled.actor.profile'])('purges once when %s is deleted', async (collection) => {
+    const db = fakeDb()
+    await handleRecord({ did: 'did:plc:a', collection, rkey: 'self', action: 'delete' }, db)
+    expect(db.purgeImages).toHaveBeenCalledTimes(1)
   })
   it('purges once when the Bluesky profile is deleted', async () => {
     const db = fakeDb()

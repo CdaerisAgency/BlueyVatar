@@ -34,12 +34,23 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |
-| `not_found` | 404 | No such image, profile, or route target. Also returned for `d=404` with no avatar, and for hidden profiles. |
+| `not_found` | 404 | No such image, profile, or route target. Also returned for `d=404` with no avatar, for hidden profiles, and on `/img` when the user's PDS answers 404 for the original blob. |
 | `rate_limited` | 429 | Anonymous daily limit (100 per IP) or Free keyed daily limit (1,000) reached. |
-| `upstream_error` | 502 | The image could not be fetched or processed. |
+| `upstream_error` | 502 | The image could not be fetched or processed. On `/img` this covers PDS 5xx responses, timeouts, network errors, an unusable PDS endpoint, and bytes that do not match the CID. |
 | `internal` | 500 | An unhandled server fault. |
 
 Unhandled server faults return `500` with code `internal` in the same JSON shape. Treat 5xx as transient and retry with backoff. Hidden profiles return `not_found`, the same as an unknown profile, so a lookup cannot reveal that a profile exists.
+
+### Original blob fetch (`/img`)
+
+On a CDN miss, delivery fetches the original from the user's PDS (`com.atproto.sync.getBlob`):
+
+- The PDS endpoint from the DID document must be a public https host. A bare hostname gets `https://`. Other schemes, credentials, ports, IP literals, and local names are refused and answer `502 upstream_error`.
+- PDS `404` answers `404 not_found`. It is not retried and does not mark the host as failing.
+- PDS `5xx`, timeouts, and network errors are retried up to 2 times with a short backoff (100 ms, then 300 ms). If all attempts fail the answer is `502 upstream_error`.
+- After such a failure, the PDS host is skipped for 30 seconds and requests for it answer `502 upstream_error` at once. A later success clears the mark.
+- Other PDS 4xx responses answer `502 upstream_error` without retry.
+- Each outcome is logged as `getBlob` with the fields `outcome`, `did`, `cid`, `host`, `status`, `attempt`, `bytes`. Tokens and URLs are never logged.
 
 Parameters that a tier ignores are not errors. They are listed in `x-adjusted-params`.
 

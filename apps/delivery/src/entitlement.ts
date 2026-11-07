@@ -44,7 +44,8 @@ export async function checkEntitlement(
   const found = await licenses.findKey(raw)
   if (!found) return { ok: false, status: 401, code: 'invalid_key', message: 'Unknown API key' }
   const { key, license } = found
-  if (license.status !== 'active') {
+  // Past due is served: the store already drops the tier to Free once the grace period ends.
+  if (license.status !== 'active' && license.status !== 'past_due') {
     return { ok: false, status: 402, code: 'license_inactive', message: `License is ${license.status}` }
   }
   if (key.kind === 'publishable' && info.headerKey === undefined && key.domains.length > 0) {

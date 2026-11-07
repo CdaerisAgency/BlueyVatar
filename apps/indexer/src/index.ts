@@ -9,7 +9,7 @@ import { reverifyFromEnv } from './reverify-wiring.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
- * record as its signal collection and the four collections in handlers.ts as
+ * record as its signal collection and the collections in handlers.ts as
  * its collection filters (spec section 4). Tap is in beta; Jetstream is the
  * documented fallback.
  */
@@ -26,7 +26,8 @@ function writes(): IndexWrites {
     const rv = reverifyFromEnv(pool)
     const store = pgReverifyStore(pool)
     scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
-    return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warmerFromEnv() })
+    const warm = warmerFromEnv()
+    return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warm, onWarm: warm })
   }
   console.warn('DATABASE_URL is not set; logging index writes to the console')
   return {
