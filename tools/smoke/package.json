@@ -1,0 +1,15 @@
+{
+  "name": "@blueyvatar/smoke",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke": "node --experimental-strip-types smoke.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "vitest": "3.2.7"
+  }
+}

@@ -77,3 +77,69 @@ jobs:
 
       - name: Build image
         run: docker build -t blueyvatar:ci .
+
+  # Browser tests against `next start`, a stub delivery server, and the Postgres service below. No outside
+  # services are called. Runs beside `check`, so it does not lengthen it.
+  e2e:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blueyvatar_test
+        ports:
+          - 5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Point the app at the service port
+        run: echo "E2E_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate lexicon types
+        run: pnpm lex:build
+
+      - name: Build core
+        run: pnpm --filter @blueyvatar/core build
+
+      - name: Build hovercards
+        run: pnpm --filter @blueyvatar/hovercards build
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: ${{ env.E2E_DATABASE_URL }}
+
+      - name: Build web
+        run: pnpm --filter @blueyvatar/web build
+
+      - name: Install Chromium
+        run: pnpm --filter @blueyvatar/web exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm e2e
+
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7

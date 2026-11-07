@@ -6,3 +6,5 @@ dist/
 packages/core/src/lexicons/
 coverage/
 *.tsbuildinfo
+test-results/
+playwright-report/
