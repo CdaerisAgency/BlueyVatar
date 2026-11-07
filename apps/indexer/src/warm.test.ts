@@ -40,7 +40,7 @@ describe('CacheWarmer', () => {
     await new CacheWarmer({ publicUrl: 'https://x.test', signingSecret: 's', config: { ...DEFAULT_WARM_CONFIG, concurrency: 2 }, fetch: fetch as unknown as F, log }).warm('did:plc:a', 'bafya')
     expect(peak).toBeLessThanOrEqual(2)
     expect(log).toHaveBeenCalledOnce()
-    expect(info.mock.calls[0]![1]).toContain('"cacheStatus":{"error":1,"hit":1,"miss":2}')
+    expect(JSON.parse(info.mock.calls[0]![0] as string).cacheStatus).toEqual({ error: 1, hit: 1, miss: 2 })
     info.mockRestore()
   })
   it('drops requests over the per-minute cap and recovers after the window', async () => {

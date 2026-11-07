@@ -1,5 +1,8 @@
 import { decryptJson } from './token-crypto.js'
 import type { EmailSender } from './email.js'
+import { createLogger } from '../observability/log.js'
+
+const log = createLogger({ app: process.env.LOG_APP ?? 'core' })
 
 /**
  * Notification emails to account owners (issue #144, spec sections 9 and 12).
@@ -119,13 +122,13 @@ export class Notifier {
       if (!noticeAllowed(await this.dir.prefs(did), kind)) return 'off'
       const to = await this.dir.address(did)
       if (!to) {
-        console.warn(`${kind} notice not sent: no address on file`, { did })
+        log.warn(`${kind} notice not sent: no address on file`, { did })
         return 'no_address'
       }
       await this.sender.send({ to, ...n })
       return 'sent'
     } catch (err) {
-      console.error(`${kind} notice failed`, err instanceof Error ? err.message : 'unknown')
+      log.error(`${kind} notice failed`, { error: err instanceof Error ? err.message : 'unknown' })
       return 'failed'
     }
   }
@@ -145,7 +148,7 @@ export function pgNoticeDirectory(pool: Query, master?: Buffer): NoticeDirectory
       try {
         return decryptJson<string>(enc, master)
       } catch {
-        console.error('stored notice address could not be decrypted; check TOKEN_ENCRYPTION_KEY')
+        log.error('stored notice address could not be decrypted; check TOKEN_ENCRYPTION_KEY')
         return null
       }
     },

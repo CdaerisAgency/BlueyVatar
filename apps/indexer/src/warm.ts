@@ -1,4 +1,5 @@
 import { IMAGE_FORMATS, IMAGE_SIZE_LADDER, WARM_FORMATS, WARM_HEADER, WARM_SIZES, imagePath, type ImageFormat } from '@blueyvatar/core'
+import { log as logger } from './obs.js'
 
 /**
  * Requests the common sizes and formats through the public hostname so Cloudflare caches them
@@ -64,7 +65,7 @@ export class CacheWarmer {
     try {
       const base = this.o.publicUrl.replace(/\/$/, '')
       const urls = this.cfg.formats.flatMap((f) => this.cfg.sizes.map((s) => base + imagePath(this.o.signingSecret, did, cid, s, f)))
-      const log = this.o.log ?? console.warn
+      const log = this.o.log ?? ((m: string, meta?: unknown) => logger.warn(m, meta as Record<string, unknown> | undefined))
       const counts: Record<string, number> = {}
       let dropped = 0
       await Promise.all(urls.map(async (url) => {
@@ -84,9 +85,9 @@ export class CacheWarmer {
           this.release()
         }
       }))
-      console.log('cache warm', JSON.stringify({ did, cid, requested: urls.length - dropped, dropped, cacheStatus: counts }))
+      logger.info('cache warm', { did, cid, requested: urls.length - dropped, dropped, cacheStatus: counts })
     } catch (err) {
-      ;(this.o.log ?? console.warn)('cache warm failed', { did, cid, error: (err as Error).message })
+      ;(this.o.log ?? ((m: string, meta?: unknown) => logger.warn(m, meta as Record<string, unknown> | undefined)))('cache warm failed', { did, cid, error: (err as Error).message })
     }
   }
 

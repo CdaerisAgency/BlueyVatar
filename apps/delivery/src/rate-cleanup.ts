@@ -1,4 +1,5 @@
 import type pg from 'pg'
+import { errors, log } from './obs.js'
 
 /** Deletes rate window rows whose window has ended. Returns the number removed. */
 export async function cleanupRateWindows(pool: pg.Pool): Promise<number> {
@@ -9,7 +10,10 @@ export async function cleanupRateWindows(pool: pg.Pool): Promise<number> {
 /** Runs the cleanup on an interval (default hourly). Failures are logged and retried on the next tick. */
 export function scheduleRateWindowCleanup(pool: pg.Pool, everyMs = 3_600_000): NodeJS.Timeout {
   const timer = setInterval(() => {
-    cleanupRateWindows(pool).catch((err) => console.error('rate window cleanup failed', err))
+    cleanupRateWindows(pool).catch((err) => {
+      log.error('rate window cleanup failed', { err })
+      errors.captureException(err, { tags: { task: 'rate_window_cleanup' } })
+    })
   }, everyMs)
   timer.unref()
   return timer

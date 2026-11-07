@@ -3,6 +3,7 @@ import { graceExpiredNotice, paymentFailedNotice, subscriptionCanceledNotice, ty
 import Stripe from 'stripe'
 import { missingForWebhook, tierForPrice, webhookSecret, type Env } from './config'
 import type { BillingStore, BillingTx, SubscriptionRow } from './store'
+import { log, metrics, reportError } from '../obs'
 
 /** Events the endpoint acts on. Subscribe the Stripe webhook endpoint to exactly these (docs/deploy.md). */
 export const HANDLED_EVENTS = [
@@ -184,6 +185,8 @@ export async function handleStripeWebhook(rawBody: string, signature: string | n
   try {
     event = Stripe.webhooks.constructEvent(rawBody, signature, webhookSecret(env)!)
   } catch {
+    metrics.inc('web_stripe_webhook_total', { result: 'bad_signature' })
+    log.warn('stripe webhook signature rejected')
     return { status: 400, body: { error: 'invalid_signature', message: 'Signature verification failed.' } }
   }
   if (!(HANDLED_EVENTS as readonly string[]).includes(event.type)) return { status: 200, body: { received: true, result: 'ignored: event type not handled' } }
@@ -200,10 +203,12 @@ export async function handleStripeWebhook(rawBody: string, signature: string | n
     // Only the delivery that recorded the event id sends mail, so Stripe redelivery cannot mail twice.
     // The notifier never throws, and a failed message never fails the webhook.
     else if (deps.notifier) for (const p of pending) await deps.notifier.send(p.did, 'billing', p.notice)
-    console.info('stripe webhook', { id: event.id, type: event.type, result })
+    metrics.inc('web_stripe_webhook_total', { result: 'ok' })
+    log.info('stripe webhook', { eventId: event.id, type: event.type, result })
     return { status: 200, body: { received: true, result } }
   } catch (err) {
-    console.error('stripe webhook failed', { id: event.id, type: event.type, error: err instanceof Error ? err.message : 'unknown' })
+    metrics.inc('web_stripe_webhook_total', { result: 'failed' })
+    reportError('stripe webhook failed', err, { tags: { stripe_event_type: event.type }, extra: { eventId: event.id } })
     return { status: 500, body: { error: 'processing_failed', message: 'Event could not be applied. Stripe will retry.' } }
   }
 }
