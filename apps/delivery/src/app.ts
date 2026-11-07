@@ -3,7 +3,7 @@ import { cors } from 'hono/cors'
 import {
   ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
-  parseIdentifier, pickCandidate, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
+  parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
@@ -12,7 +12,6 @@ import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock } from './origin.js'
-import { qrSvg } from './qr.js'
 import type { Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore, Visibility } from './store.js'
@@ -84,6 +83,8 @@ function isCrossOriginRequest(origin: string | undefined, ownHosts: readonly str
 
 const QR_DEFAULT_SIZE = 256
 const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
+
+const PLATFORM_SLUG = /^[a-z0-9-]+$/
 
 const IMG_FILE = /^(\d{1,4})(?:-q(\d{1,3}))?\.(png|jpeg|webp)$/
 
@@ -325,6 +326,8 @@ export function createApp(deps: AppDeps) {
       throw err
     }
     if (p.adjusted.includes('s')) c.header('x-adjusted-params', 's')
+    const to = c.req.query('to')
+    if (to !== undefined && !PLATFORM_SLUG.test(to)) return fail(c, 400, 'invalid_platform', 'to must be a platform name such as github')
 
     let identity: Identity | null
     if (id.kind === 'hash') {
@@ -342,7 +345,8 @@ export function createApp(deps: AppDeps) {
     }
 
     const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
-    const svg = qrSvg(`${base}/p/${identity.handle}`, p.size)
+    const target = to ? `${base}/go/${encodeURIComponent(identity.handle)}/${to}` : `${base}/p/${identity.handle}`
+    const svg = qrSvg(target, p.size)
     let body: Uint8Array | string = svg
     if (ext === 'png') {
       try {
@@ -354,6 +358,39 @@ export function createApp(deps: AppDeps) {
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     c.header('content-type', ext === 'png' ? 'image/png' : 'image/svg+xml')
     return c.body(body as string & Uint8Array<ArrayBuffer>, 200)
+  })
+
+  // Public redirect from a QR code to one of the user's verified platforms, or to the profile page
+  // when that platform is missing, hidden, or not an https link (spec section 8). Hidden profiles
+  // and unknown handles look the same to the caller.
+  app.get('/go/:handle/:platform', async (c) => {
+    const e = await entitle(c)
+    if (!e.ok) return fail(c, e.status, e.code, e.message)
+    const id = parseIdentifier(c.req.param('handle'))
+    if (!id || id.kind !== 'handle') return fail(c, 404, 'not_found', 'No profile')
+    const identity = await deps.resolver.resolveIdentity(id)
+    if (e.licenseId) await deps.usage.add(e.licenseId, 'origin_resolution')
+    if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
+    if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
+
+    const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
+    const fallback = `${base}/p/${identity.handle}`
+    const platform = c.req.param('platform').toLowerCase()
+    let target = fallback
+    if (platform === 'bluesky') {
+      target = `https://bsky.app/profile/${identity.handle}`
+    } else {
+      const match = (await deps.index.verifiedAccounts(identity.did)).find((a) => !a.hidden && a.platform.toLowerCase() === platform)
+      if (match) {
+        try {
+          if (new URL(match.uri).protocol === 'https:') target = match.uri
+        } catch {
+          /* keep the fallback */
+        }
+      }
+    }
+    c.header('cache-control', 'private, max-age=60')
+    return c.redirect(target, 302)
   })
 
   // Immutable resized image. Cached by Cloudflare by file extension (spec section 14.1).
