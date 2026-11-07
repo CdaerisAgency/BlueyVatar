@@ -123,7 +123,17 @@ export function createApp(deps: AppDeps) {
     return true
   }
 
-  async function serveAvatar(c: Context, lookup: () => Promise<Identity | null>, seed: string, initials = '') {
+  /**
+   * `lookup` receives a gate that does the database-only checks (repo active, visibility rules).
+   * Hash lookups must call it before any network identity resolution, so that unlinked,
+   * opted-out, and restricted hashes all take the same cheap path and return the same default.
+   */
+  async function serveAvatar(
+    c: Context,
+    lookup: (gate: (did: string) => Promise<boolean>) => Promise<Identity | null>,
+    seed: string,
+    initials = '',
+  ) {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
 
@@ -136,7 +146,8 @@ export function createApp(deps: AppDeps) {
     }
     if (p.adjusted.length) c.header('x-adjusted-params', p.adjusted.join(','))
 
-    const identity = await lookup()
+    const gate = async (did: string) => (await deps.index.isRepoActive(did)) && (await visibilityAllows(c, did, e))
+    const identity = await lookup(gate)
     if (e.licenseId) {
       const used = await deps.usage.add(e.licenseId, 'origin_resolution')
       await deps.alerts?.check(e.licenseId, e.tier, used)
@@ -173,9 +184,12 @@ export function createApp(deps: AppDeps) {
     const hash = c.req.param('hash').toLowerCase().replace(/\.(png|jpe?g|webp)$/, '')
     // MD5 is accepted for older Gravatar clients and takes the same path as SHA256.
     if (!isSha256Hex(hash) && !isMd5Hex(hash)) return fail(c, 400, 'invalid_identifier', 'Expected a SHA256 (64 hex) or MD5 (32 hex) hash of the email')
-    return serveAvatar(c, async () => {
+    // Every miss (unlinked, opted out, inactive, restricted for this caller) ends in the same
+    // default redirect before any identity resolution, so the response does not reveal a link.
+    return serveAvatar(c, async (gate) => {
       const did = await deps.index.didForEmailHash(hash)
-      return did ? deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
+      if (!did || !(await gate(did))) return null
+      return deps.resolver.resolveIdentity({ kind: 'did', value: did })
     }, hash)
   })
 
@@ -210,7 +224,10 @@ export function createApp(deps: AppDeps) {
     if (!identity || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
     const vis = await deps.index.visibility(identity.did)
     if (vis.hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
-    if (!(await visibilityAllows(c, identity.did, e))) return fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    if (!(await visibilityAllows(c, identity.did, e))) {
+      // A hash lookup must not tell a restricted profile apart from an unlinked hash.
+      return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    }
 
     const [bsky, own] = await Promise.all([
       deps.resolver.getRecord(identity, 'app.bsky.actor.profile', 'self').catch(() => null),
@@ -277,7 +294,9 @@ export function createApp(deps: AppDeps) {
     // The profile page lives at /p/{handle}, so an identity without a handle has no QR target.
     if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
     if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
-    if (!(await visibilityAllows(c, identity.did, e))) return fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    if (!(await visibilityAllows(c, identity.did, e))) {
+      return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
+    }
 
     const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
     const svg = qrSvg(`${base}/p/${identity.handle}`, p.size)
