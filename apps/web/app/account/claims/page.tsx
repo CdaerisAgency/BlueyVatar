@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import AccountNav from '../AccountNav'
 import { currentDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
-import { COMING_LATER, METHOD_FOR, PLATFORMS, PLATFORM_LABELS, isPlatform, profileLinkFor } from '../../../lib/claims'
+import { DNS_PROOF_LABEL, PLATFORMS, PLATFORM_LABELS, isPlatform, profileLinkFor, proofToken } from '../../../lib/claims'
+import { methodFor, platformAvailable } from '../../../lib/claim-providers'
 import { listClaims, repoHandle, type StoredClaim } from '../../../lib/claims-repo'
 import { PUBLIC_URL } from '../../../lib/oauth'
 import { RepoError, repoSession } from '../../../lib/repo'
@@ -17,7 +18,18 @@ const HELP: Record<string, string> = {
   mastodon: 'Your Mastodon instance asks you to sign in once. blueyvatar reads only your account address.',
   website: 'Add a link to your blueyvatar profile on that page with rel="me".',
   instagram: 'Add a link to your blueyvatar profile on that page with rel="me". Instagram may not show bio links to crawlers, so this can fail.',
+  domain: 'Add a TXT record to the domain (see the exact name and value below). Domain changes can take a while to spread.',
+  bluesky: 'Your own Bluesky account verifies at once. For another account, put the proof text below in that account\'s bio. blueyvatar reads the public profile.',
+  threads: 'Threads asks you to sign in once. blueyvatar reads only your username.',
+  tiktok: 'TikTok asks you to sign in once. blueyvatar reads only your username.',
+  youtube: 'Google asks you to sign in once. blueyvatar reads only the ID of the channel you own. Use the channel ID address (youtube.com/channel/UC...), not an @handle.',
+  twitch: 'Twitch asks you to sign in once. blueyvatar reads only your username.',
   x: 'Add a link to your blueyvatar profile on that page with rel="me". X may not show bio links to crawlers, so this can fail.',
+}
+
+const checkLabel = (platform: Parameters<typeof methodFor>[0], label: string): string => {
+  const m = methodFor(platform)
+  return m === 'rel-me' ? 'Check my page' : m === 'dns-txt' || m === 'bsky-proof' ? 'Check now' : `Verify with ${label}`
 }
 
 export default async function ClaimsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
@@ -61,13 +73,13 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                 <strong>{label}</strong> <code>{c.value.uri}</code>{' '}
                 {verified ? <span>Verified ({a!.method}){c.value.hidden ? ', hidden from hovercards' : ''}</span> : <span>Not verified</span>}
                 <div className="mt-1 flex flex-wrap gap-2">
-                  {isPlatform(c.value.platform) ? (
+                  {isPlatform(c.value.platform) && platformAvailable(c.value.platform) ? (
                     <form action={verifyClaim}>
                       <input type="hidden" name="rkey" value={c.rkey} />
-                      <Button type="submit">{verified ? 'Verify again' : METHOD_FOR[c.value.platform] === 'rel-me' ? 'Check my page' : `Verify with ${label}`}</Button>
+                      <Button type="submit">{verified ? 'Verify again' : checkLabel(c.value.platform, label)}</Button>
                     </form>
                   ) : (
-                    <span>Verification is coming later.</span>
+                    <span>Verification is not available for this platform right now.</span>
                   )}
                   <form action={setHidden}>
                     <input type="hidden" name="rkey" value={c.rkey} />
@@ -91,13 +103,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
           Platform{' '}
           <select name="platform" defaultValue="github">
             {PLATFORMS.map((p) => (
-              <option key={p} value={p}>
-                {PLATFORM_LABELS[p]}
-              </option>
-            ))}
-            {COMING_LATER.map((p) => (
-              <option key={p} value={p} disabled>
-                {PLATFORM_LABELS[p]} (coming later)
+              <option key={p} value={p} disabled={!platformAvailable(p)}>
+                {PLATFORM_LABELS[p]}{platformAvailable(p) ? '' : ' (not available yet)'}
               </option>
             ))}
           </select>
@@ -112,15 +119,15 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
       <ul>
         {PLATFORMS.map((p) => (
           <li key={p}>
-            <strong>{PLATFORM_LABELS[p]}.</strong> {HELP[p]}
-          </li>
-        ))}
-        {COMING_LATER.map((p) => (
-          <li key={p}>
-            <strong>{PLATFORM_LABELS[p]}.</strong> Coming later.
+            <strong>{PLATFORM_LABELS[p]}.</strong> {platformAvailable(p) ? HELP[p] : 'Not available yet.'}
           </li>
         ))}
       </ul>
+      <p>
+        Proof text for Bluesky bios and domain records: <code>{proofToken(did)}</code>. For a domain, create a TXT record
+        named <code>{DNS_PROOF_LABEL}.your-domain</code> whose value is exactly that text. Remove the proof and the badge goes
+        away at the next re-check.
+      </p>
       {link && (
         <p>
           Your profile link for rel=&quot;me&quot; checks: <code>{link}</code>

@@ -1,4 +1,4 @@
-import type { ClaimRecord } from './claims'
+import type { ClaimRecord, OAuthProvider } from './claims'
 import type { MastodonApp } from './mastodon-oauth'
 import { getPool } from './store'
 
@@ -14,7 +14,7 @@ export type AttestationRow = {
   createdAt: Date
 }
 
-export type PendingVerification = { state: string; did: string; rkey: string; provider: 'github' | 'mastodon'; instance?: string }
+export type PendingVerification = { state: string; did: string; rkey: string; provider: 'github' | 'mastodon' | OAuthProvider; instance?: string }
 
 const STATE_TTL_MS = 15 * 60_000
 

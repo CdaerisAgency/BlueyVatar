@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import AvatarRing from '../../../components/AvatarRing'
 import { siteUrl } from '../../../lib/site'
 import { PageMain } from '../../../components/Page'
+import { PLATFORM_LABELS } from '../../../lib/claims'
 import { resolvePlan } from '../../../lib/plan'
 import { getDomainStore } from '../../../lib/domain-store'
 import { jsonLdString, personJsonLd, profileCanonical } from '../../../lib/seo'
@@ -74,7 +75,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
           <ul aria-label="Verified accounts" className={list}>
             {accounts.map((a) => (
               <li key={a.uri}>
-                <a href={a.uri} rel="me noopener">{a.platform}</a>
+                <a href={a.uri} rel="me noopener" title="Verified by blueyvatar">{PLATFORM_LABELS[a.platform] ?? a.platform} <span aria-label="verified">✓</span></a>
               </li>
             ))}
           </ul>
