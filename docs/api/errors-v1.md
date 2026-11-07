@@ -37,9 +37,9 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `not_found` | 404 | No such image, profile, or route target. Also returned for `d=404` with no avatar, and for hidden profiles. |
 | `rate_limited` | 429 | Anonymous daily limit (100 per IP) or Free keyed daily limit (1,000) reached. |
 | `upstream_error` | 502 | The image could not be fetched or processed. |
-| `profile_hidden` | none | Reserved. Defined in code and not emitted today. Hidden profiles return `not_found`. |
+| `internal` | 500 | An unhandled server fault. |
 
-Unhandled server faults return a framework default 500 that is not in this JSON shape. Treat any non-JSON 5xx as a transient failure.
+Unhandled server faults return `500` with code `internal` in the same JSON shape. Treat 5xx as transient and retry with backoff. Hidden profiles return `not_found`, the same as an unknown profile, so a lookup cannot reveal that a profile exists.
 
 Parameters that a tier ignores are not errors. They are listed in `x-adjusted-params`.
 
@@ -53,7 +53,7 @@ Sent on successful responses and on `429` responses, when the caller has a count
 | `x-rate-limit-remaining` | Requests left. Never below 0. |
 | `x-rate-limit-reset` | Unix time in seconds when the window resets. |
 
-Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. Pro and Business have monthly included volume of 50,000 and 1,000,000 (30-day window), with metered overage, so they are not blocked at the limit. Enterprise has no window and the three headers are omitted. The API does not send `retry-after`. On a `429`, wait until `x-rate-limit-reset`.
+Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. Pro and Business have monthly included volume of 50,000 and 1,000,000 (30-day window), with metered overage, so they are not blocked at the limit. Enterprise has no window and the three headers are omitted. A `429` also carries `retry-after`, the whole seconds (at least 1) until `x-rate-limit-reset`.
 
 ## Other response headers
 
@@ -62,8 +62,10 @@ Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. 
 | `x-tier` | Successful responses | `free`, `pro`, `business`, or `enterprise`. |
 | `x-usage-cost` | Successful keyed requests | `1`, the metered units for the request. Absent for anonymous requests. |
 | `x-adjusted-params` | A tier clamped or ignored a parameter | Comma-separated names, for example `s,fmt,ttl`. Possible names: `s`, `d`, `fmt`, `q`, `ttl`. On `/qr`, only `s` is reported. |
-| `x-cache-status` | `/img/...` responses from the origin | `MISS`. The origin always sets `MISS`, and a CDN in front may report its own status. |
+| `retry-after` | `429` responses with a counted window | Seconds to wait before retrying. |
 | `x-content-type-options` | Every response | `nosniff`. |
 | `cache-control` | Avatar, JSON, and QR responses | `private, max-age=<ttl>`. See [cache-ttl-v1.md](cache-ttl-v1.md). |
+
+The API does not send `x-cache-status`. Cloudflare reports cache state in `cf-cache-status`.
 
 Browser code can read `x-rate-limit-limit`, `x-rate-limit-remaining`, `x-rate-limit-reset`, and `x-tier` on `/profile/{id}` responses. Those routes send CORS headers allowing any origin. Other routes do not expose these headers to cross-origin scripts.

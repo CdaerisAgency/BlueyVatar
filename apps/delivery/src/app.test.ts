@@ -127,6 +127,42 @@ describe('delivery API', () => {
     expect(last).toBe(429)
   })
 
+  it('sends retry-after on 429 and no x-cache-status on /img', async () => {
+    const { app } = setup()
+    const h = emailHash('alice@example.com')
+    let res: Response | undefined
+    for (let i = 0; i < 101; i++) res = await app.request(`/avatar/${h}`, { headers: { 'cf-connecting-ip': '203.0.113.88' } })
+    expect(res!.status).toBe(429)
+    const wait = Number(res!.headers.get('retry-after'))
+    expect(wait).toBeGreaterThanOrEqual(1)
+    expect(wait).toBeLessThanOrEqual(86_400)
+    expect((await app.request(`/avatar/${h}`, { headers: { 'cf-connecting-ip': '203.0.113.89' } })).headers.get('retry-after')).toBeNull()
+    expect((await app.request(img(80))).headers.get('x-cache-status')).toBeNull()
+  })
+
+  it('returns the standard JSON error for unhandled faults', async () => {
+    const { app, deps } = setup()
+    deps.resolver.resolveIdentity = async () => { throw new Error('boom') }
+    const res = await app.request('/u/alice.test')
+    expect(res.status).toBe(500)
+    expect((await res.json()).error.code).toBe('internal')
+  })
+
+  it('answers json=true in JSON with found false for missing, inactive, and restricted identities', async () => {
+    const { app, index } = setup()
+    const miss = { did: null, handle: null, found: false, source: 'default', rating: null, url: null, updatedDate: null }
+    const unlinked = await app.request(`/avatar/${emailHash('nobody@example.com')}?json=true&d=404`)
+    expect(unlinked.status).toBe(200)
+    expect(await unlinked.json()).toEqual(miss)
+    expect(await (await app.request('/u/unknown.test?json=true')).json()).toEqual(miss)
+    index.inactive.add(DID)
+    expect(await (await app.request('/u/alice.test?json=true')).json()).toEqual(miss)
+    index.inactive.clear()
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+    expect(await (await app.request(`/avatar/${emailHash('alice@example.com')}?json=true`)).json()).toEqual(miss)
+    expect((await app.request('/u/alice.test?json=true&s=abc')).status).toBe(400)
+  })
+
   it('serves the default when nothing passes the rating filter', async () => {
     const { app } = setup([{ source: 'blueyvatar', did: DID, blob: { cid: 'bafyx', mimeType: 'image/png' }, rating: 'x' }])
     const res = await app.request('/u/alice.test?d=404')
