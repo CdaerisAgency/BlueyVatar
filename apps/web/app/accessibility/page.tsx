@@ -19,7 +19,7 @@ export default function AccessibilityPage() {
       <h2>Known limits</h2>
       <p>Automated checks find only part of the problems that people meet. Avatars and gallery images come from your own repository, so their alt text is only as good as the text the owner wrote. Hosted profile pages show it when it exists.</p>
       <h2>Tell us about a barrier</h2>
-      <p>If something on blueyvatar is hard to use, write to security@blueyvatar.com with the page address and what happened. We read every report and reply with a fix date or a workaround.</p>
+      <p>If something on blueyvatar is hard to use, write to support@blueyvatar.com with the page address and what happened. We read every report and reply with a fix date or a workaround.</p>
     </PageMain>
   )
 }
