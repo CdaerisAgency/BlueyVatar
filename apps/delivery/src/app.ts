@@ -1,8 +1,8 @@
-import { createLogger, Metrics } from '@blueyvatar/core'
+import { createLogger, Metrics, normalizeBackgroundColor } from '@blueyvatar/core'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, historyDays, historyPeriods, includedVolume, periodEndOf, periodStartOf, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
@@ -13,8 +13,9 @@ import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock, secretsEqual } from './origin.js'
+import { openApiDocument } from './openapi.js'
 import { BlobError } from './blob.js'
-import type { Resizer } from './resize.js'
+import { ResizeBusyError, type Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore, Visibility } from './store.js'
 import type { UsageMeter } from './usage.js'
@@ -70,7 +71,14 @@ function fail(c: Context, status: number, code: ErrorCode, message: string) {
   return c.json(errorBody(code, message, status >= 500 ? (c.get('requestId' as never) as string | undefined) : undefined), status as 400)
 }
 
-function rateHeaders(c: Context, e: EntitlementResult) {
+/** Shed response when the resize queue is full: 503 with Retry-After, never cached. */
+function overloaded(c: Context, err: ResizeBusyError) {
+  c.header('retry-after', String(err.retryAfterSeconds))
+  c.header('cache-control', 'no-store')
+  return fail(c, 503, 'overloaded', 'Image processing is busy; retry shortly')
+}
+
+function rateHeaders(c: Context, e: EntitlementResult, metered = true) {
   const w = e.window
   if (w && w.limit > 0) {
     c.header('x-rate-limit-limit', String(w.limit))
@@ -79,7 +87,7 @@ function rateHeaders(c: Context, e: EntitlementResult) {
   }
   if (e.ok) {
     c.header('x-tier', e.tier)
-    if (e.licenseId) c.header('x-usage-cost', '1')
+    if (e.licenseId && metered) c.header('x-usage-cost', '1')
   }
 }
 
@@ -151,7 +159,7 @@ export function createApp(deps: AppDeps) {
     ?? deps.remoteAddress?.(c)
     ?? 'unknown'
 
-  async function entitle(c: Context) {
+  async function entitle(c: Context, metered = true) {
     const e = await checkEntitlement(
       {
         headerKey: c.req.header('x-api-key'),
@@ -163,7 +171,7 @@ export function createApp(deps: AppDeps) {
       deps.licenses,
       deps.limiter,
     )
-    rateHeaders(c, e)
+    rateHeaders(c, e, metered)
     if (!e.ok && e.status === 429) metrics.inc('delivery_rate_limit_rejections_total')
     if (!e.ok && e.status === 429 && e.window) {
       c.header('retry-after', String(Math.max(1, e.window.reset - Math.floor(Date.now() / 1000))))
@@ -285,6 +293,12 @@ export function createApp(deps: AppDeps) {
   // Liveness: the process answers. Readiness: Postgres answers within the time budget.
   app.get('/healthz', (c) => c.text('ok'))
 
+  // Machine-readable API description (issue #142). Public, no key, no metering.
+  app.get('/openapi.json', (c) => {
+    c.header('cache-control', 'public, max-age=3600')
+    return c.json(openApiDocument)
+  })
+
   app.get('/readyz', async (c) => {
     if (deps.ready) {
       let timer: NodeJS.Timeout | undefined
@@ -313,6 +327,43 @@ export function createApp(deps: AppDeps) {
   })
 
   // Gravatar-compatible route. Hash only (SHA256 or MD5); raw email is never accepted (spec section 6).
+  // Usage API (spec sections 10.3 and 11.1). Secret keys only. The call hits the rate limit like any
+  // keyed request but writes no meter and sends no x-usage-cost.
+  app.get('/usage', async (c) => {
+    const e = await entitle(c, false)
+    if (!e.ok) return fail(c, e.status, e.code, e.message)
+    c.header('cache-control', 'private, no-store')
+    if (!e.licenseId || c.req.header('x-api-key') === undefined) {
+      return fail(c, 401, 'invalid_key', 'Send a secret key in the x-api-key header')
+    }
+    if (e.keyKind !== 'secret') {
+      return fail(c, 403, 'secret_key_required', 'Usage is available to secret keys only')
+    }
+    const now = new Date()
+    const period = periodStartOf(now)
+    const months = historyPeriods(e.tier, now)
+    const days = historyDays(e.tier, now)
+    const snap = await deps.usage.read(e.licenseId, [period, ...months], days)
+    const m = (p: string, meter: string) => snap.monthly.get(`${p}|${meter}`) ?? 0
+    const meters = (p: string) => ({ origin_resolution: m(p, 'origin_resolution'), profile_json: m(p, 'profile_json'), transform: m(p, 'transform') })
+    const inc = includedVolume(e.tier)
+    return c.json({
+      tier: e.tier,
+      period: { start: period, end: periodEndOf(period) },
+      included: { volume: inc.volume, per: inc.per },
+      total: m(period, 'origin_resolution'),
+      meters: meters(period),
+      history: {
+        months: months.map((p) => ({ period: p, ...meters(p) })),
+        days: days.map((d) => ({
+          date: d,
+          origin_resolution: snap.daily.get(`${d}|origin_resolution`) ?? 0,
+          profile_json: snap.daily.get(`${d}|profile_json`) ?? 0,
+        })),
+      },
+    })
+  })
+
   app.get('/avatar/:hash', async (c) => {
     const hash = c.req.param('hash').toLowerCase().replace(/\.(png|jpe?g|webp)$/, '')
     // MD5 is accepted for older Gravatar clients and takes the same path as SHA256.
@@ -404,6 +455,8 @@ export function createApp(deps: AppDeps) {
       pronunciation: own?.pronunciation ?? null,
       timezone: own?.timezone ?? null,
       interests: own?.interests ?? [],
+      // #rrggbb or null. A stored value that is not exactly that shape is treated as unset.
+      backgroundColor: normalizeBackgroundColor(own?.backgroundColor),
       gallery,
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
       atprotoApps,
@@ -461,7 +514,8 @@ export function createApp(deps: AppDeps) {
     if (ext === 'png') {
       try {
         body = await deps.resize({ input: new TextEncoder().encode(svg), size: p.size, format: 'png', quality: 85 })
-      } catch {
+      } catch (err) {
+        if (err instanceof ResizeBusyError) return overloaded(c, err)
         return fail(c, 502, 'upstream_error', 'Could not render the QR code')
       }
     }
@@ -548,6 +602,7 @@ export function createApp(deps: AppDeps) {
       const original = await deps.resolver.getBlob(identity, cid)
       bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
     } catch (err) {
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
       logger.warn('image fetch or resize failed', { requestId: c.get('requestId' as never), did, kind: err instanceof BlobError ? err.kind : 'resize', err })
       if (err instanceof BlobError && err.kind === 'not_found') return fail(c, 404, 'not_found', 'Original image not found')
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
@@ -582,7 +637,13 @@ export function createApp(deps: AppDeps) {
     const size = Math.min(Number(m[1]), 2048)
     const seed = c.req.query('seed') ?? ''
     const svg = defaultSvg(style as DefaultStyle, seed, cleanInitials(c.req.query('initials')))
-    const bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
+    let bytes: Uint8Array
+    try {
+      bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
+    } catch (err) {
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
+      throw err
+    }
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${m[3]}`,
       'cache-control': 'public, max-age=86400',

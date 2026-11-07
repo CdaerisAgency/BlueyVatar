@@ -12,7 +12,7 @@ export const metadata = pageMetadata('/', 'blueyvatar | Avatars and profiles in 
 
 export default function Home() {
   return (
-    <main>
+    <main id="main" tabIndex={-1} className="focus:outline-none">
       <PricingHashRedirect />
       <div className={`${inner} grid grid-cols-1 items-center gap-12 pt-8 pb-12 md:grid-cols-[1.2fr_1fr] md:pt-14`}>
         <div className="flex flex-col items-start gap-[22px]">
@@ -23,7 +23,7 @@ export default function Home() {
             <ButtonLink href="/login" variant="primary" size="lg">
               {COPY.hero.primary}
             </ButtonLink>
-            <ButtonLink href="/#dev" size="lg">
+            <ButtonLink href="/docs" size="lg">
               {COPY.hero.secondary}
             </ButtonLink>
           </div>
@@ -70,7 +70,7 @@ export default function Home() {
             </h2>
             <p className="max-w-[480px] text-bv-line">{COPY.dev.body}</p>
             <Link
-              href="/#dev"
+              href="/docs"
               className="font-semibold text-bv-cream underline decoration-bv-orange decoration-2 underline-offset-[6px] hover:text-bv-cream hover:decoration-4 focus-visible:outline-bv-cream"
             >
               {COPY.dev.link}

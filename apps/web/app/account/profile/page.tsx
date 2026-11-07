@@ -1,3 +1,4 @@
+import { normalizeBackgroundColor } from '@blueyvatar/core'
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
@@ -28,10 +29,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       <AccountNav />
       <h1>Profile</h1>
       <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your Bluesky profile.</p>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" id="profile-error">{error}</p>}
       {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
-      <form action={saveProfile}>
+      {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
+      <form action={saveProfile} aria-describedby={[error && 'profile-error', loadError && 'profile-load-error'].filter(Boolean).join(' ') || undefined}>
         {field('jobTitle', 'Job title', p.jobTitle, 1000)}
         {field('company', 'Company', p.company, 1000)}
         {field('location', 'Location', p.location, 1000)}
@@ -42,6 +43,14 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           Interests (up to {MAX_INTERESTS}, separated by commas or new lines)
           <textarea name="interests" rows={3} defaultValue={(p.interests ?? []).join(', ')} />
         </label>
+        <label>
+          Page background color
+          <input type="color" name="backgroundColor" defaultValue={normalizeBackgroundColor(p.backgroundColor) ?? '#ffffff'} />
+        </label>
+        <label>
+          <input type="checkbox" name="clearBackgroundColor" defaultChecked={!normalizeBackgroundColor(p.backgroundColor)} /> Use the default colors (clears the background color)
+        </label>
+        <p>Text on your profile page switches between dark and white to stay readable. A color that works with neither is ignored and the default colors show.</p>
         <Button type="submit" variant="primary" disabled={loadError !== null}>
           Save profile
         </Button>

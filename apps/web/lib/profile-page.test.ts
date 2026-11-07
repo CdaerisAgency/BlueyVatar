@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GALLERY_MAX } from '@blueyvatar/core'
-import { pageAtprotoApps, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
+import { pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
 
 const base: PublicProfile = { did: 'did:plc:a', handle: 'alice.test', displayName: 'Alice', description: 'Hi there', avatar: { url: '/img/x/y/256.png' }, jobTitle: null, company: null, location: null, pronouns: null }
 
@@ -21,6 +21,20 @@ describe('profile page model', () => {
   it('re-checks links and interests', () => {
     expect(pageLinks({ ...base, links: [{ label: 'A', url: 'https://a.test/' }, { label: 'B', url: 'javascript:1' }] })).toEqual([{ label: 'A', url: 'https://a.test/' }])
     expect(pageInterests({ ...base, interests: ['go', '', 3, 'tea'] })).toEqual(['go', 'tea'])
+  })
+  describe('background color', () => {
+    it('uses the default palette when no color is set', () => {
+      expect(pageColors(base)).toBeNull()
+      expect(pageColors({ ...base, backgroundColor: null })).toBeNull()
+    })
+    it('picks white text on dark colors and dark text on light colors', () => {
+      expect(pageColors({ ...base, backgroundColor: '#1f4e9b' })).toEqual({ background: '#1f4e9b', text: '#ffffff' })
+      expect(pageColors({ ...base, backgroundColor: '#FFF1C9' })).toEqual({ background: '#fff1c9', text: '#1a1a1a' })
+    })
+    it('falls back to the default palette for malformed colors and for colors where no text passes 4.5 to 1', () => {
+      expect(pageColors({ ...base, backgroundColor: 'red; background:url(//evil)' })).toBeNull()
+      expect(pageColors({ ...base, backgroundColor: '#777777' })).toBeNull()
+    })
   })
   it('keeps only well-formed atproto apps, once each', () => {
     const a = { name: 'Tangled', url: 'https://tangled.org' }

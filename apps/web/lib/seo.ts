@@ -47,7 +47,7 @@ export const SITEMAP_MAX_URLS = 50_000
 
 export interface SitemapEntry { url: string; lastModified?: Date }
 
-const xmlEscape = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+export const xmlEscape = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;')
 
 export function urlsetXml(entries: readonly SitemapEntry[]): string {
   const body = entries

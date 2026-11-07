@@ -9,11 +9,14 @@ const autoCards = [
   '[&>ul>li:first-child]:border-t-0 [&>ul>li:first-child]:pt-0 [&>ul>li:last-child]:pb-0',
 ].join(' ')
 
+/** The id the skip link in SiteNav points at. */
+export const MAIN_ID = 'main'
+
 /** The page container for login, account, profile, and demo pages. */
 export function PageMain({ narrow = false, children }: { narrow?: boolean; children: ReactNode }) {
   const width = narrow ? 'max-w-[540px]' : 'max-w-[860px]'
   return (
-    <main className={`mx-auto w-full flex-auto px-4 pt-7 pb-14 sm:px-5 sm:pt-10 sm:pb-[72px] ${width} ${autoCards}`}>{children}</main>
+    <main id={MAIN_ID} tabIndex={-1} className={`focus:outline-none mx-auto w-full flex-auto px-4 pt-7 pb-14 sm:px-5 sm:pt-10 sm:pb-[72px] ${width} ${autoCards}`}>{children}</main>
   )
 }
 

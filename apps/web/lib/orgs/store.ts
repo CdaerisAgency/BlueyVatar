@@ -78,8 +78,8 @@ export async function createOrganization(pool: pg.Pool, did: string, rawName: st
     await c.query('INSERT INTO organizations (org_id, name, created_by) VALUES ($1, $2, $3)', [orgId, name, did])
     await c.query("INSERT INTO organization_members (org_id, did, role, added_by) VALUES ($1, $2, 'owner', $2)", [orgId, did])
     await c.query(
-      `INSERT INTO licenses (license_id, owner, tier, status, term, attribution_required, entitlements, org_id)
-       VALUES ($1, $2, 'free', 'active', 'monthly', true, $3, $4)`,
+      `INSERT INTO licenses (license_id, owner, tier, status, term, entitlements, org_id)
+       VALUES ($1, $2, 'free', 'active', 'monthly', $3, $4)`,
       [`lic_${randomUUID()}`, did, JSON.stringify(ENTITLEMENTS.free), orgId],
     )
     await recordOrgAudit(c, orgId, did, 'org_created', null, name)

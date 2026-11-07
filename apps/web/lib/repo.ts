@@ -28,6 +28,7 @@ export type ProfileRecord = {
   pronunciation?: string
   timezone?: string
   interests?: string[]
+  backgroundColor?: string
   createdAt: string
   [k: string]: unknown
 }

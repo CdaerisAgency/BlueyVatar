@@ -30,7 +30,8 @@ export interface RateWindow {
 }
 
 export interface RateLimiter {
-  hit(bucket: string, limit: number, windowSeconds: number): Promise<RateWindow>
+  /** Counts `n` requests (default 1) in the bucket's fixed window and returns the window state. */
+  hit(bucket: string, limit: number, windowSeconds: number, n?: number): Promise<RateWindow>
 }
 
 export function hostAllowed(host: string, domains: readonly string[]): boolean {
@@ -46,14 +47,14 @@ export function hostAllowed(host: string, domains: readonly string[]): boolean {
 export class MemoryRateLimiter implements RateLimiter {
   private buckets = new Map<string, { count: number; reset: number }>()
   constructor(private now: () => number = () => Math.floor(Date.now() / 1000)) {}
-  async hit(bucket: string, limit: number, windowSeconds: number): Promise<RateWindow> {
+  async hit(bucket: string, limit: number, windowSeconds: number, n = 1): Promise<RateWindow> {
     const t = this.now()
     let b = this.buckets.get(bucket)
     if (!b || b.reset <= t) {
       b = { count: 0, reset: t + windowSeconds }
       this.buckets.set(bucket, b)
     }
-    b.count += 1
+    b.count += n
     return { limit, remaining: Math.max(0, limit - b.count), reset: b.reset, exceeded: b.count > limit }
   }
 }

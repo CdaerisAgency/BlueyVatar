@@ -165,8 +165,8 @@ function pgTx(c: pg.PoolClient): BillingTx {
       if (r.rows[0]) return { licenseId: r.rows[0].license_id, tier: r.rows[0].tier }
       const id = newLicenseId()
       await c.query(
-        `INSERT INTO licenses (license_id, owner, tier, status, term, attribution_required, entitlements)
-         VALUES ($1, $2, 'free', 'active', 'monthly', true, $3)`,
+        `INSERT INTO licenses (license_id, owner, tier, status, term, entitlements)
+         VALUES ($1, $2, 'free', 'active', 'monthly', $3)`,
         [id, did, JSON.stringify(ENTITLEMENTS.free)],
       )
       return { licenseId: id, tier: 'free' as const }
@@ -212,9 +212,9 @@ function pgTx(c: pg.PoolClient): BillingTx {
     async applyLicense(licenseId, s) {
       await c.query(
         `UPDATE licenses SET tier = $2, status = $3, grace_ends_at = $4, term = 'monthly',
-           attribution_required = $5, entitlements = $6
+           entitlements = $5
          WHERE license_id = $1 AND tier <> 'enterprise'`,
-        [licenseId, s.tier, s.status, s.graceEndsAt, ENTITLEMENTS[s.tier].attributionRequired, JSON.stringify(ENTITLEMENTS[s.tier])],
+        [licenseId, s.tier, s.status, s.graceEndsAt, JSON.stringify(ENTITLEMENTS[s.tier])],
       )
     },
   }

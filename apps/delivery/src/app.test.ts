@@ -7,6 +7,7 @@ import type { AvatarResolver, Identity } from './resolver.js'
 import { MemoryIndexStore, PUBLIC_VISIBILITY } from './store.js'
 import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from './alerts.js'
 import { MemoryUsageMeter } from './usage.js'
+import { ResizeBusyError } from './resize.js'
 
 const DID = 'did:plc:abc123'
 const CID = 'bafyreiabc123'
@@ -288,6 +289,21 @@ describe('delivery API', () => {
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
   })
 
+  it('returns backgroundColor in the profile JSON, null when unset or malformed', async () => {
+    const { app, deps } = setup()
+    expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBeNull()
+    const record = (own: Record<string, unknown>) => {
+      const base = deps.resolver.getRecord
+      deps.resolver.getRecord = async (i, collection, rkey) => (collection === 'com.blueyvatar.profile' ? own : base(i, collection, rkey))
+    }
+    record({ backgroundColor: '#1F4E9B' })
+    expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBe('#1f4e9b')
+    for (const bad of ['red', '#fff', 'url(javascript:1)', 7]) {
+      record({ backgroundColor: bad })
+      expect((await (await app.request('/profile/alice.test')).json()).backgroundColor).toBeNull()
+    }
+  })
+
   it('lists detected atproto apps in the profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
@@ -444,6 +460,27 @@ describe('delivery API', () => {
       expect(res.headers.get('content-type')).toBe('image/webp')
       expect((await app.request(raw('128-q101.webp'))).status).toBe(404)
       expect((await app.request(img(128).replace(/\.png$/, '.avif'))).status).toBe(404)
+    })
+  })
+
+  describe('resize capacity (issue #198)', () => {
+    it('answers 503 with Retry-After and no-store when the resize queue is full, and meters nothing', async () => {
+      const { deps, usage } = setup()
+      const app = createApp({ ...deps, resize: async () => { throw new ResizeBusyError(4) } })
+      const res = await app.request(img(128))
+      expect(res.status).toBe(503)
+      expect(res.headers.get('retry-after')).toBe('4')
+      expect(res.headers.get('cache-control')).toBe('no-store')
+      expect((await res.json()).error.code).toBe('overloaded')
+      expect(usage.service.size).toBe(0)
+    })
+
+    it('sheds default avatars the same way', async () => {
+      const { deps } = setup()
+      const app = createApp({ ...deps, resize: async () => { throw new ResizeBusyError(2) } })
+      const res = await app.request('/default/mp/128.png?seed=x')
+      expect(res.status).toBe(503)
+      expect(res.headers.get('retry-after')).toBe('2')
     })
   })
 
@@ -858,5 +895,88 @@ describe('profile gallery (F21)', () => {
     const app = createApp({ ...deps, now: () => 0 })
     const res = await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_test' } })
     expect((await res.json()).gallery[0].url).toBe(imagePath(SECRET, DID, 'bafygal0', 512, 'png', undefined, restrictedScope('k:L1', 0)))
+  })
+})
+
+describe('GET /usage', () => {
+  it('rejects anonymous callers and publishable keys with stable codes', async () => {
+    const { app } = setup()
+    const anon = await app.request('/usage')
+    expect(anon.status).toBe(401)
+    expect((await anon.json()).error.code).toBe('invalid_key')
+    const viaToken = await app.request('/usage?token=pk_test', { headers: { origin: 'https://app.example.com' } })
+    expect(viaToken.status).toBe(401)
+    expect((await viaToken.json()).error.code).toBe('invalid_key')
+    const pub = await app.request('/usage', { headers: { 'x-api-key': 'pk_test' } })
+    expect(pub.status).toBe(403)
+    expect((await pub.json()).error.code).toBe('secret_key_required')
+    expect((await app.request('/usage', { headers: { 'x-api-key': 'sk_nope' } })).status).toBe(401)
+    expect((await app.request('/usage', { headers: { 'x-api-key': 'sk_dead' } })).status).toBe(402)
+  })
+
+  it('reports the current period, included volume, and per-meter counts for a Pro key', async () => {
+    const { app } = setup()
+    for (let i = 0; i < 3; i++) await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_test' } })
+    await app.request('/profile/did:plc:abc123', { headers: { 'x-api-key': 'sk_test' } })
+    const res = await app.request('/usage', { headers: { 'x-api-key': 'sk_test' } })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toBe('private, no-store')
+    expect(res.headers.get('x-tier')).toBe('pro')
+    expect(res.headers.get('x-rate-limit-limit')).toBe('50000')
+    const body = await res.json()
+    const now = new Date()
+    const period = `${now.toISOString().slice(0, 7)}-01`
+    expect(body.tier).toBe('pro')
+    expect(body.period.start).toBe(period)
+    expect(body.included).toEqual({ volume: 50_000, per: 'month' })
+    expect(body.total).toBe(3)
+    expect(body.meters).toEqual({ origin_resolution: 3, profile_json: 1, transform: 0 })
+    expect(body.history.months).toHaveLength(2)
+    expect(body.history.months[0]).toEqual({ period, origin_resolution: 3, profile_json: 1, transform: 0 })
+    expect(body.history.days).toHaveLength(30)
+    expect(body.history.days[0]).toEqual({ date: now.toISOString().slice(0, 10), origin_resolution: 3, profile_json: 1 })
+  })
+
+  it('gives Business 12 months and Pro 30 days of history', async () => {
+    const { app } = setup()
+    const biz = await (await app.request('/usage', { headers: { 'x-api-key': 'sk_biz' } })).json()
+    expect(biz.history.months).toHaveLength(12)
+    expect(biz.history.days).toHaveLength(30)
+    expect(biz.included).toEqual({ volume: 1_000_000, per: 'month' })
+    const pro = await (await app.request('/usage', { headers: { 'x-api-key': 'sk_test' } })).json()
+    expect(pro.history.months).toHaveLength(2)
+  })
+
+  it('shows the current period only for Free', async () => {
+    const { deps } = setup()
+    deps.licenses = new MemoryLicenseStore([
+      { key: { key: 'sk_free', kind: 'secret', licenseId: 'LF', domains: [] }, license: { licenseId: 'LF', owner: DID, tier: 'free', status: 'active' } },
+    ])
+    const body = await (await createApp(deps).request('/usage', { headers: { 'x-api-key': 'sk_free' } })).json()
+    expect(body.tier).toBe('free')
+    expect(body.included).toEqual({ volume: 1_000, per: 'day' })
+    expect(body.history).toEqual({ months: [], days: [] })
+  })
+
+  it('does not meter itself and sends no x-usage-cost', async () => {
+    const { app, usage } = setup()
+    const res = await app.request('/usage', { headers: { 'x-api-key': 'sk_test' } })
+    expect(res.headers.get('x-usage-cost')).toBeNull()
+    await app.request('/usage', { headers: { 'x-api-key': 'sk_test' } })
+    expect(usage.counts.size).toBe(0)
+    expect(usage.byPeriod.size).toBe(0)
+    expect(usage.byDay.size).toBe(0)
+  })
+
+  it('applies the rate limit', async () => {
+    const { deps } = setup()
+    deps.licenses = new MemoryLicenseStore([
+      { key: { key: 'sk_free', kind: 'secret', licenseId: 'LF', domains: [] }, license: { licenseId: 'LF', owner: DID, tier: 'free', status: 'active' } },
+    ])
+    deps.limiter = { hit: async () => ({ limit: 1000, remaining: 0, reset: Math.floor(Date.now() / 1000) + 60, exceeded: true }) }
+    const res = await createApp(deps).request('/usage', { headers: { 'x-api-key': 'sk_free' } })
+    expect(res.status).toBe(429)
+    expect((await res.json()).error.code).toBe('rate_limited')
+    expect(res.headers.get('retry-after')).not.toBeNull()
   })
 })

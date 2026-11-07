@@ -11,7 +11,8 @@ import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimi
 import { scheduleLogRetention } from './log-retention.js'
 import { scheduleRateWindowCleanup } from './rate-cleanup.js'
 import { createPool, PgAlertLedger, pgLicenseOwner, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
-import { sandboxedResizer } from './resize.js'
+import { BatchedRateLimiter, BatchedUsageMeter } from './batch.js'
+import { limitedResizer, resizeLimitsFromEnv, sandboxedResizer } from './resize.js'
 import { AtprotoResolver } from './resolver.js'
 import { MemoryIndexStore, type IndexStore } from './store.js'
 import { MemoryUsageMeter, type UsageMeter } from './usage.js'
@@ -31,7 +32,18 @@ function stores(): Stores {
     log.error('postgres pool error', { err })
     errors.captureException(err, { tags: { task: 'postgres_pool' } })
   })
-  return { pool, index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: new PgRateLimiter(pool), usage: new PgUsageMeter(pool), ledger: new PgAlertLedger(pool) }
+  // RATE_BATCH_MS is the flush period of the in-memory first tier for rate windows and usage counters (default 1000; 0 writes through on every request).
+  const flushMs = process.env.RATE_BATCH_MS === undefined || process.env.RATE_BATCH_MS === '' ? 1000 : Number(process.env.RATE_BATCH_MS)
+  const onError = (err: unknown) => { metrics.inc('delivery_postgres_errors_total', { source: 'batch_flush' }); log.error('batched counter flush failed', { err }) }
+  const pgLimiter = new PgRateLimiter(pool)
+  const pgUsage = new PgUsageMeter(pool)
+  if (!(flushMs > 0)) return { pool, index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: pgLimiter, usage: pgUsage, ledger: new PgAlertLedger(pool) }
+  const limiter = new BatchedRateLimiter(pgLimiter, { flushMs, onError })
+  const usage = new BatchedUsageMeter(pgUsage, { flushMs, onError })
+  const shutdown = () => { void Promise.all([limiter.close(), usage.close()]).finally(() => process.exit(0)) }
+  process.once('SIGTERM', shutdown)
+  process.once('SIGINT', shutdown)
+  return { pool, index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter, usage, ledger: new PgAlertLedger(pool) }
 }
 
 const { pool, index, licenses, limiter, usage, ledger } = stores()
@@ -55,7 +67,15 @@ const app = createApp({
   limiter,
   usage,
   alerts: new UsageAlerts(alertSink, ledger),
-  resize: sandboxedResizer(),
+  // Caps concurrent resize workers (IMG_MAX_CONCURRENT, default 2 for the 512 MB VM) and queues briefly; overflow is a 503 with Retry-After.
+  resize: limitedResizer(sandboxedResizer(), {
+    ...resizeLimitsFromEnv(),
+    onChange: ({ inFlight, queued, shed }) => {
+      metrics.set('delivery_transforms_in_flight', inFlight)
+      metrics.set('delivery_transforms_queued', queued)
+      if (shed) metrics.inc('delivery_transforms_shed_total')
+    },
+  }),
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
   profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,
   originSecret: process.env.ORIGIN_SECRET || undefined,

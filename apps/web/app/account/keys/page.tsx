@@ -1,5 +1,5 @@
 import { PageMain, TableBox } from '../../../components/Page'
-import { ENTITLEMENTS, TIERS, type Tier } from '@blueyvatar/core'
+import { ENTITLEMENTS, historyDays, TIERS, type Tier } from '@blueyvatar/core'
 import Link from 'next/link'
 import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
@@ -36,6 +36,8 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   const period = periodStartOf(now)
   const periods = historyPeriods(license.tier, now)
   const usage = await store.usage(license.licenseId, [period, ...periods])
+  const days = historyDays(license.tier, now)
+  const daily = await store.usageDaily(license.licenseId, days)
   const sent = await store.alertsSent(license.licenseId, period)
   const ent = ENTITLEMENTS[license.tier]
   const inc = includedVolume(license.tier)
@@ -53,6 +55,8 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
       <h1>License and API keys</h1>
       <p>Signed in as {did}</p>
       {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
+
+      <p>New to the API? Read the <Link href="/docs">API docs</Link> for parameters, error codes, rate-limit headers, and copy-paste examples, or fetch the <a href="https://img.blueyvatar.com/openapi.json">OpenAPI description</a>.</p>
 
       <h2>License</h2>
       <ul>
@@ -99,6 +103,28 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
           </table>
           </TableBox>
           <p>{license.tier === 'pro' ? 'Pro shows 30 days of history.' : 'Shows up to 12 months of history.'}</p>
+          <h3>Last 30 days</h3>
+          <TableBox label="Daily usage">
+          <table>
+            <thead>
+              <tr>
+                <th align="left">Day (UTC)</th>
+                <th align="right">Origin resolutions</th>
+                <th align="right">Profile JSON calls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {days.map((d) => (
+                <tr key={d}>
+                  <td>{d}</td>
+                  <td align="right">{n(daily.get(`${d}|origin_resolution`) ?? 0)}</td>
+                  <td align="right">{n(daily.get(`${d}|profile_json`) ?? 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </TableBox>
+          <p>The same numbers are available from code with <code>GET /usage</code> and a secret key. See the API docs.</p>
         </>
       )}
 
@@ -138,7 +164,6 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
               ['Overage', (e) => e.overage],
               ['Max size', (e) => String(e.maxSize)],
               ['Formats', (e) => e.formats.join(', ')],
-              ['Attribution required', (e) => (e.attributionRequired ? 'Yes' : 'No')],
               ['Hovercards', (e) => (e.hovercards ? 'Yes' : 'No')],
             ] as [string, (e: (typeof ENTITLEMENTS)[Tier]) => string][]
           ).map(([label, f]) => (
