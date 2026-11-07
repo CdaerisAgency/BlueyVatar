@@ -497,6 +497,27 @@ Fly keeps logs only briefly for `fly logs`; the exact window is **unconfirmed** 
 3. Cost at expected volume: at the table above, 0.3 to 2.7 GB per 90 days is within free tiers at several vendors, but plan limits change and are **unconfirmed** here. Owner action: confirm the plan and that a paid destination is acceptable (the issue asked).
 4. Logs must never carry client IPs, query strings, cookies, keys, or raw DIDs, because the logger removes them before they reach any sink (Observability, Logging). Per request, a shipped line holds timestamp, route pattern, status, duration, and request id. The key id and a user agent length class from the issue's field list are not logged; that is stricter than required.
 
+## Publish the npm packages
+
+Two public packages ship from `packages/`: `@blueyvatar/avatar` (URL builder, hashing, Gravatar migration helper, React component) and `@blueyvatar/hovercards`. Neither is published yet. The workflow `.github/workflows/publish-npm.yml` runs only when a version tag such as `v0.1.0` is pushed, and it publishes with npm provenance. It fails before publishing if the `NPM_TOKEN` secret is missing.
+
+### One-time setup (owner)
+
+1. Create the `blueyvatar` organization on npmjs.com (owner decision on issue #153). Packages under the `@blueyvatar` scope are public, so the free plan is enough.
+2. Create a granular access token on npmjs.com with read and write access to the `@blueyvatar` packages, and an expiry you will track. Store it in Infisical as `NPM_TOKEN`.
+3. Add the same value as the GitHub repository secret `NPM_TOKEN` (Settings, Secrets and variables, Actions). Infisical stays the source of truth. Whether an Infisical to GitHub sync is set up here was not verified.
+4. Provenance needs a public source repository when npm verifies the build. The repository is private today (see docs/licensing-v1.md), and npm rejects `--provenance` from a private repository. Make the repository public first, or remove `--provenance` from the workflow and from `publishConfig` in `packages/avatar/package.json` for a private-repo publish. This was not tested here.
+
+### Release steps
+
+1. Set `version` in the `package.json` of each package to release (`packages/avatar`, `packages/hovercards`) and merge to `main`. On the first release, also remove the "not published yet" status line from each package README.
+2. Run locally as a dry run: `pnpm --filter @blueyvatar/avatar build && cd packages/avatar && npm pack --dry-run`. Confirm only `dist` and `README.md` are listed.
+3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`. The tag must equal the package version with a leading `v`. A package whose version differs from the tag is skipped, and the run fails if no package matches.
+4. Watch the "Publish npm packages" run. Then check the package page shows the provenance badge.
+5. A published version cannot be replaced. To fix a bad release, publish a new version and run `npm deprecate` on the bad one.
+
+The versioning policy is in `packages/avatar/README.md`.
+
 ## Release checklist
 
 1. Merge to `main`. The deploy workflow builds and deploys delivery, web, and indexer.
