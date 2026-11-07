@@ -1,0 +1,36 @@
+{
+  "name": "@blueyvatar/avatar",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Avatar URL builder, email hashing, Gravatar migration helper, and React component for blueyvatar.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./react": { "types": "./dist/react.d.ts", "default": "./dist/react.js" }
+  },
+  "sideEffects": false,
+  "files": ["dist", "README.md"],
+  "publishConfig": { "access": "public", "provenance": true },
+  "repository": { "type": "git", "url": "git+https://github.com/CdaerisAgency/blueyvatar.git", "directory": "packages/avatar" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "@types/react-dom": "19.2.2",
+    "vitest": "3.2.7"
+  }
+}
