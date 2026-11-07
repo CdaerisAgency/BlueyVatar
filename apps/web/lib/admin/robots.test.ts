@@ -12,6 +12,10 @@ describe('admin discovery and limits', () => {
   it('the sitemap page list has no admin path', () => {
     expect(STATIC_PAGES.some((p) => p.startsWith('/admin'))).toBe(false)
   })
+  it('the appeal form is rate limited by account and network', () => {
+    expect(BUCKETS['appeal.did'].limit).toBeGreaterThan(0)
+    expect(BUCKETS['appeal.ip'].limit).toBeGreaterThan(0)
+  })
   it('admin sign-in has failure lockouts and action limits', () => {
     for (const b of ['adminLogin.did', 'adminLogin.ip', 'adminFail.did', 'adminFail.ip', 'adminAction.did', 'adminAction.ip'] as const) expect(BUCKETS[b].limit).toBeGreaterThan(0)
     expect(BUCKETS['adminFail.did'].limit).toBeLessThanOrEqual(5)

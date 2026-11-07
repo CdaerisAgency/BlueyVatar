@@ -23,6 +23,7 @@ export const SECURITY_NOTICES = [
   'A verified account was removed from your profile after re-verification failed.',
   'Your email address was linked to a different account.',
   'One of your keys was revoked.',
+  'Your images were removed, your account was suspended, or an appeal was decided.',
 ] as const
 
 export interface Notice {
@@ -112,6 +113,38 @@ export function reportOutcomeNotice(i: { reportId: number; outcome: 'actioned' |
     `--\nReport number: ${i.reportId}\nThis is a one-time message about your report. We deleted your email address from our records after sending it. ` +
     `Our content policy: ${base(i.publicUrl)}/policy`
   return { subject: `Update on your blueyvatar report #${i.reportId}`, text }
+}
+
+const appealLink = (publicUrl: string, actionId: number) => `${base(publicUrl)}/account/appeal?action=${actionId}`
+
+/**
+ * Tells an account owner their images were removed from delivery (issue #172). Names the one-appeal-per-action rule and links
+ * the appeal form for this action. The admin's internal reason is never included.
+ */
+export function takedownNotice(i: { did: string; actionId: number; publicUrl: string }): Notice {
+  const body =
+    `We removed the images of your account from blueyvatar delivery after a review under our content policy: ${base(i.publicUrl)}/policy\n\n` +
+    `Your repository is not changed. If you think this was a mistake, you can appeal once for this action, ` +
+    `and a different reviewer will look at it: ${appealLink(i.publicUrl, i.actionId)}`
+  return { subject: 'Your blueyvatar images were removed', text: frame(i.did, i.publicUrl, body, 'security') }
+}
+
+export function suspensionNotice(i: { did: string; actionId: number; publicUrl: string }): Notice {
+  const body =
+    `Your blueyvatar account was suspended after a review under our content policy: ${base(i.publicUrl)}/policy\n\n` +
+    `While it is suspended, your images are not served. Your repository is not changed. If you think this was a mistake, you can appeal once for this action, ` +
+    `and a different reviewer will look at it: ${appealLink(i.publicUrl, i.actionId)}`
+  return { subject: 'Your blueyvatar account was suspended', text: frame(i.did, i.publicUrl, body, 'security') }
+}
+
+/** Outcome of an appeal. Like the reporter notice, it never includes the admin's internal note. */
+export function appealOutcomeNotice(i: { did: string; appealId: number; outcome: 'overturned' | 'upheld'; publicUrl: string }): Notice {
+  const line =
+    i.outcome === 'overturned'
+      ? 'We reviewed your appeal and reversed the decision. Your images are served again after caches refresh.'
+      : 'We reviewed your appeal and kept the decision. This was the one appeal available for this action.'
+  const body = `${line}\n\nAppeal number: ${i.appealId}\nOur content policy: ${base(i.publicUrl)}/policy`
+  return { subject: `Update on your blueyvatar appeal #${i.appealId}`, text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
 /** Where a notifier finds the owner's address and preferences. */
