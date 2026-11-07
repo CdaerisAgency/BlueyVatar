@@ -147,6 +147,88 @@ export function appealOutcomeNotice(i: { did: string; appealId: number; outcome:
   return { subject: `Update on your blueyvatar appeal #${i.appealId}`, text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
+/**
+ * Statement of reasons for a moderation action (issue #209), with the fields EU Digital Services Act Article 17(3) lists:
+ * (a) the action and its scope and duration, (b) the facts relied on and whether they came from a notice or our own initiative,
+ * (c) whether automated means were used, (d) and (e) the legal or contractual ground, and (f) the redress options.
+ * Each template has {{placeholders}}. A notice with any unfilled placeholder is never built, so it cannot be sent
+ * (the same rule Ozone applies to its email templates).
+ */
+export type SorAction = 'remove_image' | 'suspend' | 'warn' | 'rating_change' | 'reverse'
+export const SOR_VARS = ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'] as const
+export type SorVar = (typeof SOR_VARS)[number]
+export type SorVars = Partial<Record<SorVar, string>>
+
+const SOR_TAIL =
+  '\n\nStatement of reasons (Article 17, EU Digital Services Act)\n' +
+  'Facts and circumstances we relied on: {{facts}}\n' +
+  'How we learned of it: {{source}}\n' +
+  'Automated means: {{automated}}\n' +
+  'Ground: this goes against our content policy, "{{policy}}" ({{policy_url}}). {{explanation}}\n\n' +
+  'Your options: you can appeal once for this action, and a different reviewer will decide: {{appeal_link}}. ' +
+  'You can also use an out-of-court dispute settlement body certified under Article 21 of the Digital Services Act, or go to court.'
+
+export const SOR_TEMPLATES: Record<SorAction, { name: string; subject: string; body: string; needs: SorVar[] }> = {
+  remove_image: {
+    name: 'sor-remove-image-v1', subject: 'Your blueyvatar images were removed',
+    body: 'What we did: we stopped serving {{scope}} from blueyvatar. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
+    needs: ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
+  },
+  suspend: {
+    name: 'sor-suspend-v1', subject: 'Your blueyvatar account was suspended',
+    body: 'What we did: we suspended your account, so none of your images are served. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
+    needs: ['duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
+  },
+  warn: {
+    name: 'sor-warn-v1', subject: 'A warning about your blueyvatar content',
+    body: 'What we did: we are warning you about {{scope}}. We did not restrict your account or remove anything. Duration: {{duration}}.' + SOR_TAIL,
+    needs: ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
+  },
+  rating_change: {
+    name: 'sor-rating-change-v1', subject: 'The rating of your blueyvatar image was changed',
+    body: 'What we did: we changed the rating shown for {{scope}} in blueyvatar. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
+    needs: ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
+  },
+  reverse: {
+    name: 'sor-reverse-v1', subject: 'We reversed a blueyvatar moderation action',
+    body: 'What we did: we reversed an earlier action on your account ({{scope}}). It takes effect after caches refresh.\n\nWhy: {{facts}}\nPolicy reviewed: "{{policy}}" ({{policy_url}}).',
+    needs: ['scope', 'facts', 'policy', 'policy_url'],
+  },
+}
+
+const PLACEHOLDER = /\{\{\s*([a-z_]+)\s*\}\}/g
+
+/** Names of placeholders still present in the text. */
+export function unfilledPlaceholders(text: string): string[] {
+  return [...new Set([...text.matchAll(PLACEHOLDER)].map((m) => m[1]!))]
+}
+
+export type SorResult = { ok: true; template: string; notice: Notice } | { ok: false; missing: string[] }
+
+/**
+ * Fills the template for an action. Returns the names of everything missing instead of a notice when any value is empty,
+ * unknown, or itself contains a placeholder, or any placeholder remains. The caller must not send in that case.
+ */
+export function statementOfReasonsNotice(i: { did: string; action: SorAction; vars: SorVars; publicUrl: string }): SorResult {
+  const t = SOR_TEMPLATES[i.action]
+  const missing = new Set<string>()
+  const fill = (text: string) =>
+    text.replace(PLACEHOLDER, (m, name: string) => {
+      const v = (i.vars as Record<string, string | undefined>)[name]?.trim()
+      if (!v || v.includes('{{')) {
+        missing.add(name)
+        return m
+      }
+      return v
+    })
+  const body = fill(t.body)
+  for (const n of t.needs) if (!i.vars[n]?.trim()) missing.add(n)
+  const left = unfilledPlaceholders(body)
+  for (const n of left) missing.add(n)
+  if (missing.size) return { ok: false, missing: [...missing] }
+  return { ok: true, template: t.name, notice: { subject: t.subject, text: frame(i.did, i.publicUrl, body, 'security') } }
+}
+
 /** Where a notifier finds the owner's address and preferences. */
 export interface NoticeDirectory {
   /** The decrypted primary email, or null when none is on file. */

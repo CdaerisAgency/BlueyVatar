@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
 import type pg from 'pg'
 
-export const REASONS = ['illegal', 'copyright', 'explicit', 'impersonation', 'harassment', 'private_info', 'spam', 'other'] as const
+export const REASONS = ['child_safety', 'illegal', 'copyright', 'explicit', 'impersonation', 'harassment', 'private_info', 'spam', 'other'] as const
 export type Reason = (typeof REASONS)[number]
 export type Source = 'profile' | 'avatar'
 
 export const REASON_LABELS: Record<Reason, string> = {
+  child_safety: 'Child safety concern',
   illegal: 'Illegal content',
   copyright: 'Copyright or trademark infringement',
   explicit: 'Explicit content rated too low',

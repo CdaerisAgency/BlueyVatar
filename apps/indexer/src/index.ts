@@ -1,6 +1,7 @@
 import { Tap } from '@atproto/tap'
 import pg from 'pg'
 import { scheduleBillingPurge } from './billing-retention.js'
+import { scheduleModerationDigest } from './moderation-digest.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
 import type { IndexWrites } from './handlers.js'
@@ -36,6 +37,8 @@ function writes(): IndexWrites {
     scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
     // Deletes Stripe billing rows 7 years after their owner deleted their data.
     scheduleBillingPurge(pool)
+    // Daily moderation digest email to the admin address (counts only). Off until an address or ADMIN_DIDS exists.
+    scheduleModerationDigest(pool)
     const warm = warmerFromEnv()
     return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warm, onWarm: warm })
   }

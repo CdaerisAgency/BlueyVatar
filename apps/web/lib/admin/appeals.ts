@@ -1,5 +1,5 @@
 import type pg from 'pg'
-import { inTx, MAX_REASON, recordAction, type Result } from './moderation'
+import { inTx, MAX_REASON, recordAction, type AuditMeta, type Result } from './moderation'
 import type { Purge } from './purge'
 
 export type AppealRow = {
@@ -26,7 +26,7 @@ export async function listAppeals(pool: Pick<pg.Pool, 'query'>, status: 'open' |
  * reviewer must decide.
  */
 export async function decideAppeal(
-  pool: pg.Pool, purge: Purge, actor: string, appealId: number, outcome: 'upheld' | 'overturned', note: string,
+  pool: pg.Pool, purge: Purge, actor: string, appealId: number, outcome: 'upheld' | 'overturned', note: string, meta: AuditMeta = {},
 ): Promise<Result<{ did: string; appealId: number; outcome: 'upheld' | 'overturned' }>> {
   const done = await inTx(pool, async (c) => {
     const { rows } = await c.query<{ did: string; action: string; actor: string }>(
@@ -39,19 +39,25 @@ export async function decideAppeal(
     if (ap.actor === actor) return { error: 'A different admin than the one who took the action must decide this appeal.' }
     await c.query("UPDATE appeals SET status = $2, decided_by = $3, decision_note = $4, decided_at = now() WHERE id = $1", [appealId, outcome, actor, note])
     const reason = `appeal #${appealId}: ${note}`.slice(0, MAX_REASON + 20)
-    await recordAction(c, actor, outcome === 'upheld' ? 'appeal_upheld' : 'appeal_overturned', { did: ap.did, reason })
+    await recordAction(c, actor, outcome === 'upheld' ? 'appeal_upheld' : 'appeal_overturned', { did: ap.did, reason, ...meta })
     let cids: string[] = []
     if (outcome === 'overturned') {
       if (ap.action === 'suspend') {
         const lifted = await c.query('UPDATE account_suspensions SET lifted_at = now(), lifted_by = $2 WHERE did = $1 AND lifted_at IS NULL', [ap.did, actor])
-        if (lifted.rowCount) await recordAction(c, actor, 'unsuspend', { did: ap.did, reason })
+        if (lifted.rowCount) await recordAction(c, actor, 'unsuspend', { did: ap.did, reason, ...meta })
       }
-      const kind = ap.action === 'suspend' ? 'suspension' : 'takedown'
-      const r = await c.query<{ cid: string }>(
-        'UPDATE blocked_images SET unblocked_at = now() WHERE did = $1 AND kind = $2 AND unblocked_at IS NULL RETURNING cid',
-        [ap.did, kind],
-      )
-      cids = r.rows.map((x) => x.cid)
+      if (ap.action === 'rating_change') {
+        const o = await c.query<{ cid: string; prior_rating: string }>('UPDATE rating_overrides SET lifted_at = now() WHERE did = $1 AND lifted_at IS NULL RETURNING cid, prior_rating', [ap.did])
+        for (const x of o.rows) await c.query('UPDATE images SET rating = $3 WHERE did = $1 AND cid = $2', [ap.did, x.cid, x.prior_rating])
+        cids = o.rows.map((x) => x.cid)
+      } else if (ap.action !== 'warn') {
+        const kind = ap.action === 'suspend' ? 'suspension' : 'takedown'
+        const r = await c.query<{ cid: string }>(
+          'UPDATE blocked_images SET unblocked_at = now() WHERE did = $1 AND kind = $2 AND unblocked_at IS NULL RETURNING cid',
+          [ap.did, kind],
+        )
+        cids = r.rows.map((x) => x.cid)
+      }
     }
     return { did: ap.did, cids }
   })

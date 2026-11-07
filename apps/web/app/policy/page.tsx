@@ -23,8 +23,8 @@ export default function PolicyPage() {
       <h2>Usage limits</h2>
       <p>To keep the service available, some actions are limited. Examples: a few email codes per hour, a limited number of avatar imports, uploads, claim checks, and key changes per hour, and short lockouts after repeated failed sign-ins or wrong codes. If you hit a limit, the page tells you how long to wait. Each account also has caps on stored items, such as 3 avatar images on Free and 20 on Plus, up to 10 linked emails, and up to 10 profile links.</p>
       <h2 id="appeals">Appeals</h2>
-      <p>Who can appeal: the owner of an account whose images were taken down or whose account was suspended. You need to sign in, so we know the appeal comes from the account owner.</p>
-      <p>What can be appealed: takedowns and suspensions. Decisions on reports you filed cannot be appealed.</p>
+      <p>Who can appeal: the owner of an account whose images were taken down, whose account was suspended, who received a warning, or whose image rating was changed. You need to sign in, so we know the appeal comes from the account owner.</p>
+      <p>What can be appealed: takedowns, suspensions, warnings, and rating changes. Decisions on reports you filed cannot be appealed.</p>
       <p>How: when we take one of these actions, we email the primary address on your account a notice with a link to the appeal form. You can also open the form at <a href="/account/appeal">/account/appeal</a> while signed in. Tell us why you think the decision was a mistake, in up to 2000 characters.</p>
       <p>Response time: we aim to answer within 7 days. A reviewer other than the one who took the action decides the appeal.</p>
       <p>Outcome: we email the primary address on your account to say whether the decision was reversed or kept. We do not share internal notes. If a decision is reversed, your images are served again after caches refresh.</p>
