@@ -177,6 +177,10 @@ Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It re
 - Token: the API token used for setup is in Infisical project `blueyvatar`, environment `prod`, as `Cloudflare Bluey Setup Token`. It needs Zone: Email Routing Rules Edit, Zone: DNS Edit, and Account: Email Routing Addresses Edit. Never commit its value.
 - To add an address: `POST /zones/{zone_id}/email/routing/rules` with a `literal` matcher on `to` and a `forward` action. To add a destination: `POST /accounts/{account_id}/email/routing/addresses`. Docs: <https://developers.cloudflare.com/email-routing/>.
 
+## Notification emails
+
+Usage alerts (80 and 100 percent), billing notices (failed payment, grace expiry, cancellation), and key revoked notices are mailed to the account's primary email from `notice_emails` (issue 144). Delivery and web both send through Resend, so set `RESEND_API_KEY`, `EMAIL_FROM`, `PUBLIC_URL`, and `TOKEN_ENCRYPTION_KEY` on both apps. Without a stored address delivery logs the usage alert instead. Owners switch usage and billing messages off at `/account/notifications` (migration 0019); security notices stay on. Grace expiry is mailed when Stripe ends a subscription that was past due, since the license itself drops to Free limits with no event.
+
 ## CDN cache warming
 
 After an avatar changes (an image record upsert, or a Bluesky profile change, which also purges), the indexer requests a fixed list of sizes and formats through the public delivery hostname so Cloudflare caches them before the first visitor asks (issue 49, spec sections 4 and 12). It is best-effort: failures are logged and never fail indexing.
