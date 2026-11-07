@@ -44,7 +44,7 @@ indexer.identity(async (evt) => {
 })
 indexer.record(async (evt) => {
   await handleRecord(
-    { did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: 'cid' in evt ? (evt.cid as string | undefined) : undefined, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
+    { did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: evt.cid, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
     db,
   )
 })
