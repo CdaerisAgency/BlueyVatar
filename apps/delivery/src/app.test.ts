@@ -163,7 +163,7 @@ describe('delivery API', () => {
 
   it('allows cross-origin reads of profile JSON', async () => {
     const { app } = setup()
-    const res = await app.request('/profile/alice.test', { headers: { origin: 'https://site.test' } })
+    const res = await app.request('/profile/alice.test', { headers: { origin: 'https://site.test', 'x-api-key': 'sk_biz' } })
     expect(res.headers.get('access-control-allow-origin')).toBe('*')
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
   })
@@ -182,6 +182,30 @@ describe('delivery API', () => {
     const json = await (await labeled.app.request('/u/alice.test?json=true')).json()
     expect(json).toMatchObject({ found: false, source: 'default', rating: null, url: null })
     expect((await (await labeled.app.request('/profile/alice.test')).json()).avatar).toBeNull()
+  })
+
+  describe('profile hovercard gating', () => {
+    const cross = { origin: 'https://site.test' }
+    it('rejects cross-origin callers without a Business key', async () => {
+      const { app } = setup()
+      for (const headers of [cross, { ...cross, 'x-api-key': 'sk_test' }]) {
+        const res = await app.request('/profile/alice.test', { headers })
+        expect(res.status).toBe(403)
+        expect((await res.json()).error.code).toBe('tier_required')
+      }
+    })
+    it('allows cross-origin callers with a Business key', async () => {
+      const { app } = setup()
+      const res = await app.request('/profile/alice.test', { headers: { ...cross, 'x-api-key': 'sk_biz' } })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    })
+    it('keeps same-origin and server-to-server behavior', async () => {
+      const { app } = setup()
+      expect((await app.request('/profile/alice.test')).status).toBe(200)
+      expect((await app.request('/profile/alice.test', { headers: { origin: 'https://bv.test' } })).status).toBe(200)
+      expect((await app.request('http://delivery.test/profile/alice.test', { headers: { origin: 'http://delivery.test' } })).status).toBe(200)
+    })
   })
 
   it('returns profile JSON', async () => {

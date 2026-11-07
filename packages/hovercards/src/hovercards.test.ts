@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { transform } from 'esbuild'
-import { buildCard, cleanId, profileEndpoint } from './hovercard-model'
+import { buildCard, cleanId, profileEndpoint } from './model.js'
 
 const API = 'https://api.example'
 const WEB = 'https://blueyvatar.com'
@@ -39,7 +39,7 @@ describe('hovercard model', () => {
 })
 
 describe('embed source', () => {
-  const src = readFileSync(new URL('../embed/hovercard.ts', import.meta.url), 'utf8')
+  const src = readFileSync(new URL('hovercards.ts', import.meta.url), 'utf8')
   it('never writes HTML and sets no cookies', () => {
     expect(src).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|document\.cookie/)
     expect(src).toContain("credentials: 'omit'")

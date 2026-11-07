@@ -67,6 +67,16 @@ function originHost(c: Context): string | null {
   return null
 }
 
+/** True when the request carries an Origin header that is neither this service's host nor the profile site's host. */
+function isCrossOriginRequest(origin: string | undefined, ownHosts: readonly string[]): boolean {
+  if (!origin) return false
+  try {
+    return !ownHosts.includes(new URL(origin).host)
+  } catch {
+    return true
+  }
+}
+
 const QR_DEFAULT_SIZE = 256
 const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
 
@@ -102,6 +112,11 @@ export function createApp(deps: AppDeps) {
     )
     rateHeaders(c, e)
     return e
+  }
+
+  function isCrossOrigin(c: Context): boolean {
+    const own = [new URL(c.req.url).host, new URL(deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).host]
+    return isCrossOriginRequest(c.req.header('origin'), own)
   }
 
   function respondDefault(c: Context, p: AvatarParams, seed: string, initials: string) {
@@ -212,6 +227,11 @@ export function createApp(deps: AppDeps) {
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
+    // Cross-origin browser callers are hovercards embedded on other sites (Business and Enterprise).
+    // Same-origin pages and server-to-server calls without an Origin header are not gated.
+    if (isCrossOrigin(c) && !ENTITLEMENTS[e.tier].hovercards) {
+      return fail(c, 403, 'tier_required', 'Hovercards require a Business or Enterprise key')
+    }
     const id = parseIdentifier(c.req.param('id'))
     if (!id) return fail(c, 400, 'invalid_identifier', 'Expected a hash, handle, or DID')
     let identity: Identity | null = null
