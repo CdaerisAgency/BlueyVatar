@@ -5,7 +5,7 @@
  */
 export const COPY = {
   brand: 'blueyvatar',
-  nav: { how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in with Bluesky' },
+  nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in with Bluesky' },
   hero: {
     eyebrow: 'One avatar. Every app.',
     title: 'Your face, carried by your own account.',
@@ -62,6 +62,7 @@ export const COPY = {
       { label: 'Migrate from Gravatar', href: '/migrate-from-gravatar' },
       { label: 'Changelog', href: '/changelog' },
       { label: 'Privacy', href: '/privacy' },
+      { label: 'Accessibility', href: '/accessibility' },
       { label: 'Sign in', href: '/login' },
     ],
   },

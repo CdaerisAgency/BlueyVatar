@@ -8,7 +8,7 @@ import { saveVisibility, type VisibilityState } from './actions'
 export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
   const [state, action, pending] = useActionState(saveVisibility, {} as VisibilityState)
   return (
-    <form action={action}>
+    <form action={action} aria-describedby={state.error ? 'visibility-error' : undefined}>
       <p>
         <label>
           <input type="checkbox" name="keyedOnly" defaultChecked={rules.keyedOnly} /> Keyed only: only requests with a valid license key can fetch my avatar and profile.
@@ -19,9 +19,9 @@ export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
           <input type="checkbox" name="domainAllowlistOn" defaultChecked={rules.domainAllowlist.length > 0} /> Domain allowlist: only requests from the sites below can fetch.
         </label>
         <br />
-        <textarea name="domains" rows={4} cols={40} defaultValue={rules.domainAllowlist.join('\n')} aria-label="Allowed domains" placeholder={'app.example.com\n*.example.com\nlocalhost'} />
+        <textarea name="domains" rows={4} cols={40} defaultValue={rules.domainAllowlist.join('\n')} aria-label="Allowed domains" aria-describedby="domains-help" placeholder={'app.example.com\n*.example.com\nlocalhost'} />
         <br />
-        One per line: exact host, *.example.com wildcard, or localhost.
+        <span id="domains-help">One per line: exact host, *.example.com wildcard, or localhost.</span>
       </p>
       <p>
         <label>
@@ -34,7 +34,7 @@ export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
         </label>
       </p>
       <Button type="submit" variant="primary" disabled={pending}>Save</Button>
-      {state.error && <p role="alert">{state.error}</p>}
+      {state.error && <p role="alert" id="visibility-error">{state.error}</p>}
       {state.saved && <p role="status">Saved. Changes apply on the next request.</p>}
     </form>
   )

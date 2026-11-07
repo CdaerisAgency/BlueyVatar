@@ -6,6 +6,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 
 ### Added
 - Delivery caps concurrent image resizes (default 2 for the 512 MB VM), queues briefly, and answers 503 with Retry-After when full; metrics for in flight, queued, and shed (#198).
+- Skip link, accessibility statement at /accessibility, and an automated axe-core check in CI (#171).
 - Web admin page with an audit log for moderation (#165).
 - Self-serve data export and deletion (#166).
 - First-run checklist, settings hub, and signed-in sessions (#168).

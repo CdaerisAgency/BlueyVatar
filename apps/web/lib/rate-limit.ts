@@ -46,6 +46,7 @@ export const BUCKETS = {
   'adminAction.ip': { limit: 240, windowSec: 10 * MIN },
   'export.did': { limit: 5, windowSec: HOUR },
   'export.ip': { limit: 20, windowSec: HOUR },
+  'profileSave.did': { limit: 60, windowSec: HOUR },
   'deleteData.did': { limit: 5, windowSec: HOUR },
   'deleteData.ip': { limit: 20, windowSec: HOUR },
 } as const satisfies Record<string, BucketConfig>

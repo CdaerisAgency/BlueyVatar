@@ -42,6 +42,12 @@ describe('indexer handlers', () => {
     expect(db.deleteImage).toHaveBeenCalledWith('did:plc:a', '3k')
     expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined)
   })
+  it('passes backgroundColor through with the rest of the com.blueyvatar.profile record', async () => {
+    const db = fakeDb()
+    const record = { backgroundColor: '#1f4e9b', createdAt: '2026-11-03T00:00:00Z' }
+    await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.profile', rkey: 'self', action: 'update', record }, db)
+    expect(db.upsertProfile).toHaveBeenCalledWith('did:plc:a', record)
+  })
   it('purges indexed images and the Bluesky avatar when the profile changes, so a label change takes effect', async () => {
     const db = fakeDb()
     await handleRecord({
