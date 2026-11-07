@@ -290,6 +290,25 @@ describe('delivery API', () => {
     expect(usage.counts.size).toBe(0)
   })
 
+  it('writes no usage meters or rate limit hits for a request with a valid warm header', async () => {
+    const { deps, usage } = setup()
+    const app = createApp({ ...deps, warmSecret: 'ws' })
+    const warm = await app.request(img(80), { headers: { 'x-warm-auth': 'ws' } })
+    expect(warm.status).toBe(200)
+    expect(usage.service.size).toBe(0)
+    expect(usage.counts.size).toBe(0)
+    // A wrong secret is served as a normal, metered request.
+    await app.request(img(80), { headers: { 'x-warm-auth': 'nope' } })
+    expect(usage.service.get(`${DID}:transform`)).toBe(1)
+  })
+
+  it('ignores the warm header when WARM_SECRET is unset', async () => {
+    const { app, usage } = setup()
+    await app.request(img(80), { headers: { 'x-warm-auth': '' } })
+    await app.request(img(80), { headers: { 'x-warm-auth': 'anything' } })
+    expect(usage.service.get(`${DID}:transform`)).toBe(2)
+  })
+
   it('sends a usage alert when a keyed request reaches 80 percent', async () => {
     const { app, usage, sent } = setup()
     usage.counts.set('L1:origin_resolution', 39_999)
