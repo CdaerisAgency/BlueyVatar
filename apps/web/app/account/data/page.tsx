@@ -22,7 +22,7 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
       <p>
         A JSON file with what blueyvatar holds about you: email link hashes and methods (the primary address only in masked form),
         profile links, claims and attestations, visibility rules, license and API key details (never key secrets), your custom
-        domain, and a summary of your subscriptions.
+        domain, daily profile view counts, and a summary of your subscriptions.
       </p>
       <p>
         <a href="/account/data/export" download>Download my data</a>
@@ -35,6 +35,7 @@ export default async function DataPage({ searchParams }: { searchParams: Promise
         <li>Profile links, claims, attestations, and visibility rules.</li>
         <li>Your license and API keys, which stop working at once. You leave any organization you belong to. An organization you created and that has no other members is deleted with its keys. If it still has other members, remove them first.</li>
         <li>Your custom domain, including its Cloudflare hostname.</li>
+        <li>Your daily profile view counts.</li>
         <li>Your indexed avatars and profile, with their cached copies purged.</li>
         <li>Your sign-in session.</li>
       </ul>

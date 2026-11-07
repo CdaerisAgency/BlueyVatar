@@ -27,7 +27,7 @@ describe.skipIf(!url)('log retention purge', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0015_billing.sql', '0012_reports.sql', '0020_log_retention.sql']) await pool.query(read(f))
+    for (const f of ['0001_init.sql', '0015_billing.sql', '0012_reports.sql', '0020_log_retention.sql', '0025_profile_view_counters.sql']) await pool.query(read(f))
   }, 60_000)
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
@@ -63,5 +63,19 @@ describe.skipIf(!url)('log retention purge', () => {
     await event('e3', 1)
     await enforceLogRetention(pool, { days: 90, maxBytes: 0 })
     expect((await pool.query('SELECT 1 FROM stripe_events')).rowCount).toBe(0)
+  })
+
+  it('purges profile view counters older than the window and trims the oldest days under the size cap', async () => {
+    await pool.query('DELETE FROM stripe_events; DELETE FROM reports; DELETE FROM profile_view_counters')
+    const day = (ageDays: number, did: string) => pool.query(
+      "INSERT INTO profile_view_counters (did, day, views) VALUES ($1, (now() AT TIME ZONE 'UTC')::date - $2::int, 1)", [did, ageDays])
+    await day(91, 'did:plc:v'); await day(89, 'did:plc:v'); await day(1, 'did:plc:v')
+    const res = await enforceLogRetention(pool, { days: 90, maxBytes: 1024 ** 3 })
+    expect(res.expiredViewDays).toBe(1)
+    expect((await pool.query('SELECT count(*)::int AS c FROM profile_view_counters')).rows[0].c).toBe(2)
+    const total = await logBytes(pool)
+    const trimmed = await enforceLogRetention(pool, { days: 90, maxBytes: Math.floor(total / 2) })
+    expect(trimmed.trimmedViewDays).toBeGreaterThan(0)
+    expect(await logBytes(pool)).toBeLessThanOrEqual(Math.floor(total / 2))
   })
 })

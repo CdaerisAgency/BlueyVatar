@@ -20,7 +20,7 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
-  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, orgs, orgAudit] = await Promise.all([
+  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit] = await Promise.all([
     q('SELECT email_hash, method, is_primary, email_domain, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
     q('SELECT email_hash, reason, released_at FROM email_holds WHERE did = $1 ORDER BY released_at'),
     q('SELECT email_enc FROM notice_emails WHERE did = $1'),
@@ -35,6 +35,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q('SELECT stripe_subscription_id, tier, status, current_period_end, cancel_at_period_end, deleted_at FROM subscriptions WHERE did = $1 ORDER BY stripe_subscription_id'),
     q('SELECT rkey, cid, mime_type, rating, is_default, license, created_at FROM images WHERE did = $1 ORDER BY created_at, rkey'),
     q('SELECT record FROM profiles WHERE did = $1'),
+    q("SELECT to_char(day, 'YYYY-MM-DD') AS day, views, json_calls FROM profile_view_counters WHERE did = $1 ORDER BY day"),
     q('SELECT o.org_id, o.name, m.role, m.added_at FROM organization_members m JOIN organizations o ON o.org_id = m.org_id WHERE m.did = $1 ORDER BY m.added_at, o.org_id'),
     q('SELECT org_id, actor, action, target_did, detail, created_at FROM organization_audit WHERE actor = $1 OR target_did = $1 ORDER BY id'),
   ])
@@ -61,6 +62,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     customDomain: dates(domains)[0] ?? null,
     organizations: { memberships: dates(orgs), audit: dates(orgAudit) },
     billing: { customers: dates(customers), subscriptions: dates(subs) },
+    profileViews: views.map((r) => ({ day: r.day, views: Number(r.views), jsonCalls: Number(r.json_calls) })),
     indexed: { images: dates(images), profile: profile[0]?.record ?? null },
   }
 }
@@ -127,6 +129,7 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     await c.query('DELETE FROM visibility_rules WHERE did = $1', [did])
     await c.query('DELETE FROM verification_state WHERE did = $1', [did])
     await c.query('DELETE FROM custom_domains WHERE did = $1', [did])
+    await c.query('DELETE FROM profile_view_counters WHERE did = $1', [did])
     const images = await c.query('DELETE FROM images WHERE did = $1', [did])
     await c.query('DELETE FROM profiles WHERE did = $1', [did])
     const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])
