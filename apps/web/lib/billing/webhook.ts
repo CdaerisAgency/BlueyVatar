@@ -103,7 +103,9 @@ async function onSubscription(tx: BillingTx, type: string, sub: SubscriptionObje
   const status: SubscriptionStatus = type === 'customer.subscription.deleted' ? 'canceled' : STATUSES.has(sub.status) ? (sub.status as SubscriptionStatus) : 'incomplete'
   const ends = (sub.items?.data ?? []).map((i) => i.current_period_end).filter((n): n is number => typeof n === 'number')
   const periodEnd = ends.length > 0 ? Math.max(...ends) : sub.current_period_end
-  const license = await tx.ensureLicense(did)
+  // Checkout stamps the license it was started for. An organization license is owned by its billing owner's DID.
+  const stamped = sub.metadata?.license_id
+  const license = (stamped ? await tx.ownedLicense(did, stamped) : null) ?? (await tx.ensureLicense(did))
   await tx.linkCustomer(did, license.licenseId, customer)
   const row: SubscriptionRow = {
     id: sub.id,

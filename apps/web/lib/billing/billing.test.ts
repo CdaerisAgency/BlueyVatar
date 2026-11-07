@@ -325,15 +325,20 @@ describe('checkout and portal', () => {
     expect(await createPortalUrl(ctx, DID)).toMatchObject({ ok: false })
     expect(await createCheckoutUrl(ctx, DID, 'lic_1', 'business')).toEqual({ ok: true, url: 'https://checkout.stripe.test/s' })
     expect(create.mock.calls[0]![0]).toMatchObject({ line_items: [{ price: 'price_biz', quantity: 1 }], automatic_tax: { enabled: true } })
+    let licenseId = ''
     await store.process('e1', 'x', async (tx) => {
       const l = await tx.ensureLicense(DID)
+      licenseId = l.licenseId
       await tx.linkCustomer(DID, l.licenseId, 'cus_1')
       await tx.putSubscription({ id: 'sub_1', customerId: 'cus_1', did: DID, licenseId: l.licenseId, priceId: 'price_pro', tier: 'pro', status: 'active', currentPeriodEnd: null, cancelAtPeriodEnd: false, pastDueSince: null, lastEventAt: new Date(T0) })
     })
     expect(await createPortalUrl(ctx, DID)).toEqual({ ok: true, url: 'https://billing.stripe.test/p' })
     expect(portal.mock.calls[0]![0]).toEqual({ customer: 'cus_1', return_url: 'https://blueyvatar.com/account/billing' })
-    expect((await createCheckoutUrl(ctx, DID, 'lic_1', 'pro')).ok).toBe(false)
+    expect((await createCheckoutUrl(ctx, DID, licenseId, 'pro')).ok).toBe(false)
     expect(create).toHaveBeenCalledTimes(1)
+    // Developer subscriptions are per license, so another license (an organization's) may subscribe.
+    expect((await createCheckoutUrl(ctx, DID, 'lic_org', 'business')).ok).toBe(true)
+    expect(create).toHaveBeenCalledTimes(2)
   })
 })
 
@@ -458,7 +463,7 @@ describe.skipIf(!url)('postgres billing store', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
+    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql', '0026_organizations.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)

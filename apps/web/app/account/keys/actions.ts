@@ -9,6 +9,7 @@ import { getNotifier } from '../../../lib/notify'
 import { PUBLIC_URL } from '../../../lib/oauth'
 import { keyRevokedNotice } from '@blueyvatar/core/verification'
 import { limited } from '../../../lib/rate-guard'
+import { isScope, resolveScope } from '../../../lib/orgs/scope'
 import { checkKeyLimit, cleanLabel, displayPrefix, generateKey, hashKey, parseDomainList, type KeyKind } from '../../../lib/keys'
 
 export interface KeyState {
@@ -19,11 +20,15 @@ export interface KeyState {
   keyKind?: KeyKind
 }
 
-async function ctx() {
+const orgOf = (form: FormData): string | null => String(form.get('org') ?? '') || null
+
+/** The signed-in DID and the license they are working on: their own, or an organization's when `org` is set and they belong to it. */
+async function ctx(orgId: string | null) {
   const did = await currentDid()
   if (!did) return redirect('/login')
-  const store = getDashboardStore()
-  return { did, store, license: await store.ensureLicense(did) }
+  const scope = await resolveScope(did, orgId)
+  if (!isScope(scope)) return { did, store: getDashboardStore(), error: scope.error }
+  return { did, store: getDashboardStore(), license: scope.license, scope }
 }
 
 const asKind = (v: FormDataEntryValue | null): KeyKind | null => (v === 'secret' || v === 'publishable' ? v : null)
@@ -32,8 +37,10 @@ const guardFor = (tier: Parameters<typeof checkKeyLimit>[0], kind: KeyKind, repl
   return r.ok ? null : r.error
 }
 
-async function issue(kind: KeyKind, label: string | null, domains: string[], replace?: string): Promise<KeyState> {
-  const { did, store, license } = await ctx()
+async function issue(orgId: string | null, kind: KeyKind, label: string | null, domains: string[], replace?: string): Promise<KeyState> {
+  const c = await ctx(orgId)
+  if (!c.scope) return { error: c.error }
+  const { did, store, license, scope } = c
   const wait = await limited(['key.did', 'key.ip'], did)
   if (wait) return { error: wait }
   if (license.status !== 'active') return { error: `This license is ${license.status.replace('_', ' ')}. Keys cannot be issued.` }
@@ -45,6 +52,7 @@ async function issue(kind: KeyKind, label: string | null, domains: string[], rep
     replace,
   )
   if (err) return { error: err }
+  await scope.audit(did, replace ? 'key_rotated' : 'key_created', null, `${displayPrefix(key)} ${kind}`)
   revalidatePath('/account/keys')
   return { key, keyKind: kind, message: replace ? 'Key rotated. The old key is revoked.' : 'Key created.' }
 }
@@ -52,36 +60,44 @@ async function issue(kind: KeyKind, label: string | null, domains: string[], rep
 export async function createKey(_prev: KeyState, form: FormData): Promise<KeyState> {
   const kind = asKind(form.get('kind'))
   if (!kind) return { error: 'Choose a key type.' }
-  return issue(kind, cleanLabel(String(form.get('label') ?? '')), [])
+  return issue(orgOf(form), kind, cleanLabel(String(form.get('label') ?? '')), [])
 }
 
 /** Creates the replacement first, then revokes the old key, in one transaction. */
 export async function rotateKey(_prev: KeyState, form: FormData): Promise<KeyState> {
-  const { store, license } = await ctx()
+  const c = await ctx(orgOf(form))
+  if (!c.scope) return { error: c.error }
+  const { store, license } = c
   const hash = String(form.get('hash') ?? '')
   const old = (await store.listKeys(license.licenseId)).find((k) => k.hash === hash && !k.revokedAt)
   if (!old) return { error: 'That key is already revoked or does not exist.' }
-  return issue(old.kind, old.label, old.domains, hash)
+  return issue(orgOf(form), old.kind, old.label, old.domains, hash)
 }
 
 export async function revokeKey(form: FormData): Promise<void> {
-  const { store, license } = await ctx()
+  const c = await ctx(orgOf(form))
+  if (!c.scope) return
+  const { did, store, license, scope } = c
   const hash = String(form.get('hash') ?? '')
   const key = (await store.listKeys(license.licenseId)).find((k) => k.hash === hash && !k.revokedAt)
   // revokeKey is true only for the call that revoked it, so a repeated submit sends one notice.
   if ((await store.revokeKey(license.licenseId, hash)) && key) {
+    await scope.audit(did, 'key_revoked', null, `${key.prefix} ${key.kind}`)
     await getNotifier().send(license.owner, 'security', keyRevokedNotice({ did: license.owner, prefix: key.prefix, label: key.label, publicUrl: PUBLIC_URL }))
   }
   revalidatePath('/account/keys')
 }
 
 export async function saveDomains(_prev: KeyState, form: FormData): Promise<KeyState> {
-  const { store, license } = await ctx()
+  const c = await ctx(orgOf(form))
+  if (!c.scope) return { error: c.error }
+  const { did, store, license, scope } = c
   if (!ENTITLEMENTS[license.tier].domainRestrictions) return { error: 'Domain restrictions are not included in this tier.' }
   const parsed = parseDomainList(String(form.get('domains') ?? ''))
   if (!parsed.ok) return { error: parsed.errors.join(' ') }
   const ok = await store.setDomains(license.licenseId, String(form.get('hash') ?? ''), parsed.domains)
   if (!ok) return { error: 'Only active publishable keys have a domain list.' }
+  await scope.audit(did, 'key_domains_changed', null, `${parsed.domains.length} domains`)
   revalidatePath('/account/keys')
   return { message: parsed.domains.length ? 'Domains saved.' : 'Domain list cleared. Any host may use this key.' }
 }

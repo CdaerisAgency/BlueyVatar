@@ -33,6 +33,8 @@ export interface LicenseRef {
 export interface BillingTx {
   /** The DID's license, issuing a Free one when none exists (same rule as the dashboard). */
   ensureLicense(did: string): Promise<LicenseRef>
+  /** A license the DID owns, by id: their personal one or an organization license they are the billing owner of (issue #180). Null if it does not exist or belongs to someone else. */
+  ownedLicense(did: string, licenseId: string): Promise<LicenseRef | null>
   linkCustomer(did: string, licenseId: string, customerId: string): Promise<void>
   didForCustomer(customerId: string): Promise<string | null>
   /** True when the DID deleted their data and has not started a new checkout since (issue #140). Their late events must not rebuild a license. */
@@ -51,8 +53,8 @@ export interface BillingStore {
    */
   process(eventId: string, type: string, fn: (tx: BillingTx) => Promise<void>): Promise<'processed' | 'duplicate'>
   customerFor(did: string): Promise<string | null>
-  /** The newest entitled subscription of one kind: a developer tier (Pro or Business, the default) or Plus. */
-  subscriptionFor(did: string, kind?: SubKind): Promise<SubscriptionRow | null>
+  /** The newest entitled subscription of one kind: a developer tier (Pro or Business, the default) or Plus. With `licenseId`, only that license's subscriptions, so an organization license and a personal one each hold their own. */
+  subscriptionFor(did: string, kind?: SubKind, licenseId?: string): Promise<SubscriptionRow | null>
   /** True when the DID holds a Plus subscription that entitles Plus at `now` (active, trialing, or past due inside the grace period). */
   hasPlus(did: string, now?: Date): Promise<boolean>
 }
@@ -77,6 +79,10 @@ export function memoryBillingStore() {
         licenses.set(l.licenseId, l)
       }
       return { licenseId: l.licenseId, tier: l.tier }
+    },
+    async ownedLicense(did, licenseId) {
+      const l = licenses.get(licenseId)
+      return l && l.owner === did ? { licenseId: l.licenseId, tier: l.tier } : null
     },
     async linkCustomer(did, _licenseId, customerId) {
       customers.set(did, customerId)
@@ -118,8 +124,8 @@ export function memoryBillingStore() {
     async customerFor(did) {
       return customers.get(did) ?? null
     },
-    async subscriptionFor(did, kind = 'developer') {
-      return [...subs.values()].filter((s) => s.did === did && kindOf(s.tier) === kind && ENTITLED.has(s.status)).sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())[0] ?? null
+    async subscriptionFor(did, kind = 'developer', licenseId) {
+      return [...subs.values()].filter((s) => s.did === did && (!licenseId || s.licenseId === licenseId) && kindOf(s.tier) === kind && ENTITLED.has(s.status)).sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())[0] ?? null
     },
     async hasPlus(did, now = new Date()) {
       return plusEntitled([...subs.values()].filter((s) => s.did === did), now)
@@ -155,7 +161,7 @@ function pgTx(c: pg.PoolClient): BillingTx {
     async ensureLicense(did) {
       // Same per-owner lock the dashboard uses, so a first dashboard visit and a first webhook cannot both issue a license.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
-      const r = await c.query('SELECT license_id, tier FROM licenses WHERE owner = $1 ORDER BY created_at LIMIT 1', [did])
+      const r = await c.query('SELECT license_id, tier FROM licenses WHERE owner = $1 AND org_id IS NULL ORDER BY created_at LIMIT 1', [did])
       if (r.rows[0]) return { licenseId: r.rows[0].license_id, tier: r.rows[0].tier }
       const id = newLicenseId()
       await c.query(
@@ -165,10 +171,16 @@ function pgTx(c: pg.PoolClient): BillingTx {
       )
       return { licenseId: id, tier: 'free' as const }
     },
+    async ownedLicense(did, licenseId) {
+      const r = await c.query('SELECT license_id, tier FROM licenses WHERE license_id = $1 AND owner = $2', [licenseId, did])
+      return r.rows[0] ? { licenseId: r.rows[0].license_id, tier: r.rows[0].tier } : null
+    },
     async linkCustomer(did, licenseId, customerId) {
       await c.query(
         `INSERT INTO billing_customers (did, license_id, stripe_customer_id) VALUES ($1, $2, $3)
-         ON CONFLICT (did) DO UPDATE SET stripe_customer_id = EXCLUDED.stripe_customer_id, license_id = EXCLUDED.license_id, deleted_at = NULL`,
+         ON CONFLICT (did) DO UPDATE SET stripe_customer_id = EXCLUDED.stripe_customer_id, deleted_at = NULL,
+           -- One customer per DID serves the personal license and any organization license, so a live row keeps its license id.
+           license_id = CASE WHEN billing_customers.deleted_at IS NOT NULL THEN EXCLUDED.license_id ELSE billing_customers.license_id END`,
         [did, licenseId, customerId],
       )
     },
@@ -233,10 +245,11 @@ export function postgresBillingStore(pool: pg.Pool): BillingStore {
     async customerFor(did) {
       return (await pool.query('SELECT stripe_customer_id FROM billing_customers WHERE did = $1', [did])).rows[0]?.stripe_customer_id ?? null
     },
-    async subscriptionFor(did, kind = 'developer') {
+    async subscriptionFor(did, kind = 'developer', licenseId) {
       const r = await pool.query(
-        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND (tier = 'plus') = ($2 = 'plus') AND status IN ('active', 'trialing', 'past_due') ORDER BY last_event_at DESC LIMIT 1`,
-        [did, kind],
+        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND (tier = 'plus') = ($2 = 'plus') AND ($3::text IS NULL OR license_id = $3)
+           AND status IN ('active', 'trialing', 'past_due') ORDER BY last_event_at DESC LIMIT 1`,
+        [did, kind, licenseId ?? null],
       )
       return r.rows[0] ? toSub(r.rows[0]) : null
     },

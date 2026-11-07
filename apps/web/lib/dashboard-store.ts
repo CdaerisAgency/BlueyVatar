@@ -37,8 +37,10 @@ export interface NewKey {
 export type KeyGuard = (active: KeyRow[]) => string | null
 
 export interface DashboardStore {
-  /** Finds the DID's license, issuing a Free one on first call. */
+  /** Finds the DID's personal license (not an organization's), issuing a Free one on first call. */
   ensureLicense(did: string): Promise<LicenseRow>
+  /** Any license by id, for organization licenses. The caller has checked access. */
+  licenseById(licenseId: string): Promise<LicenseRow | null>
   listKeys(licenseId: string): Promise<KeyRow[]>
   /** Counter totals keyed by `${period}|${meter}`. */
   usage(licenseId: string, periods: string[]): Promise<Map<string, number>>
@@ -70,6 +72,9 @@ function memory(): DashboardStore {
         licenses.set(did, l)
       }
       return l
+    },
+    async licenseById(id) {
+      return [...licenses.values()].find((l) => l.licenseId === id) ?? null
     },
     async listKeys(id) {
       return [...keys.values()].filter((k) => k.licenseId === id).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
@@ -144,11 +149,12 @@ async function inTx<T>(pool: pg.Pool, did: string, fn: (c: pg.PoolClient) => Pro
 }
 
 function postgres(pool: pg.Pool): DashboardStore {
+  const toLicense = (x: pg.QueryResultRow): LicenseRow => ({ licenseId: x.license_id, owner: x.owner, tier: effectiveTier({ tier: x.tier, status: x.status, graceEndsAt: x.grace_ends_at }, new Date()), status: x.status, term: x.term, graceEndsAt: x.grace_ends_at })
   const readLicense = async (q: { query: pg.Pool['query'] }, did: string): Promise<LicenseRow | undefined> => {
-    const r = await q.query('SELECT license_id, owner, tier, status, term, grace_ends_at FROM licenses WHERE owner = $1 ORDER BY created_at LIMIT 1', [did])
+    const r = await q.query('SELECT license_id, owner, tier, status, term, grace_ends_at FROM licenses WHERE owner = $1 AND org_id IS NULL ORDER BY created_at LIMIT 1', [did])
     const x = r.rows[0]
     // A past-due license reads as Free once its grace period ends, with no webhook needed (spec section 12).
-    return x && { licenseId: x.license_id, owner: x.owner, tier: effectiveTier({ tier: x.tier, status: x.status, graceEndsAt: x.grace_ends_at }, new Date()), status: x.status, term: x.term, graceEndsAt: x.grace_ends_at }
+    return x && toLicense(x)
   }
   return {
     async ensureLicense(did) {
@@ -165,6 +171,10 @@ function postgres(pool: pg.Pool): DashboardStore {
         )
         return { licenseId: id, owner: did, tier: 'free' as const, status: 'active' as const, term: 'monthly' as const }
       })
+    },
+    async licenseById(id) {
+      const r = await pool.query('SELECT license_id, owner, tier, status, term, grace_ends_at FROM licenses WHERE license_id = $1', [id])
+      return r.rows[0] ? toLicense(r.rows[0]) : null
     },
     async listKeys(id) {
       const r = await pool.query(`SELECT ${keyCols} FROM api_keys WHERE license_id = $1 ORDER BY created_at DESC`, [id])

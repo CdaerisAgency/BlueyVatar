@@ -20,7 +20,7 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
-  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views] = await Promise.all([
+  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit] = await Promise.all([
     q('SELECT email_hash, method, is_primary, email_domain, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
     q('SELECT email_hash, reason, released_at FROM email_holds WHERE did = $1 ORDER BY released_at'),
     q('SELECT email_enc FROM notice_emails WHERE did = $1'),
@@ -28,7 +28,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q('SELECT rkey, platform, uri, record, indexed_at FROM claims WHERE did = $1 ORDER BY rkey'),
     q('SELECT uri, claim_rkey, result, method, created_at FROM attestations WHERE claim_did = $1 ORDER BY created_at'),
     q('SELECT keyed_only, domain_allowlist, hidden_profile, email_lookup_opt_out, updated_at FROM visibility_rules WHERE did = $1'),
-    q('SELECT license_id, tier, status, term, entitlements, grace_ends_at, created_at FROM licenses WHERE owner = $1 ORDER BY created_at'),
+    q('SELECT license_id, org_id, tier, status, term, entitlements, grace_ends_at, created_at FROM licenses WHERE owner = $1 ORDER BY created_at'),
     q('SELECT k.prefix, k.kind, k.label, k.domains, k.created_at, k.revoked_at FROM api_keys k JOIN licenses l ON l.license_id = k.license_id WHERE l.owner = $1 ORDER BY k.created_at'),
     q('SELECT hostname, status, created_at, verified_at FROM custom_domains WHERE did = $1'),
     q('SELECT stripe_customer_id, created_at FROM billing_customers WHERE did = $1'),
@@ -36,6 +36,8 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q('SELECT rkey, cid, mime_type, rating, is_default, license, created_at FROM images WHERE did = $1 ORDER BY created_at, rkey'),
     q('SELECT record FROM profiles WHERE did = $1'),
     q("SELECT to_char(day, 'YYYY-MM-DD') AS day, views, json_calls FROM profile_view_counters WHERE did = $1 ORDER BY day"),
+    q('SELECT o.org_id, o.name, m.role, m.added_at FROM organization_members m JOIN organizations o ON o.org_id = m.org_id WHERE m.did = $1 ORDER BY m.added_at, o.org_id'),
+    q('SELECT org_id, actor, action, target_did, detail, created_at FROM organization_audit WHERE actor = $1 OR target_did = $1 ORDER BY id'),
   ])
   let primaryEmail: string | null = null
   if (notice[0]) {
@@ -58,6 +60,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     licenses: dates(licenses),
     apiKeys: dates(keys),
     customDomain: dates(domains)[0] ?? null,
+    organizations: { memberships: dates(orgs), audit: dates(orgAudit) },
     billing: { customers: dates(customers), subscriptions: dates(subs) },
     profileViews: views.map((r) => ({ day: r.day, views: Number(r.views), jsonCalls: Number(r.json_calls) })),
     indexed: { images: dates(images), profile: profile[0]?.record ?? null },
@@ -77,6 +80,10 @@ export type DeleteDeps = {
 
 export class DeletionBlocked extends Error {}
 
+/** Shown when the billing owner of an organization that still has other members deletes their account (issue #180). */
+export const ORG_BILLING_BLOCK =
+  'You are the billing owner of an organization that still has other members. Nothing was deleted. Remove the other members from the organization first; the organization and its subscription then go away with your account.'
+
 export type DeleteSummary = { emailLinksHeld: number; images: number; claims: number; subscriptionsCanceled: number }
 
 /**
@@ -88,6 +95,12 @@ export type DeleteSummary = { emailLinksHeld: number; images: number; claims: nu
 export async function deleteAccountData(pool: pg.Pool, did: string, deps: DeleteDeps = {}): Promise<DeleteSummary> {
   const rows = async (sql: string) => (await pool.query(sql, [did])).rows as Record<string, string>[]
 
+  // The billing owner holds the organization's Stripe customer, so they cannot leave it behind with other members in it.
+  const stuck = await rows(
+    `SELECT l.org_id FROM licenses l WHERE l.owner = $1 AND l.org_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM organization_members m WHERE m.org_id = l.org_id AND m.did <> $1)`,
+  )
+  if (stuck.length > 0) throw new DeletionBlocked(ORG_BILLING_BLOCK)
   // Outside the transaction: external systems first, so a failure leaves the account whole and the user can retry.
   const live = await rows("SELECT stripe_subscription_id AS id FROM subscriptions WHERE did = $1 AND status NOT IN ('canceled', 'incomplete_expired')")
   try {
@@ -122,6 +135,7 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])
     await c.query('DELETE FROM attestations WHERE claim_did = $1', [did])
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
+    await leaveOrganizations(c, did)
     // Cascades to api_keys, usage_counters, and usage_alerts. Billing rows no longer depend on the license (migration 0022).
     await c.query('DELETE FROM licenses WHERE owner = $1', [did])
     await c.query('UPDATE billing_customers SET deleted_at = coalesce(deleted_at, now()) WHERE did = $1', [did])
@@ -138,4 +152,31 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
   for (const uri of uris) await deps.removeAttestation?.(uri).catch((e) => console.error('attestation remove failed', e instanceof Error ? e.message : 'unknown'))
   if (cids.length) await deps.purgeImages?.(did, cids).catch((e) => console.error('image purge failed', e instanceof Error ? e.message : 'unknown'))
   return summary
+}
+
+/**
+ * Organization rows of a deleting account (issue #166, #180). An organization the DID is the billing owner of, and has no other
+ * members, is deleted with its license, keys, usage, and audit rows; its billing rows are marked deleted by the caller. In any other
+ * organization the DID just leaves: membership goes, and the DID is cleared from audit rows and `added_by` so the organization keeps
+ * its history without the deleted identity. A billing owner who still has co-members is refused before anything is removed.
+ */
+export async function leaveOrganizations(c: pg.PoolClient, did: string): Promise<void> {
+  const orgs = (await c.query('SELECT org_id FROM organization_members WHERE did = $1 ORDER BY org_id', [did])).rows as { org_id: string }[]
+  for (const { org_id: orgId } of orgs) {
+    // Same lock the membership changes take, so a member added at this instant cannot slip in after the check.
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`org:${orgId}`])
+    const billing = (await c.query('SELECT 1 FROM licenses WHERE org_id = $1 AND owner = $2', [orgId, did])).rowCount ?? 0
+    const others = (await c.query('SELECT count(*)::int AS n FROM organization_members WHERE org_id = $1 AND did <> $2', [orgId, did])).rows[0].n as number
+    if (billing > 0) {
+      if (others > 0) throw new DeletionBlocked(ORG_BILLING_BLOCK)
+      // Cascades to members, audit, the organization license, its keys, usage counters, and usage alerts.
+      await c.query('DELETE FROM organizations WHERE org_id = $1', [orgId])
+      continue
+    }
+    await c.query('DELETE FROM organization_members WHERE org_id = $1 AND did = $2', [orgId, did])
+    await c.query("INSERT INTO organization_audit (org_id, actor, action, target_did, detail) VALUES ($1, NULL, 'member_left', NULL, 'account deleted')", [orgId])
+  }
+  await c.query('UPDATE organization_audit SET actor = NULL WHERE actor = $1', [did])
+  await c.query('UPDATE organization_audit SET target_did = NULL WHERE target_did = $1', [did])
+  await c.query('UPDATE organization_members SET added_by = NULL WHERE added_by = $1', [did])
 }

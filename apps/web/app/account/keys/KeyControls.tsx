@@ -25,13 +25,14 @@ function Result({ s }: { s: KeyState }) {
   )
 }
 
-export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason }: { allowSecret: boolean; allowPublishable: boolean; disabledReason: string | null }) {
+export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason, orgId = '' }: { allowSecret: boolean; allowPublishable: boolean; disabledReason: string | null; orgId?: string }) {
   const [state, action, pending] = useActionState(createKey, none)
   return (
     <section>
       <h2>Create a key</h2>
       {disabledReason && <p>{disabledReason}</p>}
       <form action={action}>
+        <input type="hidden" name="org" value={orgId} />
         <label>
           Type{' '}
           <select name="kind" defaultValue={allowPublishable ? 'publishable' : 'secret'}>
@@ -51,7 +52,7 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason }:
   )
 }
 
-export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: string; kind: 'secret' | 'publishable'; domains: string[]; domainsEnabled: boolean }) {
+export function KeyActions({ hash, kind, domains, domainsEnabled, orgId = '' }: { hash: string; kind: 'secret' | 'publishable'; domains: string[]; domainsEnabled: boolean; orgId?: string }) {
   const [rot, rotate, rotating] = useActionState(rotateKey, none)
   const [dom, saveDom, saving] = useActionState(saveDomains, none)
   return (
@@ -60,6 +61,7 @@ export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: stri
         (domainsEnabled ? (
           <form action={saveDom}>
             <input type="hidden" name="hash" value={hash} />
+            <input type="hidden" name="org" value={orgId} />
             <label>
               Allowed domains (one per line: app.example.com, *.example.com, localhost). Empty allows any host.
               <br />
@@ -76,12 +78,14 @@ export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: stri
         ))}
       <form action={rotate} className="inline">
         <input type="hidden" name="hash" value={hash} />
+            <input type="hidden" name="org" value={orgId} />
         <Button type="submit" disabled={rotating}>
           Rotate
         </Button>
       </form>{' '}
       <form action={revokeKey} className="inline">
         <input type="hidden" name="hash" value={hash} />
+            <input type="hidden" name="org" value={orgId} />
         <Button type="submit">Revoke</Button>
       </form>
       <Result s={rot} />
