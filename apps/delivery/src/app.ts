@@ -9,7 +9,7 @@ import {
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
 import { errorBody, type ErrorCode } from './errors.js'
 import type { UsageAlerts } from './alerts.js'
-import { cleanInitials, defaultSvg } from './defaults.js'
+import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock } from './origin.js'
 import type { Resizer } from './resize.js'
@@ -136,7 +136,9 @@ export function createApp(deps: AppDeps) {
     }
     if (p.default.kind === 'url') return c.redirect(p.default.url, 302)
     const style = p.default.kind === 'style' ? p.default.style : 'mp'
-    return c.redirect(`/default/${style}/${p.size}.${p.format}?seed=${encodeURIComponent(seed)}${initials ? `&initials=${initials}` : ''}`, 302)
+    // blank is a transparent image, so it is always PNG (JPEG has no alpha channel).
+    const format = style === 'blank' ? 'png' : p.format
+    return c.redirect(`/default/${style}/${p.size}.${format}?seed=${encodeURIComponent(seed)}${initials ? `&initials=${initials}` : ''}`, 302)
   }
 
   /** The visibility rules when this caller may fetch the avatar (spec section 10.2), else null. */
@@ -208,6 +210,7 @@ export function createApp(deps: AppDeps) {
         source: picked.kind === 'image' ? picked.candidate.source : 'default',
         rating: picked.kind === 'image' ? picked.candidate.rating : null,
         url: path,
+        updatedDate: picked.kind === 'image' ? (picked.candidate.updatedAt ?? null) : null,
       })
     }
     if (!path) return respondDefault(c, p, seed, initials)
@@ -228,7 +231,7 @@ export function createApp(deps: AppDeps) {
       const did = await deps.index.didForEmailHash(hash)
       if (!did || !(await gate(did))) return null
       return deps.resolver.resolveIdentity({ kind: 'did', value: did })
-    }, hash)
+    }, hash, initialsFromName(c.req.query('name')))
   })
 
   app.get('/u/:id', async (c) => {

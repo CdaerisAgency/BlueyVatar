@@ -111,6 +111,7 @@ export class AtprotoResolver implements AvatarResolver {
         did: identity.did,
         blob: { cid: img.cid, mimeType: img.mimeType },
         rating: img.rating,
+        updatedAt: img.createdAt,
       })
     }
     for (const adapter of activeAdapters(this.opts.adapters)) {

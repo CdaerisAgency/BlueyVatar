@@ -3,7 +3,7 @@ import { ENTITLEMENTS, type OutputFormat, type Tier } from './tiers.js'
 
 /** Query parameters from spec section 7. */
 export const DEFAULT_STYLES = [
-  '404', 'mp', 'identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'pagan', 'initials',
+  '404', 'mp', 'identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'pagan', 'initials', 'blank',
 ] as const
 export type DefaultStyle = (typeof DEFAULT_STYLES)[number]
 
