@@ -20,6 +20,7 @@ export const slugify = (text) =>
 export function render(slug, markdown) {
   const headings = []
   const seen = new Map()
+  let tables = 0
   const marked = new Marked({
     renderer: {
       heading({ tokens, depth }) {
@@ -43,7 +44,7 @@ export function render(slug, markdown) {
         const rows = token.rows
           .map((r) => `<tr>${r.map((c) => `<td>${this.parser.parseInline(c.tokens)}</td>`).join('')}</tr>`)
           .join('\n')
-        return `<div class="docs-table" role="region" aria-label="Table" tabindex="0"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>\n`
+        return `<div class="docs-table" role="region" aria-label="Table ${++tables}" tabindex="0"><table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>\n`
       },
     },
   })
