@@ -13,6 +13,15 @@ The delivery API serves avatars and profile JSON. The proposed delivery host is 
 | [examples-v1.md](examples-v1.md) | Copy-paste examples in curl, JavaScript, and an HTML `<img>` tag |
 | [errors-v1.md](errors-v1.md) | Error codes, rate limit headers, and other response headers |
 
+## Integration guides
+
+| Guide | Covers |
+| --- | --- |
+| [html-v1.md](../integrations/html-v1.md) | Plain HTML: hash route, `d=` fallback, no-referrer |
+| [wordpress-v1.md](../integrations/wordpress-v1.md) | The WordPress plugin, its license, and submission steps |
+| [ghost-v1.md](../integrations/ghost-v1.md) | Ghost themes and code injection |
+| [discourse-v1.md](../integrations/discourse-v1.md) | Discourse's `gravatar_base_url` setting |
+
 The OpenAPI 3.1 description is served at `/openapi.json` on the delivery host and lives in `apps/delivery/src/openapi.ts`.
 
 Source of truth: `apps/delivery/src/app.ts`, `apps/delivery/src/errors.ts`, `packages/core/src/params.ts`, `packages/core/src/tiers.ts`, and `packages/core/src/hash.ts`.

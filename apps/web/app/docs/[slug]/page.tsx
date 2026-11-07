@@ -10,7 +10,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const page = docPage((await params).slug)
-  return page ? { title: `${page.title} | API docs` } : {}
+  return page ? { title: `${page.title} | ${page.group === 'api' ? 'API docs' : 'Integration guides'}` } : {}
 }
 
 export default async function DocsPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -15,7 +15,16 @@ export default function IntegrationsPage() {
   return (
     <PageMain>
       <h1>Integrations</h1>
-      <p>Your profile can show the accounts you own elsewhere, each one checked before it appears. There are three kinds.</p>
+      <p>Your profile can show the accounts you own elsewhere, each one checked before it appears. Beyond the guides above, there are three kinds.</p>
+
+      <h2>Use blueyvatar on your site</h2>
+      <p>Guides for putting avatars on a site you run. Each uses the SHA-256 hash route, a default image with <code>d=</code>, and a no-referrer policy.</p>
+      <ul aria-label="Integration guides">
+        <li><a href="/docs/integrations-html">Plain HTML</a></li>
+        <li><a href="/docs/integrations-wordpress">WordPress</a> (plugin source in the repository, distributed as a GitHub release)</li>
+        <li><a href="/docs/integrations-ghost">Ghost</a></li>
+        <li><a href="/docs/integrations-discourse">Discourse</a></li>
+      </ul>
 
       <h2>atproto apps</h2>
       <p>
