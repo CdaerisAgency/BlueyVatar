@@ -16,7 +16,7 @@ describe.skipIf(!url)('billing retention purge', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0015_billing', '0017_plus_subscriptions', '0021_account_deletion']) await pool.query(mig(n))
+    for (const n of ['0001_init', '0015_billing', '0017_plus_subscriptions', '0022_account_deletion']) await pool.query(mig(n))
     await pool.query("INSERT INTO billing_customers (did, license_id, stripe_customer_id, deleted_at) VALUES ('did:plc:old', 'lic_x', 'cus_old', '2026-05-31T00:00:00Z'), ('did:plc:new', 'lic_y', 'cus_new', '2026-06-02T00:00:00Z'), ('did:plc:live', 'lic_z', 'cus_live', NULL)")
     const sub = (id: string, cus: string, did: string, del: string | null) =>
       pool.query("INSERT INTO subscriptions (stripe_subscription_id, stripe_customer_id, did, license_id, price_id, tier, status, last_event_at, deleted_at) VALUES ($1, $2, $3, 'lic_x', 'price', 'pro', 'canceled', now(), $4)", [id, cus, did, del])
