@@ -71,7 +71,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 10 | Default image styles | G, L, U | Generated styles, custom URL, or 404 | v1 |
 | 11 | Force default | G, L | Query parameter | v1 |
 | 12 | Content rating filter | G | Map ratings to atproto self-labels (section 9) | v1 |
-| 13 | Format and quality transforms | A | Width, height, quality, format parameters | v2 |
+| 13 | Format and quality transforms | A | Quality and format parameters. Decision: square sizes only, no width or height (see note below the table) | v2 |
 | 14 | JSON response mode | U | json parameter returns metadata | v1 |
 | 15 | Redirect to CDN-cached image | A | Immutable cached copies keyed by blob CID | v1 |
 | 16 | Cache TTL control | U | Tier-gated TTL parameter | v2 |
@@ -89,6 +89,8 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 28 | Rate limit headers and stable error codes | U | Response headers and error schema | v1 |
 | 29 | Custom profile domains | G | Paid tier feature | v2 |
 | 30 | Open source and self-hosting | L, A | Publish the delivery layer under an open license | Later |
+
+Note on row 13: width and height are not added. Avatars are square and center-cropped at upload, non-square outputs would multiply cache variants, and a single square `s` keeps parity with Gravatar. `fmt` (png, jpeg, webp) and `q` (1 to 100, default 85) are the transforms. The image path encodes both. Details are in `docs/api/format-quality-v1.md`.
 
 ## 4. atproto architecture
 

@@ -359,6 +359,34 @@ describe('delivery API', () => {
       expect((await (await app.request('/u/alice.test?fmt=webp&q=101', { headers: h })).json()).error.code).toBe('invalid_quality')
     })
 
+    it('rejects q=abc, fmt=gif, and uppercase fmt with stable codes', async () => {
+      const { app } = setup()
+      for (const [qs, code] of [['q=abc', 'invalid_quality'], ['fmt=gif', 'invalid_format'], ['fmt=WEBP', 'invalid_format'], ['fmt=PNG', 'invalid_format']] as const) {
+        for (const headers of [{ 'x-api-key': 'sk_test' }, {}]) {
+          const res = await app.request(`/u/alice.test?${qs}`, { headers })
+          expect(res.status).toBe(400)
+          expect((await res.json()).error.code).toBe(code)
+        }
+      }
+    })
+
+    it('accepts q=1 and q=100 on pro and business, snapping the path to an allowed quality', async () => {
+      const { app } = setup()
+      for (const key of ['sk_test', 'sk_biz']) {
+        const h = { 'x-api-key': key }
+        const low = await app.request('/u/alice.test?fmt=webp&q=1', { headers: h })
+        expect(low.headers.get('location')).toBe(img(80, 'webp', 60))
+        expect(low.headers.get('x-adjusted-params')).toBeNull()
+        const high = await app.request('/u/alice.test?fmt=jpeg&q=100', { headers: h })
+        expect(high.headers.get('location')).toBe(img(80, 'jpeg'))
+      }
+    })
+
+    it('gives every format its own distinct signed path', async () => {
+      const paths = new Set([img(80), img(80, 'jpeg'), img(80, 'webp'), img(80, 'jpeg', 60), img(80, 'webp', 60)])
+      expect(paths.size).toBe(5)
+    })
+
     it('serves each variant path as its own object with the matching content type', async () => {
       const { app } = setup()
       const res = await app.request(img(128, 'webp', 60))

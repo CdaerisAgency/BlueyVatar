@@ -62,6 +62,51 @@ describe('params', () => {
     const p = parseAvatarParams(new URLSearchParams('fmt=webp&q=70&ttl=7d&d=https://example.com/x.png'), { ...opts, tier: 'pro' })
     expect(p).toMatchObject({ format: 'webp', quality: 70, ttlSeconds: 7 * 86400, default: { kind: 'url' } })
   })
+  describe('fmt and q (F13)', () => {
+    const parse = (qs: string, tier: 'free' | 'pro' | 'business' | 'enterprise') => parseAvatarParams(new URLSearchParams(qs), { ...opts, tier })
+    const paid = ['pro', 'business', 'enterprise'] as const
+
+    it('accepts png, jpeg, and webp on every paid tier with no adjustment', () => {
+      for (const tier of paid) {
+        for (const fmt of ['png', 'jpeg', 'webp'] as const) {
+          const p = parse(`fmt=${fmt}`, tier)
+          expect(p.format).toBe(fmt)
+          expect(p.adjusted).toEqual([])
+        }
+      }
+    })
+    it('gives free PNG only and reports every ignored fmt and q', () => {
+      for (const fmt of ['jpeg', 'webp']) {
+        const p = parse(`fmt=${fmt}&q=70`, 'free')
+        expect(p).toMatchObject({ format: 'png', quality: 85 })
+        expect(p.adjusted).toEqual(['fmt', 'q'])
+      }
+      expect(parse('fmt=png', 'free').adjusted).toEqual([])
+      expect(parse('q=70', 'free').adjusted).toEqual(['q'])
+    })
+    it('accepts q from 1 to 100 on paid tiers and defaults to 85', () => {
+      for (const tier of paid) {
+        expect(parse('', tier).quality).toBe(85)
+        expect(parse('q=1', tier).quality).toBe(1)
+        expect(parse('q=100', tier).quality).toBe(100)
+        expect(parse('q=70', tier).adjusted).toEqual([])
+      }
+    })
+    it('rejects bad q on every tier', () => {
+      for (const tier of ['free', ...paid] as const) {
+        for (const q of ['0', '101', 'abc', '-5', '7.5', '']) {
+          expect(() => parse(`q=${q}`, tier), `${tier} q=${q}`).toThrow(/q must be 1 to 100/)
+        }
+      }
+    })
+    it('rejects unknown and wrongly cased fmt on every tier', () => {
+      for (const tier of ['free', ...paid] as const) {
+        for (const fmt of ['gif', 'avif', 'jpg', 'PNG', 'WEBP', 'Jpeg', '']) {
+          expect(() => parse(`fmt=${fmt}`, tier), `${tier} fmt=${fmt}`).toThrow(ParamError)
+        }
+      }
+    })
+  })
   it('rejects bad input', () => {
     expect(() => parseAvatarParams(new URLSearchParams('r=nc17'), opts)).toThrow(ParamError)
     expect(() => parseAvatarParams(new URLSearchParams('d=http://example.com/x.png'), opts)).toThrow(ParamError)
