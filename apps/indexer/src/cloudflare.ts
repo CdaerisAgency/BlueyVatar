@@ -9,12 +9,13 @@ import { ladderPaths } from '@blueyvatar/core'
  * tag, prefix, and purge-everything share 5 requests per minute. Endpoint and body:
  * https://developers.cloudflare.com/api/resources/cache/methods/purge/
  *
- * Default mode "files" purges the known size ladder per CID (sizes x formats at the default
- * quality, public scope, signed with IMG_SIGNING_SECRET). LIMITATION: a URL with a size off
- * the ladder, a `-q` quality override, or a per-caller restricted scope is not purged
- * and stays cached until Cloudflare evicts it, but the `/img` route never serves it fresh after a
- * block because the origin returns 404 on the next cache miss. Mode "prefix" purges
- * `host/img/{did}/{cid}/` and covers every variant, at the cost of the 5 per minute limit.
+ * Default mode "files" purges every public-scope URL that can exist per CID: the size ladder, all
+ * formats, and each allowed quality for JPEG and WebP (75 URLs), signed with IMG_SIGNING_SECRET.
+ * `/img` serves only those canonical paths and redirects anything else (off-ladder size, other
+ * quality, query string) to one of them, so the set is complete for public avatars. LIMITATION:
+ * restricted avatars use per-caller scoped URLs that are not listed here. Mode "prefix" purges
+ * `host/img/{did}/{cid}/` in one operation and covers every variant, at the cost of the 5 per
+ * minute limit.
  */
 export interface PurgeLogger { info(msg: string, meta?: unknown): void; error(msg: string, meta?: unknown): void }
 export type PurgeMode = 'files' | 'prefix'

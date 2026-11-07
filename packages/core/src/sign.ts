@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { IMAGE_FORMATS, IMAGE_QUALITIES, IMAGE_SIZE_LADDER, imageFile } from './resolve.js'
 
 /**
  * Signed `/img` paths (issues #68 and #72). The redirect routes sign the path they send the
@@ -22,11 +23,6 @@ export type ImageFormat = 'png' | 'jpeg' | 'webp'
 export const SIGNATURE_BYTES = 16
 const MAC_RE = /^(?:([A-Za-z0-9_-]+)\.)?([A-Za-z0-9_-]{22})$/
 
-export function imageFile(size: number, ext: ImageFormat, quality?: number): string {
-  const q = quality !== undefined && ext !== 'png' ? `-q${quality}` : ''
-  return `${size}${q}.${ext}`
-}
-
 export function imageMac(secret: string, did: string, cid: string, file: string, scope: string): string {
   return createHmac('sha256', secret)
     .update(`img\n${did}\n${cid}\n${file}\n${scope}`)
@@ -41,10 +37,26 @@ export function imageSig(secret: string, did: string, cid: string, file: string,
   return scope ? `${Buffer.from(scope).toString('base64url')}.${mac}` : mac
 }
 
-/** Immutable, CDN-cacheable, signed image path (spec sections 7 and 14.1). */
+/**
+ * Immutable, CDN-cacheable, signed image path (spec sections 7 and 14.1). The file name is the
+ * canonical one from `imageFile` (size snapped to the ladder, quality to the allowed set), so the
+ * signature only ever covers a path `/img` serves without a redirect.
+ */
 export function imagePath(secret: string, did: string, cid: string, size: number, ext: ImageFormat, quality?: number, scope = ''): string {
   const file = imageFile(size, ext, quality)
   return `/img/${encodeURIComponent(did)}/${cid}/${imageSig(secret, did, cid, file, scope)}/${file}`
+}
+
+/**
+ * Every public-scope `/img` path that can exist for a CID: all ladder sizes, all formats, and
+ * every allowed quality for JPEG and WebP. Purge covers exactly this set, because `/img`
+ * redirects any other request to one of these paths. Per-caller restricted scopes are not
+ * listed; prefix purges cover them.
+ */
+export function ladderPaths(secret: string, did: string, cid: string, sizes: readonly number[] = IMAGE_SIZE_LADDER, formats: readonly ImageFormat[] = IMAGE_FORMATS): string[] {
+  return sizes.flatMap((s) => formats.flatMap((f) => (
+    f === 'png' ? [imagePath(secret, did, cid, s, f)] : IMAGE_QUALITIES.map((q) => imagePath(secret, did, cid, s, f, q))
+  )))
 }
 
 /**

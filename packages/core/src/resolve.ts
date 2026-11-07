@@ -1,5 +1,4 @@
 import { ratingAllowed, type Rating } from './ratings.js'
-import { imagePath } from './sign.js'
 import type { BlobRef } from './adapters.js'
 
 /** One avatar candidate found for an identity, in resolution order (spec section 7). */
@@ -32,17 +31,41 @@ export function pickCandidate(
 
 export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
-/** Sizes the service treats as common (spec section 4). Used to purge and warm `/img` URLs. */
+/** Sizes the service treats as common (spec section 4). `/img` serves only these. */
 export const IMAGE_SIZE_LADDER = [16, 24, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 512, 1024, 2048] as const
 /** Subset of the ladder worth warming after an avatar change. */
 export const WARM_SIZES = [48, 80, 128, 256, 512] as const
 export const IMAGE_FORMATS = ['png', 'jpeg', 'webp'] as const
+/** Qualities `/img` serves for JPEG and WebP. PNG ignores quality. */
+export const IMAGE_QUALITIES = [60, 85] as const
+/** Quality that has no `-q` suffix in the canonical path. */
+export const CANONICAL_QUALITY = 85
+
+type ImageExt = (typeof IMAGE_FORMATS)[number]
+
+/** Smallest ladder size that is at least `size`, or the largest step when `size` exceeds it. */
+export function snapSize(size: number): number {
+  return IMAGE_SIZE_LADDER.find((s) => s >= size) ?? IMAGE_SIZE_LADDER[IMAGE_SIZE_LADDER.length - 1]!
+}
+
+/** Nearest allowed quality; ties go to the higher one. */
+export function snapQuality(quality: number): number {
+  let best: number = IMAGE_QUALITIES[0]
+  for (const q of IMAGE_QUALITIES) {
+    if (Math.abs(q - quality) <= Math.abs(best - quality)) best = q
+  }
+  return best
+}
 
 /**
- * Public-scope `/img` paths for the size ladder at the default quality, signed with the
- * delivery signing secret. Callers that request a size off the ladder, a `-q` quality
- * override, or a restricted avatar (per-caller scope) are not covered.
+ * The one canonical file name per image variant (spec sections 7 and 14.1). Size snaps up to the
+ * ladder and quality to `IMAGE_QUALITIES`. PNG and the default quality carry no `-q` suffix, so
+ * every variant has exactly one name. The signed path builder in sign.ts wraps this, and the
+ * avatar redirect, warm, purge, and `/img` itself all go through it. Every tier cap (512, 1024,
+ * 2048) is a ladder step, so snapping a clamped size up never exceeds the cap.
  */
-export function ladderPaths(secret: string, did: string, cid: string, sizes: readonly number[] = IMAGE_SIZE_LADDER, formats: readonly ('png' | 'jpeg' | 'webp')[] = IMAGE_FORMATS): string[] {
-  return sizes.flatMap((s) => formats.map((f) => imagePath(secret, did, cid, s, f)))
+export function imageFile(size: number, ext: ImageExt, quality?: number): string {
+  const q = quality === undefined || ext === 'png' ? CANONICAL_QUALITY : snapQuality(quality)
+  const suffix = q === CANONICAL_QUALITY ? '' : `-q${q}`
+  return `${snapSize(size)}${suffix}.${ext}`
 }

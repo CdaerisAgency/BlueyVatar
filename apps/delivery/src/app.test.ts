@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailHash, emailMd5, imagePath, type Candidate, type ImageFormat } from '@blueyvatar/core'
+import { emailHash, emailMd5, imagePath, imageSig, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -13,6 +13,8 @@ const SECRET = 'test-signing-secret'
 const DAY = 86_400_000
 /** Signed /img path as the redirect routes build it. */
 const img = (size: number, format: ImageFormat = 'png', quality?: number, scope = '') => imagePath(SECRET, DID, CID, size, format, quality, scope)
+/** Signed /img path for an arbitrary (possibly non-canonical) file name. */
+const raw = (file: string) => `/img/did%3Aplc%3Aabc123/${CID}/${imageSig(SECRET, DID, CID, file)}/${file}`
 const ident: Identity = { did: DID, handle: 'alice.test', pds: 'https://pds.test' }
 
 function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID, blob: { cid: 'bafyreiabc123', mimeType: 'image/jpeg' }, rating: 'g' }]) {
@@ -21,7 +23,7 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   const resolver: AvatarResolver = {
     resolveIdentity: async (id) => (id.value === DID || id.value === 'alice.test' ? ident : null),
     candidates: async () => candidates,
-    getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice' } : null),
+    getRecord: async (_i, collection) => (collection === 'app.bsky.actor.profile' ? { displayName: 'Alice', links: [{ uri: `at://${DID}/app.bsky.actor.link/l1`, cid: 'cl1' }, { uri: `at://${DID}/app.bsky.actor.link/l2`, cid: 'cl2' }, { uri: `at://${DID}/app.bsky.actor.link/l3`, cid: 'stale' }] } : null),
     getBlob: async () => new Uint8Array([1, 2, 3]),
   }
   const usage = new MemoryUsageMeter()
@@ -40,6 +42,11 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     trustCloudflare: true,
     imgSigningSecret: SECRET,
   }
+  index.linkRecords.set(DID, [
+    { rkey: 'l1', cid: 'cl1', url: 'https://alice.example/', title: 'Site' },
+    { rkey: 'l2', cid: 'cl2', url: 'http://alice.example/', title: 'Insecure' },
+    { rkey: 'l3', cid: 'cl3', url: 'https://old.example/', title: 'Edited' },
+  ])
   const sent: UsageAlert[] = []
   deps.alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger())
   return { app: createApp(deps), index, usage, sent, deps }
@@ -48,6 +55,12 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
 function setupDeps() { const { deps } = setup(); return { deps } }
 
 describe('delivery API', () => {
+  it('answers 404 for a blocked image on /img and skips it in redirects', async () => {
+    const { app, index } = setup()
+    index.blocked.add(`${DID}/bafyreiabc123`)
+    expect((await app.request(img(80))).status).toBe(404)
+  })
+
   it('redirects an email hash to an immutable image path', async () => {
     const { app } = setup()
     const res = await app.request(`/avatar/${emailHash('Alice@Example.com')}?s=4000`)
@@ -163,7 +176,7 @@ describe('delivery API', () => {
 
   it('allows cross-origin reads of profile JSON', async () => {
     const { app } = setup()
-    const res = await app.request('/profile/alice.test', { headers: { origin: 'https://site.test' } })
+    const res = await app.request('/profile/alice.test', { headers: { origin: 'https://site.test', 'x-api-key': 'sk_biz' } })
     expect(res.headers.get('access-control-allow-origin')).toBe('*')
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
   })
@@ -184,10 +197,34 @@ describe('delivery API', () => {
     expect((await (await labeled.app.request('/profile/alice.test')).json()).avatar).toBeNull()
   })
 
+  describe('profile hovercard gating', () => {
+    const cross = { origin: 'https://site.test' }
+    it('rejects cross-origin callers without a Business key', async () => {
+      const { app } = setup()
+      for (const headers of [cross, { ...cross, 'x-api-key': 'sk_test' }]) {
+        const res = await app.request('/profile/alice.test', { headers })
+        expect(res.status).toBe(403)
+        expect((await res.json()).error.code).toBe('tier_required')
+      }
+    })
+    it('allows cross-origin callers with a Business key', async () => {
+      const { app } = setup()
+      const res = await app.request('/profile/alice.test', { headers: { ...cross, 'x-api-key': 'sk_biz' } })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('access-control-allow-origin')).toBe('*')
+    })
+    it('keeps same-origin and server-to-server behavior', async () => {
+      const { app } = setup()
+      expect((await app.request('/profile/alice.test')).status).toBe(200)
+      expect((await app.request('/profile/alice.test', { headers: { origin: 'https://bv.test' } })).status).toBe(200)
+      expect((await app.request('http://delivery.test/profile/alice.test', { headers: { origin: 'http://delivery.test' } })).status).toBe(200)
+    })
+  })
+
   it('returns profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
-    expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [] })
+    expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
   })
 
   it('returns attested accounts only, with hidden ones flagged and the Free cap applied', async () => {
@@ -243,10 +280,11 @@ describe('delivery API', () => {
       expect(res.headers.get('x-adjusted-params')).toBe('fmt,q')
     })
 
-    it('encodes jpeg and quality in the path, and omits quality for png', async () => {
+    it('encodes a non-default jpeg quality in the path, and omits quality for png and the default', async () => {
       const { app } = setup()
       const h = { 'x-api-key': 'sk_test' }
-      expect((await app.request('/u/alice.test?fmt=jpeg', { headers: h })).headers.get('location')).toMatch(/\/80-q85\.jpeg$/)
+      expect((await app.request('/u/alice.test?fmt=jpeg&q=60', { headers: h })).headers.get('location')).toMatch(/\/80-q60\.jpeg$/)
+      expect((await app.request('/u/alice.test?fmt=jpeg', { headers: h })).headers.get('location')).toMatch(/\/80\.jpeg$/)
       expect((await app.request('/u/alice.test?fmt=png&q=40', { headers: h })).headers.get('location')).toMatch(/\/80\.png$/)
     })
 
@@ -263,7 +301,7 @@ describe('delivery API', () => {
       const res = await app.request(img(128, 'webp', 60))
       expect(res.status).toBe(200)
       expect(res.headers.get('content-type')).toBe('image/webp')
-      expect((await app.request(img(128, 'webp', 101))).status).toBe(404)
+      expect((await app.request(raw('128-q101.webp'))).status).toBe(404)
       expect((await app.request(img(128).replace(/\.png$/, '.avif'))).status).toBe(404)
     })
   })
@@ -339,6 +377,77 @@ describe('delivery API', () => {
       const { app } = setup()
       const body = await (await app.request('/profile/alice.test')).json()
       expect(body.avatar.url).toBe(img(256))
+    })
+
+    describe('canonical /img URLs', () => {
+      const get = (path: string) => setup().app.request(path)
+
+      it('redirects a signed off-ladder size to the signed next ladder step without resizing', async () => {
+        const { app, deps } = setup()
+        let resizes = 0
+        deps.resize = async () => { resizes++; return new Uint8Array([9, 9]) }
+        const res = await app.request(raw('100.png'))
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe(img(128))
+        expect(res.headers.get('cache-control')).toBe('public, max-age=3600')
+        expect(resizes).toBe(0)
+      })
+
+      it('redirects off-set qualities, PNG quality, and the redundant default quality', async () => {
+        expect((await get(raw('80-q70.webp'))).headers.get('location')).toBe(img(80, 'webp', 60))
+        expect((await get(raw('80-q100.jpeg'))).headers.get('location')).toBe(img(80, 'jpeg'))
+        expect((await get(raw('80-q85.webp'))).headers.get('location')).toBe(img(80, 'webp'))
+        expect((await get(raw('80-q60.png'))).headers.get('location')).toBe(img(80))
+      })
+
+      it('redirects any query string to the query-less canonical URL', async () => {
+        const res = await get(`${img(80)}?x=1&v=2`)
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe(img(80))
+      })
+
+      it('redirects a non-canonical DID encoding to the canonical path', async () => {
+        const res = await get(img(80).replace('did%3Aplc%3Aabc123', 'did:plc:abc123'))
+        expect(res.status).toBe(302)
+        expect(res.headers.get('location')).toBe(img(80))
+      })
+
+      it('does not redirect an unsigned off-ladder path', async () => {
+        expect((await get(`/img/did%3Aplc%3Aabc123/${CID}/100.png`)).status).toBe(403)
+      })
+
+      it('serves the redirect target as an immutable image', async () => {
+        const { app } = setup()
+        const loc = (await app.request(`${raw('100.png')}?x=1`)).headers.get('location')!
+        const res = await app.request(loc)
+        expect(res.status).toBe(200)
+        expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
+      })
+
+      it('rejects sizes outside 1 to 2048 with a stable code', async () => {
+        for (const f of ['0.png', '2049.png', '9999.png']) {
+          const res = await get(raw(f))
+          expect(res.status).toBe(404)
+          expect((await res.json()).error.code).toBe('invalid_size')
+        }
+      })
+
+      it('rejects qualities outside 1 to 100 with a stable code', async () => {
+        for (const f of ['80-q0.webp', '80-q101.webp']) {
+          const res = await get(raw(f))
+          expect(res.status).toBe(404)
+          expect((await res.json()).error.code).toBe('invalid_quality')
+        }
+      })
+
+      it('emits avatar redirects that /img serves directly', async () => {
+        const { app } = setup()
+        const hdr = { 'x-api-key': 'sk_test' }
+        for (const q of ['s=100', 's=1000&fmt=webp&q=70', 's=17&fmt=jpeg&q=1', 's=512&fmt=png&q=60']) {
+          const loc = (await app.request(`/u/did:plc:abc123?${q}`, { headers: hdr })).headers.get('location')!
+          expect((await app.request(loc)).status).toBe(200)
+        }
+      })
     })
   })
 
