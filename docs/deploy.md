@@ -57,6 +57,23 @@ fly deploy --config fly/indexer.toml --dockerfile Dockerfile
 
 Create a deploy token for CI: `fly tokens create deploy --app blueyvatar-delivery` (repeat per app, or use an organization token) and store it as the GitHub secret `FLY_API_TOKEN`. **Unconfirmed:** a single app-scoped deploy token only covers one app, so the workflow needs an org-scoped token (`fly tokens create org`) to deploy all three.
 
+## Staging
+
+Staging runs as a second set of Fly apps in the same organization, named `blueyvatar-<app>-staging`. The configs in `fly/` keep the production app names, so staging overrides them on the command line. Staging uses the Neon `staging` branch. Its secrets live in the Infisical `prod` environment under a `STAGING_` prefix (see Infisical secrets).
+
+```sh
+fly apps create blueyvatar-tap-staging   # repeat for web, delivery, indexer
+fly volumes create tap_data --app blueyvatar-tap-staging --region iad --size 10
+
+fly deploy --config fly/tap.toml --app blueyvatar-tap-staging
+fly deploy --config fly/delivery.toml --app blueyvatar-delivery-staging --dockerfile Dockerfile --remote-only
+fly deploy --config fly/web.toml --app blueyvatar-web-staging --dockerfile Dockerfile --remote-only
+fly deploy --config fly/indexer.toml --app blueyvatar-indexer-staging --dockerfile Dockerfile --remote-only \
+  --env TAP_URL=http://blueyvatar-tap-staging.internal:2480
+```
+
+The indexer needs the `--env` override because `fly/indexer.toml` points at the production Tap. The CI workflow deploys only the production apps.
+
 ## CI deploys
 
 `.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch, but only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
@@ -68,9 +85,10 @@ Create a deploy token for CI: `fly tokens create deploy --app blueyvatar-deliver
 Tap is a separate app that the indexer connects to (`TAP_URL`).
 
 - Env names come from Tap's README: <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>. `fly/tap.toml` sets `TAP_BIND`, `TAP_SIGNAL_COLLECTION` (`com.blueyvatar.profile`), `TAP_COLLECTION_FILTERS` (the four collections, comma separated), `TAP_LOG_LEVEL`, and `TAP_DATABASE_URL`. The secret `TAP_ADMIN_PASSWORD` is set with `fly secrets set`. Clients use Basic auth with user `admin`.
-- **Pin the image.** `fly/tap.toml` has the placeholder tag `PIN_REAL_TAG`. Replace it with a real tag or digest from the indigo package registry before the first deploy (the tag list was not checked). Upgrade by changing the pin in staging, watching for a clean backfill, then promoting.
-- **Storage.** The volume `tap_data` mounts at `/data`, so Tap runs as one machine. **Unconfirmed:** the README default is `sqlite://./tap.db` and does not say where that lands in the container, so the config sets `sqlite:///data/tap.db`. Verify the URL form in staging. The README says `TAP_DATABASE_URL` also accepts a PostgreSQL connection string but gives no example. A Neon database for Tap is an option to test in staging.
+- **Pin the image.** `fly/tap.toml` pins `ghcr.io/bluesky-social/indigo/tap` to tag `0.1.10` and digest `sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb`, the highest semver tag in the registry on November 4, 2026 (tag list read anonymously from the registry API). Upgrade by changing the pin in staging, watching for a clean backfill, then promoting.
+- **Storage.** The volume `tap_data` mounts at `/data`, so Tap runs as one machine. The README default is `sqlite://./tap.db` and does not say where that lands in the container, so the config sets `sqlite:///data/tap.db`. Confirmed in staging on November 4, 2026: Tap creates `/data/tap.db` (plus `-shm` and `-wal` files) on the `tap_data` volume. The README says `TAP_DATABASE_URL` also accepts a PostgreSQL connection string but gives no example. A Neon database for Tap is an option to test in staging.
 - **Private access.** `fly/tap.toml` has no `http_service` and no `services`, so Tap has no public address (<https://docs.fly.io/reference/configuration>). Do not allocate IPs for it. The indexer reaches it over Fly private networking at `http://blueyvatar-tap.internal:2480` (`<app>.internal` resolves to the app's 6PN addresses, <https://docs.fly.io/networking/private-networking>). Flycast (`<app>.flycast`) is the alternative when you want Fly Proxy features such as autostart for internal traffic (<https://docs.fly.io/networking/flycast>), which Tap does not need.
+- **Health check.** `fly/tap.toml` uses a TCP check on port 2480. An HTTP check on `/health` returns 401 in Tap 0.1.10 because it requires the admin password (seen in staging on November 4, 2026), and the password cannot be committed in the config.
 - **Jetstream fallback.** Tap is in beta. If it fails, switch the indexer to Jetstream (<https://atproto.com/guides/streaming-data>). That needs an indexer change to filter the same collections and does not exist yet.
 
 ## Cloudflare
@@ -95,7 +113,7 @@ DNS and proxy for `blueyvatar.com` on the free plan (spec section 14.1). Nothing
 
 ## Infisical secrets
 
-Infisical stays the secret store, one environment per Fly environment (`staging`, `production`). Push values to Fly with `fly secrets set --app <app>` (or an Infisical sync, steps not verified here). Names match `.env.example`. Non-secret settings live in `fly/*.toml` `[env]`.
+Infisical stays the secret store. The team uses only the `prod` environment, so staging values sit there with a `STAGING_` prefix (for example `STAGING_DATABASE_URL`) and production values use the plain names from the table below. Staging and production never share a database URL, session secret, origin secret, Tap password, or OAuth key. Push values to Fly with `fly secrets set --app <app>` (or an Infisical sync, steps not verified here). Names match `.env.example`. Non-secret settings live in `fly/*.toml` `[env]`.
 
 | App | Secrets (Fly secrets) |
 | --- | --- |
@@ -124,3 +142,7 @@ Fly keeps recent logs for `fly logs` only, and any longer retention needs a log 
   - Branch `staging` (0.25 to 1 CU, suspends after 5 minutes idle).
   - Connection strings come from the Neon console or API and go into Infisical; they are never committed. The pooled host contains `-pooler`; the direct host (for migrations) is the same host without it.
 
+- Infisical project `blueyvatar` (ID `0851796f-0fa5-4321-9f50-3ae11e821cd9`), environments `dev`, `staging`, `prod`; only `prod` is used. It holds `STAGING_DATABASE_URL`, `STAGING_DATABASE_URL_DIRECT`, `STAGING_ORIGIN_SECRET`, `STAGING_SESSION_SECRET`, `STAGING_TAP_ADMIN_PASSWORD`, `STAGING_OAUTH_PRIVATE_JWK`, plus `RESEND_API_KEY` and `EMAIL_FROM` (shared by both). `RESEND_API_KEY` is the shared platform key also used by Muster CRM and Cadence V2. `EMAIL_FROM` uses `mail.cdaeris.com`, the only domain verified in Resend, until `blueyvatar.com` is verified. Cloudflare values are not set yet.
+- Fly staging apps in the `personal` organization, region `iad`, created November 4, 2026: `blueyvatar-tap-staging` (volume `tap_data`, ID `vol_r1jd8enn1q2dj19r`, 10 GB), `blueyvatar-delivery-staging`, `blueyvatar-indexer-staging`, `blueyvatar-web-staging`.
+  - Deployed: tap (image `0.1.10`, TCP check passing), delivery (five migrations applied to the Neon `staging` branch; `/healthz` returns 200, a direct hit on `/u/x` returns 403 `origin_forbidden`), indexer (running; Cloudflare purges logged only).
+  - Not deployed: web, which waits on the Cloudflare setup and the `TRUSTED_PDS_HOSTS` value.

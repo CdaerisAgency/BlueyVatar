@@ -9,6 +9,8 @@ export const RESEND_GAP_MS = 60 * 1000
 export type PendingCode = {
   did: string
   emailHash: string
+  /** MD5 of the same normalized email. Absent for codes sent before migration 0006. */
+  emailMd5?: string
   codeHash: string
   masked: string
   attempts: number
@@ -25,10 +27,11 @@ export function hashCode(did: string, emailHash: string, code: string): string {
   return createHash('sha256').update(`${did}\n${emailHash}\n${code}`).digest('hex')
 }
 
-export function newPending(did: string, emailHash: string, masked: string, code: string, now: number): PendingCode {
+export function newPending(did: string, emailHash: string, masked: string, code: string, now: number, emailMd5?: string): PendingCode {
   return {
     did,
     emailHash,
+    emailMd5,
     codeHash: hashCode(did, emailHash, code),
     masked,
     attempts: 0,

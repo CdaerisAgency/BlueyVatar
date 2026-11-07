@@ -18,6 +18,13 @@ describe('default styles', () => {
     })
   }
 
+  for (const style of [...STYLES, 'initials' as const]) {
+    it(`${style} output matches its snapshot`, () => {
+      expect(defaultSvg(style, 'alice.test', 'al')).toMatchSnapshot()
+      expect(defaultSvg(style, 'did:plc:abc123', 'bo')).toMatchSnapshot()
+    })
+  }
+
   it('each style looks different for the same seed', () => {
     const all = [...STYLES, 'mp' as const].map((s) => defaultSvg(s, 'alice.test'))
     expect(new Set(all).size).toBe(all.length)

@@ -11,7 +11,7 @@ export interface Store {
   links: {
     list(did: string): Promise<LinkRow[]>
     /** Two DIDs claiming one hash: the newest verification wins (spec section 13, item 5). */
-    upsert(emailHash: string, did: string, method: LinkMethod): Promise<void>
+    upsert(emailHash: string, did: string, method: LinkMethod, emailMd5?: string): Promise<void>
     remove(did: string, emailHash: string): Promise<void>
   }
   codes: {
@@ -25,7 +25,7 @@ export interface Store {
 function memoryStore(): Store {
   const states = new Map<string, NodeSavedState>()
   const sessions = new Map<string, NodeSavedSession>()
-  const links = new Map<string, { did: string; method: LinkMethod; verifiedAt: Date }>()
+  const links = new Map<string, { did: string; method: LinkMethod; verifiedAt: Date; emailMd5?: string }>()
   const codes = new Map<string, PendingCode>()
   return {
     oauthState: { get: (k) => states.get(k), set: (k, v) => void states.set(k, v), del: (k) => void states.delete(k) },
@@ -34,8 +34,8 @@ function memoryStore(): Store {
       async list(did) {
         return [...links].filter(([, v]) => v.did === did).map(([emailHash, v]) => ({ emailHash, method: v.method, verifiedAt: v.verifiedAt }))
       },
-      async upsert(emailHash, did, method) {
-        links.set(emailHash, { did, method, verifiedAt: new Date() })
+      async upsert(emailHash, did, method, emailMd5) {
+        links.set(emailHash, { did, method, verifiedAt: new Date(), emailMd5: emailMd5 ?? links.get(emailHash)?.emailMd5 })
       },
       async remove(did, emailHash) {
         if (links.get(emailHash)?.did === did) links.delete(emailHash)
@@ -98,11 +98,12 @@ function pgStore(pool: pg.Pool): Store {
         const r = await pool.query('SELECT email_hash, method, verified_at FROM email_links WHERE did = $1 ORDER BY verified_at', [did])
         return r.rows.map((x) => ({ emailHash: x.email_hash, method: x.method, verifiedAt: x.verified_at }))
       },
-      async upsert(emailHash, did, method) {
+      async upsert(emailHash, did, method, emailMd5) {
         await pool.query(
-          `INSERT INTO email_links (email_hash, did, method) VALUES ($1, $2, $3)
-           ON CONFLICT (email_hash) DO UPDATE SET did = EXCLUDED.did, method = EXCLUDED.method, verified_at = now()`,
-          [emailHash, did, method],
+          `INSERT INTO email_links (email_hash, did, method, email_md5) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (email_hash) DO UPDATE SET did = EXCLUDED.did, method = EXCLUDED.method, verified_at = now(),
+             email_md5 = coalesce(EXCLUDED.email_md5, email_links.email_md5)`,
+          [emailHash, did, method, emailMd5 ?? null],
         )
       },
       async remove(did, emailHash) {
@@ -117,6 +118,7 @@ function pgStore(pool: pg.Pool): Store {
         return {
           did: x.did,
           emailHash: x.email_hash,
+          emailMd5: x.email_md5 ?? undefined,
           codeHash: x.code_hash,
           masked: x.masked,
           attempts: x.attempts,
@@ -126,11 +128,12 @@ function pgStore(pool: pg.Pool): Store {
       },
       async put(p) {
         await pool.query(
-          `INSERT INTO email_codes (did, email_hash, code_hash, masked, attempts, expires_at, created_at)
-           VALUES ($1, $2, $3, $4, 0, $5, $6)
-           ON CONFLICT (did) DO UPDATE SET email_hash = EXCLUDED.email_hash, code_hash = EXCLUDED.code_hash,
-             masked = EXCLUDED.masked, attempts = 0, expires_at = EXCLUDED.expires_at, created_at = EXCLUDED.created_at`,
-          [p.did, p.emailHash, p.codeHash, p.masked, new Date(p.expiresAt), new Date(p.createdAt)],
+          `INSERT INTO email_codes (did, email_hash, email_md5, code_hash, masked, attempts, expires_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, 0, $6, $7)
+           ON CONFLICT (did) DO UPDATE SET email_hash = EXCLUDED.email_hash, email_md5 = EXCLUDED.email_md5,
+             code_hash = EXCLUDED.code_hash, masked = EXCLUDED.masked, attempts = 0,
+             expires_at = EXCLUDED.expires_at, created_at = EXCLUDED.created_at`,
+          [p.did, p.emailHash, p.emailMd5 ?? null, p.codeHash, p.masked, new Date(p.expiresAt), new Date(p.createdAt)],
         )
       },
       async setAttempts(did, attempts) {
