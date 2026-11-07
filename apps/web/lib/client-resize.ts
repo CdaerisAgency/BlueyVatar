@@ -3,8 +3,9 @@
 //
 // The full original is kept (issue #203): nothing is cropped here. The crop box only produces crop
 // parameters that go into the record (lib/crop.ts). An image whose long edge is at most
-// MAX_LONG_SIDE and whose file fits the byte cap is uploaded untouched. A larger one is shrunk to
-// MAX_LONG_SIDE with the whole frame and re-encoded under the cap.
+// MAX_LONG_SIDE is re-drawn at full size, a larger one is shrunk to MAX_LONG_SIDE with the whole frame,
+// and both are re-encoded under the cap. Re-encoding through a canvas drops all metadata (EXIF GPS,
+// camera serial, XMP, IPTC) and bakes in the orientation. The server strips again (issue #206).
 //
 // This is best effort, not a guarantee. Browsers differ in what they can
 // decode (HEIC, for one), in canvas memory limits on phones, and in how they
@@ -72,9 +73,8 @@ async function render(bmp: ImageBitmap, file: File, width: number, height: numbe
 }
 
 /**
- * Returns the file to upload. Rejects images under MIN_SIDE. An image within MAX_LONG_SIDE whose file
- * fits the cap comes back untouched. Otherwise the whole frame is downscaled to at most MAX_LONG_SIDE
- * and re-encoded; a PNG stays PNG if it fits, else becomes JPEG at quality 0.92, 0.85, then 0.75, and
+ * Returns the file to upload. Rejects images under MIN_SIDE. The whole frame is drawn at full size, or
+ * downscaled to at most MAX_LONG_SIDE, and always re-encoded so metadata is dropped; a PNG stays PNG if it fits, else becomes JPEG at quality 0.92, 0.85, then 0.75, and
  * if that is still over the cap the image is shrunk further in a few steps. The smallest result is
  * returned if none fit, and the server decides.
  */
@@ -84,8 +84,6 @@ export async function prepareImage(file: File, decoded?: ImageBitmap): Promise<P
   try {
     if (Math.min(bmp.width, bmp.height) < MIN_SIDE) return { error: TOO_SMALL_MESSAGE }
     const first = fitWithin(bmp.width, bmp.height, MAX_LONG_SIDE)
-    const resized = first.width !== bmp.width || first.height !== bmp.height
-    if (!resized && file.size <= MAX_BLOB_BYTES) return { file }
 
     let out = await render(bmp, file, first.width, first.height)
     for (const f of SHRINK_STEPS) {
