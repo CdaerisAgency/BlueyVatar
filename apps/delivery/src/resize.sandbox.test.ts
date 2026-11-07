@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { qrSvg } from '../dist/qr.js'
+import { qrSvg } from '@blueyvatar/core'
 import { describe, expect, it } from 'vitest'
 // The worker path resolves next to the compiled module, so this test runs the
 // built output. The package test script builds dist before running vitest.
