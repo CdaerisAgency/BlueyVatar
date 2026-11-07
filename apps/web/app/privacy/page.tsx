@@ -9,9 +9,13 @@ export default function PrivacyPage() {
       <h2>Email addresses</h2>
       <p>When you link an email address, we store a SHA256 hash and an MD5 hash of it so that sites can look up your avatar by hash. The first address you link also stays on file, encrypted, so we can send you account notices. We never store a plain copy of an address.</p>
       <p>We also store the domain of each linked email address (the part after the @, for example example.com) next to its hash, and never the full address in the clear. The domain lets us support domains that choose to serve their own avatars.</p>
-      <p>Unlinking an address removes its hash and domain. Deleting your account removes all of them.</p>
+      <p>Unlinking an address removes its hash and domain. Deleting your data removes all of them. After an address is unlinked or your data is deleted, we keep its hash for 30 days so no other account can claim it right away.</p>
+      <h2>Download or delete your data</h2>
+      <p>Signed in, open Your data in your account to download a JSON file of what we hold about you, or to delete it. Deleting removes your email hashes and domains, encrypted primary email, profile links, claims and attestations, visibility rules, license and API keys, custom domain, and indexed avatars and profile, and signs you out.</p>
+      <h2>Billing records</h2>
+      <p>If you paid for a plan, Stripe processes your payment and we keep a record of your Stripe customer and subscriptions. When you delete your data we keep these billing records for 7 years from the day you delete, because tax and accounting rules require it, and we use them for nothing else. We then delete them automatically. We cancel any active subscription when you delete your data.</p>
       <h2>Your repository</h2>
-      <p>Your avatars, profile, and gallery stay in your atproto repository. We read them to deliver them, and we cannot edit your repository.</p>
+      <p>Your avatars, profile, and gallery stay in your atproto repository. We read them to deliver them, and we cannot edit your repository. Deleting your blueyvatar data does not delete anything in your repository. Those records are yours and live on your PDS, so remove them there if you want them gone.</p>
       <h2>Contact</h2>
       <p>For privacy or security questions, write to security@blueyvatar.com.</p>
     </PageMain>

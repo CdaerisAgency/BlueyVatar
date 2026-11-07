@@ -79,6 +79,7 @@ async function onSubscription(tx: BillingTx, type: string, sub: SubscriptionObje
   const did = isDid(sub.metadata?.did) ? sub.metadata!.did! : await tx.didForCustomer(customer)
   if (!did) throw new RetryableBillingError(`customer ${customer} is not linked to a DID yet`)
 
+  if (await tx.isDeleted(did)) return 'ignored: the account owner deleted their data'
   const existing = await tx.getSubscription(sub.id)
   if (existing && existing.did !== did) return 'ignored: subscription belongs to another DID'
   if (existing && at < existing.lastEventAt) return 'ignored: older than the stored state'
