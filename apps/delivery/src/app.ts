@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isSha256Hex, parseAvatarParams,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isSha256Hex, parseAvatarParams,
   parseIdentifier, pickCandidate, type AvatarParams, type DefaultStyle,
 } from '@blueyvatar/core'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
@@ -294,15 +294,27 @@ export function createApp(deps: AppDeps) {
   })
 
   // Immutable resized image. Cached by Cloudflare by file extension (spec section 14.1).
+  // Cloudflare's default cache key is the full URL including the query string, so the origin
+  // sends every non-canonical request to the one canonical URL for its variant (imagePath snaps
+  // size to the ladder and quality to the allowed set, and drops the query string). That keeps
+  // one cache entry per variant, lets the indexer purge exactly the URLs that can exist, and
+  // keeps URLs emitted before this change working. Redirecting is cheaper than a resize.
   app.get('/img/:did/:cid/:file', async (c) => {
     const did = decodeURIComponent(c.req.param('did'))
     const cid = c.req.param('cid')
     const m = IMG_FILE.exec(c.req.param('file'))
     if (!m || !/^[a-z0-9]{10,100}$/.test(cid)) return fail(c, 404, 'not_found', 'Unknown image')
     const size = Number(m[1])
-    const quality = m[2] ? Number(m[2]) : 85
+    const quality = m[2] ? Number(m[2]) : undefined
     const format = m[3] as 'png' | 'jpeg' | 'webp'
-    if (size < 1 || size > 2048 || quality < 1 || quality > 100) return fail(c, 404, 'not_found', 'Unknown image')
+    if (size < 1 || size > ABSOLUTE_MAX_SIZE) return fail(c, 404, 'invalid_size', 'Size must be from 1 to 2048')
+    if (quality !== undefined && (quality < 1 || quality > 100)) return fail(c, 404, 'invalid_quality', 'Quality must be from 1 to 100')
+    const canonical = imagePath(did, cid, size, format, quality)
+    const url = new URL(c.req.url)
+    if (url.search !== '' || url.pathname !== canonical) {
+      c.header('cache-control', 'public, max-age=3600')
+      return c.redirect(canonical, 302)
+    }
     if (!(await deps.index.isRepoActive(did)) || (await deps.index.isBlocked(did, cid))) {
       return fail(c, 404, 'not_found', 'Image unavailable')
     }
@@ -311,7 +323,7 @@ export function createApp(deps: AppDeps) {
     let bytes: Uint8Array
     try {
       const original = await deps.resolver.getBlob(identity, cid)
-      bytes = await deps.resize({ input: original, size, format, quality })
+      bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
     } catch {
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
     }

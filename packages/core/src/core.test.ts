@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailHash, isSha256Hex, parseIdentifier, ratingFromLabels, ratingAllowed,
-  parseAvatarParams, ParamError, pickCandidate, imagePath, readBlobRef, selfLabelValues,
+  parseAvatarParams, ParamError, pickCandidate, imagePath, snapSize, ladderPaths, IMAGE_SIZE_LADDER, readBlobRef, selfLabelValues,
   activeAdapters, DEFAULT_ADAPTERS, type Candidate,
 } from './index.js'
 
@@ -75,7 +75,32 @@ describe('resolution', () => {
   })
   it('builds an immutable path with a file extension', () => {
     expect(imagePath('did:plc:x', 'bafy', 80, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/80.png')
-    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 70)).toBe('/img/did%3Aplc%3Ax/bafy/80-q70.webp')
+    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 60)).toBe('/img/did%3Aplc%3Ax/bafy/80-q60.webp')
+  })
+  it('builds one canonical path per variant', () => {
+    // Off-ladder sizes snap up, off-set qualities snap to the nearest allowed one.
+    expect(imagePath('did:plc:x', 'bafy', 100, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/128.png')
+    expect(imagePath('did:plc:x', 'bafy', 2048, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/2048.png')
+    expect(imagePath('did:plc:x', 'bafy', 3000, 'png')).toBe('/img/did%3Aplc%3Ax/bafy/2048.png')
+    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 70)).toBe('/img/did%3Aplc%3Ax/bafy/80-q60.webp')
+    expect(imagePath('did:plc:x', 'bafy', 80, 'webp', 100)).toBe('/img/did%3Aplc%3Ax/bafy/80.webp')
+    // PNG ignores quality, and the default quality has no suffix.
+    expect(imagePath('did:plc:x', 'bafy', 80, 'png', 60)).toBe('/img/did%3Aplc%3Ax/bafy/80.png')
+    expect(imagePath('did:plc:x', 'bafy', 80, 'jpeg', 85)).toBe('/img/did%3Aplc%3Ax/bafy/80.jpeg')
+  })
+  it('snaps sizes up to the ladder and keeps every tier cap on a ladder step', () => {
+    expect(snapSize(1)).toBe(16)
+    expect(snapSize(81)).toBe(96)
+    for (const cap of [512, 1024, 2048]) expect(snapSize(cap)).toBe(cap)
+  })
+  it('lists every canonical path for purge', () => {
+    const paths = ladderPaths('did:plc:x', 'bafy')
+    expect(paths).toHaveLength(IMAGE_SIZE_LADDER.length * 5)
+    expect(new Set(paths).size).toBe(paths.length)
+    expect(paths).toContain('/img/did%3Aplc%3Ax/bafy/512.png')
+    expect(paths).toContain('/img/did%3Aplc%3Ax/bafy/512-q60.jpeg')
+    expect(paths).toContain('/img/did%3Aplc%3Ax/bafy/512.webp')
+    expect(paths.some((x) => x.includes('-q85') || x.endsWith('-q60.png'))).toBe(false)
   })
 })
 
