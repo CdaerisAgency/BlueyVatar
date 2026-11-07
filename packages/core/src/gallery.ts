@@ -6,7 +6,7 @@ export type ImagePurpose = (typeof IMAGE_PURPOSES)[number]
 
 /** Most gallery images a profile page and the profile JSON show. */
 export const GALLERY_MAX = 12
-/** Longest gallery caption, in characters (lexicon maxLength 140). */
+/** Longest gallery caption, in characters (lexicon maxGraphemes 140). */
 export const GALLERY_CAPTION_MAX = 140
 
 /**

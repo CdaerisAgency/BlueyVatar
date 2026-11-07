@@ -138,6 +138,15 @@ importers:
         specifier: 3.2.7
         version: 3.2.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.33.0)
 
+  tools/lexicon:
+    dependencies:
+      '@atproto/lexicon':
+        specifier: 0.7.17
+        version: 0.7.17
+      '@atproto/syntax':
+        specifier: 0.7.7
+        version: 0.7.7
+
   tools/migrate:
     dependencies:
       pg:

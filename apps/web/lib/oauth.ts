@@ -5,15 +5,36 @@
  */
 export const PUBLIC_URL = process.env.PUBLIC_URL ?? 'https://blueyvatar.com'
 
-/** Scopes from spec section 10.1. account:email is requested only during email linking. */
-export const SIGN_IN_SCOPE = [
-  'atproto',
-  'repo:com.blueyvatar.image',
-  'repo:com.blueyvatar.profile',
-  'repo:com.blueyvatar.claim',
-  'blob:image/*',
-].join(' ')
-export const EMAIL_LINK_SCOPE = `${SIGN_IN_SCOPE} account:email`
+/** NSID of the permission set published by tools/lexicon (docs/deploy.md, "Publish the lexicons"). */
+export const PERMISSION_SET_NSID = 'com.blueyvatar.authFull'
+
+/**
+ * Switches the requested scope from three `repo:` scopes to `include:<permission set>`. Off by
+ * default: an `include:` scope fails at the authorization server until the set is published and
+ * `_lexicon.blueyvatar.com` resolves (https://atproto.com/specs/permission, "Resolution and Caching").
+ */
+export function usePermissionSet(env: Record<string, string | undefined> = process.env): boolean {
+  const v = env.OAUTH_USE_PERMISSION_SET?.trim().toLowerCase()
+  return v === 'true' || v === '1'
+}
+
+/**
+ * Scopes from spec section 10.1. The permission set bundles the three user-repo collections.
+ * `blob:image/*` stays separate because blob permissions cannot be included in a set.
+ * account:email is requested only during email linking.
+ */
+export function signInScope(permissionSet: boolean = usePermissionSet()): string {
+  return [
+    'atproto',
+    ...(permissionSet
+      ? [`include:${PERMISSION_SET_NSID}`]
+      : ['repo:com.blueyvatar.image', 'repo:com.blueyvatar.profile', 'repo:com.blueyvatar.claim']),
+    'blob:image/*',
+  ].join(' ')
+}
+export function emailLinkScope(permissionSet: boolean = usePermissionSet()): string {
+  return `${signInScope(permissionSet)} account:email`
+}
 
 export function clientMetadata() {
   return {
@@ -21,7 +42,7 @@ export function clientMetadata() {
     client_name: 'blueyvatar',
     client_uri: PUBLIC_URL,
     redirect_uris: [`${PUBLIC_URL}/oauth/callback`],
-    scope: EMAIL_LINK_SCOPE,
+    scope: emailLinkScope(),
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
     application_type: 'web',
