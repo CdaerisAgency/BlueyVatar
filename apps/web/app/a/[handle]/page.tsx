@@ -1,9 +1,30 @@
 import AvatarRing from '../../../components/AvatarRing'
 import { PageMain } from '../../../components/Page'
+import type { Metadata } from 'next'
 import type { PublicProfile } from '../../../lib/profile-page'
+import { absoluteUrl, defaultOgImage } from '../../../lib/site'
 import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
+
+const PUBLIC_DELIVERY_URL = process.env.PUBLIC_DELIVERY_URL || DELIVERY_URL
+
+export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }): Promise<Metadata> {
+  const { handle } = await params
+  const res = await fetch(`${DELIVERY_URL}/profile/${encodeURIComponent(handle)}`, { next: { revalidate: 300 } })
+  const p = res.ok ? ((await res.json()) as PublicProfile) : null
+  if (!p || !p.avatar) return { title: 'Avatar not found', robots: { index: false } }
+  const title = p.displayName ?? p.handle ?? handle
+  const url = absoluteUrl(`/a/${encodeURIComponent(handle)}`)
+  const images = [`${PUBLIC_DELIVERY_URL.replace(/\/+$/, '')}${p.avatar.url}`]
+  return {
+    title: `${title} | blueyvatar`,
+    description: `${title}'s avatar on blueyvatar.`,
+    alternates: { canonical: url },
+    openGraph: { title, url, siteName: 'blueyvatar', type: 'website', images: images.length ? images : [defaultOgImage()] },
+    twitter: { card: 'summary', title, images },
+  }
+}
 
 /** Hosted avatar page: the avatar at full size with a report link. */
 export default async function AvatarPage({ params, searchParams }: { params: Promise<{ handle: string }>; searchParams: Promise<{ report?: string }> }) {

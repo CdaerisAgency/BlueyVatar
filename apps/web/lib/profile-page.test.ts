@@ -12,11 +12,11 @@ describe('profile page model', () => {
     expect(m.twitter.images).toEqual(m.openGraph.images)
     expect(m.twitter.description).toBe('Hi there')
   })
-  it('falls back when there is no description or avatar', () => {
+  it('falls back to the default image and text when there is no description or avatar', () => {
     const m = profileMetadata({ ...base, displayName: null, description: null, avatar: null, jobTitle: 'Dev', company: 'Acme', location: 'Oslo' }, 'alice.test', 'https://i.test')
     expect(m.title).toBe('alice.test')
     expect(m.description).toBe('Dev, Acme | Oslo')
-    expect(m.openGraph.images).toEqual([])
+    expect(m.openGraph.images).toEqual(['https://blueyvatar.com/logo.jpg'])
   })
   it('re-checks links and interests', () => {
     expect(pageLinks({ ...base, links: [{ label: 'A', url: 'https://a.test/' }, { label: 'B', url: 'javascript:1' }] })).toEqual([{ label: 'A', url: 'https://a.test/' }])
