@@ -14,7 +14,7 @@ import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
 import { originLock, secretsEqual } from './origin.js'
 import { BlobError } from './blob.js'
-import type { Resizer } from './resize.js'
+import { ResizeBusyError, type Resizer } from './resize.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import type { IndexStore, Visibility } from './store.js'
 import type { UsageMeter } from './usage.js'
@@ -68,6 +68,13 @@ function fail(c: Context, status: number, code: ErrorCode, message: string) {
   // Server errors carry the request id in the body so a user can quote it. Client errors do not:
   // hash lookups must answer byte for byte the same whether or not a link exists (issue 59).
   return c.json(errorBody(code, message, status >= 500 ? (c.get('requestId' as never) as string | undefined) : undefined), status as 400)
+}
+
+/** Shed response when the resize queue is full: 503 with Retry-After, never cached. */
+function overloaded(c: Context, err: ResizeBusyError) {
+  c.header('retry-after', String(err.retryAfterSeconds))
+  c.header('cache-control', 'no-store')
+  return fail(c, 503, 'overloaded', 'Image processing is busy; retry shortly')
 }
 
 function rateHeaders(c: Context, e: EntitlementResult) {
@@ -461,7 +468,8 @@ export function createApp(deps: AppDeps) {
     if (ext === 'png') {
       try {
         body = await deps.resize({ input: new TextEncoder().encode(svg), size: p.size, format: 'png', quality: 85 })
-      } catch {
+      } catch (err) {
+        if (err instanceof ResizeBusyError) return overloaded(c, err)
         return fail(c, 502, 'upstream_error', 'Could not render the QR code')
       }
     }
@@ -548,6 +556,7 @@ export function createApp(deps: AppDeps) {
       const original = await deps.resolver.getBlob(identity, cid)
       bytes = await deps.resize({ input: original, size, format, quality: quality ?? CANONICAL_QUALITY })
     } catch (err) {
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
       logger.warn('image fetch or resize failed', { requestId: c.get('requestId' as never), did, kind: err instanceof BlobError ? err.kind : 'resize', err })
       if (err instanceof BlobError && err.kind === 'not_found') return fail(c, 404, 'not_found', 'Original image not found')
       return fail(c, 502, 'upstream_error', 'Could not fetch or process the image')
@@ -582,7 +591,13 @@ export function createApp(deps: AppDeps) {
     const size = Math.min(Number(m[1]), 2048)
     const seed = c.req.query('seed') ?? ''
     const svg = defaultSvg(style as DefaultStyle, seed, cleanInitials(c.req.query('initials')))
-    const bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
+    let bytes: Uint8Array
+    try {
+      bytes = await deps.resize({ input: new TextEncoder().encode(svg), size, format: m[3] as 'png', quality: 85 })
+    } catch (err) {
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
+      throw err
+    }
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': `image/${m[3]}`,
       'cache-control': 'public, max-age=86400',

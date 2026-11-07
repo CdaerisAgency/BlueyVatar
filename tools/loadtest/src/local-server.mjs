@@ -8,12 +8,15 @@
 //   DATABASE_URL=postgres://postgres@localhost:5432/bv_loadtest node src/local-server.mjs
 //
 // Env: PORT (3101), IMG_SIGNING_SECRET, LT_COLD_MS (25, simulated PLC + PDS describe on a cache
-// miss), LT_BLOB_MS (40, simulated PDS getBlob), PG_POOL_MAX (10, same default as production).
+// miss), LT_BLOB_MS (40, simulated PDS getBlob), PG_POOL_MAX (10, same default as production),
+// IMG_MAX_CONCURRENT / IMG_QUEUE_MAX / IMG_QUEUE_WAIT_MS (the production resize cap, default 2 / 8 / 3000),
+// RATE_BATCH_MS (1000, flush period of the in-memory rate and usage tier; 0 writes through every request).
 import { serve } from '@hono/node-server'
 import sharp from 'sharp'
 import { createApp } from '../../../apps/delivery/dist/app.js'
 import { createPool, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from '../../../apps/delivery/dist/pg-store.js'
-import { sandboxedResizer } from '../../../apps/delivery/dist/resize.js'
+import { limitedResizer, resizeLimitsFromEnv, sandboxedResizer } from '../../../apps/delivery/dist/resize.js'
+import { BatchedRateLimiter, BatchedUsageMeter } from '../../../apps/delivery/dist/batch.js'
 import { Metrics } from '@blueyvatar/core'
 
 const url = process.env.DATABASE_URL
@@ -57,19 +60,36 @@ const resolver = {
   async getBlob() { await sleep(BLOB_MS); return original },
 }
 
+const flushMs = process.env.RATE_BATCH_MS === undefined ? 1000 : Number(process.env.RATE_BATCH_MS)
+const metrics = new Metrics()
+const rawLimiter = new PgRateLimiter(pool)
+const rawUsage = new PgUsageMeter(pool)
+const limiter = flushMs > 0 ? new BatchedRateLimiter(rawLimiter, { flushMs, onError: (e) => console.error('flush failed', e) }) : rawLimiter
+const usage = flushMs > 0 ? new BatchedUsageMeter(rawUsage, { flushMs, onError: (e) => console.error('flush failed', e) }) : rawUsage
+const limits = resizeLimitsFromEnv()
+const resize = limitedResizer(sandboxedResizer(), {
+  ...limits,
+  onChange: ({ inFlight, queued, shed }) => {
+    metrics.set('delivery_transforms_in_flight', inFlight)
+    metrics.set('delivery_transforms_queued', queued)
+    if (shed) metrics.inc('delivery_transforms_shed_total')
+  },
+})
+
 const app = createApp({
   index,
   resolver,
   licenses: new PgLicenseStore(pool),
-  limiter: new PgRateLimiter(pool),
-  usage: new PgUsageMeter(pool),
-  resize: sandboxedResizer(),
+  limiter,
+  usage,
+  resize,
   defaultUrlAllowlist: [],
   imgSigningSecret: secret,
-  metrics: new Metrics(),
+  metrics,
   // Per-request client IPs come from cf-connecting-ip, as they do behind Cloudflare.
   trustCloudflare: true,
 })
 
 const port = Number(process.env.PORT ?? 3101)
-serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, () => console.log(`loadtest delivery listening on 127.0.0.1:${port} pid=${process.pid} cold=${COLD_MS}ms blob=${BLOB_MS}ms pool=${pool.options.max}`))
+process.once('SIGTERM', () => { void Promise.all([limiter.close?.(), usage.close?.()]).finally(() => process.exit(0)) })
+serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, () => console.log(`loadtest delivery listening on 127.0.0.1:${port} pid=${process.pid} cold=${COLD_MS}ms blob=${BLOB_MS}ms pool=${pool.options.max} imgCap=${limits.maxConcurrent} queue=${limits.maxQueue} batchMs=${flushMs}`))

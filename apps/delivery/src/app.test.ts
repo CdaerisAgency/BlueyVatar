@@ -7,6 +7,7 @@ import type { AvatarResolver, Identity } from './resolver.js'
 import { MemoryIndexStore, PUBLIC_VISIBILITY } from './store.js'
 import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from './alerts.js'
 import { MemoryUsageMeter } from './usage.js'
+import { ResizeBusyError } from './resize.js'
 
 const DID = 'did:plc:abc123'
 const CID = 'bafyreiabc123'
@@ -444,6 +445,27 @@ describe('delivery API', () => {
       expect(res.headers.get('content-type')).toBe('image/webp')
       expect((await app.request(raw('128-q101.webp'))).status).toBe(404)
       expect((await app.request(img(128).replace(/\.png$/, '.avif'))).status).toBe(404)
+    })
+  })
+
+  describe('resize capacity (issue #198)', () => {
+    it('answers 503 with Retry-After and no-store when the resize queue is full, and meters nothing', async () => {
+      const { deps, usage } = setup()
+      const app = createApp({ ...deps, resize: async () => { throw new ResizeBusyError(4) } })
+      const res = await app.request(img(128))
+      expect(res.status).toBe(503)
+      expect(res.headers.get('retry-after')).toBe('4')
+      expect(res.headers.get('cache-control')).toBe('no-store')
+      expect((await res.json()).error.code).toBe('overloaded')
+      expect(usage.service.size).toBe(0)
+    })
+
+    it('sheds default avatars the same way', async () => {
+      const { deps } = setup()
+      const app = createApp({ ...deps, resize: async () => { throw new ResizeBusyError(2) } })
+      const res = await app.request('/default/mp/128.png?seed=x')
+      expect(res.status).toBe(503)
+      expect(res.headers.get('retry-after')).toBe('2')
     })
   })
 

@@ -278,7 +278,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 
 | App | Secrets (Fly secrets) |
 | --- | --- |
-| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `SENTRY_DSN`, `METRICS_TOKEN` |
+| delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `IMG_MAX_CONCURRENT`, `IMG_QUEUE_MAX`, `IMG_QUEUE_WAIT_MS`, `RATE_BATCH_MS`, `SENTRY_DSN`, `METRICS_TOKEN` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
 | web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), `TRUSTED_PDS_HOSTS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_PRICE_PLUS` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
 | tap | `TAP_ADMIN_PASSWORD` |
@@ -419,7 +419,7 @@ Chosen: an in-process registry rendered in the Prometheus text format, read by s
 | web | `GET /api/metrics` | same |
 | indexer | `GET :8080/metrics` | none, internal port only |
 
-Delivery series: `delivery_http_requests_total{route,status}` (status class), `delivery_http_request_duration_ms` (histogram by route), `delivery_resolutions_total{route,result}` (avatar and profile, `found` or `miss`), `delivery_blob_cache_hits_total`, `delivery_blob_failures_total{outcome}` (the `getBlob` outcomes `not_found`, `server_error`, `timeout`, `network_error`, `negative_cache`, `invalid_endpoint`), `delivery_transforms_total{format}`, `delivery_rate_limit_rejections_total`, `delivery_postgres_errors_total`, `delivery_readyz_failures_total`.
+Delivery series: `delivery_http_requests_total{route,status}` (status class), `delivery_http_request_duration_ms` (histogram by route), `delivery_resolutions_total{route,result}` (avatar and profile, `found` or `miss`), `delivery_blob_cache_hits_total`, `delivery_blob_failures_total{outcome}` (the `getBlob` outcomes `not_found`, `server_error`, `timeout`, `network_error`, `negative_cache`, `invalid_endpoint`), `delivery_transforms_total{format}`, `delivery_transforms_in_flight` (gauge, resize workers running), `delivery_transforms_queued` (gauge, jobs waiting for a slot), `delivery_transforms_shed_total` (jobs answered 503), `delivery_rate_limit_rejections_total`, `delivery_postgres_errors_total`, `delivery_readyz_failures_total`.
 
 Indexer series: `indexer_events_total{type,result}`, `indexer_last_event_age_seconds`, `indexer_last_heartbeat_age_seconds`, `indexer_last_event_id`, `indexer_tap_outbox_buffer` (lag), `indexer_ready`, `indexer_postgres_errors_total`.
 
@@ -537,7 +537,7 @@ Owner decision, November 7, 2026: "because we have no user adoption right now, a
 | App | VM | Machines | Scale to zero | Why this size |
 | --- | --- | --- | --- | --- |
 | web | `shared-cpu-1x`, 512 MB | 1, region `iad` only | yes | A local `next start` of the production build used about 178 MB peak resident memory after 60 requests with no database attached (measured November 7, 2026). That leaves too little headroom for a 256 MB VM once Postgres, OAuth, and image uploads are in play. Not measured on Fly. |
-| delivery | `shared-cpu-1x`, 512 MB | 1, region `iad` only | yes | Each resize forks a worker process with a 256 MB heap cap (`apps/delivery/src/resize.ts`, `maxOldSpaceMb`) beside the parent, which also holds a 32 MB original cache (`BLOB_CACHE_MB`). Not measured under load. |
+| delivery | `shared-cpu-1x`, 512 MB | 1, region `iad` only | yes | Each resize forks a worker process with a 256 MB heap cap (`apps/delivery/src/resize.ts`, `maxOldSpaceMb`) beside the parent, which also holds a 32 MB original cache (`BLOB_CACHE_MB`). Concurrent resizes are capped at 2 (see Resize concurrency cap below). Memory per worker is measured locally, not on Fly. |
 | indexer | `shared-cpu-1x`, 256 MB | exactly 1 | no | A Node process with a small Postgres pool (`PG_POOL_MAX`, default 5). Not measured on Fly; the first out-of-memory kill in `fly logs` means move to 512 MB. |
 | tap | `shared-cpu-1x`, 512 MB | exactly 1 | no | The Tap README states no memory requirement. It does say the outbox buffers up to 1M pending events in memory and the identity cache defaults to 2,000,000 entries (`TAP_IDENT_CACHE_SIZE`). Treat 512 MB as a starting point and try 256 MB in staging first. **Unconfirmed.** |
 
@@ -552,6 +552,23 @@ Both apps set `auto_stop_machines = "stop"`, `auto_start_machines = true`, and `
 **Health checks.** Fly's docs do not say whether HTTP check requests count as traffic for autostop (the autostop and health check pages are silent on it), so this is **unconfirmed**. To avoid depending on it, each scaled-to-zero app has one liveness check on a 60 second interval, and the Fly checks no longer include the readiness routes (`/readyz` on delivery, `/api/health` on web). Those routes run `SELECT 1`, so a check on them every interval would wake the Neon compute for as long as the machine runs. Use them from a manual call or an uptime monitor with a long interval. If a Machine never stops on its own after a deploy, suspect the Fly check first and try removing it.
 
 The delivery `release_command` still runs the migrations on each deploy, which wakes Neon once per deploy.
+
+### Resize concurrency cap (delivery)
+
+Every cold `/img` variant, `/default` avatar, and QR PNG forks one sharp worker. The local load test (`docs/research/load-test-v1.md`) measured about 65 to 70 MB resident per worker, and an uncapped run reached 37 workers (2.5 GB) at 50 rps and 88 workers (6.3 GB) at 200 rps. On the 512 MB VM that would be an out-of-memory kill, so delivery caps the number of workers at once (`limitedResizer` in `apps/delivery/src/resize.ts`).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `IMG_MAX_CONCURRENT` | `2` | Resize workers running at once. |
+| `IMG_QUEUE_MAX` | `8` | Jobs allowed to wait for a slot. A request past this is shed at once. |
+| `IMG_QUEUE_WAIT_MS` | `3000` | Longest a job waits for a slot before it is shed. |
+| `RATE_BATCH_MS` | `1000` | Flush period for the in-memory rate-window and usage counters (see below). `0` writes through on every request. |
+
+Sizing for 512 MB: the Node parent measured 92 to 272 MB resident in the local runs (the 32 MB blob cache included), which leaves about 240 MB. Two workers at 65 to 70 MB is 130 to 140 MB, with the rest as headroom for a larger source image (the worker accepts up to 40 megapixels, which decodes to far more than a 1024 px avatar) and for the OS. Three would fit a typical avatar and not a large one, so the default is 2. Not measured on Fly: if `fly logs` shows no out-of-memory kills under a burst of cold variants, raise it; on a 1 GB VM use 4. A shed request gets `503` with `Retry-After: 2`, `Cache-Control: no-store`, and error code `overloaded`, so Cloudflare does not cache it and the client retries.
+
+Sharp's own settings follow the cap: each worker runs `sharp.concurrency(1)` and `sharp.cache(false)`, so total sharp threads equal the cap and no libvips cache accumulates. On a 1 vCPU shared machine a higher per-worker thread count would only add contention.
+
+**Batched counters.** Rate windows and usage counters are counted in memory and flushed to Postgres every `RATE_BATCH_MS`. The first hit on a key or a new window still writes through. With several machines each one sees the others' counts only at its flush, so a limit can be overshot by up to (machines x requests per interval), and a hard kill loses at most one interval of increments (SIGTERM and SIGINT flush first). Because delivery scales to zero, a one second interval also means Neon is touched at most once a second per active key instead of once per request.
 
 ### Indexer and Tap cannot scale to zero
 
