@@ -2,6 +2,7 @@ import type { OAuthSession } from '@atproto/oauth-client-node'
 import { attestationWriter } from './attestation'
 import { getClaimStore } from './claim-store'
 import { deleteClaim, type StoredClaim } from './claims-repo'
+import { reportError } from './obs'
 
 const cooldowns = new Map<string, number>()
 
@@ -33,7 +34,7 @@ export async function attestVerified(did: string, claim: StoredClaim, method: st
     await writer.remove(ref.uri).catch(() => undefined)
     throw err
   }
-  for (const uri of superseded) await writer.remove(uri).catch((e) => console.error('attestation remove failed', e instanceof Error ? e.message : 'unknown'))
+  for (const uri of superseded) await writer.remove(uri).catch((e) => reportError('attestation remove failed', e))
 }
 
 /** Deletes the claim from the user's repo and the index, and removes its attestations everywhere. */
@@ -43,5 +44,5 @@ export async function removeClaim(session: OAuthSession, rkey: string): Promise<
   await deleteClaim(session, rkey)
   const uris = await store.revokeForClaim(session.did, rkey)
   await store.deleteClaim(session.did, rkey)
-  for (const uri of uris) await writer.remove(uri).catch((e) => console.error('attestation remove failed', e instanceof Error ? e.message : 'unknown'))
+  for (const uri of uris) await writer.remove(uri).catch((e) => reportError('attestation remove failed', e))
 }

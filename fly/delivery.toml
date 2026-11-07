@@ -38,6 +38,15 @@ primary_region = "iad"
     path = "/healthz"
     timeout = "5s"
 
+  # Readiness: runs SELECT 1 against Postgres (3 second budget, READY_TIMEOUT_MS). The 5 second check
+  # timeout leaves room for a Neon wake-up. /readyz is exempt from the origin lock like /healthz.
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/readyz"
+    timeout = "5s"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "1gb"

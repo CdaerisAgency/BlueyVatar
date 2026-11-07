@@ -1,4 +1,5 @@
 import { oauthClient } from '../../../lib/auth'
+import { reportError } from '../../../lib/obs'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,7 +9,7 @@ export async function GET() {
     const client = await oauthClient()
     return Response.json(client.jwks, { headers: { 'cache-control': 'public, max-age=300' } })
   } catch (err) {
-    console.error("jwks unavailable", err instanceof Error ? err.message : "unknown")
+    reportError('jwks unavailable', err)
     return Response.json({ error: 'signing key not configured' }, { status: 503 })
   }
 }
