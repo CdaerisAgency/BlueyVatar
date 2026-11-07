@@ -21,7 +21,7 @@ export const DEFAULT_OG_IMAGE_PATH = '/logo.jpg'
 export const defaultOgImage = (base: string = siteUrl()): string => absoluteUrl(DEFAULT_OG_IMAGE_PATH, base)
 
 /** Indexable static pages. The sitemap lists these. */
-export const STATIC_PAGES = ['/', '/pricing', '/policy', '/privacy'] as const
+export const STATIC_PAGES = ['/', '/pricing', '/policy', '/privacy', '/docs'] as const
 
 export const ROBOTS_ALLOW = ['/', '/p/', '/a/', '/pricing', '/policy', '/privacy', '/docs'] as const
 export const ROBOTS_DISALLOW = ['/account', '/oauth', '/login', '/logout', '/report', '/api'] as const

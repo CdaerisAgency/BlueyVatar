@@ -1,5 +1,6 @@
 import { ENTITLEMENTS, type Tier } from '@blueyvatar/core'
 import { periodStart } from './usage.js'
+import { errors, log } from './obs.js'
 
 /** Percent of included volume that triggers an alert (spec section 12). */
 export const ALERT_THRESHOLDS = [80, 100] as const
@@ -19,7 +20,7 @@ export interface AlertSink {
 
 export class ConsoleAlertSink implements AlertSink {
   async send(a: UsageAlert) {
-    console.warn(`usage alert: license ${a.licenseId} reached ${a.threshold}% (${a.used}/${a.included}) for ${a.period}`)
+    log.warn('usage alert', { licenseId: a.licenseId, threshold: a.threshold, used: a.used, included: a.included, period: a.period })
   }
 }
 
@@ -67,7 +68,8 @@ export class UsageAlerts {
         }
       }
     } catch (err) {
-      console.error('usage alert failed', err)
+      log.error('usage alert failed', { err })
+      errors.captureException(err, { tags: { task: 'usage_alert' } })
     }
   }
 }

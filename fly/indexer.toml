@@ -2,7 +2,8 @@
 # Deploy: fly deploy --config fly/indexer.toml --dockerfile Dockerfile
 #
 # No [http_service] and no [[services]] section: per the configuration reference an app
-# without services cannot be reached from the public internet. It reaches Tap over Fly
+# without services cannot be reached from the public internet. The internal health server on
+# port 8080 (/healthz, /readyz, /metrics) is therefore only reachable by Fly's checker and over 6PN. It reaches Tap over Fly
 # private networking (6PN) at <app>.internal, see https://docs.fly.io/networking/private-networking
 # (Flycast, <app>.flycast, is for apps that need Fly Proxy features, see https://docs.fly.io/networking/flycast).
 app = "blueyvatar-indexer"
@@ -18,6 +19,20 @@ primary_region = "iad"
 [experimental]
   # Per-app command override (https://docs.fly.io/reference/configuration, [experimental] section).
   cmd = ["node", "apps/indexer/dist/index.js"]
+
+# HTTP check on the internal health server (https://docs.fly.io/reference/configuration, [checks] section).
+# /readyz answers 503 when no Tap event or Tap health answer arrived within INDEXER_STALL_SECONDS (default 300),
+# or when event handling has failed that long. Fly marks the machine unhealthy (a restart is not assumed),
+# so the alert in docs/deploy.md is what pages a human.
+[checks]
+  [checks.indexer_ready]
+    type = "http"
+    port = 8080
+    path = "/readyz"
+    method = "GET"
+    grace_period = "60s"
+    interval = "30s"
+    timeout = "5s"
 
 [[vm]]
   size = "shared-cpu-1x"

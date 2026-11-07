@@ -8,6 +8,7 @@ import { emailDomain, looksLikeEmail, maskEmail } from './mask'
 import { linkMethod, parseTrustedHosts, pdsHost } from './pds'
 import { getStore, type Store } from './store'
 import { decryptJson, encryptJson } from './token-crypto'
+import { reportError } from './obs'
 
 export type LinkOutcome =
   | { kind: 'linked'; masked: string }
@@ -60,7 +61,7 @@ export async function confirmLink(
     const n = movedNotice(PUBLIC_URL)
     await Promise.resolve()
       .then(() => sender.send({ to: decryptJson<string>(pending.emailEnc), ...n }))
-      .catch((err) => console.error('move notice failed', err instanceof Error ? err.message : 'unknown'))
+      .catch((err) => reportError('move notice failed', err))
   }
   return { kind: 'linked', masked: pending.masked }
 }

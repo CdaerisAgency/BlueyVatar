@@ -58,6 +58,8 @@ export const openApiDocument = {
   ],
   paths: {
     '/healthz': { get: { summary: 'Health check', tags: ['Service'], responses: { '200': { description: 'ok', content: { 'text/plain': { schema: { type: 'string', const: 'ok' } } } } } } },
+    '/readyz': { get: { summary: 'Readiness check', description: 'Runs a dependency check (Postgres) within a time budget.', tags: ['Service'], responses: { '200': { description: 'Ready.', content: { 'application/json': { schema: { type: 'object' } } } }, '503': errRef('not_ready: a dependency check failed or timed out.') } } },
+    '/metrics': { get: { summary: 'Prometheus metrics', description: 'Needs a bearer token (METRICS_TOKEN). Answers not_found when no token is configured or the token is wrong.', tags: ['Service'], responses: { '200': { description: 'Prometheus text format.', content: { 'text/plain': { schema: { type: 'string' } } } }, '404': errRef('not_found') } } },
     '/openapi.json': { get: { summary: 'This document', tags: ['Service'], responses: { '200': { description: 'OpenAPI 3.1 JSON.', content: { 'application/json': { schema: { type: 'object' } } } } } } },
     '/avatar/{hash}': { get: avatarOp('Avatar by email hash (Gravatar compatible)', 'Hash', [q('name')]) },
     '/u/{id}': { get: avatarOp('Avatar by handle or DID', 'Id') },

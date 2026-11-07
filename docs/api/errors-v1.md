@@ -41,6 +41,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `rate_limited` | 429 | Anonymous daily limit (100 per IP) or Free keyed daily limit (1,000) reached. |
 | `upstream_error` | 502 | The image could not be fetched or processed. On `/img` this covers PDS 5xx responses, timeouts, network errors, an unusable PDS endpoint, and bytes that do not match the CID. |
 | `internal` | 500 | An unhandled server fault. |
+| `not_ready` | 503 | `GET /readyz` only: a dependency check (Postgres) failed or timed out. Not returned by avatar or profile routes. |
 
 Unhandled server faults return `500` with code `internal` in the same JSON shape. Treat 5xx as transient and retry with backoff. Hidden profiles return `not_found`, the same as an unknown profile, so a lookup cannot reveal that a profile exists.
 

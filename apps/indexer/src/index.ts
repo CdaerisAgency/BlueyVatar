@@ -6,6 +6,8 @@ import { handleRecord, type IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
 import { pgReverifyStore, reverifyDue, scheduleReverify } from './reverify.js'
 import { reverifyFromEnv } from './reverify-wiring.js'
+import { IndexerHealth, probeTap, startHealthServer } from './health.js'
+import { errors, log, metrics } from './obs.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
@@ -21,7 +23,11 @@ function writes(): IndexWrites {
   const url = process.env.DATABASE_URL
   if (url) {
     const pool = new pg.Pool({ connectionString: url, max: Number(process.env.PG_POOL_MAX ?? 5) })
-    pool.on('error', (err) => console.error('postgres pool error', err))
+    pool.on('error', (err) => {
+      metrics.inc('indexer_postgres_errors_total')
+      log.error('postgres pool error', { err })
+      errors.captureException(err, { tags: { task: 'postgres_pool' } })
+    })
     // Re-check attested claims older than REVERIFY_AFTER_DAYS every REVERIFY_INTERVAL_HOURS.
     const rv = reverifyFromEnv(pool)
     const store = pgReverifyStore(pool)
@@ -29,34 +35,63 @@ function writes(): IndexWrites {
     const warm = warmerFromEnv()
     return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warm, onWarm: warm })
   }
-  console.warn('DATABASE_URL is not set; logging index writes to the console')
+  log.warn('DATABASE_URL is not set; logging index writes only')
+  const dev = (op: string) => async (...args: unknown[]) => log.info('index write (dev, not stored)', { op, args })
   return {
-    upsertImage: async (r) => console.log('upsertImage', r),
-    deleteImage: async (did, rkey) => console.log('deleteImage', did, rkey),
-    upsertProfile: async (did) => console.log('upsertProfile', did),
-    deleteProfile: async (did) => console.log('deleteProfile', did),
-    upsertClaim: async (did, rkey) => console.log('upsertClaim', did, rkey),
-    deleteClaim: async (did, rkey) => console.log('deleteClaim', did, rkey),
-    upsertProfileLink: async (r) => console.log('upsertProfileLink', r),
-    deleteProfileLink: async (did, rkey) => console.log('deleteProfileLink', did, rkey),
-    setRepoStatus: async (did, handle, active, status) => console.log('setRepoStatus', did, handle, active, status),
-    purgeImages: async (did, cids) => console.log('purgeImages', did, cids),
+    upsertImage: dev('upsertImage'), deleteImage: dev('deleteImage'),
+    upsertProfile: dev('upsertProfile'), deleteProfile: dev('deleteProfile'),
+    upsertClaim: dev('upsertClaim'), deleteClaim: dev('deleteClaim'),
+    upsertProfileLink: dev('upsertProfileLink'), deleteProfileLink: dev('deleteProfileLink'),
+    setRepoStatus: dev('setRepoStatus'), purgeImages: dev('purgeImages'),
   }
 }
 const db = writes()
 
+// Readiness: Tap events or Tap health answers must keep arriving (INDEXER_STALL_SECONDS, default 300).
+const stallSeconds = Number(process.env.INDEXER_STALL_SECONDS ?? 300) || 300
+const health = new IndexerHealth({ windowMs: stallSeconds * 1000 })
+const probeEvery = Number(process.env.TAP_PROBE_INTERVAL_SECONDS ?? 15) || 15
+const probe = () => probeTap({ tapUrl, adminPassword: process.env.TAP_ADMIN_PASSWORD }, health)
+  .then((ok) => { if (!ok) log.warn('tap health probe failed') })
+void probe()
+setInterval(() => void probe(), probeEvery * 1000).unref()
+startHealthServer({ health, metrics, port: Number(process.env.HEALTH_PORT ?? 8080) })
+
+/** Runs one Tap event handler with readiness bookkeeping, metrics, and error reporting. */
+async function tracked(type: 'identity' | 'record', id: number, run: () => Promise<void>): Promise<void> {
+  try {
+    await run()
+    health.markEvent(id)
+    metrics.inc('indexer_events_total', { type, result: 'ok' })
+  } catch (err) {
+    health.markFailure()
+    metrics.inc('indexer_events_total', { type, result: 'error' })
+    log.error('event handling failed', { type, eventId: id, err })
+    errors.captureException(err, { tags: { task: 'tap_event', event_type: type } })
+    throw err
+  }
+}
+
 const indexer = new SimpleIndexer()
-indexer.identity(async (evt) => {
+indexer.identity((evt) => tracked('identity', evt.id, async () => {
   await db.setRepoStatus(evt.did, evt.handle, evt.isActive, evt.status)
-})
-indexer.record(async (evt) => {
+}))
+indexer.record((evt) => tracked('record', evt.id, async () => {
   await handleRecord(
     { did: evt.did, collection: evt.collection, rkey: evt.rkey, cid: evt.cid, action: evt.action, record: evt.record as Record<string, unknown> | undefined },
     db,
   )
+}))
+indexer.error((err) => {
+  log.error('tap error', { err })
+  errors.captureException(err, { tags: { task: 'tap_channel' } })
 })
-indexer.error((err) => console.error('tap error', err))
 
 const channel = tap.channel(indexer)
 process.on('SIGTERM', () => void channel.destroy())
+process.on('unhandledRejection', (err) => {
+  log.error('unhandled rejection', { err })
+  errors.captureException(err, { tags: { task: 'unhandled_rejection' } })
+})
+log.info('indexer starting', { tapUrl, stallSeconds })
 await channel.start()

@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
 import { getPool } from './store'
+import { reportError } from './obs'
 import {
   checkLimits, clientIp, isLockedOut, limitedMessage, memoryRateStore, pgRateStore, recordFailure,
   type BucketName, type LimitResult, type RateStore, type Who,
@@ -28,7 +29,7 @@ export async function limited(buckets: readonly BucketName[], did?: string | nul
     const r = await checkLimits(getRateStore(), buckets, await whoFor(did))
     return r.ok ? null : limitedMessage(r.retryAfterSec)
   } catch (err) {
-    console.error('rate limit check failed', err instanceof Error ? err.name : 'unknown')
+    reportError('rate limit check failed', err)
     return null
   }
 }
@@ -38,7 +39,7 @@ export async function limitedResult(buckets: readonly BucketName[], did?: string
   try {
     return await checkLimits(getRateStore(), buckets, await whoFor(did))
   } catch (err) {
-    console.error('rate limit check failed', err instanceof Error ? err.name : 'unknown')
+    reportError('rate limit check failed', err)
     return { ok: true }
   }
 }
@@ -49,7 +50,7 @@ export async function lockedOut(bucket: BucketName, did?: string | null): Promis
     const r = await isLockedOut(getRateStore(), bucket, await whoFor(did))
     return r.ok ? null : limitedMessage(r.retryAfterSec)
   } catch (err) {
-    console.error('lockout check failed', err instanceof Error ? err.name : 'unknown')
+    reportError('lockout check failed', err)
     return null
   }
 }
@@ -58,6 +59,6 @@ export async function failed(bucket: BucketName, did?: string | null): Promise<v
   try {
     await recordFailure(getRateStore(), bucket, await whoFor(did))
   } catch (err) {
-    console.error('failure count failed', err instanceof Error ? err.name : 'unknown')
+    reportError('failure count failed', err)
   }
 }

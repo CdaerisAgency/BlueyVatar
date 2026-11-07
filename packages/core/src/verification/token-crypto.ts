@@ -1,4 +1,5 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto'
+import { createLogger } from '../observability/log.js'
 
 /**
  * Encryption at rest for OAuth session and state payloads (oauth_session.value, oauth_state.value) and
@@ -33,7 +34,7 @@ export function masterKey(env: NodeJS.ProcessEnv = process.env): Buffer {
   if (env.NODE_ENV === 'production') throw new Error('TOKEN_ENCRYPTION_KEY is not set')
   if (!warned) {
     warned = true
-    console.warn('TOKEN_ENCRYPTION_KEY is not set; using a fixed development key. Do not use this outside local development.')
+    createLogger({ app: process.env.LOG_APP ?? 'core' }).warn('TOKEN_ENCRYPTION_KEY is not set; using a fixed development key. Do not use this outside local development.')
   }
   return DEV_KEY
 }
