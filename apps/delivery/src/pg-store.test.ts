@@ -26,12 +26,12 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration2)
     await pool.query(migration3)
     await pool.query(migration6)
-  })
+  }, 60_000)
 
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
     await pool?.end()
-  })
+  }, 60_000)
 
   it('looks up email hashes and honors the opt-out', async () => {
     const index = new PgIndexStore(pool)
