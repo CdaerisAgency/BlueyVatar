@@ -40,11 +40,12 @@ describe('prepareImage (full original, no crop)', () => {
     expect(MAX_BLOB_BYTES).toBe(5 * 1024 * 1024)
   })
 
-  it('leaves an image within 4096 pixels and under the cap untouched, even when it is not square', async () => {
-    const draws = stubBrowser(() => 1)
+  it('re-encodes an image within 4096 pixels at full size so metadata is dropped, even when it is not square', async () => {
+    const draws = stubBrowser(() => 100_000)
     const f = file(3_000_000)
-    expect(await prepareImage(f, bitmap(4096, 2000))).toEqual({ file: f })
-    expect(draws).toHaveLength(0)
+    const r = await prepareImage(f, bitmap(4096, 2000))
+    expect(r.file).not.toBe(f)
+    expect(draws[0]).toEqual({ sw: 4096, sh: 2000, dw: 4096, dh: 2000 })
   })
 
   it('downscales an image above 4096 pixels with the whole frame and the same aspect ratio', async () => {
