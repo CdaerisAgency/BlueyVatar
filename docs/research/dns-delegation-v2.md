@@ -163,4 +163,4 @@ Phase 1 is the smallest step that delivers value: it uses no new fetch path from
 - RFC 5452 (DNS forgery resilience): <https://www.rfc-editor.org/rfc/rfc5452>
 - RFC 4033 (DNSSEC introduction), cited only through RFC 5452's pointer: <https://www.rfc-editor.org/rfc/rfc4033>
 - OWASP SSRF Prevention Cheat Sheet: <https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html>
-- In-repo: spec sections 3, 7, 9, 11.1, 14 and 14.1 (`docs/spec/blueyvatar-product-spec-v7.md`), `docs/self-hosting-v1.md`, `docs/deploy.md`, `docs/research/decisions-phase2-v1.md`, `packages/core/src/verification/safe-fetch.ts`
+- In-repo: spec sections 3, 7, 9, 11.1, 14 and 14.1 (`docs/spec/blueyvatar-product-spec-v8.md`), `docs/self-hosting-v1.md`, `docs/deploy.md`, `docs/research/decisions-phase2-v1.md`, `packages/core/src/verification/safe-fetch.ts`

@@ -122,7 +122,6 @@ export default async function KeysPage() {
               ['Overage', (e) => e.overage],
               ['Max size', (e) => String(e.maxSize)],
               ['Formats', (e) => e.formats.join(', ')],
-              ['Attribution required', (e) => (e.attributionRequired ? 'Yes' : 'No')],
               ['Hovercards', (e) => (e.hovercards ? 'Yes' : 'No')],
             ] as [string, (e: (typeof ENTITLEMENTS)[Tier]) => string][]
           ).map(([label, f]) => (

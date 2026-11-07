@@ -1,4 +1,4 @@
-# blueyvatar - Product Spec v7
+# blueyvatar - Product Spec v8
 
 Nov 3, 2026 by @Chris Duncan
 
@@ -385,9 +385,6 @@ Each license holds these fields:
 | `keys` | Secret and publishable keys with labels and domain lists |
 | `term`, `status` | Monthly or annual term; active, past due, suspended, canceled |
 | `usage` | Metered counters (section 12) |
-| `attribution` | Whether an attribution link is required |
-
-Unavatar requires an [attribution link on its free plan and removes the requirement on paid plans](https://github.com/microlinkhq/unavatar). The same rule is proposed here for the Free tier.
 
 ### 10.4 Image license declaration
 
@@ -412,7 +409,6 @@ The proposal has four developer tiers and two user plans, with privacy and safet
 | Overage | Blocked | Metered | Metered | Contract |
 | API keys | 1 publishable | 5 | 25 | Unlimited |
 | Domain restrictions on keys | No | Yes | Yes | Yes |
-| Attribution link required | Yes | No | No | No |
 | Max size (`s`) | 512 | 1024 | 2048 | 2048 |
 | Output format and quality | PNG only | PNG, JPEG, WebP | PNG, JPEG, WebP | PNG, JPEG, WebP |
 | Cache TTL (`ttl`) | Fixed 24h | 1h to 28d | 1h to 28d | 1h to 28d |
@@ -481,7 +477,6 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 
 - Plans bill monthly or annually. Overage on Pro and Business is metered at a published per-unit rate (to be set).
 - A past-due license gets a grace period, then drops to Free limits. A downgrade changes limits only and never deletes user data, user avatars, or profiles.
-- Free-tier attribution is checked on the developer's production site. Unavatar requires the link to be [public, followable, and on a production site](https://github.com/microlinkhq/unavatar), and reserves the right to revoke free access when it is missing.
 - Keys can be rotated and revoked at any time, with usage alerts at 80 and 100 percent of included volume.
 - The payment processor is Stripe, decided by the owner on 2026-11-07 (issue #67). Tax is computed by Stripe Tax, and invoices come from Stripe Billing. Both are configured in the Stripe dashboard at deploy (docs/deploy.md, Stripe billing). The overage rate stays open until per-miss cost is measured.
 
