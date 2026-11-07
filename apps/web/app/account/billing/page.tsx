@@ -1,7 +1,6 @@
 import { PAST_DUE_GRACE_DAYS, effectiveTier } from '@blueyvatar/core'
-import { redirect } from 'next/navigation'
 import { PageMain } from '../../../components/Page'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { billingEnabled, plusEnabled } from '../../../lib/billing/config'
 import { getBillingStore } from '../../../lib/billing/store'
 import { getDashboardStore } from '../../../lib/dashboard-store'
@@ -18,8 +17,7 @@ const NOTICE: Record<string, string> = {
 }
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/billing')
   const q = await searchParams
   const license = await getDashboardStore().ensureLicense(did)
   const billing = getBillingStore()

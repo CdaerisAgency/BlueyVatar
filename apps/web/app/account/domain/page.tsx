@@ -1,7 +1,6 @@
 import { Note, PageMain, TableBox } from '../../../components/Page'
 import { Button } from '../../../components/Button'
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { cfSaasConfig, fallbackOrigin, getHostname, type HostnameState } from '../../../lib/cf-saas'
 import { getDomainStore } from '../../../lib/domain-store'
 import { resolvePlan } from '../../../lib/plan'
@@ -13,8 +12,7 @@ import { PollRefresh } from './PollRefresh'
 export const dynamic = 'force-dynamic'
 
 export default async function DomainPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/domain')
   const { error } = await searchParams
   const cfg = cfSaasConfig()
   const target = fallbackOrigin()
@@ -115,6 +113,8 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
       )}
 
       {cfg && target && !row && plus && (
+        <>
+        <p>You have no custom domain yet. Enter a subdomain you control, then add the DNS records we show you.</p>
         <form action={addDomain}>
           <label>
             Subdomain you own{' '}
@@ -122,6 +122,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
           </label>
           <Button type="submit" variant="primary">Add domain</Button>
         </form>
+        </>
       )}
 
       <h2>Using a root domain</h2>

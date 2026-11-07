@@ -8,7 +8,7 @@ const WEB_PORT = Number(process.env.A11Y_PORT ?? 3917)
 const DELIVERY_PORT = WEB_PORT + 1
 const base = `http://localhost:${WEB_PORT}`
 
-const PUBLIC = ['/', '/pricing', '/login', '/login?error=Handle%20not%20found', '/p/alice.example.com', '/p/alice.example.com?report=invalid', '/policy', '/privacy', '/accessibility']
+const PUBLIC = ['/', '/pricing', '/integrations', '/login', '/login?error=Handle%20not%20found', '/p/alice.example.com', '/p/alice.example.com?report=invalid', '/policy', '/privacy', '/accessibility']
 const ACCOUNT = ['/account', '/account/profile', '/account/avatars', '/account/billing', '/account/claims', '/account/domain', '/account/keys', '/account/notifications', '/account/visibility']
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']
 
@@ -40,7 +40,7 @@ try {
     await page.close()
   }
   // Skip link: the first Tab stop on every page, and it moves focus to <main id="main">.
-  for (const path of ['/', '/pricing', '/login', '/privacy']) {
+  for (const path of ['/', '/pricing', '/integrations', '/login', '/privacy']) {
     await anon.goto(base + path)
     await anon.keyboard.press('Tab')
     const first = await anon.evaluate(() => document.activeElement?.textContent?.trim())

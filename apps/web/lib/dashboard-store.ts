@@ -48,6 +48,8 @@ export interface DashboardStore {
   revokeKey(licenseId: string, hash: string): Promise<boolean>
   setDomains(licenseId: string, hash: string, domains: string[]): Promise<boolean>
   getRules(did: string): Promise<VisibilityRules>
+  /** True once the owner has saved visibility rules, even if they match the public defaults. */
+  rulesSaved(did: string): Promise<boolean>
   setRules(did: string, rules: VisibilityRules): Promise<void>
 }
 
@@ -98,6 +100,9 @@ function memory(): DashboardStore {
     },
     async getRules(did) {
       return rules.get(did) ?? PUBLIC_RULES
+    },
+    async rulesSaved(did) {
+      return rules.has(did)
     },
     async setRules(did, r) {
       rules.set(did, r)
@@ -208,6 +213,9 @@ function postgres(pool: pg.Pool): DashboardStore {
       const x = r.rows[0]
       if (!x) return PUBLIC_RULES
       return { keyedOnly: x.keyed_only, domainAllowlist: x.domain_allowlist, hiddenProfile: x.hidden_profile, emailLookupOptOut: x.email_lookup_opt_out }
+    },
+    async rulesSaved(did) {
+      return ((await pool.query('SELECT 1 FROM visibility_rules WHERE did = $1', [did])).rowCount ?? 0) > 0
     },
     async setRules(did, r) {
       await pool.query(

@@ -108,6 +108,8 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     await c.query('BEGIN')
     const emailLinksHeld = await releaseAllPg(c, did)
     await c.query('DELETE FROM oauth_session WHERE sub = $1', [did])
+    await c.query('DELETE FROM web_session WHERE did = $1', [did])
+    await c.query('DELETE FROM session_floor WHERE did = $1', [did])
     await c.query('DELETE FROM profile_links WHERE did = $1', [did])
     await c.query('DELETE FROM visibility_rules WHERE did = $1', [did])
     await c.query('DELETE FROM verification_state WHERE did = $1', [did])

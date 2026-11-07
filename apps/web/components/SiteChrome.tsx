@@ -30,6 +30,9 @@ export function SiteNav() {
           <Link href="/pricing" className={link}>
             {COPY.nav.pricing}
           </Link>
+          <Link href="/integrations" className={link}>
+            {COPY.nav.integrations}
+          </Link>
           <ButtonLink href="/login" variant="primary">
             {COPY.nav.signIn}
           </ButtonLink>

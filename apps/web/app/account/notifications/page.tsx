@@ -1,8 +1,7 @@
 import { SECURITY_NOTICES } from '@blueyvatar/core/verification'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { PageMain } from '../../../components/Page'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { getNoticeDirectory } from '../../../lib/notify'
 import { getStore } from '../../../lib/store'
 import AccountNav from '../AccountNav'
@@ -11,8 +10,7 @@ import { NotificationsForm } from './NotificationsForm'
 export const dynamic = 'force-dynamic'
 
 export default async function NotificationsPage() {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/notifications')
   const [prefs, address] = await Promise.all([getNoticeDirectory().prefs(did), getStore().links.noticeAddress(did)])
   return (
     <PageMain>
