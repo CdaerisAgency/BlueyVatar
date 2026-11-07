@@ -20,6 +20,8 @@ export default function PrivacyPage() {
       <h2>Logs</h2>
       <p>Our servers keep request logs for security, abuse handling, and fixing faults. A log line holds the time, the route (not the full address), the response status, how long it took, and a request id. We do not log IP addresses, query strings, cookies, API keys, or email addresses in these logs.</p>
       <p>We keep logs for 90 days or until the logs reach a size cap, whichever comes first, and then delete them. Where we keep a hashed IP address in our database (for abuse reports and rate limits), it is removed on the same schedule.</p>
+      <h2>Profile view counts</h2>
+      <p>We count how many times your public profile page is viewed, and how many keyed API calls fetch your profile, as one number per day for each. We do not store the visitor's IP address, user agent, or any cookie with these counts, and we skip known crawlers. Plus members can see their last 30 days at Profile views in their account. The counts follow the same retention as logs: 90 days or until the logs reach a size cap, whichever comes first. They are included in your data download and removed when you delete your data.</p>
       <h2>Contact</h2>
       <p>For privacy or security questions, write to security@blueyvatar.com.</p>
     </PageMain>
