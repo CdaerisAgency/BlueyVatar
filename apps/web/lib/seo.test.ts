@@ -27,7 +27,7 @@ describe('robots', () => {
   it('allows public paths and disallows private ones', () => {
     expect(rule.userAgent).toBe('*')
     expect(rule.allow).toEqual(expect.arrayContaining(['/', '/p/', '/a/', '/policy', '/privacy', '/docs', '/pricing']))
-    expect(rule.disallow).toEqual(['/account', '/oauth', '/login', '/logout', '/report', '/api'])
+    expect(rule.disallow).toEqual(['/account', '/oauth', '/login', '/logout', '/report', '/api', '/admin'])
   })
   it('never allows a disallowed path and points at the sitemap', () => {
     for (const d of ROBOTS_DISALLOW) expect(ROBOTS_ALLOW.some((a) => a !== '/' && d.startsWith(a))).toBe(false)

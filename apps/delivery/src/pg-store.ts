@@ -208,3 +208,9 @@ export class PgAlertLedger implements AlertLedger {
     return (rowCount ?? 0) > 0
   }
 }
+
+/** The owner DID of a license, for addressing usage alerts. */
+export function pgLicenseOwner(pool: pg.Pool) {
+  return async (licenseId: string): Promise<string | null> =>
+    (await pool.query('SELECT owner FROM licenses WHERE license_id = $1', [licenseId])).rows[0]?.owner ?? null
+}

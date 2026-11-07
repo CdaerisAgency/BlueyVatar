@@ -280,7 +280,7 @@ if (url) {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     const pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs']) await pool.query(m(n))
     return {
       store: pgStore(pool),
       // Age every hold instead of waiting 30 days.
@@ -353,7 +353,7 @@ describe.skipIf(!url)('postgres: no plaintext address at rest', () => {
     await admin.query(`CREATE SCHEMA ${s3}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${s3}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs']) await pool.query(m(n))
   })
   afterAll(async () => {
     await pool.query(`DROP SCHEMA ${s3} CASCADE`)
