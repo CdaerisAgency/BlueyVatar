@@ -8,6 +8,7 @@ import { createApp } from './app.js'
 import { errors, log, metrics, resolverLog } from './obs.js'
 import { originLockWarning } from './origin.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
+import { scheduleLogRetention } from './log-retention.js'
 import { scheduleRateWindowCleanup } from './rate-cleanup.js'
 import { createPool, PgAlertLedger, pgLicenseOwner, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
 import { sandboxedResizer } from './resize.js'
@@ -34,7 +35,7 @@ function stores(): Stores {
 }
 
 const { pool, index, licenses, limiter, usage, ledger } = stores()
-if (pool) scheduleRateWindowCleanup(pool)
+if (pool) { scheduleRateWindowCleanup(pool); scheduleLogRetention(pool) }
 // Usage alerts go to the owner's primary email when a database is configured; otherwise they are logged.
 const alertSink = pool
   ? new EmailAlertSink(new Notifier(emailSender(), pgNoticeDirectory(pool)), pgLicenseOwner(pool), process.env.PUBLIC_URL ?? 'https://blueyvatar.com')
