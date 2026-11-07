@@ -8,7 +8,7 @@ const url = process.env.TEST_DATABASE_URL
 const schema = `t_digest_${process.pid}_${Date.now()}`
 const NOW = new Date('2026-11-07T14:00:00Z')
 const ago = (h: number) => new Date(NOW.getTime() - h * 3_600_000)
-const ENV = { MODERATION_DIGEST_TO: 'owner@example.test', PUBLIC_URL: 'https://blueyvatar.test' }
+const ENV = { MODERATION_DIGEST_TO: 'owner@example.test', PUBLIC_URL: 'https://blueyvatar.test', MODERATION_SLA_HOURS: 'critical=4,high=24' }
 
 describe.skipIf(!url)('moderation digest', () => {
   let pool: pg.Pool
