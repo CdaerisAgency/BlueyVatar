@@ -7,7 +7,7 @@ export const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 16).replace
 export function AdminNav() {
   return (
     <nav aria-label="Admin" className="mb-4 flex flex-wrap items-center gap-4">
-      <a href="/admin">Reports</a>
+      <a href="/admin">Reports and appeals</a>
       <a href="/admin/audit">Audit log</a>
       <form action={adminLogout} className="ml-auto"><Button type="submit">End admin session</Button></form>
     </nav>

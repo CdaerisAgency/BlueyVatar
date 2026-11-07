@@ -1,7 +1,7 @@
 import type pg from 'pg'
 import type { Purge } from './purge'
 
-export type AdminAction = 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report'
+export type AdminAction = 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report' | 'appeal_upheld' | 'appeal_overturned'
 export const DID_RE = /^did:(plc|web):[A-Za-z0-9._:%-]{1,200}$/
 export const MAX_REASON = 500
 
@@ -9,11 +9,12 @@ type Q = Pick<pg.Pool, 'query'>
 
 export async function recordAction(
   q: Q, actor: string, action: AdminAction, t: { did?: string | null; cid?: string | null; reportId?: number | null; reason?: string | null },
-): Promise<void> {
-  await q.query(
-    'INSERT INTO admin_actions (actor, action, target_did, target_cid, report_id, reason) VALUES ($1, $2, $3, $4, $5, $6)',
+): Promise<number> {
+  const { rows } = await q.query<{ id: number }>(
+    'INSERT INTO admin_actions (actor, action, target_did, target_cid, report_id, reason) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id::int AS id',
     [actor, action, t.did ?? null, t.cid ?? null, t.reportId ?? null, t.reason ?? null],
   )
+  return rows[0]!.id
 }
 
 export type Result<T = object> = ({ ok: true; purged: boolean } & T) | { ok: false; error: string }
@@ -24,7 +25,7 @@ export function cleanReason(raw: unknown): string | null {
   return s && s.length <= MAX_REASON ? s : null
 }
 
-async function inTx<T>(pool: pg.Pool, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+export async function inTx<T>(pool: pg.Pool, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const c = await pool.connect()
   try {
     await c.query('BEGIN')
@@ -55,24 +56,24 @@ async function blockAll(c: Q, did: string, reason: string, by: string, kind: 'ta
 }
 
 /** Takedown: blocks all images, marks the report (or all open reports for the DID) actioned, and audits it. */
-export async function takedown(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string, reportId?: number): Promise<Result<{ blocked: number; reportIds: number[] }>> {
+export async function takedown(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string, reportId?: number): Promise<Result<{ blocked: number; reportIds: number[]; actionId: number }>> {
   if (!DID_RE.test(did)) return { ok: false, error: 'Unknown account.' }
-  const { cids, reportIds } = await inTx(pool, async (c) => {
+  const { cids, reportIds, actionId } = await inTx(pool, async (c) => {
     const list = await blockAll(c, did, reason, actor, 'takedown')
     const { rows } = await c.query<{ id: number }>(
       `UPDATE reports SET status = 'actioned', actioned_by = $2, action_reason = $3, actioned_at = now()
        WHERE target_did = $1 AND status = 'open' AND ($4::bigint IS NULL OR id = $4) RETURNING id::int AS id`,
       [did, actor, reason, reportId ?? null],
     )
-    await recordAction(c, actor, 'takedown', { did, reportId, reason })
-    return { cids: list, reportIds: rows.map((r) => r.id) }
+    const actionId = await recordAction(c, actor, 'takedown', { did, reportId, reason })
+    return { cids: list, reportIds: rows.map((r) => r.id), actionId }
   })
-  return { ok: true, purged: cids.length === 0 || (await purge(did, cids)), blocked: cids.length, reportIds }
+  return { ok: true, purged: cids.length === 0 || (await purge(did, cids)), blocked: cids.length, reportIds, actionId }
 }
 
-export async function suspend(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string): Promise<Result<{ blocked: number }>> {
+export async function suspend(pool: pg.Pool, purge: Purge, actor: string, did: string, reason: string): Promise<Result<{ blocked: number; actionId: number }>> {
   if (!DID_RE.test(did)) return { ok: false, error: 'Unknown account.' }
-  const cids = await inTx(pool, async (c) => {
+  const done = await inTx(pool, async (c) => {
     const { rowCount } = await c.query(
       `INSERT INTO account_suspensions (did, reason, suspended_by) VALUES ($1, $2, $3)
        ON CONFLICT (did) DO UPDATE SET reason = EXCLUDED.reason, suspended_by = EXCLUDED.suspended_by, suspended_at = now(), lifted_at = NULL, lifted_by = NULL
@@ -81,11 +82,11 @@ export async function suspend(pool: pg.Pool, purge: Purge, actor: string, did: s
     )
     if (!rowCount) return null
     const list = await blockAll(c, did, reason, actor, 'suspension')
-    await recordAction(c, actor, 'suspend', { did, reason })
-    return list
+    const actionId = await recordAction(c, actor, 'suspend', { did, reason })
+    return { list, actionId }
   })
-  if (cids === null) return { ok: false, error: 'Account is already suspended.' }
-  return { ok: true, purged: cids.length === 0 || (await purge(did, cids)), blocked: cids.length }
+  if (done === null) return { ok: false, error: 'Account is already suspended.' }
+  return { ok: true, purged: done.list.length === 0 || (await purge(did, done.list)), blocked: done.list.length, actionId: done.actionId }
 }
 
 /** Lifts the suspension and unblocks only the images that the suspension blocked. */
