@@ -8,6 +8,7 @@ const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
 const migration3 = readFileSync(new URL('../../../db/migrations/0003_usage_alerts.sql', import.meta.url), 'utf8')
 const migration2 = readFileSync(new URL('../../../db/migrations/0002_web_auth.sql', import.meta.url), 'utf8')
+const migration7 = readFileSync(new URL('../../../db/migrations/0007_blocked_images.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -26,6 +27,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration2)
     await pool.query(migration3)
     await pool.query(migration6)
+    await pool.query(migration7)
   }, 60_000)
 
   afterAll(async () => {
@@ -83,6 +85,8 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await index.isBlocked(DID, 'bafyone')).toBe(false)
     await pool.query(`INSERT INTO blocked_images (did, cid) VALUES ($1, 'bafyone')`, [DID])
     expect(await index.isBlocked(DID, 'bafyone')).toBe(true)
+    await pool.query(`UPDATE blocked_images SET unblocked_at = now() WHERE did = $1`, [DID])
+    expect(await index.isBlocked(DID, 'bafyone')).toBe(false)
   })
 
   it('finds keys by SHA256 and ignores revoked keys', async () => {

@@ -1,6 +1,7 @@
 import type { NodeSavedSession, NodeSavedSessionStore, NodeSavedState, NodeSavedStateStore } from '@atproto/oauth-client-node'
 import pg from 'pg'
 import type { PendingCode } from './codes'
+import { decryptJson, encryptJson } from './token-crypto'
 
 export type LinkMethod = 'trusted_pds' | 'code'
 export type LinkRow = { emailHash: string; method: LinkMethod; verifiedAt: Date }
@@ -64,12 +65,12 @@ function pgStore(pool: pg.Pool): Store {
     oauthState: {
       async get(key) {
         const r = await pool.query('SELECT value FROM oauth_state WHERE key = $1', [key])
-        return r.rows[0]?.value as NodeSavedState | undefined
+        return r.rows[0] ? decryptJson<NodeSavedState>(r.rows[0].value) : undefined
       },
       async set(key, value) {
         await pool.query(
           'INSERT INTO oauth_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
-          [key, JSON.stringify(value)],
+          [key, encryptJson(value)],
         )
         // Pending requests older than an hour are abandoned.
         await pool.query("DELETE FROM oauth_state WHERE created_at < now() - interval '1 hour'")
@@ -81,12 +82,12 @@ function pgStore(pool: pg.Pool): Store {
     oauthSession: {
       async get(sub) {
         const r = await pool.query('SELECT value FROM oauth_session WHERE sub = $1', [sub])
-        return r.rows[0]?.value as NodeSavedSession | undefined
+        return r.rows[0] ? decryptJson<NodeSavedSession>(r.rows[0].value) : undefined
       },
       async set(sub, value) {
         await pool.query(
           'INSERT INTO oauth_session (sub, value) VALUES ($1, $2) ON CONFLICT (sub) DO UPDATE SET value = EXCLUDED.value, updated_at = now()',
-          [sub, JSON.stringify(value)],
+          [sub, encryptJson(value)],
         )
       },
       async del(sub) {
