@@ -78,7 +78,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 17 | Hosted profile page | G | Rendered from the service profile record plus app.bsky.actor.profile | v1 |
 | 18 | Extended profile fields | G | Fields in the service profile lexicon (section 5) | v1 |
 | 19 | Verified accounts | G | Verification records plus service attestation (section 8) | v2 |
-| 20 | Links | G | Reuse the links field in the Bluesky profile lexicon | v1 |
+| 20 | Links | G | Reuse the links field in the Bluesky profile lexicon: strongRefs to `app.bsky.actor.link` records | v1 |
 | 21 | Image gallery | G | Extra blobs in the user repo | Later |
 | 22 | Hovercards | G | Embeddable script reading the profile API | v2 |
 | 23 | QR code | G | Endpoint returning a QR for the profile URL | v2 |
@@ -122,7 +122,7 @@ The service defines three record types in the user's repository and keeps everyt
 | Email link | none | none | Service database only | Hash of a verified email mapped to a DID (section 6) |
 | Permission rules | none in v1 | none | Service database | Who may fetch each avatar and profile field (section 10) |
 
-**Reuse the Bluesky profile where it fits.** The Bluesky profile record already holds display name, description, an avatar blob that [accepts PNG and JPEG up to 1,000,000 bytes](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json), self-labels, and a links list capped at 10 items. The service reads it as the fallback source and does not copy it.
+**Reuse the Bluesky profile where it fits.** The Bluesky profile record already holds display name, description, an avatar blob that [accepts PNG and JPEG up to 1,000,000 bytes](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json), self-labels, and a links list capped at 10 items. The links field holds strongRefs (uri and cid) to `app.bsky.actor.link` records in the same repo, each with a URL and an optional title, so the indexer also follows that collection and the profile API resolves the refs in order, dropping any whose cid no longer matches. The service reads it as the fallback source and does not copy it.
 
 **Avatar image record (draft).**
 
@@ -151,6 +151,12 @@ The service defines three record types in the user's repository and keeps everyt
 }
 ```
 
+**Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
+
+- **Square crop.** Delivery center-crops a non-square source to a square before resizing (`fit: cover`, centered position). The crop is deterministic and not content-aware. The stored original is never modified. A crop box in the web editor is a later addition.
+- **Minimum size.** Sources must be at least 80 pixels on both sides. The web editor rejects smaller images with a clear message, and delivery treats a smaller source as an invalid image rather than upscaling it.
+- **Client resize.** Before upload, the web editor downscales images in the browser with a canvas to at most 2048 pixels on the long side, then re-encodes toward the 1,000,000 byte cap: JPEG at quality 0.92, 0.85, then 0.75, with a PNG kept as PNG if it fits. This is best effort, so phone photos usually pass but the result is not guaranteed. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
+
 The blob limits copy the Bluesky avatar field so a user can reuse one file in both places. The license values are placeholders for the user-declared license in section 10.
 
 **Two constraints shape this model.**
@@ -166,10 +172,18 @@ Email lookup is the one Gravatar mechanic no atproto service offers, and atproto
 
 1. The user signs in with atproto OAuth. Requested scopes: `atproto`, write access to the three user-repo collections (scope forms in section 10.1), `blob:image/*`, and `account:email` for the linking step only.
 2. The service calls `com.atproto.server.getSession` and reads `email` and `emailConfirmed`.
-3. If the email is confirmed and the user's PDS host is on a trusted list, the link is created. Otherwise the service emails a one-time code and the user enters it.
-4. The service stores SHA256 of the trimmed, lowercased email (the same hash [Gravatar uses](https://docs.gravatar.com/guides/llms-txt/)) mapped to the user's DID. The raw email is discarded after verification.
+3. If the email is confirmed and the user's PDS host is on a trusted list, the link is created. Otherwise the service emails a one-time code and the user enters it. A trusted host never takes a hash that is linked to a different account: that case always needs the mailed code.
+4. The service stores SHA256 of the trimmed, lowercased email (the same hash [Gravatar uses](https://docs.gravatar.com/guides/llms-txt/)) mapped to the user's DID, plus the MD5 for older clients. The raw email is discarded after verification.
 5. Additional emails are added the same way, by one-time code.
-6. Unlinking deletes the mapping immediately.
+6. Unlinking deletes the mapping immediately and starts a 30-day hold (see ownership rules).
+
+**Ownership rules** (issues #63 and #93)
+
+- **One hash, one DID.** Every link, trusted-host or code, is checked against the rules below in one database transaction.
+- **Newest verification wins.** If the hash is already linked to another DID and the new claimant passes the mailed code, the old link is removed in the same transaction. The previous owner is emailed at that address, which says the link was moved and how to reclaim it (sign in and add the address again by code). The raw address is kept only for that case, in the pending code row, and is deleted when the code is confirmed, replaced, or expires.
+- **Cap.** An account links at most 10 emails. The account page and the code request reject the 11th with a clear error before any code is mailed, and the database enforces it too. Re-verifying an email the account already has does not count. Accounts over 10 before this rule keep their links but cannot add more.
+- **Primary.** One email per account is primary. The first one linked is primary by default, the user can change it on the account page, and it is listed first. Unlinking the primary promotes the oldest remaining email.
+- **30-day hold.** When a user unlinks an email, or the indexer sees the account as deleted, the hash moves to the `email_holds` table. No other DID can link it for 30 days. The same DID can reclaim it during the hold. Held hashes are not in `email_links`, so delivery lookups never resolve them. The hold applies to released hashes only: a hash that is still linked can be moved by a verified code, as above.
 
 **Design rules**
 
@@ -253,7 +267,7 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 | Field | Source | Phase |
 | --- | --- | --- |
 | Display name, description, avatar | `app.bsky.actor.profile` | v1 |
-| Links (up to 10) | Links field in `app.bsky.actor.profile` | v1 |
+| Links (up to 10) | Links field in `app.bsky.actor.profile` (strongRefs to `app.bsky.actor.link` records) | v1 |
 | Job title, company, location | `com.blueyvatar.profile` | v1 |
 | Pronouns, pronunciation, timezone, interests | `com.blueyvatar.profile` | v1 |
 | Background color | `com.blueyvatar.profile` | v2 |
@@ -263,22 +277,26 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 
 **Verified accounts.** Gravatar lets users [link and verify accounts such as Instagram, GitHub, TikTok, and Threads](https://www.sqlservercentral.com/blogs/beyond-avatars-how-gravatar-is-transforming-online-identity), and its API [caps unauthenticated responses at four](https://docs.gravatar.com/rest-api). The v2 design is a claim record in the user repo and an attestation record in the service repo that points at the claim. The profile API returns only claims that have an attestation. No source I read documents how Gravatar performs each verification, so the verification methods per platform are an open item (section 13).
 
+**Re-verification and revocation.** The indexer re-checks attested claims on a timer. Every `REVERIFY_INTERVAL_HOURS` (default 24) it selects claims whose last successful verification (`attestations.verified_at`) is older than `REVERIFY_AFTER_DAYS` (default 30), and re-runs the verifier in batches of 50 with a short pause between batches. Each attempt stamps `last_checked_at`. A success resets `fail_count` to 0 and restarts the 30 day window. A failure adds 1 to `fail_count`. The third consecutive failure revokes the claim: the attestation record is deleted from the service repo, the index row is marked `revoked`, and the badge disappears from the profile JSON, the profile page, and delivery. A claim that fails at 3 days of checks therefore loses its badge about 33 days after verification. Failures that say nothing about the claim (HTTP 5xx or 429, network errors, a missing handle) do not count. rel="me" claims re-run the same reciprocal-link check as the claims page. GitHub and Mastodon claims were proven with OAuth, and the token is not kept, so the re-check confirms only that the account still exists at the claimed address. The user is emailed once on revocation. The service stores only email hashes (section 6), so no address is available to the indexer today and the notice is skipped with a log line until an address source is chosen.
+
 **Profile page.** A hosted page at `/p/{handle}` renders the profile, and the same data is available as JSON at the profile route in section 7. A user's handle works as the page slug, so no separate username system is needed.
 
 **Hovercards.** A small embeddable script shows a profile card when a visitor hovers an avatar. Gravatar ships this as an [npm package and WordPress block](https://fao.wordpress.org/plugins/?p=12258). Verified accounts the user chose to hide are omitted from the card.
 
-**QR code.** An endpoint returns a QR code for the profile URL, with a size parameter, as Gravatar [offers](https://docs.gravatar.com/guides/llms-txt/).
+**QR code.** An endpoint returns a QR code for the profile URL, with a size parameter, as Gravatar [offers](https://docs.gravatar.com/guides/llms-txt/). The optional `to=` parameter (a platform name such as `github`) makes the code encode `/go/{handle}/{platform}` instead of the profile URL. That public route redirects to the user's verified, non-hidden account on that platform when its link is https, and otherwise to the profile page.
 
 ## 9. Ratings, safety, and privacy
 
 Gravatar's four ratings map onto atproto's existing self-label values, so ratings travel with the image and other apps can read them. The mapping below is a proposal. The values atproto supports for self-labeling are [`!no-unauthenticated`, `porn`, `sexual`, `nudity`, and `graphic-media`](https://docs.bsky.app/docs/advanced-guides/moderation).
 
-| Rating | Meaning | Self-label on the image record |
-| --- | --- | --- |
-| G | Suitable for all audiences | No label |
-| PG | Non-sexual nudity or mild content | `nudity` |
-| R | Sexually suggestive or graphic media | `sexual` or `graphic-media` |
-| X | Adult content | `porn` |
+| Rating | Meaning | Example | Self-label on the image record |
+| --- | --- | --- | --- |
+| G | Suitable for all audiences | A portrait, a pet, a logo, or a landscape | No label |
+| PG | Non-sexual nudity or mild content | A classical statue, a breastfeeding photo, or a beach photo with bare skin and no sexual context | `nudity` |
+| R | Sexually suggestive or graphic media | Lingerie or provocative posing without explicit acts, or a medical image with graphic injury | `sexual` or `graphic-media` |
+| X | Adult content | Explicit sexual imagery | `porn` |
+
+**Difference from Gravatar's R.** Gravatar's R rating [includes nudity](https://docs.gravatar.com/api/images/) alongside violence and strong language. blueyvatar rates non-sexual nudity PG, following Bluesky's `nudity` label, and reserves R for sexually suggestive or graphic content. An image Gravatar rates R for non-sexual nudity may therefore be PG here, and a G-only request still excludes it.
 
 Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to ignore](https://docs.bsky.app/docs/advanced-guides/moderation), which is why it sits at PG. Gravatar shows [only G-rated images unless the caller asks for more](https://docs.gravatar.com/api/images/), and the service keeps that default.
 
@@ -462,7 +480,7 @@ Thirteen items in the table below need a decision or an answer before build, and
 | 2 | Support MD5 hashes? | Older Gravatar integrations send MD5. [Libravatar](https://wiki.libravatar.org/api/) and [Unavatar](https://github.com/microlinkhq/unavatar) accept it, but MD5 is weaker | Decision needed |
 | 3 | Which verification method for each outside account? | Verified accounts depend on it | Gravatar's methods are not documented in the pages I read |
 | 4 | Which Gravatar details are missing? | Multiple emails per account, upload limits, cropping, abuse flow | Not confirmed in sources; can be pulled from Gravatar support docs |
-| 5 | Two DIDs claim the same email hash | Wrong owner would receive the avatar | Policy needed, for example both must pass a mailed code and the newest verification wins |
+| 5 | Two DIDs claim the same email hash | Wrong owner would receive the avatar | Decided (issues #63 and #93, section 6): one hash maps to one DID, a mailed code is required to take a hash from another DID, the newest verification wins and the previous owner is emailed, 10 emails per account, one primary, 30-day hold after unlink or account deletion |
 | 6 | Hash lookups reveal whether an email has a linked account | Anyone can test a list of known addresses | Mitigate with rate limits and a user opt-out of email lookup |
 | 7 | Honor the `!no-unauthenticated` self-label? | It could serve as a privacy signal | Semantics confirmed: the atproto labels guide says it [makes the content inaccessible to logged-out users in applications which respect the label](https://atproto.com/guides/labels), lists it as a global value usable as a self-label, and leaves enforcement to applications. The [label spec](https://atproto.com/specs/label) does not mention it. Decision needed: avatar requests carry no viewer session, so honoring it would mean refusing delivery for that account (my inference) |
 | 8 | Atproto spaces timing | Real access control for avatars depends on it | [Alpha since August 20, 2026, not for production, launch targeted later this year](https://atproto.com/blog/atproto-spaces-alpha) |

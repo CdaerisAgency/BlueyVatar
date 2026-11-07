@@ -58,25 +58,14 @@ export function snapQuality(quality: number): number {
 }
 
 /**
- * The one canonical, CDN-cacheable path per image variant (spec sections 7 and 14.1). Size snaps
- * up to the ladder and quality to `IMAGE_QUALITIES`. PNG and the default quality carry no `-q`
- * suffix, so every variant has exactly one URL. The avatar redirect, warm, purge, and `/img`
- * itself all build paths here. Every tier cap (512, 1024, 2048) is a ladder step, so snapping a
- * clamped size up never exceeds the cap.
+ * The one canonical file name per image variant (spec sections 7 and 14.1). Size snaps up to the
+ * ladder and quality to `IMAGE_QUALITIES`. PNG and the default quality carry no `-q` suffix, so
+ * every variant has exactly one name. The signed path builder in sign.ts wraps this, and the
+ * avatar redirect, warm, purge, and `/img` itself all go through it. Every tier cap (512, 1024,
+ * 2048) is a ladder step, so snapping a clamped size up never exceeds the cap.
  */
-export function imagePath(did: string, cid: string, size: number, ext: ImageExt, quality?: number): string {
+export function imageFile(size: number, ext: ImageExt, quality?: number): string {
   const q = quality === undefined || ext === 'png' ? CANONICAL_QUALITY : snapQuality(quality)
   const suffix = q === CANONICAL_QUALITY ? '' : `-q${q}`
-  return `/img/${encodeURIComponent(did)}/${cid}/${snapSize(size)}${suffix}.${ext}`
-}
-
-/**
- * Every `/img` path that can exist for a CID: all ladder sizes, all formats, and every allowed
- * quality for JPEG and WebP. Purge covers exactly this set, because `/img` redirects any other
- * request to one of these paths.
- */
-export function ladderPaths(did: string, cid: string, sizes: readonly number[] = IMAGE_SIZE_LADDER, formats: readonly ImageExt[] = IMAGE_FORMATS): string[] {
-  return sizes.flatMap((s) => formats.flatMap((f) => (
-    f === 'png' ? [imagePath(did, cid, s, f)] : IMAGE_QUALITIES.map((q) => imagePath(did, cid, s, f, q))
-  )))
+  return `${snapSize(size)}${suffix}.${ext}`
 }

@@ -8,6 +8,7 @@ import {
   labelsForRating,
   parseInterests,
   selfLabels,
+  readImageSize,
   sniffImageMime,
   validateImageBytes,
   validateNewImage,
@@ -15,7 +16,15 @@ import {
 } from './records'
 import { ratingFromLabels } from '@blueyvatar/core'
 
-const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0])
+function pngBytes(w: number, h: number, extra = 0): Uint8Array {
+  const b = new Uint8Array(24 + extra)
+  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])
+  const v = new DataView(b.buffer)
+  v.setUint32(16, w)
+  v.setUint32(20, h)
+  return b
+}
+const PNG = pngBytes(100, 100)
 const JPG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0])
 const blank = { jobTitle: '', company: '', location: '', pronouns: '', pronunciation: '', timezone: '', interests: '' }
 
@@ -48,12 +57,22 @@ describe('image bytes', () => {
     expect(sniffImageMime(Uint8Array.from([0x47, 0x49, 0x46, 0x38]))).toBeNull()
   })
   it('enforces the size limit exactly', () => {
-    const at = new Uint8Array(MAX_BLOB_BYTES)
-    at.set(PNG)
+    const at = pngBytes(100, 100, MAX_BLOB_BYTES - 24)
     expect(validateImageBytes(at)).toMatchObject({ ok: true, value: { mime: 'image/png' } })
-    const over = new Uint8Array(MAX_BLOB_BYTES + 1)
-    over.set(PNG)
+    const over = pngBytes(100, 100, MAX_BLOB_BYTES + 1 - 24)
     expect(validateImageBytes(over).ok).toBe(false)
+  })
+  it('reads PNG and JPEG dimensions', () => {
+    expect(readImageSize(pngBytes(300, 120))).toEqual({ width: 300, height: 120 })
+    // SOI, APP0 (len 4), SOF0 with height 90 and width 200.
+    const jpg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, 0, 90, 0, 200, 1, 1, 0x11, 0])
+    expect(readImageSize(jpg)).toEqual({ width: 200, height: 90 })
+    expect(readImageSize(JPG)).toBeNull()
+  })
+  it('rejects images under 80px on either side', () => {
+    expect(validateImageBytes(pngBytes(80, 80)).ok).toBe(true)
+    expect(validateImageBytes(pngBytes(79, 500))).toMatchObject({ ok: false, error: expect.stringContaining('80 by 80') })
+    expect(validateImageBytes(pngBytes(500, 79)).ok).toBe(false)
   })
   it('rejects empty and unsupported files', () => {
     expect(validateImageBytes(new Uint8Array(0)).ok).toBe(false)

@@ -9,11 +9,13 @@ import { ladderPaths } from '@blueyvatar/core'
  * tag, prefix, and purge-everything share 5 requests per minute. Endpoint and body:
  * https://developers.cloudflare.com/api/resources/cache/methods/purge/
  *
- * Default mode "files" purges every URL that can exist per CID: the size ladder, all formats, and
- * each allowed quality for JPEG and WebP (75 URLs). `/img` serves only those canonical paths and
- * redirects anything else (off-ladder size, other quality, query string) to one of them, so the
- * set is complete. Mode "prefix" purges `host/img/{did}/{cid}/` in one operation, at the cost of
- * the 5 per minute limit.
+ * Default mode "files" purges every public-scope URL that can exist per CID: the size ladder, all
+ * formats, and each allowed quality for JPEG and WebP (75 URLs), signed with IMG_SIGNING_SECRET.
+ * `/img` serves only those canonical paths and redirects anything else (off-ladder size, other
+ * quality, query string) to one of them, so the set is complete for public avatars. LIMITATION:
+ * restricted avatars use per-caller scoped URLs that are not listed here. Mode "prefix" purges
+ * `host/img/{did}/{cid}/` in one operation and covers every variant, at the cost of the 5 per
+ * minute limit.
  */
 export interface PurgeLogger { info(msg: string, meta?: unknown): void; error(msg: string, meta?: unknown): void }
 export type PurgeMode = 'files' | 'prefix'
@@ -23,6 +25,8 @@ export interface CloudflarePurgerOptions {
   apiToken: string
   /** Public origin of the delivery API, such as https://blueyvatar.com. */
   publicUrl: string
+  /** Delivery's IMG_SIGNING_SECRET, needed to build the ladder URLs in "files" mode. */
+  signingSecret?: string
   mode?: PurgeMode
   retries?: number
   retryDelayMs?: number
@@ -40,7 +44,7 @@ export class CloudflarePurger {
     const base = this.o.publicUrl.replace(/\/$/, '')
     const items = this.o.mode === 'prefix'
       ? cids.map((cid) => `${base.replace(/^https?:\/\//, '')}/img/${encodeURIComponent(did)}/${cid}/`)
-      : cids.flatMap((cid) => ladderPaths(did, cid).map((p) => base + p))
+      : cids.flatMap((cid) => ladderPaths(this.o.signingSecret ?? '', did, cid).map((p) => base + p))
     const key = this.o.mode === 'prefix' ? 'prefixes' : 'files'
     for (let i = 0; i < items.length; i += FILES_PER_REQUEST) {
       await this.send({ [key]: items.slice(i, i + FILES_PER_REQUEST) }, did)
@@ -72,11 +76,12 @@ export class CloudflarePurger {
 
 /** Returns a purge hook, or a no-op logger when CF_ZONE_ID, CF_API_TOKEN, or PUBLIC_DELIVERY_URL is unset. */
 export function purgerFromEnv(env = process.env): (did: string, cids: string[]) => Promise<void> {
-  const { CF_ZONE_ID: zoneId, CF_API_TOKEN: apiToken, PUBLIC_DELIVERY_URL: publicUrl } = env
-  if (!zoneId || !apiToken || !publicUrl) {
-    console.warn('CF_ZONE_ID, CF_API_TOKEN, or PUBLIC_DELIVERY_URL is not set; Cloudflare purges are logged only')
+  const { CF_ZONE_ID: zoneId, CF_API_TOKEN: apiToken, PUBLIC_DELIVERY_URL: publicUrl, IMG_SIGNING_SECRET: signingSecret } = env
+  const mode: PurgeMode = env.CF_PURGE_MODE === 'prefix' ? 'prefix' : 'files'
+  if (!zoneId || !apiToken || !publicUrl || (mode === 'files' && !signingSecret)) {
+    console.warn('CF_ZONE_ID, CF_API_TOKEN, PUBLIC_DELIVERY_URL, or IMG_SIGNING_SECRET (files mode) is not set; Cloudflare purges are logged only')
     return async (did, cids) => console.log('purge (no-op)', did, cids)
   }
-  const purger = new CloudflarePurger({ zoneId, apiToken, publicUrl, mode: env.CF_PURGE_MODE === 'prefix' ? 'prefix' : 'files' })
+  const purger = new CloudflarePurger({ zoneId, apiToken, publicUrl, signingSecret, mode })
   return (did, cids) => purger.purge(did, cids)
 }

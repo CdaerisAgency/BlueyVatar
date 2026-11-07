@@ -61,6 +61,20 @@ export class PgIndexWrites implements IndexWrites {
     await this.pool.query('DELETE FROM claims WHERE did = $1 AND rkey = $2', [did, rkey])
   }
 
+  async upsertProfileLink(r: Parameters<IndexWrites['upsertProfileLink']>[0]): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO profile_links (did, rkey, cid, url, title, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (did, rkey) DO UPDATE SET
+            cid = EXCLUDED.cid, url = EXCLUDED.url, title = EXCLUDED.title,
+            created_at = EXCLUDED.created_at, indexed_at = now()`,
+      [r.did, r.rkey, r.cid, r.url, r.title, r.createdAt],
+    )
+  }
+
+  async deleteProfileLink(did: string, rkey: string): Promise<void> {
+    await this.pool.query('DELETE FROM profile_links WHERE did = $1 AND rkey = $2', [did, rkey])
+  }
+
   async setRepoStatus(did: string, handle: string | null, active: boolean, status?: string): Promise<void> {
     await this.pool.query(
       `INSERT INTO repos (did, handle, active, status) VALUES ($1, $2, $3, $4)
@@ -68,7 +82,30 @@ export class PgIndexWrites implements IndexWrites {
             handle = EXCLUDED.handle, active = EXCLUDED.active, status = EXCLUDED.status, updated_at = now()`,
       [did, handle, active, status ?? (active ? 'active' : null)],
     )
+    if (status === 'deleted') await this.releaseEmails(did)
     if (!active) await this.purgeImages(did)
+  }
+
+  /** Account deleted: its email links become 30-day holds so no other DID can claim them at once (spec section 6). */
+  private async releaseEmails(did: string): Promise<void> {
+    const c = await this.pool.connect()
+    try {
+      await c.query('BEGIN')
+      await c.query(
+        `INSERT INTO email_holds (email_hash, did, reason)
+              SELECT email_hash, did, 'account_deleted' FROM email_links WHERE did = $1
+         ON CONFLICT (email_hash) DO UPDATE SET did = EXCLUDED.did, released_at = now(), reason = EXCLUDED.reason`,
+        [did],
+      )
+      await c.query('DELETE FROM email_links WHERE did = $1', [did])
+      await c.query('DELETE FROM email_codes WHERE did = $1', [did])
+      await c.query('COMMIT')
+    } catch (err) {
+      await c.query('ROLLBACK').catch(() => {})
+      throw err
+    } finally {
+      c.release()
+    }
   }
 
   async purgeImages(did: string, cids?: string[]): Promise<void> {
