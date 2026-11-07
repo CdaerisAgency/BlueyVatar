@@ -9,9 +9,9 @@ app = "blueyvatar-tap"
 primary_region = "iad"
 
 [build]
-  # TODO: pin a real tag or digest from the indigo package registry before the first deploy.
+  # Pinned to tag 0.1.10 (latest semver tag in the ghcr.io registry, checked 2026-11-04) plus its digest.
   # Do not deploy with :latest. https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
-  image = "ghcr.io/bluesky-social/indigo/tap:PIN_REAL_TAG"
+  image = "ghcr.io/bluesky-social/indigo/tap:0.1.10@sha256:5e20bfe416d29fcd215ed8bf99f10b2ab825a6de4e5599846dd33967ade2abeb"
 
 # Env names come from the Tap README:
 # https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md
@@ -21,8 +21,8 @@ primary_region = "iad"
   TAP_SIGNAL_COLLECTION = "com.blueyvatar.profile"
   TAP_COLLECTION_FILTERS = "com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile"
   TAP_LOG_LEVEL = "error"
-  # UNCONFIRMED: the README default is sqlite://./tap.db and does not say where that lands in the
-  # container. This path keeps the database on the /data volume; verify the URL form in staging.
+  # The README default is sqlite://./tap.db and does not say where that lands in the container.
+  # This path keeps the database on the /data volume (confirmed in staging on 2026-11-04).
   TAP_DATABASE_URL = "sqlite:///data/tap.db"
 
 # One volume means one machine; run Tap as a single machine.
@@ -31,13 +31,13 @@ primary_region = "iad"
   source = "tap_data"
   destination = "/data"
 
-# Health check on the documented /health endpoint (https://docs.fly.io/reference/configuration, [checks] section).
+# TCP check on the Tap port (https://docs.fly.io/reference/configuration, [checks] section).
+# An HTTP check on /health does not work: Tap 0.1.10 answers 401 without the admin password
+# (seen in staging on November 4, 2026), and the password must not be committed here.
 [checks]
   [checks.tap_health]
-    type = "http"
+    type = "tcp"
     port = 2480
-    path = "/health"
-    method = "GET"
     grace_period = "30s"
     interval = "30s"
     timeout = "5s"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { emailHash, qrSvg, type Candidate } from '@blueyvatar/core'
+import { emailHash, emailMd5, qrSvg, type Candidate } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
@@ -52,11 +52,60 @@ describe('delivery API', () => {
     expect(res.headers.get('set-cookie')).toBeNull()
   })
 
-  it('rejects anything that is not a SHA256 hash', async () => {
+  it('rejects a raw email in the hash position', async () => {
     const { app } = setup()
     const res = await app.request('/avatar/alice@example.com')
     expect(res.status).toBe(400)
     expect((await res.json()).error.code).toBe('invalid_identifier')
+  })
+
+  it('redirects an MD5 email hash exactly like its SHA256', async () => {
+    const { app, index } = setup()
+    index.md5s.set(emailMd5('alice@example.com'), emailHash('alice@example.com'))
+    const sha = await app.request(`/avatar/${emailHash('alice@example.com')}?s=64`)
+    const md5 = await app.request(`/avatar/${emailMd5('  Alice@Example.com ')}?s=64`)
+    expect(md5.status).toBe(302)
+    expect(md5.headers.get('location')).toBe(sha.headers.get('location'))
+    expect(md5.headers.get('x-rate-limit-limit')).toBe('100')
+    expect(md5.headers.get('set-cookie')).toBeNull()
+    expect((await app.request(`/avatar/${emailMd5('alice@example.com').toUpperCase()}.png`)).status).toBe(302)
+  })
+
+  it('rejects hashes that are neither 32 nor 64 hex characters', async () => {
+    const { app } = setup()
+    for (const bad of ['a'.repeat(31), 'a'.repeat(33), 'a'.repeat(40), 'a'.repeat(63), 'a'.repeat(65), 'z'.repeat(32), 'alice@example.com']) {
+      const res = await app.request(`/avatar/${bad}`)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error.code).toBe('invalid_identifier')
+    }
+  })
+
+  it('answers unlinked and opted-out hashes identically, for MD5 as for SHA256', async () => {
+    const { app, index } = setup()
+    index.md5s.set(emailMd5('alice@example.com'), emailHash('alice@example.com'))
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, emailLookupOptOut: true })
+    const shape = async (hash: string, d: string) => {
+      const res = await app.request(`/avatar/${hash}?d=${d}`, { headers: { 'cf-connecting-ip': '203.0.113.50' } })
+      return { status: res.status, cache: res.headers.get('cache-control'), body: await res.text() }
+    }
+    for (const d of ['404', 'mp']) {
+      expect(await shape(emailMd5('alice@example.com'), d)).toEqual(await shape(emailMd5('nobody@example.com'), d))
+      expect(await shape(emailHash('alice@example.com'), d)).toEqual(await shape(emailHash('nobody@example.com'), d))
+    }
+    expect((await shape(emailMd5('alice@example.com'), '404')).status).toBe(404)
+  })
+
+  it('applies visibility rules and the anonymous daily limit to MD5 lookups', async () => {
+    const { app, index } = setup()
+    const md5 = emailMd5('alice@example.com')
+    index.md5s.set(md5, emailHash('alice@example.com'))
+    index.rules.set(DID, { ...PUBLIC_VISIBILITY, keyedOnly: true })
+    expect((await app.request(`/avatar/${md5}?d=404`)).status).toBe(404)
+    expect((await app.request(`/avatar/${md5}`, { headers: { 'x-api-key': 'sk_test' } })).status).toBe(302)
+    index.rules.clear()
+    let last = 0
+    for (let i = 0; i < 101; i++) last = (await app.request(`/avatar/${md5}`, { headers: { 'cf-connecting-ip': '203.0.113.77' } })).status
+    expect(last).toBe(429)
   })
 
   it('serves the default when nothing passes the rating filter', async () => {
@@ -111,6 +160,22 @@ describe('delivery API', () => {
     const res = await app.request('/profile/alice.test', { headers: { origin: 'https://site.test' } })
     expect(res.headers.get('access-control-allow-origin')).toBe('*')
     expect(res.headers.get('access-control-allow-credentials')).toBeNull()
+  })
+
+  it('treats a profile with no candidates, as a labeled one yields, like any default response', async () => {
+    const withAvatar = setup()
+    const labeled = setup([])
+    for (const path of ['/u/alice.test?d=identicon', `/avatar/${emailHash('alice@example.com')}?d=identicon`]) {
+      const a = await withAvatar.app.request(path)
+      const b = await labeled.app.request(path)
+      expect(b.status).toBe(302)
+      expect(b.headers.get('location')).toMatch(/^\/default\/identicon\/80\.png/)
+      expect(b.headers.get('cache-control')).toBe('private, max-age=86400')
+      expect(a.headers.get('location')).toMatch(/^\/img\//)
+    }
+    const json = await (await labeled.app.request('/u/alice.test?json=true')).json()
+    expect(json).toMatchObject({ found: false, source: 'default', rating: null, url: null })
+    expect((await (await labeled.app.request('/profile/alice.test')).json()).avatar).toBeNull()
   })
 
   it('returns profile JSON', async () => {
