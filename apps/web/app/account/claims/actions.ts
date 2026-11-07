@@ -15,6 +15,7 @@ import { RepoError, repoSession } from '../../../lib/repo'
 import { safeFetch } from '../../../lib/safe-fetch'
 import { verifyRelMe } from '../../../lib/verify'
 import { attestVerified, coolingDown, removeClaim } from '../../../lib/verification-service'
+import { reportError } from '../../../lib/obs'
 
 const CALLBACK_PATH = '/account/claims/callback'
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/claims?${key}=${encodeURIComponent(value)}`)
@@ -37,7 +38,7 @@ export async function addClaim(form: FormData): Promise<void> {
     const ref = await createClaim(session, record)
     await getClaimStore().upsertClaim(did, ref.uri.slice(ref.uri.lastIndexOf('/') + 1), record)
   } catch (err) {
-    console.error('claim add failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim add failed', err)
     return back('error', message(err))
   }
   return back('done', 'Claim added. Run verification to show it on your profile.')
@@ -48,7 +49,7 @@ export async function deleteClaimAction(form: FormData): Promise<void> {
   try {
     await removeClaim(await repoSession(did), String(form.get('rkey') ?? ''))
   } catch (err) {
-    console.error('claim delete failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim delete failed', err)
     return back('error', message(err))
   }
   return back('done', 'Claim deleted and its attestation removed.')
@@ -65,7 +66,7 @@ export async function setHidden(form: FormData): Promise<void> {
     await putClaim(session, claim.rkey, value, claim.cid)
     await getClaimStore().upsertClaim(did, claim.rkey, value)
   } catch (err) {
-    console.error('claim hide failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim hide failed', err)
     return back('error', message(err))
   }
   return back('done', hidden ? 'Hidden from hovercards.' : 'Shown in hovercards.')
@@ -138,7 +139,7 @@ export async function verifyClaim(form: FormData): Promise<void> {
       target = authorizeUrl(app, state)
     }
   } catch (err) {
-    console.error('claim verify failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim verify failed', err)
     return back('error', message(err))
   }
   return redirect(target)
