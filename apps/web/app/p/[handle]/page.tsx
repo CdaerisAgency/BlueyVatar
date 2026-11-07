@@ -1,7 +1,9 @@
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import AvatarRing from '../../../components/AvatarRing'
+import { PageMain } from '../../../components/Page'
 import { pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
+import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
 // Link previews are fetched by outside crawlers, so the image needs the public delivery origin.
@@ -19,19 +21,21 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
   return profileMetadata(p, handle, PUBLIC_DELIVERY_URL)
 }
 
-export default async function ProfilePage({ params }: { params: Promise<{ handle: string }> }) {
+export default async function ProfilePage({ params, searchParams }: { params: Promise<{ handle: string }>; searchParams: Promise<{ report?: string }> }) {
   const { handle } = await params
+  const { report } = await searchParams
   const p = await load(handle)
-  if (!p) return <main className="bv-narrow"><h1>Profile not found</h1></main>
+  if (!p) return <PageMain narrow><h1>Profile not found</h1></PageMain>
   // Only https links render, and accounts the user hid stay off the page.
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
   const links = pageLinks(p)
   const interests = pageInterests(p)
+  const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
   return (
-    <main className="bv-narrow">
-      <div className="bv-profile">
+    <PageMain narrow>
+      <div className="flex flex-col items-center text-center [&_p]:mb-2">
         {p.avatar && <AvatarRing src={`${DELIVERY_URL}${p.avatar.url}`} alt="" size={380} referrerPolicy="no-referrer" />}
-        <h1>{p.displayName ?? p.handle}</h1>
+        <h1 className="mt-5 mb-2">{p.displayName ?? p.handle}</h1>
         {p.pronouns && <p>{p.pronouns}</p>}
         {(p.jobTitle || p.company) && <p>{[p.jobTitle, p.company].filter(Boolean).join(', ')}</p>}
         {p.location && <p>{p.location}</p>}
@@ -39,7 +43,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         {p.description && <p>{p.description}</p>}
         {interests.length > 0 && <p>Interests: {interests.join(', ')}</p>}
         {links.length > 0 && (
-          <ul aria-label="Links">
+          <ul aria-label="Links" className={list}>
             {links.map((l) => (
               <li key={l.url}>
                 <a href={l.url} rel="me nofollow noopener noreferrer">{l.label}</a>
@@ -48,7 +52,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           </ul>
         )}
         {accounts.length > 0 && (
-          <ul aria-label="Verified accounts">
+          <ul aria-label="Verified accounts" className={list}>
             {accounts.map((a) => (
               <li key={a.uri}>
                 <a href={a.uri} rel="me noopener">{a.platform}</a>
@@ -57,6 +61,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           </ul>
         )}
       </div>
-    </main>
+      <ReportForm did={p.did} source="profile" back={`/p/${encodeURIComponent(handle)}`} status={report} />
+    </PageMain>
   )
 }

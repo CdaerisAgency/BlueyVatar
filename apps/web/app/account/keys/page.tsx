@@ -1,3 +1,4 @@
+import { PageMain, TableBox } from '../../../components/Page'
 import { ENTITLEMENTS, TIERS, type Tier } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
@@ -33,7 +34,7 @@ export default async function KeysPage() {
   const reason = license.status !== 'active' ? `This license is ${license.status.replace('_', ' ')}. New keys are disabled.` : !canPub && !canSec ? 'Key limit reached for this tier. Revoke a key to add another.' : null
 
   return (
-    <main>
+    <PageMain>
       <AccountNav />
       <h1>License and API keys</h1>
       <p>Signed in as {did}</p>
@@ -60,7 +61,7 @@ export default async function KeysPage() {
       {periods.length > 0 && (
         <>
           <h2>Usage history</h2>
-          <div className="bv-scroll" role="region" aria-label="Usage history" tabIndex={0}>
+          <TableBox label="Usage history">
           <table>
             <thead>
               <tr>
@@ -81,7 +82,7 @@ export default async function KeysPage() {
               ))}
             </tbody>
           </table>
-          </div>
+          </TableBox>
           <p>{license.tier === 'pro' ? 'Pro shows 30 days of history.' : 'Shows up to 12 months of history.'}</p>
         </>
       )}
@@ -90,7 +91,7 @@ export default async function KeysPage() {
       {keys.length === 0 && <p>No keys yet.</p>}
       <ul>
         {keys.map((k) => (
-          <li key={k.hash} style={{ marginBottom: 16 }}>
+          <li key={k.hash} className="mb-4">
             <code>{k.prefix}...</code> {k.kind} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
             {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : ''}
             {k.kind === 'publishable' && !k.revokedAt && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
@@ -103,7 +104,7 @@ export default async function KeysPage() {
       <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} />
 
       <h2>Tiers</h2>
-      <div className="bv-scroll" role="region" aria-label="Tiers" tabIndex={0}>
+      <TableBox label="Tiers">
       <table>
         <thead>
           <tr>
@@ -135,7 +136,7 @@ export default async function KeysPage() {
           ))}
         </tbody>
       </table>
-      </div>
-    </main>
+      </TableBox>
+    </PageMain>
   )
 }

@@ -1,4 +1,5 @@
 'use client'
+import { Button } from '../../../components/Button'
 
 import { useActionState } from 'react'
 import { createKey, revokeKey, rotateKey, saveDomains, type KeyState } from './actions'
@@ -41,9 +42,9 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason }:
         <label>
           Label <input name="label" maxLength={60} placeholder="optional" />
         </label>
-        <button type="submit" className="bv-primary" disabled={pending || !!disabledReason}>
+        <Button type="submit" variant="primary" disabled={pending || !!disabledReason}>
           Create key
-        </button>
+        </Button>
       </form>
       <Result s={state} />
     </section>
@@ -65,23 +66,23 @@ export function KeyActions({ hash, kind, domains, domainsEnabled }: { hash: stri
               <textarea name="domains" rows={3} cols={40} defaultValue={domains.join('\n')} />
             </label>
             <br />
-            <button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving}>
               Save domains
-            </button>
+            </Button>
             <Result s={dom} />
           </form>
         ) : (
           <p>Domain restrictions are not included in the Free tier.</p>
         ))}
-      <form action={rotate} style={{ display: 'inline' }}>
+      <form action={rotate} className="inline">
         <input type="hidden" name="hash" value={hash} />
-        <button type="submit" disabled={rotating}>
+        <Button type="submit" disabled={rotating}>
           Rotate
-        </button>
+        </Button>
       </form>{' '}
-      <form action={revokeKey} style={{ display: 'inline' }}>
+      <form action={revokeKey} className="inline">
         <input type="hidden" name="hash" value={hash} />
-        <button type="submit">Revoke</button>
+        <Button type="submit">Revoke</Button>
       </form>
       <Result s={rot} />
     </div>

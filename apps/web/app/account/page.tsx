@@ -1,3 +1,5 @@
+import { PageMain } from '../../components/Page'
+import { Button } from '../../components/Button'
 import { redirect } from 'next/navigation'
 import { qrSvg } from '@blueyvatar/core'
 import { addEmail, linkEmail, makePrimary, unlink } from '../actions'
@@ -40,7 +42,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const qrUrl = handle ? (target ? `${PUBLIC_URL}/go/${encodeURIComponent(handle)}/${target}` : `${PUBLIC_URL}/p/${handle}`) : null
   const svg = qrUrl ? qrSvg(qrUrl, 256) : null
   return (
-    <main>
+    <PageMain>
       <AccountNav />
       <h1>Account</h1>
       <p>Signed in as {did}</p>
@@ -55,14 +57,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <li key={l.emailHash}>
               <code>{l.emailHash}</code> ({l.method}){l.primary && <strong> primary</strong>}{' '}
               {!l.primary && (
-                <form action={makePrimary} style={{ display: 'inline' }}>
+                <form action={makePrimary} className="inline">
                   <input type="hidden" name="hash" value={l.emailHash} />
-                  <button type="submit">Make primary</button>
+                  <Button type="submit">Make primary</Button>
                 </form>
               )}{' '}
-              <form action={unlink} style={{ display: 'inline' }}>
+              <form action={unlink} className="inline">
                 <input type="hidden" name="hash" value={l.emailHash} />
-                <button type="submit">Unlink</button>
+                <Button type="submit">Unlink</Button>
               </form>
             </li>
           ))}
@@ -74,13 +76,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         link it again until then.
       </p>
       <form action={linkEmail}>
-        <button type="submit" className="bv-primary">Link the email from my PDS</button>
+        <Button type="submit" variant="primary">Link the email from my PDS</Button>
       </form>
       <form action={addEmail}>
         <label>
           Add another email by code <input name="email" type="email" required autoComplete="email" />
         </label>
-        <button type="submit" className="bv-primary">Send code</button>
+        <Button type="submit" variant="primary">Send code</Button>
       </form>
       <h2>QR code</h2>
       {svg && qrUrl ? (
@@ -95,7 +97,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 ))}
               </select>
             </label>{' '}
-            <button type="submit">Update</button>
+            <Button type="submit">Update</Button>
           </form>
           <p>
             <img src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} alt={`QR code for ${qrUrl}`} width={256} height={256} />
@@ -111,8 +113,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <p>Your QR code is unavailable until your handle can be loaded.</p>
       )}
       <form action="/logout" method="post">
-        <button type="submit">Sign out</button>
+        <Button type="submit">Sign out</Button>
       </form>
-    </main>
+    </PageMain>
   )
 }

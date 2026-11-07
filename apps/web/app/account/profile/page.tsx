@@ -1,3 +1,5 @@
+import { PageMain } from '../../../components/Page'
+import { Button } from '../../../components/Button'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
@@ -24,7 +26,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     </label>
   )
   return (
-    <main>
+    <PageMain>
       <AccountNav />
       <h1>Profile</h1>
       <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your Bluesky profile.</p>
@@ -42,10 +44,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           Interests (up to {MAX_INTERESTS}, separated by commas or new lines)
           <textarea name="interests" rows={3} defaultValue={(p.interests ?? []).join(', ')} />
         </label>
-        <button type="submit" className="bv-primary" disabled={loadError !== null}>
+        <Button type="submit" variant="primary" disabled={loadError !== null}>
           Save profile
-        </button>
+        </Button>
       </form>
-    </main>
+    </PageMain>
   )
 }

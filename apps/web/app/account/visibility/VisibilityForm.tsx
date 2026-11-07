@@ -1,4 +1,5 @@
 'use client'
+import { Button } from '../../../components/Button'
 
 import { useActionState } from 'react'
 import type { VisibilityRules } from '../../../lib/visibility'
@@ -32,7 +33,7 @@ export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
           <input type="checkbox" name="emailLookupOptOut" defaultChecked={rules.emailLookupOptOut} /> Opt out of email lookup: people cannot find my avatar by email hash.
         </label>
       </p>
-      <button type="submit" className="bv-primary" disabled={pending}>Save</button>
+      <Button type="submit" variant="primary" disabled={pending}>Save</Button>
       {state.error && <p role="alert">{state.error}</p>}
       {state.saved && <p role="status">Saved. Changes apply on the next request.</p>}
     </form>

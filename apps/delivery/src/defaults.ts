@@ -160,11 +160,18 @@ export function cleanInitials(raw: string | undefined): string {
   return (raw ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2)
 }
 
+/** Initials from a display name: the first letters of its first two words, as Gravatar's `name` does. */
+export function initialsFromName(raw: string | null | undefined): string {
+  const words = (raw ?? '').slice(0, 100).split(/[\s._-]+/).filter(Boolean)
+  return cleanInitials(words.slice(0, 2).map((w) => [...w][0]).join(''))
+}
+
 /**
  * `initials` is a handle's first letters. With none, or for a hash seed, it draws the silhouette.
  * `mp` and any unknown style also draw the silhouette.
  */
 export function defaultSvg(style: DefaultStyle | 'service', seed: string, initials?: string): string {
+  if (style === 'blank') return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"/>'
   if (style === 'initials') {
     const text = cleanInitials(initials)
     if (!text) return silhouette()

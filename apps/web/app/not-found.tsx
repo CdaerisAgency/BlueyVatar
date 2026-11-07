@@ -1,14 +1,15 @@
-import Link from 'next/link'
+import { ButtonLink } from '../components/Button'
+import { PageMain } from '../components/Page'
 import { COPY } from '../lib/copy'
 
 export default function NotFound() {
   return (
-    <main className="bv-narrow">
+    <PageMain narrow>
       <h1>{COPY.notFound.title}</h1>
       <p>{COPY.notFound.body}</p>
-      <Link href="/" className="bv-btn bv-primary">
+      <ButtonLink href="/" variant="primary">
         {COPY.notFound.home}
-      </Link>
-    </main>
+      </ButtonLink>
+    </PageMain>
   )
 }

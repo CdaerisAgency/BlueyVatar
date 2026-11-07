@@ -13,7 +13,8 @@ Add `json=true` to an avatar request (`/avatar/{hash}` or `/u/{id}`) to receive 
   "found": true,
   "source": "blueyvatar",
   "rating": "g",
-  "url": "/img/did%3Aplc%3Aabc123/bafkreiexample/80.png"
+  "url": "/img/did%3Aplc%3Aabc123/bafkreiexample/80.png",
+  "updatedDate": "2026-01-02T03:04:05.000Z"
 }
 ```
 
@@ -25,6 +26,7 @@ Add `json=true` to an avatar request (`/avatar/{hash}` or `/u/{id}`) to receive 
 | `source` | string | Where the image came from: `blueyvatar`, `adapter:<name>`, or `blueyvatar-default`. The value is `default` when `found` is `false`. |
 | `rating` | string or null | `g`, `pg`, `r`, or `x` for the chosen image. `null` when `found` is `false`. |
 | `url` | string or null | Path of the immutable resized image, relative to the base URL. `null` when `found` is `false`. |
+| `updatedDate` | string or null | ISO 8601 time the chosen image record was indexed, the closest match to Gravatar's `updated_date`. `null` when `found` is `false` and for images read from another app's profile (such as the Bluesky avatar), which carry no timestamp. |
 
 `url` follows the same `s`, `fmt`, and `q` parameters as the redirect, with two adjustments. The size snaps up to the nearest step of the size ladder (16, 24, 32, 48, 64, 80, 96, 128, 160, 192, 256, 320, 512, 1024, 2048), so `s=100` yields `/128.png`. For `jpeg` and `webp`, `q` snaps to the nearest allowed quality, 60 or 85. Quality 85 is the default and has no suffix. Quality 60 adds `-q60`, for example `/80-q60.webp`. PNG ignores `q`. Fetch the path with a normal GET. `/img` URLs need no key.
 

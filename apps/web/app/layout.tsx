@@ -14,7 +14,7 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
-      <body>
+      <body className="flex min-h-screen flex-col bg-bv-cream font-sans text-[17px] leading-[1.55] text-bv-black [overflow-wrap:anywhere]">
         <SiteNav />
         {children}
         <SiteFooter />

@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
-import { defaultSvg } from './defaults.js'
+import { defaultSvg, initialsFromName } from './defaults.js'
 
 const STYLES = ['identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'pagan'] as const
 const SEEDS = ['alice.test', 'bob.test', 'did:plc:abc123', 'a'.repeat(64)]
@@ -35,5 +35,21 @@ describe('default styles', () => {
     const hashSeed = 'f'.repeat(64)
     expect(defaultSvg('initials', hashSeed)).toBe(defaultSvg('mp', hashSeed))
     expect(defaultSvg('initials', hashSeed, '--')).toBe(defaultSvg('mp', hashSeed))
+  })
+})
+
+describe('blank and name initials', () => {
+  it('blank renders a fully transparent PNG', async () => {
+    const { data, info } = await sharp(Buffer.from(defaultSvg('blank', 'x'))).resize(16).png().ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    expect(info.channels).toBe(4)
+    for (let i = 3; i < data.length; i += 4) expect(data[i]).toBe(0)
+  })
+
+  it('initialsFromName takes the first letters of two words', () => {
+    expect(initialsFromName('Ada Lovelace')).toBe('AL')
+    expect(initialsFromName('ada')).toBe('A')
+    expect(initialsFromName('jean-luc picard')).toBe('JL')
+    expect(initialsFromName('')).toBe('')
+    expect(initialsFromName(null)).toBe('')
   })
 })

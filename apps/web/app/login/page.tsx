@@ -1,10 +1,12 @@
 import { login } from '../actions'
+import { Button } from '../../components/Button'
+import { PageMain } from '../../components/Page'
 import { COPY } from '../../lib/copy'
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams
   return (
-    <main className="bv-narrow">
+    <PageMain narrow>
       <h1>{COPY.login.title}</h1>
       <p>{COPY.login.lead}</p>
       {error && <p role="alert">{error}</p>}
@@ -12,10 +14,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <label>
           {COPY.login.label} <input name="handle" placeholder={COPY.login.placeholder} required autoComplete="username" />
         </label>
-        <button type="submit" className="bv-primary">
+        <Button type="submit" variant="primary">
           {COPY.login.submit}
-        </button>
+        </Button>
       </form>
-    </main>
+    </PageMain>
   )
 }

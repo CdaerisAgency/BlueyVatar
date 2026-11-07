@@ -1,3 +1,5 @@
+import { Note, PageMain, TableBox } from '../../../components/Page'
+import { Button } from '../../../components/Button'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { cfSaasConfig, fallbackOrigin, getHostname, type HostnameState } from '../../../lib/cf-saas'
@@ -34,7 +36,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
   }
 
   return (
-    <main>
+    <PageMain>
       <AccountNav />
       <h1>Custom profile domain</h1>
       <p>Serve your profile from your own subdomain, such as me.example.com.</p>
@@ -43,11 +45,11 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
       {!cfg || !target ? (
         <p>Custom domains are not available yet. Check back soon.</p>
       ) : !plus && !row ? (
-        <div role="note">
+        <Note>
           <p>
             <strong>Custom profile domains are part of the Plus plan.</strong> You are on the Free plan, so this page is locked.
           </p>
-        </div>
+        </Note>
       ) : null}
 
       {cfg && target && row && (
@@ -64,7 +66,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
           {row.status !== 'active' && (
             <>
               <p>Add these records at your DNS provider.</p>
-              <div className="bv-scroll" role="region" aria-label="DNS records" tabIndex={0}>
+              <TableBox label="DNS records">
               <table>
                 <thead>
                   <tr>
@@ -96,7 +98,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
                   ))}
                 </tbody>
               </table>
-              </div>
+              </TableBox>
               {live && live.records.length === 0 && <p>The validation records are still being generated. They appear here shortly.</p>}
               {live?.errors.map((e) => (
                 <p key={e}>{e}</p>
@@ -105,7 +107,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
           )}
           <PollRefresh active={row.status === 'pending'} />
           <form action={removeDomain}>
-            <button type="submit">Remove domain</button>
+            <Button type="submit">Remove domain</Button>
           </form>
         </section>
       )}
@@ -116,7 +118,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
             Subdomain you own{' '}
             <input name="hostname" placeholder="me.example.com" required autoComplete="off" spellCheck={false} />
           </label>
-          <button type="submit" className="bv-primary">Add domain</button>
+          <Button type="submit" variant="primary">Add domain</Button>
         </form>
       )}
 
@@ -125,6 +127,6 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
         Root domains such as example.com cannot be served this way. Instead, set your Bluesky handle to your domain. Once your handle is the domain,
         /p/{'{domain}'} on blueyvatar shows your profile.
       </p>
-    </main>
+    </PageMain>
   )
 }

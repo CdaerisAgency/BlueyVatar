@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "test": "vitest run --passWithNoTests",
     "ops:block": "tsc -p tsconfig.json && node dist/ops-block.js block",
+    "ops:block-did": "tsc -p tsconfig.json && node dist/ops-block.js block-did",
     "ops:unblock": "tsc -p tsconfig.json && node dist/ops-block.js unblock"
   },
   "dependencies": {

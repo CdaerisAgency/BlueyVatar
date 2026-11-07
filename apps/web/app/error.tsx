@@ -1,15 +1,17 @@
 'use client'
 
+import { Button } from '../components/Button'
+import { PageMain } from '../components/Page'
 import { COPY } from '../lib/copy'
 
 export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <main className="bv-narrow">
+    <PageMain narrow>
       <h1>{COPY.error.title}</h1>
       <p>{COPY.error.body}</p>
-      <button type="button" className="bv-primary" onClick={() => reset()}>
+      <Button type="button" variant="primary" onClick={() => reset()}>
         {COPY.error.retry}
-      </button>
-    </main>
+      </Button>
+    </PageMain>
   )
 }

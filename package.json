@@ -14,6 +14,7 @@
     "lex:install": "lex install --lexicons ./lexicons/vendor",
     "lex:build": "lex build --lexicons ./lexicons --out ./packages/core/src/lexicons --clear",
     "ops:block": "pnpm --filter @blueyvatar/indexer ops:block",
+    "ops:block-did": "pnpm --filter @blueyvatar/indexer ops:block-did",
     "ops:unblock": "pnpm --filter @blueyvatar/indexer ops:unblock"
   },
   "devDependencies": {

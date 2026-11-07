@@ -1,3 +1,5 @@
+import { PageMain } from '../../../../components/Page'
+import { Button } from '../../../../components/Button'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
@@ -28,7 +30,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
   }
 
   return (
-    <main>
+    <PageMain>
       <AccountNav />
       <h1>Import an avatar</h1>
       {error && <p role="alert">{error}</p>}
@@ -37,7 +39,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
         <form action={confirmImport}>
           <input type="hidden" name="source" value={source} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview.uri} alt="Preview of the image to import" width={160} height={160} style={{ objectFit: 'cover' }} />
+          <img src={preview.uri} alt="Preview of the image to import" width={160} height={160} className="object-cover" />
           <p>
             This image comes from {preview.label}. Confirm its rating and license before it is saved to your repository, where it will be public.
             {preview.suggested === null ? ' We cannot see how the image was rated, so choose a rating.' : ''}
@@ -75,12 +77,12 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
           <label>
             <input name="isDefault" type="checkbox" /> Use as my default image
           </label>
-          <button type="submit" className="bv-primary">Import</button>
+          <Button type="submit" variant="primary">Import</Button>
         </form>
       )}
       <p>
         <a href="/account/avatars">Back to avatars</a>
       </p>
-    </main>
+    </PageMain>
   )
 }

@@ -304,7 +304,9 @@ Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to i
 
 - The image record's labels set its rating. The service does not accept a rating that conflicts with a label.
 - Self-labels on the Bluesky profile apply to the [overall account](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json). If the account carries `porn` or `sexual`, the Bluesky fallback avatar is rated X or R.
-- Users can report an avatar. The service can remove it from delivery and caches without touching the user's repo.
+- Anyone can report a profile or hosted avatar page without an account, using a form that records the target DID, a reason, optional details, an optional reporter email, and the time. Submissions are limited to 5 per IP per hour (the IP is stored only as a salted hash). The reporter email is never logged or shown publicly. Reports live in the `reports` table (migration 0012).
+- An operator takes action with `pnpm ops:block-did -- <did> --reason "..." [--report id]`. It blocks every indexed image of the account through the same block and purge path as `ops:block`, and marks open reports for that DID actioned with who acted and why. The service removes the images from delivery and caches without touching the user's repo.
+- The content policy page (`/policy`) lists what is not allowed and how to appeal. Its wording waits on legal review (#66).
 - The service stops serving avatars for accounts whose repo is no longer active (taken down, suspended, or deactivated).
 - The service never stores raw email addresses, never sets tracking cookies on avatar requests, and keeps request logs for a short, published period.
 - Embed guidance tells sites to add a no-referrer policy to avatar images, as [Libravatar recommends](https://wiki.libravatar.org/api/).

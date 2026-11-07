@@ -17,10 +17,13 @@
     "@atproto/oauth-client-node": "0.5.13",
     "@blueyvatar/core": "workspace:*",
     "@blueyvatar/hovercards": "workspace:*",
+    "@tailwindcss/postcss": "4.3.5",
     "next": "16.4.4",
     "pg": "8.23.1",
+    "postcss": "8.5.32",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "tailwindcss": "4.3.5",
     "tldts": "7.4.19"
   },
   "devDependencies": {
