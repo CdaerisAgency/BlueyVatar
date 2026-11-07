@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { blockImage, unblockImage } from './ops-block.js'
+import { blockDid, blockImage, unblockImage } from './ops-block.js'
 
 const url = process.env.TEST_DATABASE_URL
 const sql = (f: string) => readFileSync(new URL(`../../../db/migrations/${f}`, import.meta.url), 'utf8')
@@ -20,6 +20,7 @@ describe.skipIf(!url)('operator block and unblock', () => {
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(sql('0001_init.sql'))
     await pool.query(sql('0008_blocked_images.sql'))
+    await pool.query(sql('0012_reports.sql'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
@@ -43,5 +44,18 @@ describe.skipIf(!url)('operator block and unblock', () => {
     expect(purge).toHaveBeenCalledOnce()
     await blockImage(pool, purge, DID, 'bafyone', 'again', 'ops')
     expect(await active()).toBe(1)
+  })
+
+  it('blocks every image of a reported DID and records who and why on the report', async () => {
+    const did = 'did:plc:reported'
+    for (const [rkey, cid] of [['a', 'bafya'], ['b', 'bafyb']])
+      await pool.query(`INSERT INTO images (did, rkey, cid, mime_type, rating, created_at) VALUES ($1, $2, $3, 'image/png', 'g', now())`, [did, rkey, cid])
+    const { rows } = await pool.query(`INSERT INTO reports (target_did, source, reason, ip_hash) VALUES ($1, 'profile', 'illegal', 'h') RETURNING id`, [did])
+    const purge = vi.fn(async () => {})
+    expect((await blockDid(pool, purge, did, 'policy', 'ops', Number(rows[0].id))).sort()).toEqual(['bafya', 'bafyb'])
+    expect(purge).toHaveBeenCalledTimes(2)
+    const r = await pool.query('SELECT status, actioned_by, action_reason FROM reports WHERE id = $1', [rows[0].id])
+    expect(r.rows[0]).toEqual({ status: 'actioned', actioned_by: 'ops', action_reason: 'policy' })
+    expect((await pool.query('SELECT 1 FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL', [did])).rowCount).toBe(2)
   })
 })
