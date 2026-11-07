@@ -13,7 +13,7 @@
  * Only fixed hosts are ever contacted. Callers pass an email hash from the user's own links, never a URL.
  */
 import { isSha256Hex, ratingFromLabels, type Rating } from '@blueyvatar/core'
-import { MAX_BLOB_BYTES, labelValues, validateImageBytes, type Check, type ImageMime } from './records'
+import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, labelValues, validateImageBytes, type Check, type ImageMime } from './records'
 
 export const IMPORT_SOURCES = ['bluesky', 'gravatar', 'libravatar'] as const
 export type ImportSource = (typeof IMPORT_SOURCES)[number]
@@ -72,7 +72,7 @@ export function bskyAvatarBlob(record: unknown): Check<BlobMeta> {
   const mimeType = typeof av?.mimeType === 'string' ? av.mimeType : ''
   const size = typeof av?.size === 'number' ? av.size : 0
   if (mimeType !== 'image/png' && mimeType !== 'image/jpeg') return { ok: false, error: 'Only PNG and JPEG images are supported. Your Bluesky avatar is a different type.' }
-  if (size > MAX_BLOB_BYTES) return { ok: false, error: 'Your Bluesky avatar is larger than 1,000,000 bytes. Resize or compress it and upload it directly instead.' }
+  if (size > MAX_BLOB_BYTES) return { ok: false, error: `Your Bluesky avatar is larger than 5 MB (${MAX_BLOB_BYTES.toLocaleString('en-US')} bytes). Upload a smaller file directly instead.` }
   return { ok: true, value: { cid, mimeType, size } }
 }
 
@@ -141,7 +141,7 @@ export async function fetchRemoteImage(url: string, source: 'Gravatar' | 'Librav
         return { ok: false, error: `${source} could not be reached (${res.status}). Try again later.` }
       }
       const bytes = await readCapped(res, MAX_BLOB_BYTES)
-      if (!bytes) return { ok: false, error: `The ${source} image is larger than 1,000,000 bytes. Resize or compress it and upload it directly instead.` }
+      if (!bytes) return { ok: false, error: `The ${source} image is larger than 5 MB (${MAX_BLOB_BYTES.toLocaleString('en-US')} bytes). Upload a smaller file directly instead.` }
       const v = validateImageBytes(bytes)
       if (!v.ok) return { ok: false, error: v.error }
       return { ok: true, value: { bytes, mime: v.value.mime } }

@@ -1,19 +1,27 @@
 // Browser-side downscaling for the avatar uploader. Dependency-free: it uses
 // only createImageBitmap, canvas, and Blob APIs.
 //
+// The full original is kept (issue #203): nothing is cropped here. The crop box only produces crop
+// parameters that go into the record (lib/crop.ts). An image whose long edge is at most
+// MAX_LONG_SIDE and whose file fits the byte cap is uploaded untouched. A larger one is shrunk to
+// MAX_LONG_SIDE with the whole frame and re-encoded under the cap.
+//
 // This is best effort, not a guarantee. Browsers differ in what they can
 // decode (HEIC, for one), in canvas memory limits on phones, and in how they
 // re-encode JPEG, so the output size is not predictable. Every failure falls
-// back to the original file, and the server still enforces the 1,000,000 byte
-// cap, the 80px minimum, and the PNG/JPEG check. Never rely on this for safety.
+// back to the original file, and the server still enforces the byte cap, the
+// 80px minimum, the PNG/JPEG check, and downscales above MAX_LONG_SIDE itself.
+// Never rely on this for safety.
 
-import { clampCrop, coversImage, meetsMinimum, type CropRect } from './crop'
+import { MAX_BLOB_BYTES, MAX_LONG_EDGE } from './upload-limits'
 
-export const MAX_BLOB_BYTES = 1_000_000
-export const MAX_LONG_SIDE = 2048
+export { MAX_BLOB_BYTES }
+export const MAX_LONG_SIDE = MAX_LONG_EDGE
 export const MIN_SIDE = 80
 export const TOO_SMALL_MESSAGE = `The image is smaller than ${MIN_SIDE} by ${MIN_SIDE} pixels. Choose a larger image.`
 export const JPEG_QUALITY_STEPS = [0.92, 0.85, 0.75] as const
+/** Extra shrink factors tried when quality alone does not get under the cap. */
+export const SHRINK_STEPS = [0.85, 0.7, 0.55, 0.4] as const
 
 /** Fit (w, h) so the long side is at most max, never upscaling. */
 export function fitWithin(w: number, h: number, max: number): { width: number; height: number } {
@@ -36,54 +44,57 @@ export async function decodeImage(file: File): Promise<ImageBitmap | null> {
 
 export type PrepareResult = { file: File; error?: undefined } | { file?: undefined; error: string }
 
+/** Renders the whole frame at the given size and encodes it under the cap. Returns the smallest result when none fit, and null when the canvas is unavailable. */
+async function render(bmp: ImageBitmap, file: File, width: number, height: number): Promise<File | null> {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(bmp, 0, 0, bmp.width, bmp.height, 0, 0, width, height)
+  const base = file.name.replace(/\.[^.]+$/, '')
+  if (file.type === 'image/png') {
+    const png = await toBlob(canvas, 'image/png')
+    if (png && png.size <= MAX_BLOB_BYTES) return new File([png], `${base}.png`, { type: 'image/png' })
+  }
+  // JPEG has no alpha: paint transparent pixels over white first.
+  ctx.globalCompositeOperation = 'destination-over'
+  ctx.fillStyle = '#fff'
+  ctx.fillRect(0, 0, width, height)
+  let best: Blob | null = null
+  for (const q of JPEG_QUALITY_STEPS) {
+    const jpg = await toBlob(canvas, 'image/jpeg', q)
+    if (!jpg) continue
+    if (!best || jpg.size < best.size) best = jpg
+    if (jpg.size <= MAX_BLOB_BYTES) break
+  }
+  return best ? new File([best], `${base}.jpg`, { type: 'image/jpeg' }) : null
+}
+
 /**
- * Returns a file to upload. Rejects images under MIN_SIDE. With a crop (a square
- * region in source pixels), renders only that region and re-encodes it, and the
- * 80 pixel minimum applies to the cropped result. Without one, leaves small,
- * already-fitting files untouched; otherwise downscales to at most
- * MAX_LONG_SIDE and re-encodes. A PNG stays PNG if it fits, else becomes JPEG
- * at quality 0.92, 0.85, then 0.75 (the smallest result is returned if none fit).
+ * Returns the file to upload. Rejects images under MIN_SIDE. An image within MAX_LONG_SIDE whose file
+ * fits the cap comes back untouched. Otherwise the whole frame is downscaled to at most MAX_LONG_SIDE
+ * and re-encoded; a PNG stays PNG if it fits, else becomes JPEG at quality 0.92, 0.85, then 0.75, and
+ * if that is still over the cap the image is shrunk further in a few steps. The smallest result is
+ * returned if none fit, and the server decides.
  */
-export async function prepareImage(file: File, crop?: CropRect, decoded?: ImageBitmap): Promise<PrepareResult> {
+export async function prepareImage(file: File, decoded?: ImageBitmap): Promise<PrepareResult> {
   const bmp = decoded ?? (await decodeImage(file))
   if (!bmp) return { file } // undecodable here; let the server decide
   try {
     if (Math.min(bmp.width, bmp.height) < MIN_SIDE) return { error: TOO_SMALL_MESSAGE }
-    const region = crop && !coversImage(crop, bmp.width, bmp.height) ? clampCrop(crop, bmp.width, bmp.height) : null
-    if (region && !meetsMinimum(region, MIN_SIDE)) return { error: TOO_SMALL_MESSAGE }
-    const sx = region?.x ?? 0
-    const sy = region?.y ?? 0
-    const sw = region?.size ?? bmp.width
-    const sh = region?.size ?? bmp.height
-    const { width, height } = fitWithin(sw, sh, MAX_LONG_SIDE)
-    const resized = width !== sw || height !== sh
-    if (!region && !resized && file.size <= MAX_BLOB_BYTES) return { file }
+    const first = fitWithin(bmp.width, bmp.height, MAX_LONG_SIDE)
+    const resized = first.width !== bmp.width || first.height !== bmp.height
+    if (!resized && file.size <= MAX_BLOB_BYTES) return { file }
 
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return { file }
-    ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, width, height)
-
-    const base = file.name.replace(/\.[^.]+$/, '')
-    if (file.type === 'image/png') {
-      const png = await toBlob(canvas, 'image/png')
-      if (png && png.size <= MAX_BLOB_BYTES) return { file: new File([png], `${base}.png`, { type: 'image/png' }) }
+    let out = await render(bmp, file, first.width, first.height)
+    for (const f of SHRINK_STEPS) {
+      if (!out || out.size <= MAX_BLOB_BYTES) break
+      const { width, height } = fitWithin(bmp.width, bmp.height, Math.round(MAX_LONG_SIDE * f))
+      if (Math.min(width, height) < MIN_SIDE) break
+      out = (await render(bmp, file, width, height)) ?? out
     }
-    // JPEG has no alpha: paint transparent pixels over white first.
-    ctx.globalCompositeOperation = 'destination-over'
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, width, height)
-    let best: Blob | null = null
-    for (const q of JPEG_QUALITY_STEPS) {
-      const jpg = await toBlob(canvas, 'image/jpeg', q)
-      if (!jpg) continue
-      if (!best || jpg.size < best.size) best = jpg
-      if (jpg.size <= MAX_BLOB_BYTES) break
-    }
-    if (!best) return { file }
-    return { file: new File([best], `${base}.jpg`, { type: 'image/jpeg' }) }
+    return { file: out ?? file }
   } finally {
     if (!decoded) bmp.close()
   }

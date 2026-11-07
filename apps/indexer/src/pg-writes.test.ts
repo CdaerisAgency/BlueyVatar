@@ -7,7 +7,7 @@ import { PgIndexWrites } from './pg-writes.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const migration = readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8')
-const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery', '0019_notification_prefs'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
+const migrations = ['0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0014_gallery', '0019_notification_prefs', '0029_image_crop'].map((n) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8'))
 const schema = `t_indexer_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
 
@@ -58,6 +58,25 @@ describe.skipIf(!url)('postgres index writes', () => {
     expect(rows).toEqual([
       { rkey: 'a1', purpose: 'avatar', caption: null, sort: null },
       { rkey: 'g1', purpose: 'gallery', caption: 'Beach', sort: 3 },
+    ])
+    await pool.query('DELETE FROM images WHERE did = $1', [DID])
+  })
+
+  it('stores crop parameters and ignores a malformed crop', async () => {
+    const db = new PgIndexWrites(pool)
+    const image = { $type: 'blob', ref: { $link: 'bafycrop1' }, mimeType: 'image/png', size: 10 }
+    const put = (rkey: string, crop: unknown) =>
+      handleRecord({ did: DID, collection: 'com.blueyvatar.image', rkey, action: 'create', record: { image, crop, createdAt: '2026-01-01T00:00:00Z' } }, db)
+    await put('k1', { x: 1000, y: 0, size: 7500 })
+    await put('k2', undefined)
+    await put('k3', { x: 1000, y: 0, size: 2.5 })
+    await put('k4', { x: -1, y: 0, size: 5000 })
+    const { rows } = await pool.query('SELECT rkey, crop_x, crop_y, crop_size FROM images WHERE did = $1 ORDER BY rkey', [DID])
+    expect(rows).toEqual([
+      { rkey: 'k1', crop_x: 1000, crop_y: 0, crop_size: 7500 },
+      { rkey: 'k2', crop_x: null, crop_y: null, crop_size: null },
+      { rkey: 'k3', crop_x: null, crop_y: null, crop_size: null },
+      { rkey: 'k4', crop_x: null, crop_y: null, crop_size: null },
     ])
     await pool.query('DELETE FROM images WHERE did = $1', [DID])
   })

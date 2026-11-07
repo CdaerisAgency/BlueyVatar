@@ -1,4 +1,5 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
+import type { CropParams } from '@blueyvatar/core'
 import { oauthClient } from './auth'
 import { bskyAvatarBlob, readCapped } from './import'
 import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, validateImageBytes, type ImageMime, type NewImageFields } from './records'
@@ -13,6 +14,8 @@ export type ImageRecord = {
   labels?: unknown
   license?: string
   isDefault?: boolean
+  /** Square region of the full original to show, in 1/10000 units (spec section 5). Absent means the center crop. */
+  crop?: CropParams
   /** `gallery` for gallery images. Absent means avatar. */
   purpose?: string
   caption?: string
@@ -165,9 +168,9 @@ export async function saveNewImage(session: OAuthSession, bytes: Uint8Array, mim
   const plan = await resolvePlan(session.did)
   if (!canAddImage(existing.length, plan)) throw new RepoError(limitMessage(plan))
   const blob = await uploadBlob(session, bytes, mime)
-  const { alt, labels, license } = fields
+  const { alt, labels, license, crop } = fields
   const isDefault = fields.isDefault || existing.length === 0
-  const value: ImageRecord = { image: blob, ...(alt ? { alt } : {}), ...(labels ? { labels } : {}), license, isDefault, createdAt: new Date().toISOString() }
+  const value: ImageRecord = { image: blob, ...(alt ? { alt } : {}), ...(labels ? { labels } : {}), ...(crop ? { crop } : {}), license, isDefault, createdAt: new Date().toISOString() }
   const ref = await createImage(session, value)
   if (isDefault) await setDefaultImage(session, { ...ref, rkey: rkeyOf(ref.uri), value })
 }
@@ -185,7 +188,7 @@ export async function fetchBlueskyAvatar(session: OAuthSession): Promise<{ bytes
   const res = await session.fetchHandler(`/xrpc/com.atproto.sync.getBlob?${new URLSearchParams({ did: session.did, cid: meta.value.cid })}`, { signal: AbortSignal.timeout(8000) })
   if (!res.ok) throw new RepoError('Your PDS did not return the Bluesky avatar.')
   const bytes = await readCapped(res, MAX_BLOB_BYTES)
-  if (!bytes) throw new RepoError('Your Bluesky avatar is larger than 1,000,000 bytes. Resize or compress it and upload it directly instead.')
+  if (!bytes) throw new RepoError('Your Bluesky avatar is larger than 5 MB. Upload a smaller file directly instead.')
   const v = validateImageBytes(bytes)
   if (!v.ok) throw new RepoError(v.error)
   return { bytes, mime: v.value.mime, labels: value?.labels }

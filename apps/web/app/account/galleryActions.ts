@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../lib/auth'
 import { RepoError, repoSession } from '../../lib/repo'
 import { limited } from '../../lib/rate-guard'
-import { validateImageBytes } from '../../lib/records'
+import { prepareUpload } from '../../lib/server-resize'
 import { checkUploadForm } from '../../lib/upload-caps'
 import { GALLERY_PLUS_MESSAGE, addGalleryImage, deleteGalleryImage, isPlus, moveGalleryImage, validateGalleryFields } from '../../lib/gallery'
 import { reportError } from '../../lib/obs'
@@ -30,7 +30,7 @@ export async function uploadGalleryImage(form: FormData): Promise<void> {
   if (!picked.ok) return back('galleryError', picked.error)
   const file = picked.value
   const bytes = new Uint8Array(await file.arrayBuffer())
-  const img = validateImageBytes(bytes)
+  const img = await prepareUpload(bytes) // downscales above 4096 px; rejects only above the byte cap
   if (!img.ok) return back('galleryError', img.error)
   const input = {
     alt: String(form.get('alt') ?? ''),
@@ -38,11 +38,14 @@ export async function uploadGalleryImage(form: FormData): Promise<void> {
     rating: String(form.get('rating') ?? ''),
     rLabel: String(form.get('rLabel') ?? ''),
     license: String(form.get('license') ?? ''),
+    cropX: String(form.get('cropX') ?? ''),
+    cropY: String(form.get('cropY') ?? ''),
+    cropSize: String(form.get('cropSize') ?? ''),
   }
   const fields = validateGalleryFields(input)
   if (!fields.ok) return back('galleryError', fields.error)
   try {
-    await addGalleryImage(await repoSession(did), bytes, img.value.mime, input)
+    await addGalleryImage(await repoSession(did), img.value.bytes, img.value.mime, input)
   } catch (err) {
     return fail(err)
   }

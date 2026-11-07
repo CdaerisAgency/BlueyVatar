@@ -74,7 +74,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       <h2>Import an image</h2>
       {canAdd ? (
         <>
-          <p>Copy an avatar you already use into your repository. You preview the image and confirm its rating and license before anything is saved. The image must be PNG or JPEG and at most 1,000,000 bytes.</p>
+          <p>Copy an avatar you already use into your repository. You preview the image and confirm its rating and license before anything is saved. The image must be PNG or JPEG and at most 5 MB. Images above 4096 pixels on the long side are shrunk to fit.</p>
           <ul>
             <li>
               <a href="/account/avatars/import?source=bluesky">Import my Bluesky profile avatar</a>

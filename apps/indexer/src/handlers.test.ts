@@ -21,6 +21,18 @@ describe('indexer handlers', () => {
     }, db)
     expect(db.upsertImage).toHaveBeenCalledWith(expect.objectContaining({ cid: 'bafyimg', rating: 'pg', isDefault: true }))
   })
+  it('indexes the crop parameters and drops a malformed crop', async () => {
+    const db = fakeDb()
+    const image = { $type: 'blob', ref: { $link: 'bafycrop' }, mimeType: 'image/png', size: 100 }
+    const put = (crop: unknown) =>
+      handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.image', rkey: 'c', action: 'create', record: { image, crop, createdAt: '2026-11-03T00:00:00Z' } }, db)
+    await put({ x: 100, y: 200, size: 5000 })
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ crop: { x: 100, y: 200, size: 5000 } }))
+    await put({ x: 0.5, y: 0.5, size: 0.5 })
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ crop: null }))
+    await put(undefined)
+    expect(db.upsertImage).toHaveBeenLastCalledWith(expect.objectContaining({ crop: null }))
+  })
   it('indexes purpose, caption, and sort, and treats a missing purpose as avatar', async () => {
     const db = fakeDb()
     const image = { $type: 'blob', ref: { $link: 'bafygal' }, mimeType: 'image/png', size: 100 }

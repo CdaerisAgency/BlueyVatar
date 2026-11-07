@@ -1,4 +1,4 @@
-import type { IndexedLinkRecord, Rating } from '@blueyvatar/core'
+import type { CropParams, IndexedLinkRecord, Rating } from '@blueyvatar/core'
 
 /** Visibility rules a user sets for viewers (spec section 10.2). */
 export interface Visibility {
@@ -23,6 +23,8 @@ export interface IndexedImage {
   purpose?: string
   caption?: string | null
   sort?: number | null
+  /** Square region to show, from the record's `crop` field. Null or absent means the center crop. */
+  crop?: CropParams | null
   createdAt: string
 }
 
@@ -45,6 +47,8 @@ export interface IndexStore {
   visibility(did: string): Promise<Visibility>
   /** False when the repo is taken down, suspended, or deactivated. */
   isRepoActive(did: string): Promise<boolean>
+  /** The crop saved on the record that holds this blob, or null for the center crop. */
+  imageCrop(did: string, cid: string): Promise<CropParams | null>
   /** Images removed from delivery after a report, keyed by blob CID. */
   isBlocked(did: string, cid: string): Promise<boolean>
   /** Claims whose latest attestation is verified and still matches the claim's uri, oldest first. */
@@ -74,6 +78,7 @@ export class MemoryIndexStore implements IndexStore {
   }
   async serviceImages(did: string) { return (this.images.get(did) ?? []).filter((i) => (i.purpose ?? 'avatar') === 'avatar') }
   async galleryImages(did: string) { return orderGallery((this.images.get(did) ?? []).filter((i) => i.purpose === 'gallery')) }
+  async imageCrop(did: string, cid: string) { return (this.images.get(did) ?? []).find((i) => i.cid === cid && i.crop)?.crop ?? null }
   async visibility(did: string) { return this.rules.get(did) ?? PUBLIC_VISIBILITY }
   async isRepoActive(did: string) { return !this.inactive.has(did) }
   async isBlocked(did: string, cid: string) { return this.blocked.has(`${did}/${cid}`) }

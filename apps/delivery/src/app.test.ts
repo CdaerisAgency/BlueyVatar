@@ -463,6 +463,19 @@ describe('delivery API', () => {
     })
   })
 
+  describe('crop parameters (issue #203)', () => {
+    it('hands the crop saved on the record to the resizer, and none when the record has no crop', async () => {
+      const { deps, index } = setup()
+      const jobs: Array<{ crop?: unknown }> = []
+      const app = createApp({ ...deps, resize: async (job) => { jobs.push(job); return new Uint8Array([9]) } })
+      await app.request(img(128))
+      expect(jobs.at(-1)).not.toHaveProperty('crop')
+      index.images.set(DID, [{ rkey: 'r1', cid: 'bafyreiabc123', mimeType: 'image/jpeg', rating: 'g', isDefault: true, createdAt: '2026-01-01T00:00:00Z', crop: { x: 1000, y: 2000, size: 6000 } }])
+      await app.request(img(256))
+      expect(jobs.at(-1)).toMatchObject({ crop: { x: 1000, y: 2000, size: 6000 } })
+    })
+  })
+
   describe('resize capacity (issue #198)', () => {
     it('answers 503 with Retry-After and no-store when the resize queue is full, and meters nothing', async () => {
       const { deps, usage } = setup()

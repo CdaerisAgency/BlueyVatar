@@ -1,6 +1,6 @@
 # Cloudflare Free plan fit for a paid service (v1)
 
-Checked: November 6, 2026. Scope: issue #70, spec sections 13 (Cloudflare and image items, item 3) and 14.1 of `docs/spec/blueyvatar-product-spec-v8.md`, and the Cloudflare settings that `docs/deploy.md` relies on. This is a summary of what Cloudflare's published terms and docs say, not legal advice. Items marked **unconfirmed** have no published answer in the pages I opened.
+Checked: November 6, 2026. Scope: issue #70, spec sections 13 (Cloudflare and image items, item 3) and 14.1 of `docs/spec/blueyvatar-product-spec-v9.md`, and the Cloudflare settings that `docs/deploy.md` relies on. This is a summary of what Cloudflare's published terms and docs say, not legal advice. Items marked **unconfirmed** have no published answer in the pages I opened.
 
 ## Question
 

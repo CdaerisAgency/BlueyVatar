@@ -4,13 +4,13 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "One image. By default an avatar; see purpose for gallery images. The blob limits match app.bsky.actor.profile#avatar so one file works in both places.",
+      "description": "One image. By default an avatar; see purpose for gallery images. The blob holds the full original (long edge up to 4096 pixels). The optional crop says which square of it to show; without one, delivery takes the center square. The blob size limit matches the reference PDS default, so an image above the app.bsky.actor.profile#avatar limit of 1,000,000 bytes cannot be reused there as is.",
       "key": "tid",
       "record": {
         "type": "object",
         "required": ["image", "createdAt"],
         "properties": {
-          "image": { "type": "blob", "accept": ["image/png", "image/jpeg"], "maxSize": 1000000 },
+          "image": { "type": "blob", "accept": ["image/png", "image/jpeg"], "maxSize": 5242880 },
           "alt": { "type": "string", "maxGraphemes": 300, "maxLength": 3000 },
           "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
           "license": {
@@ -18,6 +18,7 @@
             "description": "User-declared usage license. Values are placeholders until legal review.",
             "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"]
           },
+          "crop": { "type": "ref", "ref": "#crop", "description": "Square region of the image to show. Absent means the center square." },
           "isDefault": { "type": "boolean" },
           "purpose": {
             "type": "string",
@@ -29,6 +30,16 @@
           "sort": { "type": "integer", "description": "Gallery order, lowest first. Images without a value follow, newest first." },
           "createdAt": { "type": "string", "format": "datetime" }
         }
+      }
+    },
+    "crop": {
+      "type": "object",
+      "description": "A square region of the image. Records cannot hold fractions, so each value is an integer in units of 1/10000 of the image (10000 is the whole). Measured on the image as displayed, with any EXIF orientation applied.",
+      "required": ["x", "y", "size"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0, "maximum": 10000, "description": "Left edge, as a fraction of the image width." },
+        "y": { "type": "integer", "minimum": 0, "maximum": 10000, "description": "Top edge, as a fraction of the image height." },
+        "size": { "type": "integer", "minimum": 1, "maximum": 10000, "description": "Side length, as a fraction of the shorter side. 10000 is the whole short side." }
       }
     }
   }

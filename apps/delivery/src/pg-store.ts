@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { DAILY_METERS, effectiveTier, isRating, plusEntitled, type IndexedLinkRecord, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
+import { DAILY_METERS, effectiveTier, isRating, parseCrop, plusEntitled, type CropParams, type IndexedLinkRecord, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import pg from 'pg'
 import type { ApiKey, License, LicenseStore, RateLimiter, RateWindow } from './licenses.js'
 import { PUBLIC_VISIBILITY, type IndexedImage, type IndexStore, type VerifiedAccount, type Visibility } from './store.js'
@@ -16,6 +16,10 @@ export function createPool(connectionString: string): pg.Pool {
 export function hashApiKey(key: string): string {
   return createHash('sha256').update(key, 'utf8').digest('hex')
 }
+
+/** The crop columns are written together (migration 0029). Anything that does not parse means the center crop. */
+const rowCrop = (r: { crop_x: number | null; crop_y: number | null; crop_size: number | null }): CropParams | null =>
+  parseCrop({ x: r.crop_x, y: r.crop_y, size: r.crop_size })
 
 export class PgIndexStore implements IndexStore {
   constructor(private pool: pg.Pool) {}
@@ -46,8 +50,9 @@ export class PgIndexStore implements IndexStore {
     const { rows } = await this.pool.query<{
       rkey: string; cid: string; mime_type: string; rating: string; is_default: boolean; purpose: string
       caption: string | null; sort: number | null; created_at: Date
+      crop_x: number | null; crop_y: number | null; crop_size: number | null
     }>(
-      `SELECT rkey, cid, mime_type, rating, is_default, purpose, caption, sort, created_at
+      `SELECT rkey, cid, mime_type, rating, is_default, purpose, caption, sort, created_at, crop_x, crop_y, crop_size
          FROM images WHERE did = $1 AND ${where} ORDER BY ${order}`,
       [did],
     )
@@ -61,8 +66,17 @@ export class PgIndexStore implements IndexStore {
       purpose: r.purpose,
       caption: r.caption,
       sort: r.sort,
+      crop: rowCrop(r),
       createdAt: r.created_at.toISOString(),
     }))
+  }
+
+  async imageCrop(did: string, cid: string): Promise<CropParams | null> {
+    const { rows } = await this.pool.query<{ crop_x: number | null; crop_y: number | null; crop_size: number | null }>(
+      'SELECT crop_x, crop_y, crop_size FROM images WHERE did = $1 AND cid = $2 AND crop_size IS NOT NULL ORDER BY created_at DESC LIMIT 1',
+      [did, cid],
+    )
+    return rows[0] ? rowCrop(rows[0]) : null
   }
 
   async profileLinks(did: string): Promise<IndexedLinkRecord[]> {
