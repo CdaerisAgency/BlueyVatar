@@ -49,6 +49,7 @@ const app = createApp({
   profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,
   originSecret: process.env.ORIGIN_SECRET || undefined,
   imgSigningSecret,
+  plusDids: process.env.PLUS_DIDS,
   trustCloudflare: process.env.TRUST_CLOUDFLARE === 'true',
   remoteAddress: (c) => (c.env as { incoming?: { socket?: { remoteAddress?: string } } })?.incoming?.socket?.remoteAddress,
 })

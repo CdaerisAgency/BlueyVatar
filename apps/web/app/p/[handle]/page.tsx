@@ -2,7 +2,8 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import AvatarRing from '../../../components/AvatarRing'
 import { PageMain } from '../../../components/Page'
-import { pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
+import { planFor } from '../../../lib/records'
+import { pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
@@ -30,6 +31,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
   const links = pageLinks(p)
   const interests = pageInterests(p)
+  const gallery = pageGallery(p, planFor(p.did) === 'plus')
   const list = 'mt-3 mb-0 flex list-none flex-wrap justify-center gap-x-5 gap-y-2 p-0'
   return (
     <PageMain narrow>
@@ -61,6 +63,20 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
           </ul>
         )}
       </div>
+      {gallery.length > 0 && (
+        <ul aria-label="Gallery" className="mt-8 mb-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3">
+          {gallery.map((g) => (
+            <li key={g.url} className="m-0">
+              <figure className="m-0">
+                {/* Signed delivery paths, never raw PDS URLs. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`${DELIVERY_URL}${g.url}`} alt={g.caption ?? ''} loading="lazy" referrerPolicy="no-referrer" className="aspect-square w-full rounded-bv-card border border-solid border-bv-line bg-bv-white object-cover" />
+                {g.caption && <figcaption className="mt-1 text-sm text-bv-ink-2">{g.caption}</figcaption>}
+              </figure>
+            </li>
+          ))}
+        </ul>
+      )}
       <ReportForm did={p.did} source="profile" back={`/p/${encodeURIComponent(handle)}`} status={report} />
     </PageMain>
   )

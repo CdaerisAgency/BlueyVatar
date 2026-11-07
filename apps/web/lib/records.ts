@@ -2,7 +2,7 @@
  * Pure validation and mapping for the record editor (spec sections 5, 9, 11.2).
  * Limits mirror lexicons/com/blueyvatar/*.json.
  */
-import { RATINGS, type Rating } from '@blueyvatar/core'
+import { RATINGS, isPlusDid, type Rating } from '@blueyvatar/core'
 
 export const IMAGE_COLLECTION = 'com.blueyvatar.image'
 export const PROFILE_COLLECTION = 'com.blueyvatar.profile'
@@ -22,13 +22,7 @@ export type RLabel = (typeof R_LABELS)[number]
  */
 export const PLAN_IMAGE_LIMITS = { free: 3, plus: 20 } as const
 export type Plan = keyof typeof PLAN_IMAGE_LIMITS
-export const planFor = (did: string): Plan =>
-  (process.env.PLUS_DIDS ?? '')
-    .split(',')
-    .map((d) => d.trim())
-    .includes(did)
-    ? 'plus'
-    : 'free'
+export const planFor = (did: string): Plan => (isPlusDid(did, process.env.PLUS_DIDS) ? 'plus' : 'free')
 
 export type Check<T> = { ok: true; value: T } | { ok: false; error: string }
 const ok = <T>(value: T): Check<T> => ({ ok: true, value })

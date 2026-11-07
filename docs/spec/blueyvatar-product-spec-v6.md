@@ -79,7 +79,7 @@ Seen in: G Gravatar, L Libravatar, U Unavatar, A atp.pics.
 | 18 | Extended profile fields | G | Fields in the service profile lexicon (section 5) | v1 |
 | 19 | Verified accounts | G | Verification records plus service attestation (section 8) | v2 |
 | 20 | Links | G | Reuse the links field in the Bluesky profile lexicon: strongRefs to `app.bsky.actor.link` records | v1 |
-| 21 | Image gallery | G | Extra blobs in the user repo | Later |
+| 21 | Image gallery | G | Extra `com.blueyvatar.image` records with `purpose` set to `gallery` (section 5), shown on the profile page and in profile JSON for Plus users only | v2 |
 | 22 | Hovercards | G | Embeddable script reading the profile API | v2 |
 | 23 | QR code | G | Endpoint returning a QR for the profile URL | v2 |
 | 24 | Multiple avatars with ratings | G | One record per avatar in a collection | v1 |
@@ -145,6 +145,9 @@ The service defines three record types in the user's repository and keeps everyt
           "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
           "license": { "type": "string", "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"] },
           "isDefault": { "type": "boolean" },
+          "purpose": { "type": "string", "knownValues": ["avatar", "gallery"], "maxLength": 32 },
+          "caption": { "type": "string", "maxGraphemes": 140, "maxLength": 1400 },
+          "sort": { "type": "integer" },
           "createdAt": { "type": "string", "format": "datetime" }
         }
       }
@@ -152,6 +155,10 @@ The service defines three record types in the user's repository and keeps everyt
   }
 }
 ```
+
+**Gallery images (feature 21).** A gallery image is another `com.blueyvatar.image` record. The optional string field `purpose` tells them apart: `avatar` (the default when the field is absent, so every existing record stays valid) or `gallery`. A gallery record may also carry `caption` (up to 140 characters) and `sort` (an integer, lowest first; images without one follow, newest first). The change is additive and the lexicons are not published yet (issue #54). The indexer stores `purpose`, `caption`, and `sort` on the `images` row (migration 0014). Avatar resolution reads `purpose = 'avatar'` rows only, so a gallery upload never becomes the avatar, whatever its date or `isDefault` value. A record with any other `purpose` is neither an avatar nor a gallery image.
+
+Gallery rules follow the avatar rules. The gallery is a Plus user feature (section 11.2), gated by the same plan check as other Plus features (`PLUS_DIDS` until plan storage exists). The profile JSON carries `gallery`, an array of `{ url, caption }`, and it is empty for Free users. The profile page renders it for Plus users only. Each image passes the same filters as an avatar: the account-level `!no-unauthenticated` label hides the gallery, blocked images (section 9) never appear, and only rating `g` images show. URLs are signed `/img` paths (512 pixel PNG) under the visibility rules of section 10, never PDS URLs. A profile shows at most 12 gallery images (`GALLERY_MAX`). The web avatar editor lists avatar records only.
 
 **Upload rules.** Gravatar [requires square uploads](https://docs.gravatar.com/api/images/). blueyvatar accepts any aspect ratio and crops at delivery instead.
 
@@ -275,7 +282,7 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 | Background color | `com.blueyvatar.profile` | v2 |
 | Verified accounts | Claim and attestation records | v2 |
 | Contact info, payment and wallet links | `com.blueyvatar.profile` with visibility rules | Later |
-| Gallery images | Extra `com.blueyvatar.image` records | Later |
+| Gallery images (Plus) | Extra `com.blueyvatar.image` records with `purpose: "gallery"`, plus optional `caption` and `sort` | v2 |
 
 **Verified accounts.** Gravatar lets users [link and verify accounts such as Instagram, GitHub, TikTok, and Threads](https://www.sqlservercentral.com/blogs/beyond-avatars-how-gravatar-is-transforming-online-identity), and its API [caps unauthenticated responses at four](https://docs.gravatar.com/rest-api). The v2 design is a claim record in the user repo and an attestation record in the service repo that points at the claim. The profile API returns only claims that have an attestation. No source I read documents how Gravatar performs each verification, so the verification methods per platform are an open item (section 13).
 

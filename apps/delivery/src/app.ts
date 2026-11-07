@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat,
@@ -36,6 +36,8 @@ export interface AppDeps {
   originSecret?: string
   /** HMAC secret for /img paths (IMG_SIGNING_SECRET). The redirect routes sign, /img verifies. */
   imgSigningSecret: string
+  /** PLUS_DIDS comma list: the user plan gate (spec section 11.2). Gallery images ship in profile JSON only for these DIDs. */
+  plusDids?: string
   /** Clock for the restricted-scope day bucket. Tests override it. */
   now?: () => number
 }
@@ -300,6 +302,15 @@ export function createApp(deps: AppDeps) {
     // oldest verifications are kept. Hidden accounts stay in the list with hidden: true.
     const cap = ENTITLEMENTS[e.tier].maxVerifiedAccountsInJson
     const verified = await deps.index.verifiedAccounts(identity.did)
+    // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:
+    // the rating filter is the avatar default (g), blocked images never come back, and URLs
+    // are signed /img paths. The page shows at most GALLERY_MAX.
+    const gallery = isPlusDid(identity.did, deps.plusDids)
+      ? (await deps.resolver.galleryItems(identity))
+          .filter((g) => ratingAllowed(g.rating, 'g'))
+          .slice(0, GALLERY_MAX)
+          .map((g) => ({ url: signedPath(c, e, vis, identity.did, g.cid, 512, 'png'), caption: g.caption }))
+      : []
     c.header('cache-control', 'private, max-age=300')
     return c.json({
       did: identity.did,
@@ -315,6 +326,7 @@ export function createApp(deps: AppDeps) {
       pronunciation: own?.pronunciation ?? null,
       timezone: own?.timezone ?? null,
       interests: own?.interests ?? [],
+      gallery,
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
     })
