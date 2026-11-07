@@ -12,6 +12,8 @@
     "test": "pnpm -r test",
     "tap:live": "bash tools/tap-live.sh",
     "tap:live:local": "bash tools/tap-live-local.sh",
+    "smoke": "node --experimental-strip-types tools/smoke/smoke.ts",
+    "e2e": "pnpm --filter @blueyvatar/web e2e",
     "db:migrate": "pnpm --filter @blueyvatar/migrate migrate",
     "lex:install": "lex install --lexicons ./lexicons/vendor",
     "lex:build": "lex build --lexicons ./lexicons --out ./packages/core/src/lexicons --clear",
