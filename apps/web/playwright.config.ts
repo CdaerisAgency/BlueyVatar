@@ -33,6 +33,7 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       NODE_ENV: 'production',
+      E2E_HARNESS: '1',
       PUBLIC_URL: base,
       DELIVERY_URL: `http://127.0.0.1:${STUB_PORT}`,
       ...(database ? { DATABASE_URL: database } : {}),

@@ -50,10 +50,14 @@ export const COPY = {
   // Only destinations that exist today. Add Docs, Status, and Terms here when those pages ship.
   footer: {
     tagline: 'blueyvatar. Built on atproto.',
+    // Wording follows Stripe Climate guidance: state the share of revenue, make no carbon-neutral or donation claim.
+    // Swap in the official badge image from the Stripe Dashboard (Climate page) once it is downloaded.
+    climate: { text: 'We contribute 1% of revenue to carbon removal through', linkLabel: 'Stripe Climate', href: 'https://stripe.com/climate' },
     links: [
       { label: 'Developers', href: '/#dev' },
       { label: 'Pricing', href: '/pricing' },
       { label: 'Integrations', href: '/integrations' },
+      { label: 'Changelog', href: '/changelog' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Sign in', href: '/login' },
     ],
