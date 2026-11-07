@@ -43,7 +43,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
       {!cfg || !target ? (
         <p>Custom domains are not available yet. Check back soon.</p>
       ) : !plus && !row ? (
-        <div role="note" style={{ border: '1px solid currentColor', padding: 12 }}>
+        <div role="note">
           <p>
             <strong>Custom profile domains are part of the Plus plan.</strong> You are on the Free plan, so this page is locked.
           </p>
@@ -64,6 +64,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
           {row.status !== 'active' && (
             <>
               <p>Add these records at your DNS provider.</p>
+              <div className="bv-scroll" role="region" aria-label="DNS records" tabIndex={0}>
               <table>
                 <thead>
                   <tr>
@@ -95,6 +96,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
                   ))}
                 </tbody>
               </table>
+              </div>
               {live && live.records.length === 0 && <p>The validation records are still being generated. They appear here shortly.</p>}
               {live?.errors.map((e) => (
                 <p key={e}>{e}</p>
@@ -113,8 +115,8 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
           <label>
             Subdomain you own{' '}
             <input name="hostname" placeholder="me.example.com" required autoComplete="off" spellCheck={false} />
-          </label>{' '}
-          <button type="submit">Add domain</button>
+          </label>
+          <button type="submit" className="bv-primary">Add domain</button>
         </form>
       )}
 

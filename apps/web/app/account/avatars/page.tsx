@@ -38,7 +38,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
         Your images ({images.length} of {imageLimit(plan)})
       </h2>
       {images.length === 0 && !loadError ? <p>No images yet.</p> : null}
-      <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gap: 16 }}>
+      <ul>
         {images.map((img) => {
           const isDefault = img.value.isDefault === true
           return (
@@ -97,7 +97,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
         you need real access control, this service cannot provide it for repository images.
       </p>
       {canAdd ? (
-        <form action={uploadImage} encType="multipart/form-data" style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
+        <form action={uploadImage} encType="multipart/form-data">
           <label>
             Image (PNG or JPEG, up to 1,000,000 bytes) <input name="file" type="file" accept="image/png,image/jpeg" required />
           </label>
@@ -133,7 +133,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           <label>
             <input name="isDefault" type="checkbox" /> Use as my default image
           </label>
-          <button type="submit">Upload</button>
+          <button type="submit" className="bv-primary">Upload</button>
         </form>
       ) : (
         !loadError && <p>You have reached the {imageLimit(plan)} image limit for the Free plan. Delete an image to add another.</p>

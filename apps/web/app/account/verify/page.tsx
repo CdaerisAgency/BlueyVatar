@@ -12,13 +12,15 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   if (!pending) redirect('/account')
   const { error } = await searchParams
   return (
-    <main>
+    <main className="bv-narrow">
       <h1>Enter your code</h1>
       <p>We sent a 6-digit code to {pending.masked}. It expires in 15 minutes.</p>
       {error && <p role="alert">{error}</p>}
       <form action={verifyCode}>
-        <input name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="one-time-code" />{' '}
-        <button type="submit">Verify</button>
+        <label>
+          6-digit code <input name="code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required autoComplete="one-time-code" />
+        </label>
+        <button type="submit" className="bv-primary">Verify</button>
       </form>
     </main>
   )

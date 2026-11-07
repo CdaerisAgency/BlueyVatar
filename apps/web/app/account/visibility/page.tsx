@@ -15,7 +15,7 @@ export default async function VisibilityPage() {
       <h1>Visibility</h1>
       <p>Signed in as {did}</p>
       <p>Current setting: {isPublic(rules) ? 'Public. Anyone can fetch your avatar and profile.' : 'Restricted by the rules below.'}</p>
-      <div role="note" style={{ border: '1px solid currentColor', padding: 12, margin: '12px 0' }}>
+      <div role="note">
         <p>
           <strong>Your avatar in your repo stays public.</strong>
         </p>

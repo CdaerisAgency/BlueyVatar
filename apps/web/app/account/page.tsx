@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { addEmail, linkEmail, unlink } from '../actions'
 import { currentDid } from '../../lib/auth'
 import { getStore } from '../../lib/store'
+import AccountNav from './AccountNav'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const links = await getStore().links.list(did)
   return (
     <main>
+      <AccountNav />
       <h1>Account</h1>
       <p>Signed in as {did}</p>
       {error && <p role="alert">{error}</p>}
@@ -34,13 +36,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       )}
       <h2>Link email</h2>
       <form action={linkEmail}>
-        <button type="submit">Link the email from my PDS</button>
+        <button type="submit" className="bv-primary">Link the email from my PDS</button>
       </form>
       <form action={addEmail}>
         <label>
           Add another email by code <input name="email" type="email" required autoComplete="email" />
-        </label>{' '}
-        <button type="submit">Send code</button>
+        </label>
+        <button type="submit" className="bv-primary">Send code</button>
       </form>
       <form action="/logout" method="post">
         <button type="submit">Sign out</button>

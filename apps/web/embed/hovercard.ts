@@ -46,12 +46,12 @@ const hide = () => {
 const render = (c: Card, target: Element) => {
   hide()
   owner = target
-  card = el('div', 'position:fixed;z-index:2147483647;max-width:280px;box-sizing:border-box;padding:12px;display:flex;gap:10px;align-items:flex-start;background:#fff;color:#111;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.2);font:14px/1.4 system-ui,sans-serif')
+  card = el('div', 'position:fixed;z-index:2147483647;max-width:280px;box-sizing:border-box;padding:12px;display:flex;gap:10px;align-items:flex-start;background:#ffffff;color:#1a1a1a;border:1.5px solid #e6dfd3;border-radius:16px;box-shadow:0 4px 16px rgba(26,26,26,.18);font:14px/1.4 system-ui,sans-serif')
   card.id = 'bv-card-' + ++seq
   card.setAttribute('role', 'group')
   card.setAttribute('aria-label', c.name)
   if (c.avatarUrl) {
-    const i = el('img', 'width:48px;height:48px;border-radius:50%;object-fit:cover;flex:none')
+    const i = el('img', 'width:48px;height:48px;border-radius:50%;object-fit:cover;flex:none;box-shadow:0 0 0 2px #ffffff,0 0 0 4px #1a1a1a;margin:4px')
     i.alt = ''
     i.referrerPolicy = 'no-referrer'
     i.src = c.avatarUrl
@@ -60,9 +60,9 @@ const render = (c: Card, target: Element) => {
   const body = el('div', 'min-width:0;overflow-wrap:anywhere')
   body.append(el('strong', 'display:block', c.name))
   for (const l of c.lines) body.append(el('div', '', l))
-  if (c.accounts.length) body.append(el('div', 'font-size:12px;color:#555', c.accounts.join(', ')))
+  if (c.accounts.length) body.append(el('div', 'font-size:12px;color:#6b6660', c.accounts.join(', ')))
   if (c.profileUrl) {
-    const a = el('a', 'display:inline-block;margin-top:4px;color:#0b57d0', 'View profile')
+    const a = el('a', 'display:inline-block;margin-top:4px;color:#b4400e;font-weight:600', 'View profile')
     a.href = c.profileUrl
     a.rel = 'noopener'
     body.append(a)

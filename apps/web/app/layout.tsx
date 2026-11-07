@@ -1,4 +1,10 @@
 import type { ReactNode } from 'react'
+import { Fraunces, Inter } from 'next/font/google'
+import { SiteFooter, SiteNav } from '../components/SiteChrome'
+import './globals.css'
+
+const fraunces = Fraunces({ subsets: ['latin'], axes: ['opsz'], weight: 'variable', display: 'swap', variable: '--font-fraunces' })
+const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600'], display: 'swap', variable: '--font-inter' })
 
 export const metadata = {
   title: 'blueyvatar',
@@ -7,8 +13,12 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body style={{ fontFamily: 'system-ui, sans-serif', margin: 0, padding: 16 }}>{children}</body>
+    <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
+      <body>
+        <SiteNav />
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   )
 }

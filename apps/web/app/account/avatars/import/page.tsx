@@ -34,7 +34,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       {error && <p role="alert">{error}</p>}
       {problem && <p role="alert">{problem}</p>}
       {preview && (
-        <form action={confirmImport} style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
+        <form action={confirmImport}>
           <input type="hidden" name="source" value={source} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview.uri} alt="Preview of the image to import" width={160} height={160} style={{ objectFit: 'cover' }} />
@@ -75,7 +75,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
           <label>
             <input name="isDefault" type="checkbox" /> Use as my default image
           </label>
-          <button type="submit">Import</button>
+          <button type="submit" className="bv-primary">Import</button>
         </form>
       )}
       <p>

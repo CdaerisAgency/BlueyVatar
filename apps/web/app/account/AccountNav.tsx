@@ -12,7 +12,7 @@ const LINKS = [
 
 export default function AccountNav() {
   return (
-    <nav aria-label="Account" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+    <nav aria-label="Account" className="bv-subnav">
       {LINKS.map(([href, label]) => (
         <Link key={href} href={href}>
           {label}

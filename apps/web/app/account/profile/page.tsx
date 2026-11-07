@@ -31,7 +31,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
-      <form action={saveProfile} style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
+      <form action={saveProfile}>
         {field('jobTitle', 'Job title', p.jobTitle, 1000)}
         {field('company', 'Company', p.company, 1000)}
         {field('location', 'Location', p.location, 1000)}
@@ -42,7 +42,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           Interests (up to {MAX_INTERESTS}, separated by commas or new lines)
           <textarea name="interests" rows={3} defaultValue={(p.interests ?? []).join(', ')} />
         </label>
-        <button type="submit" disabled={loadError !== null}>
+        <button type="submit" className="bv-primary" disabled={loadError !== null}>
           Save profile
         </button>
       </form>

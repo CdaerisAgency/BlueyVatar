@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
+import AccountNav from '../AccountNav'
 import { CreateKeyForm, KeyActions } from './KeyControls'
 
 export const dynamic = 'force-dynamic'
@@ -33,6 +34,7 @@ export default async function KeysPage() {
 
   return (
     <main>
+      <AccountNav />
       <h1>License and API keys</h1>
       <p>Signed in as {did}</p>
 
@@ -58,6 +60,7 @@ export default async function KeysPage() {
       {periods.length > 0 && (
         <>
           <h2>Usage history</h2>
+          <div className="bv-scroll" role="region" aria-label="Usage history" tabIndex={0}>
           <table>
             <thead>
               <tr>
@@ -78,6 +81,7 @@ export default async function KeysPage() {
               ))}
             </tbody>
           </table>
+          </div>
           <p>{license.tier === 'pro' ? 'Pro shows 30 days of history.' : 'Shows up to 12 months of history.'}</p>
         </>
       )}
@@ -99,6 +103,7 @@ export default async function KeysPage() {
       <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} />
 
       <h2>Tiers</h2>
+      <div className="bv-scroll" role="region" aria-label="Tiers" tabIndex={0}>
       <table>
         <thead>
           <tr>
@@ -130,6 +135,7 @@ export default async function KeysPage() {
           ))}
         </tbody>
       </table>
+      </div>
     </main>
   )
 }

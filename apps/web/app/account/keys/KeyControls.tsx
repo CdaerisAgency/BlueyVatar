@@ -15,7 +15,7 @@ function Result({ s }: { s: KeyState }) {
           <p>
             <strong>Copy this {s.keyKind} key now. It is shown only once and cannot be recovered.</strong>
           </p>
-          <pre style={{ overflowX: 'auto', padding: 8, border: '1px solid currentColor' }}>
+          <pre tabIndex={0}>
             <code>{s.key}</code>
           </pre>
         </div>
@@ -37,11 +37,11 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason }:
             {allowPublishable && <option value="publishable">Publishable (pk_, browsers)</option>}
             {allowSecret && <option value="secret">Secret (sk_, servers)</option>}
           </select>
-        </label>{' '}
+        </label>
         <label>
           Label <input name="label" maxLength={60} placeholder="optional" />
-        </label>{' '}
-        <button type="submit" disabled={pending || !!disabledReason}>
+        </label>
+        <button type="submit" className="bv-primary" disabled={pending || !!disabledReason}>
           Create key
         </button>
       </form>

@@ -102,8 +102,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         </label>{' '}
         <label>
           Account or address <input name="account" required maxLength={300} placeholder="username, @name@instance, or https://..." />
-        </label>{' '}
-        <button type="submit">Add</button>
+        </label>
+        <button type="submit" className="bv-primary">Add</button>
       </form>
 
       <h2>How each platform is checked</h2>
