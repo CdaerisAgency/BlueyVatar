@@ -55,7 +55,7 @@ export async function verifyCode(form: FormData): Promise<void> {
   if (!pending) return to('/account', 'error', 'No code is pending. Request a new one.')
   const result = checkCode(pending, String(form.get('code') ?? ''), Date.now())
   if (result.ok) {
-    await store.links.upsert(pending.emailHash, did, 'code')
+    await store.links.upsert(pending.emailHash, did, 'code', pending.emailMd5)
     await store.codes.delete(did)
     return to('/account', 'linked', pending.masked)
   }

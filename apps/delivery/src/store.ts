@@ -32,6 +32,7 @@ export interface VerifiedAccount {
 
 /** What the indexer maintains in Postgres. */
 export interface IndexStore {
+  /** Takes a SHA256 (64 hex) or MD5 (32 hex) email hash. Unlinked and opted-out hashes both return null. */
   didForEmailHash(hash: string): Promise<string | null>
   serviceImages(did: string): Promise<IndexedImage[]>
   visibility(did: string): Promise<Visibility>
@@ -45,13 +46,15 @@ export interface IndexStore {
 
 export class MemoryIndexStore implements IndexStore {
   emails = new Map<string, string>()
+  /** MD5 to SHA256 for linked emails, as email_links.email_md5 does in Postgres. */
+  md5s = new Map<string, string>()
   images = new Map<string, IndexedImage[]>()
   rules = new Map<string, Visibility>()
   inactive = new Set<string>()
   blocked = new Set<string>()
   accounts = new Map<string, VerifiedAccount[]>()
   async didForEmailHash(hash: string) {
-    const did = this.emails.get(hash) ?? null
+    const did = this.emails.get(hash.length === 32 ? (this.md5s.get(hash) ?? '') : hash) ?? null
     if (did && (await this.visibility(did)).emailLookupOptOut) return null
     return did
   }

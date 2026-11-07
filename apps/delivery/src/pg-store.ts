@@ -21,10 +21,14 @@ export class PgIndexStore implements IndexStore {
   constructor(private pool: pg.Pool) {}
 
   async didForEmailHash(hash: string): Promise<string | null> {
+    // Only links created or re-verified after migration 0006 carry an MD5. It cannot be derived
+    // from the stored SHA256 and raw emails are never kept, so older links answer to SHA256 only
+    // until their owner verifies the email again.
+    const column = hash.length === 32 ? 'email_md5' : 'email_hash'
     const { rows } = await this.pool.query<{ did: string }>(
       `SELECT e.did FROM email_links e
          LEFT JOIN visibility_rules v ON v.did = e.did
-        WHERE e.email_hash = $1 AND NOT coalesce(v.email_lookup_opt_out, false)`,
+        WHERE e.${column} = $1 AND NOT coalesce(v.email_lookup_opt_out, false)`,
       [hash.toLowerCase()],
     )
     return rows[0]?.did ?? null
