@@ -36,7 +36,7 @@ export default function ImageFileInput() {
   return (
     <>
       <label>
-        Image (PNG or JPEG, at least 80 by 80 pixels, up to 1,000,000 bytes after upload. Large images are resized in your browser first, and non-square images are cropped to the center square.){' '}
+        Image (PNG or JPEG, at least 80 by 80 pixels, up to 1,000,000 bytes after upload. Large images are resized in your browser first. Non-square images are shown cropped to the center square, and your original is kept.){' '}
         <input name="file" type="file" accept="image/png,image/jpeg" required onChange={onChange} />
       </label>
       {error && <p role="alert">{error}</p>}
