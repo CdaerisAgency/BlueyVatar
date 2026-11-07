@@ -32,7 +32,7 @@ Everything that could be built without live credentials is merged to `main`. Tha
 | Fly | Nothing created yet. Configs are `fly/web.toml`, `fly/delivery.toml`, `fly/indexer.toml`, `fly/tap.toml` |
 | Cloudflare | Nothing configured yet. The plan is the Free plan: DNS, proxy, cache, one Transform Rule, and Cloudflare for SaaS for custom profile domains |
 | CI deploy | `.github/workflows/deploy.yml` is opt-in. It stays off until the repository variable `FLY_DEPLOY_ENABLED` is `true` and the secret `FLY_API_TOKEN` exists |
-| Pricing | Draft proposal: https://claude.ai/artifact/5YgAzJJ995PfgeEsvL8FxS (issue 67, waiting on the owner's sign-off) |
+| Pricing | Draft proposal: https://claude.ai/artifact/5YgAzJJ995PfgeEsvL8FxS (issue 67): the owner approved the pricing. Stripe is the payment processor; configure Stripe Tax and invoicing at deploy |
 
 ## 4. What you need from this machine
 
@@ -48,7 +48,7 @@ If any of these is missing, stop and tell the owner which one. Don't work around
 
 Follow `docs/deploy.md`, and do staging before production.
 
-1. **Decide the hostnames with the owner.** The runbook leaves open how web and delivery split across hostnames. A typical split is `blueyvatar.com` for web, a separate host for delivery (for example `img.blueyvatar.com`), and `profiles.blueyvatar.com` as the SaaS fallback origin. Get confirmation before you create DNS records. The OAuth client ID is proposed as `https://blueyvatar.com/oauth-client-metadata.json`, so web needs the apex domain.
+1. **Hostnames are approved and the owner owns `blueyvatar.com` with DNS in Cloudflare.** Web is `blueyvatar.com`, delivery is `img.blueyvatar.com`, and the Cloudflare for SaaS fallback origin is `profiles.blueyvatar.com`. Create DNS records and Fly certificates for these. The OAuth client ID is `https://blueyvatar.com/oauth-client-metadata.json`, so web needs the apex domain.
 2. **Pin the Tap image.** `fly/tap.toml` uses the placeholder tag `PIN_REAL_TAG`. Find a real tag or digest for `ghcr.io/bluesky-social/indigo/tap` in the indigo package registry, open a PR with the pin, and merge it once CI passes.
 3. **Create the secrets in Infisical** for each environment, using the per-app table in `docs/deploy.md` under "Infisical secrets".
    - Get `DATABASE_URL` (pooled; the host contains `-pooler`) and `DATABASE_URL_DIRECT` from Neon.
