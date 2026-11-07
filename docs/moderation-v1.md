@@ -39,9 +39,9 @@ A case takes the most severe of its signals.
 
 ## Timers (SLA)
 
-Defaults: Critical 4 hours, High 24 hours, Moderate 72 hours, Low 168 hours (7 days), counted from the oldest signal in the case. The operator can change them with `MODERATION_SLA_HOURS`. These numbers are our starting point. No published source sets them. For child safety the legal standard is reporting "as soon as reasonably possible" after actual knowledge (18 U.S.C. 2258A), so do not let a Critical case wait on its timer.
+Defaults: 72 hours for every severity (Critical, High, Moderate, and Low), counted from the oldest signal in the case. The owner set this on 2026-11-07. The operator can change it per severity with `MODERATION_SLA_HOURS`. No published source sets these numbers. For child safety the legal standard is reporting "as soon as reasonably possible" after actual knowledge (18 U.S.C. 2258A), so do not let a Critical case wait on its timer.
 
-Appeals are Moderate, so they are due inside the 7 days the content policy page promises.
+Appeals are Moderate, so they are due inside 72 hours, which is within the 7 days the content policy page promises.
 
 ## The case page
 

@@ -4,6 +4,9 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 
 ## 2026-11-07
 
+### Changed
+- Moderation review SLA defaults to 72 hours for every severity, set by the owner. `MODERATION_SLA_HOURS` still overrides each severity (#209).
+
 ### Added
 - Moderation review portal: queues for unreviewed, escalated, appeal, resolved, and restricted child-safety cases, ordered by severity then age with SLA timers, one case per image or account, one reviewer lock per case, actions that require a reason and a cited policy, blurred and grayscale images with logged reveals, Article 17 statements of reasons that cannot be sent with an empty field, an append-only audit log, and review metrics on the admin home (#209). Reviewer guide in `docs/moderation-v1.md`.
 - Daily moderation digest email from the indexer (counts only, skipped on a quiet day), and a child-safety option on the report form (#209).

@@ -40,9 +40,9 @@ export type SlaHours = Record<Severity, number>
  * First-response targets in hours. These are starting points, not a legal standard: no published source sets them.
  * Critical child safety work should be as soon as reasonably possible (18 U.S.C. 2258A), so ask counsel before relaxing it.
  */
-export const DEFAULT_SLA_HOURS: SlaHours = { critical: 4, high: 24, moderate: 72, low: 168 }
+export const DEFAULT_SLA_HOURS: SlaHours = { critical: 72, high: 72, moderate: 72, low: 72 }
 
-/** MODERATION_SLA_HOURS="critical=4,high=24,moderate=72,low=168". Missing or invalid entries keep the default. */
+/** MODERATION_SLA_HOURS="critical=72,high=72,moderate=72,low=72". Missing or invalid entries keep the default. */
 export function slaHours(env: Record<string, string | undefined> = process.env): SlaHours {
   const out = { ...DEFAULT_SLA_HOURS }
   for (const part of (env.MODERATION_SLA_HOURS ?? '').split(/[,\s]+/)) {
