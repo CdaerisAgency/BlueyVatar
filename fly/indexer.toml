@@ -9,6 +9,9 @@
 app = "blueyvatar-indexer"
 primary_region = "iad"
 
+# Low-resource mode (docs/deploy.md): one always-on machine, smallest VM. It cannot scale to zero
+# because it holds the live Tap connection; do not add auto_stop_machines here.
+
 [build]
   # Relative to this file (https://docs.fly.io/reference/configuration, [build] section).
   dockerfile = "../Dockerfile"
@@ -31,9 +34,9 @@ primary_region = "iad"
     path = "/readyz"
     method = "GET"
     grace_period = "60s"
-    interval = "30s"
+    interval = "60s"
     timeout = "5s"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "256mb"
