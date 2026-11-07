@@ -19,7 +19,7 @@ describe.skipIf(!url)('operator block and unblock', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     await pool.query(sql('0001_init.sql'))
-    await pool.query(sql('0007_blocked_images.sql'))
+    await pool.query(sql('0008_blocked_images.sql'))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
