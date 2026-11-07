@@ -1,4 +1,4 @@
-/** Marketing prices shown on the home page. Proposed in #67 and still awaiting sign-off. Change them here only. */
+/** Marketing prices shown on the home page. Approved by the owner in #67 (Pro $9, Business $49 per month). Change them here only, and keep the Stripe prices in step. */
 export interface PriceTier {
   id: 'free' | 'pro' | 'business'
   name: string

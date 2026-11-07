@@ -396,13 +396,13 @@ Each image record carries a `license` value the user picks. The values in sectio
 
 ## 11. Service tiers
 
-The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. Every number below is a proposed placeholder to validate with cost modeling. No published data exists for what this product costs to run, and prices are left open.
+The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. The owner approved the Pro ($9 per month) and Business ($49 per month) prices (issue #67). Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run. The Plus user plan has no price yet.
 
 ### 11.1 Developer tiers
 
 | Capability | Free | Pro | Business | Enterprise |
 | --- | --- | --- | --- | --- |
-| Price | $0 | TBD per month | TBD per month | Contract |
+| Price | $0 | $9 per month | $49 per month | Contract |
 | Intended for | Individuals, side projects | Indie developers, small sites | Companies, SaaS products | Platforms, white-label |
 | Lookup by email hash, handle, DID | Yes | Yes | Yes | Yes |
 | Anonymous requests | 100 per day per IP | 100 per day per IP | 100 per day per IP | Custom |
@@ -479,7 +479,16 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 - A past-due license gets a grace period, then drops to Free limits. A downgrade changes limits only and never deletes user data, user avatars, or profiles.
 - Free-tier attribution is checked on the developer's production site. Unavatar requires the link to be [public, followable, and on a production site](https://github.com/microlinkhq/unavatar), and reserves the right to revoke free access when it is missing.
 - Keys can be rotated and revoked at any time, with usage alerts at 80 and 100 percent of included volume.
-- The payment processor, tax handling, and invoicing are not chosen and are listed in section 13.
+- The payment processor is Stripe, decided by the owner on 2026-11-07 (issue #67). Tax is computed by Stripe Tax, and invoices come from Stripe Billing. Both are configured in the Stripe dashboard at deploy (docs/deploy.md, Stripe billing). The overage rate stays open until per-miss cost is measured.
+
+### 12.1 Stripe billing
+
+- **Checkout and portal.** Pro and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PRO` and `STRIPE_PRICE_BUSINESS`. With any Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
+- **Webhook.** One endpoint verifies the Stripe signature against the raw body and handles `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`. Each event id is stored in the same transaction as its effects, so a redelivered event changes nothing, and a failed event leaves no trace so Stripe's retry applies it. An event older than the stored subscription state is ignored.
+- **Data.** Migration 0015 adds `billing_customers` (DID to Stripe customer), `subscriptions` (a mirror of each Stripe subscription, keyed to the DID and the license), `stripe_events`, and `licenses.grace_ends_at`.
+- **Tier resolution.** A license's tier is derived from all of its subscriptions: the highest tier among `active`, `trialing`, and in-grace `past_due` subscriptions, else Free. The derived tier is written to `licenses` on every event. Enterprise licenses are contracts and are never changed by billing.
+- **Past due.** A past-due license keeps its paid tier for a grace period, then serves at Free limits. The grace period is a proposal of 7 days from the first failed payment (`PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts`), pending owner approval. Expiry is evaluated when a license is read (`effectiveTier`), so it needs no webhook and a missed event cannot extend paid limits. Recovery to `active` clears the grace period. A downgrade changes limits only, as stated above.
+- **Plus.** The Plus user plan has no price in this spec, so billing does not sell it and Plus stays on the `PLUS_DIDS` list until a price is decided.
 
 ## 13. Open questions and risks
 
@@ -497,7 +506,7 @@ Thirteen items in the table below need a decision or an answer before build, and
 | 8 | Atproto spaces timing | Real access control for avatars depends on it | [Alpha since August 20, 2026, not for production, launch targeted later this year](https://atproto.com/blog/atproto-spaces-alpha) |
 | 9 | Name clearance for blueyvatar and blueyvatar.com | Lexicon IDs are hard to change once other apps depend on them | Name chosen. Clear it and confirm the domain before publishing lexicons (see the note below this table). Also consider proposing the profile lexicon to community standards efforts, since the atp.pics author [wants one](https://graham.leaflet.pub/3mhr36lsmo222) |
 | 10 | Legal review | Terms of service, privacy policy, image licenses, treatment of hashed emails | Needs a lawyer; I am not one |
-| 11 | Payment processor, taxes, invoicing, pricing | Section 12 depends on them | Not chosen; no cost data available |
+| 11 | Payment processor, taxes, invoicing, pricing | Section 12 depends on them | Decided (issue #67): Stripe, with Stripe Tax and Stripe invoices, and Pro $9 and Business $49 per month (section 12.1). Open: the past-due grace period (7 days proposed), a Plus price, and the overage rate, which needs the per-miss cost measured after deploy |
 | 12 | `/img` bypasses tier size caps | `/img` URLs carry no key and accept any size up to 2048 (section 7), so a Free caller can build a 2048 URL and skip the 512 cap in section 11 | Open risk. Mitigation ideas: sign image paths at the redirect route, or restrict `/img` to a fixed size ladder so tier caps map to a few cacheable sizes |
 | 13 | Which Tangled collection to read | A [Tangled core commit dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json). Both use an `avatar` blob field | No published answer found on whether existing user records were migrated. Proposal: one adapter per collection, `org.tangled.actor.profile` first |
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { checkEntitlement } from './entitlement.js'
 import { hashApiKey, PgAlertLedger, PgIndexStore, PgLicenseStore, PgRateLimiter, PgUsageMeter } from './pg-store.js'
 
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
@@ -10,6 +11,7 @@ const migration3 = readFileSync(new URL('../../../db/migrations/0003_usage_alert
 const migration2 = readFileSync(new URL('../../../db/migrations/0002_web_auth.sql', import.meta.url), 'utf8')
 const migration7 = readFileSync(new URL('../../../db/migrations/0008_blocked_images.sql', import.meta.url), 'utf8')
 const migration14 = readFileSync(new URL('../../../db/migrations/0014_gallery.sql', import.meta.url), 'utf8')
+const migration15 = readFileSync(new URL('../../../db/migrations/0015_billing.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -30,6 +32,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration6)
     await pool.query(migration7)
     await pool.query(migration14)
+    await pool.query(migration15)
   }, 60_000)
 
   afterAll(async () => {
@@ -124,6 +127,20 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await licenses.findKey('pk_other')).toBeNull()
     await pool.query(`UPDATE api_keys SET revoked_at = now()`)
     expect(await licenses.findKey(raw)).toBeNull()
+  })
+
+  it('serves a past-due license at its paid tier during grace, then at Free, and still serves it (spec section 12)', async () => {
+    const licenses = new PgLicenseStore(pool)
+    const raw = 'pk_pastdue_1'
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier, status, grace_ends_at) VALUES ('lic_pd', 'did:plc:pd', 'business', 'past_due', now() + interval '1 day')`)
+    await pool.query(`INSERT INTO api_keys (key_hash, prefix, license_id, kind) VALUES ($1, 'pk_past', 'lic_pd', 'publishable')`, [hashApiKey(raw)])
+    expect((await licenses.findKey(raw))?.license).toMatchObject({ tier: 'business', status: 'past_due' })
+    const info = { headerKey: undefined, tokenParam: raw, origin: undefined, referer: undefined, clientIp: '1.1.1.1' }
+    const limiter = new PgRateLimiter(pool)
+    expect(await checkEntitlement(info, licenses, limiter)).toMatchObject({ ok: true, tier: 'business' })
+    await pool.query(`UPDATE licenses SET grace_ends_at = now() - interval '1 second' WHERE license_id = 'lic_pd'`)
+    expect((await licenses.findKey(raw))?.license.tier).toBe('free')
+    expect(await checkEntitlement(info, licenses, limiter)).toMatchObject({ ok: true, tier: 'free' })
   })
 
   it('counts rate windows and resets expired ones', async () => {

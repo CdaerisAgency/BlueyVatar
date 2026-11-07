@@ -5,6 +5,7 @@ const LINKS = [
   ['/account/avatars', 'Avatars'],
   ['/account/profile', 'Profile'],
   ['/account/keys', 'Keys'],
+  ['/account/billing', 'Billing'],
   ['/account/claims', 'Claims'],
   ['/account/visibility', 'Visibility'],
   ['/account/domain', 'Domain'],
