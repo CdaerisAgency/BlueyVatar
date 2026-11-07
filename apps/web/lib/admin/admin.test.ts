@@ -3,6 +3,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ADMIN_SESSION_TTL_MS, adminDids, adminEnabled, isAdminDid } from './config'
 import { accountSummary, cleanReason, dismissReport, listActions, listReports, suspend, takedown, unblockImage, unsuspend } from './moderation'
+import { notifyReporters } from './followup'
 import { purgerFromEnv } from './purge'
 import { consumeTotp, createAdminSession, readAdminSession, revokeAdminSession } from './session'
 import { base32Decode, codeFor, matchStep, stepAt } from './totp'
@@ -148,11 +149,45 @@ describe.skipIf(!url)('admin database operations', () => {
   it('takedown blocks all images, actions the report, and audits; failed purge is reported', async () => {
     const id = await report()
     const failing = vi.fn(async () => false)
-    expect(await takedown(pool, failing, A, T, 'illegal', id)).toEqual({ ok: true, purged: false, blocked: 2 })
+    expect(await takedown(pool, failing, A, T, 'illegal', id)).toEqual({ ok: true, purged: false, blocked: 2, reportIds: [id] })
     expect((await pool.query('SELECT status FROM reports WHERE id = $1', [id])).rows[0].status).toBe('actioned')
     const acts = await listActions(pool, { did: T })
     expect(acts[0]).toMatchObject({ action: 'takedown', report_id: id, actor: A })
     expect((await takedown(pool, purge, A, 'nope', 'x')).ok).toBe(false)
+  })
+
+  it('emails the reporter the outcome once, then deletes the stored address', async () => {
+    const send = vi.fn(async () => {})
+    const sender = { send }
+    const a = await report()
+    await dismissReport(pool, A, a, 'internal note about the account')
+    expect(await notifyReporters(pool, sender, [a], 'dismissed', 'https://blueyvatar.com')).toEqual({ sent: 1, skipped: 0, failed: 0 })
+    const msg = send.mock.calls[0] as unknown as [{ to: string; subject: string; text: string }]
+    expect(msg[0].to).toBe('r@x.test')
+    expect(msg[0].text).toContain('did not take action')
+    expect(msg[0].text).not.toContain('internal note')
+    expect((await pool.query('SELECT reporter_contact FROM reports WHERE id = $1', [a])).rows[0].reporter_contact).toBeNull()
+    expect(await notifyReporters(pool, sender, [a], 'dismissed', 'https://blueyvatar.com')).toEqual({ sent: 0, skipped: 0, failed: 0 })
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips reporters without an email, and still deletes the contact when sending fails', async () => {
+    const send = vi.fn(async () => { throw new Error('down') })
+    const junk = await report()
+    await pool.query(`UPDATE reports SET reporter_contact = 'call me on 555-0100' WHERE id = $1`, [junk])
+    const none = await report()
+    await pool.query('UPDATE reports SET reporter_contact = NULL WHERE id = $1', [none])
+    const bad = await report()
+    await dismissReport(pool, A, junk, 'r')
+    await dismissReport(pool, A, none, 'r')
+    await dismissReport(pool, A, bad, 'r')
+    expect(await notifyReporters(pool, { send }, [junk, none, bad], 'dismissed', 'https://blueyvatar.com')).toEqual({ sent: 0, skipped: 1, failed: 1 })
+    const left = await pool.query('SELECT count(*)::int AS n FROM reports WHERE id = ANY($1) AND reporter_contact IS NOT NULL', [[junk, none, bad]])
+    expect(left.rows[0].n).toBe(0)
+    // Not yet decided as the stated outcome: nothing is sent and nothing is deleted.
+    const open = await report()
+    expect(await notifyReporters(pool, { send }, [open], 'actioned', 'https://blueyvatar.com')).toEqual({ sent: 0, skipped: 0, failed: 0 })
+    expect((await pool.query('SELECT reporter_contact FROM reports WHERE id = $1', [open])).rows[0].reporter_contact).toBe('r@x.test')
   })
 
   it('unblocks one image with an audit row', async () => {
@@ -167,7 +202,7 @@ describe.skipIf(!url)('admin database operations', () => {
     expect(s.repo).toEqual({ handle: 't.test', active: true, status: 'active' })
     expect(s.images).toHaveLength(2)
     expect(s.blocked.map((b) => b.cid)).toEqual(['bafybbbbbbbbbb'])
-    expect(s.reports.total).toBe(2)
+    expect(s.reports.total).toBeGreaterThanOrEqual(2)
     expect(s.actions.length).toBeGreaterThan(3)
     expect((await accountSummary(pool, 'did:plc:nobody')).repo).toBeNull()
   })
