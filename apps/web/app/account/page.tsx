@@ -75,6 +75,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         You can link up to {MAX_LINKED_EMAILS} emails. An address you unlink is held for {HOLD_DAYS} days: only this account can
         link it again until then.
       </p>
+      <p>
+        We keep a hash of each linked email. For your primary email we also keep the address itself, encrypted, so we can tell you
+        if a claim is removed or your email moves to another account. It is deleted when you unlink or replace it, or delete your
+        account.
+      </p>
       <form action={linkEmail}>
         <Button type="submit" variant="primary">Link the email from my PDS</Button>
       </form>

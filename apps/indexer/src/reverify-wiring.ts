@@ -1,7 +1,8 @@
 import {
-  attestationWriterFromEnv, emailSender, mastodonClaimMatches, parseMastodonUri, profileLinkFor, safeFetch, verifyRelMe,
+  attestationWriterFromEnv, decryptJson, emailSender, mastodonClaimMatches, parseMastodonUri, profileLinkFor, safeFetch, verifyRelMe,
   type EmailSender, type Fetcher, type VerifyOutcome,
 } from '@blueyvatar/core/verification'
+import type pg from 'pg'
 import type { DueClaim, OnRevoked, Verifier } from './reverify.js'
 
 const GITHUB_LOGIN = /^https:\/\/github\.com\/([A-Za-z\d-]{1,39})$/
@@ -43,8 +44,23 @@ export function makeVerifier(publicUrl: string, f: Fetcher = safeFetch): Verifie
   }
 }
 
-/** Resolves a DID to a deliverable address, or null. The service keeps no raw addresses (spec section 6). */
+/** Resolves a DID to a deliverable address, or null. */
 export type RecipientLookup = (did: string) => Promise<string | null>
+
+/** Reads the account's primary email from notice_emails and decrypts it (TOKEN_ENCRYPTION_KEY). Never logs the address. */
+export function pgRecipientLookup(pool: Pick<pg.Pool, 'query'>, master?: Buffer): RecipientLookup {
+  return async (did) => {
+    const r = await pool.query('SELECT email_enc FROM notice_emails WHERE did = $1', [did])
+    const enc = r.rows[0]?.email_enc as string | undefined
+    if (!enc) return null
+    try {
+      return decryptJson<string>(enc, master)
+    } catch {
+      console.error('stored notice address could not be decrypted; check TOKEN_ENCRYPTION_KEY')
+      return null
+    }
+  }
+}
 
 export function emailNotice(sender: EmailSender, lookup: RecipientLookup, publicUrl: string): OnRevoked {
   return async (c, reason) => {
@@ -61,14 +77,13 @@ export function emailNotice(sender: EmailSender, lookup: RecipientLookup, public
   }
 }
 
-export function reverifyFromEnv(env: Record<string, string | undefined> = process.env) {
+export function reverifyFromEnv(pool: Pick<pg.Pool, 'query'>, env: Record<string, string | undefined> = process.env) {
   const publicUrl = env.PUBLIC_URL ?? 'https://blueyvatar.com'
   const writer = attestationWriterFromEnv(env)
   return {
     verify: makeVerifier(publicUrl),
     remove: (uri: string) => writer.remove(uri),
-    // No address source exists today: emails are stored only as hashes. See docs/spec section 8.
-    onRevoked: emailNotice(emailSender(env), async () => null, publicUrl),
+    onRevoked: emailNotice(emailSender(env), pgRecipientLookup(pool), publicUrl),
     afterMs: Number(env.REVERIFY_AFTER_DAYS ?? 30) * 86_400_000,
     everyMs: Number(env.REVERIFY_INTERVAL_HOURS ?? 24) * 3_600_000,
   }

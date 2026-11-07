@@ -6,6 +6,7 @@ import { newPending } from './codes'
 import { HOLD_MS, MAX_LINKED_EMAILS, decideLink } from './email-policy'
 import type { EmailSender } from './email'
 import { confirmLink, sendCode } from './link'
+import { decryptJson, encryptJson } from './token-crypto'
 import { memoryStore, pgStore, type Store } from './store'
 
 const A = 'did:plc:alice'
@@ -62,7 +63,7 @@ function suite(name: string, make: () => Promise<{ store: Store; age?: (ms: numb
       expect(sent.kind).toBe('code_sent')
       expect(outbox.sent).toHaveLength(1)
       const pending = (await store.codes.get(B))!
-      expect(pending.notifyTo).toBe(email)
+      expect(decryptJson<string>(pending.emailEnc!)).toBe(email)
       // Alice still owns it until Bob passes the code.
       expect((await store.links.list(A)).map((l) => l.emailHash)).toContain(emailHash(email))
       const out = await confirmLink(B, pending, store, outbox)
@@ -77,11 +78,11 @@ function suite(name: string, make: () => Promise<{ store: Store; age?: (ms: numb
       expect(await store.codes.get(B)).toBeUndefined()
     })
 
-    it('rule 2: no move notice and no stored address when the hash was not linked elsewhere', async () => {
+    it('rule 2: no move notice when the hash was not linked elsewhere', async () => {
       const outbox = new Outbox()
       await sendCode(B, 'fresh@x.test', store, outbox)
       const pending = (await store.codes.get(B))!
-      expect(pending.notifyTo).toBeUndefined()
+      expect(pending.emailEnc).toMatch(/^v1:/)
       await confirmLink(B, pending, store, outbox)
       expect(outbox.sent).toHaveLength(1)
     })
@@ -95,6 +96,40 @@ function suite(name: string, make: () => Promise<{ store: Store; age?: (ms: numb
       await confirmLink(A, (await store.codes.get(A))!, store, outbox)
       expect((await store.links.list(A)).map((l) => l.emailHash)).toContain(emailHash(email))
       expect((await store.links.list(B)).map((l) => l.emailHash)).not.toContain(emailHash(email))
+    })
+
+    it('notices: the primary email is stored encrypted, follows the primary, and is removed with it', async () => {
+      const N = 'did:plc:notices'
+      const e1 = 'first@x.test'
+      const e2 = 'second@x.test'
+      const addr = async () => { const s = await store.links.noticeAddress(N); return s && decryptJson<string>(s) }
+      expect(await addr()).toBeUndefined()
+      await store.links.link(emailHash(e1), N, 'code', undefined, encryptJson(e1))
+      const stored = (await store.links.noticeAddress(N))!
+      expect(stored).toMatch(/^v1:/)
+      expect(stored).not.toContain('first')
+      expect(await addr()).toBe(e1)
+      // A second, non-primary email is not stored.
+      await store.links.link(emailHash(e2), N, 'code', undefined, encryptJson(e2))
+      expect(await addr()).toBe(e1)
+      // Moving the primary to an email whose address was not kept drops the stored one rather than keeping a stale one.
+      await store.links.setPrimary(N, emailHash(e2))
+      expect(await addr()).toBeUndefined()
+      // Verifying it again stores it.
+      await store.links.link(emailHash(e2), N, 'code', undefined, encryptJson(e2))
+      expect(await addr()).toBe(e2)
+      // Unlinking the primary removes the address; the promoted email has none stored.
+      await store.links.remove(N, emailHash(e2))
+      expect(await addr()).toBeUndefined()
+      await store.links.link(emailHash(e1), N, 'code', undefined, encryptJson(e1))
+      expect(await addr()).toBe(e1)
+      // Another account taking the hash by newest-verification-wins removes it from the previous owner.
+      await store.links.link(emailHash(e1), 'did:plc:taker', 'code', undefined, encryptJson(e1))
+      expect(await addr()).toBeUndefined()
+      expect(decryptJson<string>((await store.links.noticeAddress('did:plc:taker'))!)).toBe(e1)
+      // Deleting the account removes it.
+      await store.links.releaseAll('did:plc:taker')
+      expect(await store.links.noticeAddress('did:plc:taker')).toBeUndefined()
     })
 
     it('rule 3: the 11th email is rejected, by the store and before a code is mailed', async () => {
@@ -193,7 +228,7 @@ if (url) {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     const pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails']) await pool.query(m(n))
     return {
       store: pgStore(pool),
       // Age every hold instead of waiting 30 days.
@@ -225,6 +260,7 @@ if (url) {
     it('0007 backfills one primary per DID and enforces cap and single primary in the database', async () => {
       await pool.query(`INSERT INTO email_links (email_hash, did, method, verified_at) VALUES ($1, 'did:plc:old', 'code', now() - interval '2 days'), ($2, 'did:plc:old', 'code', now() - interval '1 day')`, [h(1), h(2)])
       await pool.query(m('0010_email_ownership'))
+      await pool.query(m('0013_notice_emails'))
       expect((await pool.query(`SELECT email_hash FROM email_links WHERE is_primary AND did = 'did:plc:old'`)).rows).toEqual([{ email_hash: h(1) }])
       await expect(pool.query(`UPDATE email_links SET is_primary = true WHERE email_hash = $1`, [h(2)])).rejects.toThrow()
       for (let i = 10; i < 18; i++) await pool.query(`INSERT INTO email_links (email_hash, did, method) VALUES ($1, 'did:plc:old', 'code')`, [h(i)])
@@ -241,3 +277,48 @@ if (url) {
     })
   })
 }
+
+describe.skipIf(!url)('postgres: no plaintext address at rest', () => {
+  const s3 = `${schema}_c`
+  let pool: pg.Pool
+  beforeAll(async () => {
+    const admin = new pg.Client({ connectionString: url })
+    await admin.connect()
+    await admin.query(`CREATE SCHEMA ${s3}`)
+    await admin.end()
+    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${s3}` })
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails']) await pool.query(m(n))
+  })
+  afterAll(async () => {
+    await pool.query(`DROP SCHEMA ${s3} CASCADE`)
+    await pool.end()
+  })
+
+  it('keeps the address out of every table while a code is pending and after it is confirmed, including a move', async () => {
+    const store = pgStore(pool)
+    const outbox = new Outbox()
+    const addr = 'Needle.Person@plaintext-check.test'
+    const dump = async () => {
+      const tables = (await pool.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = $1`, [s3])).rows
+      let all = ''
+      for (const t of tables) all += JSON.stringify((await pool.query(`SELECT * FROM "${t.table_name}"`)).rows)
+      return all.toLowerCase()
+    }
+    await sendCode(A, addr, store, outbox)
+    expect(await dump()).not.toContain('needle')
+    expect(await dump()).not.toContain('plaintext-check')
+    await confirmLink(A, (await store.codes.get(A))!, store, outbox)
+    expect(await dump()).not.toContain('needle')
+    expect(decryptJson<string>((await store.links.noticeAddress(A))!)).toBe(addr)
+    expect((await pool.query('SELECT email_enc FROM notice_emails WHERE did = $1', [A])).rows[0].email_enc).toMatch(/^v1:/)
+    // Moving it to another account mails the previous owner at the same address and leaves nothing readable behind.
+    await sendCode(B, addr, store, outbox)
+    await confirmLink(B, (await store.codes.get(B))!, store, outbox)
+    expect(outbox.sent.at(-1)!.to).toBe(addr)
+    expect(await store.links.noticeAddress(A)).toBeUndefined()
+    expect(await dump()).not.toContain('needle')
+    // Deleting the account removes the stored address.
+    await store.links.releaseAll(B)
+    expect((await pool.query('SELECT 1 FROM notice_emails')).rowCount).toBe(0)
+  })
+})
