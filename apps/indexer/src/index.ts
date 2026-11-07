@@ -4,6 +4,8 @@ import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
 import { handleRecord, type IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
+import { pgReverifyStore, reverifyDue, scheduleReverify } from './reverify.js'
+import { reverifyFromEnv } from './reverify-wiring.js'
 
 /**
  * Tap runs as its own Fly app, configured with the service profile
@@ -20,6 +22,10 @@ function writes(): IndexWrites {
   if (url) {
     const pool = new pg.Pool({ connectionString: url, max: Number(process.env.PG_POOL_MAX ?? 5) })
     pool.on('error', (err) => console.error('postgres pool error', err))
+    // Re-check attested claims older than REVERIFY_AFTER_DAYS every REVERIFY_INTERVAL_HOURS.
+    const rv = reverifyFromEnv()
+    const store = pgReverifyStore(pool)
+    scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
     return new PgIndexWrites(pool, { onPurge: purgerFromEnv(), onImageUpserted: warmerFromEnv() })
   }
   console.warn('DATABASE_URL is not set; logging index writes to the console')
