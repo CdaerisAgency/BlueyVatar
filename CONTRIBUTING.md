@@ -26,6 +26,10 @@ See the README for the repository layout and how to run each service.
 | `pnpm lex:build` | Regenerate lexicon types |
 | `pnpm lex:install <nsid>` | Install a third-party lexicon into `lexicons/vendor` |
 
+## Changelog
+
+Pull requests that change what users or API developers see add a line to `CHANGELOG.md`, under today's date and the right group (Added, Changed, or Fixed), in plain U.S. English. Add a new `## YYYY-MM-DD` heading when the date has no entry yet. The site renders the file at `/changelog` and in the Atom feed at `/changelog/feed.xml`. CI warns, but does not fail, when a pull request touches `apps/` without touching `CHANGELOG.md`.
+
 ## Tests with a local Postgres
 
 The Postgres integration tests run when `TEST_DATABASE_URL` is set and skip otherwise. Each run creates and drops its own schema, so a shared scratch database is fine. CI uses `postgres:16`:

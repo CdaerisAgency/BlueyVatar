@@ -56,6 +56,7 @@ export const COPY = {
       { label: 'Integrations', href: '/integrations' },
       { label: 'Gravatar alternative', href: '/gravatar-alternative' },
       { label: 'Migrate from Gravatar', href: '/migrate-from-gravatar' },
+      { label: 'Changelog', href: '/changelog' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Sign in', href: '/login' },
     ],
