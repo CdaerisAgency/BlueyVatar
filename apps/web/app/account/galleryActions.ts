@@ -5,6 +5,7 @@ import { currentDid } from '../../lib/auth'
 import { RepoError, repoSession } from '../../lib/repo'
 import { validateImageBytes } from '../../lib/records'
 import { GALLERY_PLUS_MESSAGE, addGalleryImage, deleteGalleryImage, isPlus, moveGalleryImage, validateGalleryFields } from '../../lib/gallery'
+import { reportError } from '../../lib/obs'
 
 const back = (key: 'galleryError' | 'galleryDone', value: string): never => redirect(`/account?${key}=${encodeURIComponent(value)}#gallery`)
 
@@ -14,7 +15,7 @@ async function signedIn(): Promise<string> {
 }
 
 function fail(err: unknown): never {
-  console.error('gallery action failed', err instanceof Error ? err.message : 'unknown')
+  reportError('gallery action failed', err)
   return back('galleryError', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
 }
 

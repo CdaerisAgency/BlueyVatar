@@ -4,6 +4,7 @@ import {
 } from '@blueyvatar/core/verification'
 import type pg from 'pg'
 import type { DueClaim, OnRevoked, Verifier } from './reverify.js'
+import { errors, log } from './obs.js'
 
 const GITHUB_LOGIN = /^https:\/\/github\.com\/([A-Za-z\d-]{1,39})$/
 const transient = (reason: string): VerifyOutcome => ({ ok: false, reason, transient: true })
@@ -56,7 +57,7 @@ export function pgRecipientLookup(pool: Pick<pg.Pool, 'query'>, master?: Buffer)
     try {
       return decryptJson<string>(enc, master)
     } catch {
-      console.error('stored notice address could not be decrypted; check TOKEN_ENCRYPTION_KEY')
+      log.error('stored notice address could not be decrypted; check TOKEN_ENCRYPTION_KEY')
       return null
     }
   }
@@ -66,7 +67,7 @@ export function emailNotice(sender: EmailSender, lookup: RecipientLookup, public
   return async (c, reason) => {
     const to = await lookup(c.did)
     if (!to) {
-      console.warn('claim revoked; no address on file, notice not sent')
+      log.warn('claim revoked; no address on file, notice not sent')
       return
     }
     await sender.send({

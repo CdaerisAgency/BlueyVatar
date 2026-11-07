@@ -29,6 +29,14 @@ primary_region = "iad"
     path = "/"
     timeout = "5s"
 
+  # Readiness: SELECT 1 against Postgres (3 second budget, READY_TIMEOUT_MS).
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
 [[vm]]
   size = "shared-cpu-1x"
   memory = "1gb"

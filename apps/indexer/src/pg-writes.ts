@@ -1,5 +1,6 @@
 import pg from 'pg'
 import type { IndexWrites } from './handlers.js'
+import { errors, log } from './obs.js'
 
 export interface PgWritesOptions {
   /**
@@ -29,7 +30,7 @@ export class PgIndexWrites implements IndexWrites {
             created_at = EXCLUDED.created_at, indexed_at = now()`,
       [r.did, r.rkey, r.cid, r.mimeType, r.rating, r.isDefault, r.license, r.purpose, r.caption, r.sort, r.createdAt],
     )
-    this.opts.onImageUpserted?.(r.did, r.cid).catch((err) => console.warn('image upsert hook failed', err))
+    this.opts.onImageUpserted?.(r.did, r.cid).catch((err) => log.warn('image upsert hook failed', { err }))
   }
 
   async deleteImage(did: string, rkey: string): Promise<string | undefined> {
@@ -119,6 +120,6 @@ export class PgIndexWrites implements IndexWrites {
     await this.opts.onPurge?.(did, list)
     // Re-warm after the purge so the first visitor does not pay for the miss. Fire and forget.
     const warm = this.opts.onWarm
-    if (opts.warm && warm) for (const cid of list) warm(did, cid).catch((err) => console.warn('post-purge warm failed', err))
+    if (opts.warm && warm) for (const cid of list) warm(did, cid).catch((err) => log.warn('post-purge warm failed', { err }))
   }
 }

@@ -9,6 +9,7 @@ import { PUBLIC_URL } from '../../../../lib/oauth'
 import { repoSession } from '../../../../lib/repo'
 import { safeFetch } from '../../../../lib/safe-fetch'
 import { attestVerified } from '../../../../lib/verification-service'
+import { reportError } from '../../../../lib/obs'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
     }
     return back('done', `${PLATFORM_LABELS[norm.value.platform]} verified.`)
   } catch (err) {
-    console.error('claim callback failed', err instanceof Error ? err.message : 'unknown')
+    reportError('claim callback failed', err)
     return back('error', 'Verification did not complete. Try again.')
   }
 }

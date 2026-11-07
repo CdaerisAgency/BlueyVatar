@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, deleteImage, listImages, repoSession, saveNewImage, setDefaultImage } from '../../../lib/repo'
 import { validateImageBytes, validateNewImage } from '../../../lib/records'
+import { reportError } from '../../../lib/obs'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -13,7 +14,7 @@ async function signedIn(): Promise<string> {
 }
 
 function fail(err: unknown): never {
-  console.error('avatar action failed', err instanceof Error ? err.message : 'unknown')
+  reportError('avatar action failed', err)
   return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
 }
 
