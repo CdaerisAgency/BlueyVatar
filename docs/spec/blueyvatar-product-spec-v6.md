@@ -283,7 +283,7 @@ The profile layer reuses the Bluesky profile for basics and adds only the fields
 
 **Hovercards.** A small embeddable script shows a profile card when a visitor hovers an avatar. Gravatar ships this as an [npm package and WordPress block](https://fao.wordpress.org/plugins/?p=12258). Verified accounts the user chose to hide are omitted from the card.
 
-**QR code.** An endpoint returns a QR code for the profile URL, with a size parameter, as Gravatar [offers](https://docs.gravatar.com/guides/llms-txt/).
+**QR code.** An endpoint returns a QR code for the profile URL, with a size parameter, as Gravatar [offers](https://docs.gravatar.com/guides/llms-txt/). The optional `to=` parameter (a platform name such as `github`) makes the code encode `/go/{handle}/{platform}` instead of the profile URL. That public route redirects to the user's verified, non-hidden account on that platform when its link is https, and otherwise to the profile page.
 
 ## 9. Ratings, safety, and privacy
 
