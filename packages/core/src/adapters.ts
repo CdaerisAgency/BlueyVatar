@@ -17,7 +17,15 @@ export interface ProfileAdapter {
    * primary record costs no extra PDS read.
    */
   fallbackFor?: string
+  /**
+   * Largest avatar blob, in bytes, that this adapter accepts. A record whose blob
+   * declares a larger size is treated as having no avatar. Unset means no limit here.
+   */
+  maxAvatarBytes?: number
 }
+
+/** Avatar size limit in the Tangled profile lexicons. */
+export const TANGLED_AVATAR_MAX_BYTES = 1_000_000
 
 export const BLUESKY_PROFILE_ADAPTER: ProfileAdapter = {
   id: 'bluesky',
@@ -47,6 +55,7 @@ export const TANGLED_PROFILE_ADAPTER: ProfileAdapter = {
   accept: ['image/png', 'image/jpeg'],
   priority: 2,
   enabled: true,
+  maxAvatarBytes: TANGLED_AVATAR_MAX_BYTES,
 }
 
 export const TANGLED_LEGACY_PROFILE_ADAPTER: ProfileAdapter = {

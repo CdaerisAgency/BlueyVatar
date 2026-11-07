@@ -54,6 +54,21 @@ describe('indexer handlers', () => {
     expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined, { warm: true })
     expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafyavatar'], { warm: true })
   })
+  it.each(['org.tangled.actor.profile', 'sh.tangled.actor.profile'])('purges and warms the avatar when %s changes', async (collection) => {
+    const db = fakeDb()
+    await handleRecord({
+      did: 'did:plc:a', collection, rkey: 'self', action: 'update',
+      record: { avatar: { $type: 'blob', ref: { $link: 'bafytangled' }, mimeType: 'image/png', size: 10 } },
+    }, db)
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', undefined, { warm: true })
+    expect(db.purgeImages).toHaveBeenCalledWith('did:plc:a', ['bafytangled'], { warm: true })
+    expect(db.upsertProfile).not.toHaveBeenCalled()
+  })
+  it.each(['org.tangled.actor.profile', 'sh.tangled.actor.profile'])('purges once when %s is deleted', async (collection) => {
+    const db = fakeDb()
+    await handleRecord({ did: 'did:plc:a', collection, rkey: 'self', action: 'delete' }, db)
+    expect(db.purgeImages).toHaveBeenCalledTimes(1)
+  })
   it('purges once when the Bluesky profile is deleted', async () => {
     const db = fakeDb()
     await handleRecord({ did: 'did:plc:a', collection: 'app.bsky.actor.profile', rkey: 'self', action: 'delete' }, db)

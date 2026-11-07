@@ -7,6 +7,8 @@ export const COLLECTIONS = {
   claim: 'com.blueyvatar.claim',
   bskyProfile: 'app.bsky.actor.profile',
   bskyLink: 'app.bsky.actor.link',
+  tangledProfile: 'org.tangled.actor.profile',
+  tangledLegacyProfile: 'sh.tangled.actor.profile',
 } as const
 
 export interface IndexWrites {
@@ -87,7 +89,10 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
       })
       return
     }
+    case COLLECTIONS.tangledProfile:
+    case COLLECTIONS.tangledLegacyProfile:
     case COLLECTIONS.bskyProfile:
+      // Tangled profiles use the same path: the avatar is read live and only the cache changes.
       // Read live by the delivery API; a change only needs cache purging. A label change
       // (such as !no-unauthenticated) takes effect through the same purge. The Bluesky avatar
       // is not in the images table, so its CID is purged explicitly.

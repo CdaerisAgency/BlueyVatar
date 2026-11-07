@@ -183,6 +183,10 @@ describe('adapters', () => {
   it('orders enabled adapters by priority', () => {
     expect(activeAdapters(DEFAULT_ADAPTERS).map((a) => a.id)).toEqual(['bluesky', 'tangled', 'tangled-legacy'])
   })
+  it('limits Tangled avatars to the lexicon size and leaves Bluesky unlimited here', () => {
+    const limits = Object.fromEntries(DEFAULT_ADAPTERS.map((a) => [a.id, a.maxAvatarBytes]))
+    expect(limits).toEqual({ bluesky: undefined, tangled: 1_000_000, 'tangled-legacy': 1_000_000 })
+  })
   it('marks the legacy Tangled adapter as a fallback for the new one', () => {
     const legacy = DEFAULT_ADAPTERS.find((a) => a.id === 'tangled-legacy')
     expect(legacy?.fallbackFor).toBe('tangled')

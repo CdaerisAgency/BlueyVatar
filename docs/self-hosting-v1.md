@@ -85,7 +85,7 @@ DATABASE_URL_DIRECT=postgres://... pnpm db:migrate
 What the repo documents:
 
 - The indexer reads `TAP_URL` and `TAP_ADMIN_PASSWORD` and talks only to Tap.
-- `fly/tap.toml` configures Tap with `TAP_BIND`, `TAP_SIGNAL_COLLECTION` (`com.blueyvatar.profile`), `TAP_COLLECTION_FILTERS` (`com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile,app.bsky.actor.link`), `TAP_LOG_LEVEL`, and `TAP_DATABASE_URL` (`sqlite:///data/tap.db` on a mounted volume).
+- `fly/tap.toml` configures Tap with `TAP_BIND`, `TAP_SIGNAL_COLLECTION` (`com.blueyvatar.profile`), `TAP_COLLECTION_FILTERS` (`com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile,app.bsky.actor.link,org.tangled.actor.profile,sh.tangled.actor.profile`), `TAP_LOG_LEVEL`, and `TAP_DATABASE_URL` (`sqlite:///data/tap.db` on a mounted volume).
 - Tap's own environment names are listed in its README: <https://github.com/bluesky-social/indigo/blob/main/cmd/tap/README.md>.
 
 Which Tap variable selects the upstream relay or firehose, and its default, is not yet documented in this repo. Check the Tap README above for that setting, set it on the Tap container, then point the indexer at your Tap with `TAP_URL`. Keep Tap off the public internet. Tap is in beta, and the Jetstream fallback does not exist yet (deploy.md, section "Tap").
@@ -113,7 +113,7 @@ services:
     environment:
       TAP_BIND: ":2480"
       TAP_SIGNAL_COLLECTION: com.blueyvatar.profile
-      TAP_COLLECTION_FILTERS: com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile,app.bsky.actor.link
+      TAP_COLLECTION_FILTERS: com.blueyvatar.image,com.blueyvatar.profile,com.blueyvatar.claim,app.bsky.actor.profile,app.bsky.actor.link,org.tangled.actor.profile,sh.tangled.actor.profile
       TAP_DATABASE_URL: sqlite:///data/tap.db
       TAP_ADMIN_PASSWORD: ${TAP_ADMIN_PASSWORD}
     volumes:
