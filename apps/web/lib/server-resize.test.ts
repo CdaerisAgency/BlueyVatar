@@ -17,11 +17,50 @@ async function flat(width: number, height: number, format: 'png' | 'jpeg' = 'png
 }
 
 describe('prepareUpload', () => {
-  it('passes an image within 4096 pixels through untouched, byte for byte', async () => {
-    const bytes = await flat(4096, 3000)
-    const r = await prepareUpload(bytes)
+  it('keeps an image within 4096 pixels at full resolution and format', async () => {
+    const r = await prepareUpload(await flat(4096, 3000))
     expect(r).toMatchObject({ ok: true, value: { mime: 'image/png' } })
-    expect(r.ok && r.value.bytes).toBe(bytes)
+    if (!r.ok) return
+    const meta = await sharp(Buffer.from(r.value.bytes)).metadata()
+    expect([meta.width, meta.height]).toEqual([4096, 3000])
+  })
+
+  it('strips GPS and camera EXIF from an image within the limits and applies its orientation', async () => {
+    const src = new Uint8Array(
+      await sharp({ create: { width: 600, height: 200, channels: 3, background: { r: 30, g: 120, b: 220 } } })
+        .withExif({ IFD0: { Make: 'SecretCam', ImageDescription: 'serial 12345' }, IFD3: { GPSLatitudeRef: 'N', GPSLatitude: '51/1 30/1 0/1', GPSLongitudeRef: 'W', GPSLongitude: '0/1 7/1 0/1' } })
+        .withMetadata({ orientation: 6 })
+        .jpeg()
+        .toBuffer(),
+    )
+    const before = await sharp(Buffer.from(src)).metadata()
+    expect(before.exif).toBeDefined()
+    expect(Buffer.from(src).includes('SecretCam')).toBe(true)
+    const r = await prepareUpload(src)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const out = Buffer.from(r.value.bytes)
+    const meta = await sharp(out).metadata()
+    expect(meta.exif).toBeUndefined()
+    expect(meta.xmp).toBeUndefined()
+    expect(meta.iptc).toBeUndefined()
+    expect(out.includes('SecretCam')).toBe(false)
+    expect(out.includes('GPS')).toBe(false)
+    expect([meta.width, meta.height]).toEqual([200, 600]) // orientation 6 swaps the axes, now baked in
+    expect(meta.orientation ?? 1).toBe(1)
+  })
+
+  it('keeps the ICC color profile', async () => {
+    const src = new Uint8Array(
+      await sharp({ create: { width: 200, height: 200, channels: 3, background: { r: 30, g: 120, b: 220 } } })
+        .withIccProfile('p3')
+        .png()
+        .toBuffer(),
+    )
+    const r = await prepareUpload(src)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect((await sharp(Buffer.from(r.value.bytes)).metadata()).icc).toBeDefined()
   })
 
   it('downscales a PNG above 4096 pixels to a 4096 long edge, full frame, same aspect ratio', async () => {

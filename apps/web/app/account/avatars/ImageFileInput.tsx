@@ -85,7 +85,8 @@ export default function ImageFileInput() {
       return
     }
     if (result.file !== file) {
-      if (setFile(result.file)) setNote(`Resized to ${Math.round(result.file.size / 1000)} KB before upload. The whole image is kept.`)
+      const resized = result.file.size < file.size * 0.9 || (bmp !== null && Math.max(bmp.width, bmp.height) > MAX_LONG_SIDE)
+      if (setFile(result.file) && resized) setNote(`Resized to ${Math.round(result.file.size / 1000)} KB before upload. The whole image is kept.`)
     }
     if (bmp && !isSquare(bmp.width, bmp.height)) {
       bmpRef.current = bmp
@@ -152,8 +153,8 @@ export default function ImageFileInput() {
       <p id={hintId}>
         PNG or JPEG, at least {MIN_SIDE} by {MIN_SIDE} pixels, up to {MAX_MB} MB. Any size is fine: an image longer than {MAX_LONG_SIDE} pixels or larger than {MAX_MB} MB is
         shrunk to fit, in your browser first, and the whole picture is kept. For a non-square image you can drag and zoom a square box to choose what shows as your
-        avatar. The box is saved next to the image, so the file itself is never cropped. If you leave it alone, the center square shows. A file you upload without
-        resizing keeps its photo details, such as location, so remove them first if you do not want them public.
+        avatar. The box is saved next to the image, so the file itself is never cropped. If you leave it alone, the center square shows. Photo details such as
+        location and camera model are removed from every upload.
       </p>
       {cropping && rect && dims && (
         <div role="group" aria-label="Crop image">

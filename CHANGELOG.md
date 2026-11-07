@@ -30,6 +30,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 - The web app has a new look based on the Chrysalis design with the monarch palette (#109).
 
 ### Changed
+- Uploaded images no longer keep location, camera, or other photo metadata. Every upload is re-encoded in the browser and on the server with EXIF, XMP, and IPTC removed, the orientation applied, the color profile kept, and the full resolution kept (#206).
 - Uploads keep the full original image. Any resolution is accepted and shrunk to at most 4096 pixels on the long side, in the browser first and on the server as a fallback, and the upload limit is now 5 MB. The crop box saves a `crop` field on the image record instead of cropping the file, and delivery applies it before resizing (#203).
 - Delivery batches rate-window and usage counter writes in memory and flushes them every second (#198).
 - Web routes are rate limited and each account has abuse caps (#156).
