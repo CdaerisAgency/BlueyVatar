@@ -36,6 +36,7 @@ export const BUCKETS = {
   'addEmail.did': { limit: 5, windowSec: HOUR },
   'addEmail.ip': { limit: 20, windowSec: HOUR },
   'codeFail.did': { limit: 10, windowSec: HOUR },
+  'session.did': { limit: 20, windowSec: HOUR },
   'adminLogin.did': { limit: 10, windowSec: 10 * MIN },
   'adminLogin.ip': { limit: 20, windowSec: 10 * MIN },
   'adminFail.did': { limit: 5, windowSec: 15 * MIN },

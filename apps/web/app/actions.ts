@@ -3,7 +3,8 @@
 import { isSha256Hex, parseIdentifier } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { checkCode, MAX_ATTEMPTS } from '../lib/codes'
-import { currentDid, oauthClient } from '../lib/auth'
+import { currentDid, oauthClient, rememberNext } from '../lib/auth'
+import { safeNext } from '../lib/next-path'
 import { confirmLink, sendCode } from '../lib/link'
 import { emailLinkScope, signInScope } from '../lib/oauth'
 import { failed, limited, lockedOut } from '../lib/rate-guard'
@@ -25,13 +26,16 @@ async function authorize(input: string, scope: string, state: 'login' | 'link'):
 }
 
 export async function login(form: FormData): Promise<void> {
+  const next = safeNext(String(form.get('next') ?? ''))
+  const back = (msg: string): never => redirect(`/login?error=${encodeURIComponent(msg)}${next === '/account' ? '' : `&next=${encodeURIComponent(next)}`}`)
   const wait = (await lockedOut('loginFail.ip')) ?? (await limited(['login.ip']))
-  if (wait) return to('/login', 'error', wait)
+  if (wait) return back(wait)
   const id = parseIdentifier(String(form.get('handle') ?? ''))
   if (!id || id.kind === 'hash') {
     await failed('loginFail.ip')
-    return to('/login', 'error', 'Enter a valid handle such as alice.bsky.social.')
+    return back('Enter a valid handle such as alice.bsky.social.')
   }
+  await rememberNext(next)
   await authorize(id.value, signInScope(), 'login')
 }
 

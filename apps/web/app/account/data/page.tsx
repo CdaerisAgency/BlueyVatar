@@ -1,8 +1,7 @@
-import { redirect } from 'next/navigation'
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { BILLING_RETENTION_YEARS, DELETE_CONFIRMATION } from '../../../lib/account-data'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { HOLD_DAYS } from '../../../lib/email-policy'
 import AccountNav from '../AccountNav'
 import { deleteMyData } from './actions'
@@ -11,8 +10,7 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Your data' }
 
 export default async function DataPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/data')
   const { error } = await searchParams
   return (
     <PageMain>

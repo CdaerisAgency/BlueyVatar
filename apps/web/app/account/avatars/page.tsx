@@ -1,8 +1,7 @@
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { RepoError, blobUrl, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
 import { LICENSES, canAddImage, imageLimit } from '../../../lib/records'
 import { resolvePlan } from '../../../lib/plan'
@@ -14,8 +13,7 @@ import { makeDefault, removeImage, uploadImage } from './actions'
 export const dynamic = 'force-dynamic'
 
 export default async function AvatarsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/avatars')
   const { error, done } = await searchParams
   const plan = await resolvePlan(did)
   let images: StoredImage[] = []
@@ -41,7 +39,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       <h2>
         Your images ({images.length} of {imageLimit(plan)})
       </h2>
-      {images.length === 0 && !loadError ? <p>No images yet.</p> : null}
+      {images.length === 0 && !loadError ? <p>You have no avatar yet. Upload an image below, or import one from Gravatar if you have an email linked, and choose its rating. The first image you add becomes your default.</p> : null}
       <ul>
         {images.map((img) => {
           const isDefault = img.value.isDefault === true

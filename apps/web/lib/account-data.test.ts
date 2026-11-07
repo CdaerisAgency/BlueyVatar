@@ -60,6 +60,8 @@ describe.skipIf(!url)('account data export and deletion', () => {
     await q('INSERT INTO email_codes (did, email_hash, code_hash, masked, expires_at) VALUES ($1, $2, $3, $4, now() + interval \'10 minutes\')', [did, hash.replace(/^./, 'd'), 'f'.repeat(64), 'a***@e***.com'])
     await q('INSERT INTO notice_emails (did, email_hash, email_enc) VALUES ($1, $2, $3)', [did, hash, 'v1:secretblob'])
     await q('INSERT INTO oauth_session (sub, value) VALUES ($1, $2)', [did, 'v'])
+    await q("INSERT INTO web_session (id, did, device) VALUES ($1, $2, 'Firefox on Linux')", [`s${tag}`, did])
+    await q('INSERT INTO session_floor (did, revoked_at) VALUES ($1, now())', [did])
     await q('INSERT INTO oauth_state (key, value) VALUES ($1, $2)', [`state-${tag}`, 'v'])
     await q("INSERT INTO profile_links (did, rkey, cid, url) VALUES ($1, 'r1', 'cid', 'https://example.com')", [did])
     await q('INSERT INTO visibility_rules (did, hidden_profile) VALUES ($1, true)', [did])
@@ -122,7 +124,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(purged[0]!.sort()).toEqual(['bafy1a', 'bafy2a'])
 
     for (const [t, col] of [
-      ['email_links', 'did'], ['email_codes', 'did'], ['notice_emails', 'did'], ['oauth_session', 'sub'], ['profile_links', 'did'],
+      ['email_links', 'did'], ['email_codes', 'did'], ['notice_emails', 'did'], ['oauth_session', 'sub'], ['web_session', 'did'], ['session_floor', 'did'], ['profile_links', 'did'],
       ['visibility_rules', 'did'], ['verification_state', 'did'], ['custom_domains', 'did'], ['images', 'did'], ['profiles', 'did'],
       ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'],
     ] as const) expect(await count(t, col, A), t).toBe(0)
