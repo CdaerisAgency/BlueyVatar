@@ -52,6 +52,9 @@ jobs:
       - name: Build core
         run: pnpm --filter @blueyvatar/core build
 
+      - name: Build hovercards
+        run: pnpm --filter @blueyvatar/hovercards build
+
       - name: Typecheck
         run: pnpm -r typecheck
 

@@ -61,6 +61,20 @@ export class PgIndexWrites implements IndexWrites {
     await this.pool.query('DELETE FROM claims WHERE did = $1 AND rkey = $2', [did, rkey])
   }
 
+  async upsertProfileLink(r: Parameters<IndexWrites['upsertProfileLink']>[0]): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO profile_links (did, rkey, cid, url, title, created_at) VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (did, rkey) DO UPDATE SET
+            cid = EXCLUDED.cid, url = EXCLUDED.url, title = EXCLUDED.title,
+            created_at = EXCLUDED.created_at, indexed_at = now()`,
+      [r.did, r.rkey, r.cid, r.url, r.title, r.createdAt],
+    )
+  }
+
+  async deleteProfileLink(did: string, rkey: string): Promise<void> {
+    await this.pool.query('DELETE FROM profile_links WHERE did = $1 AND rkey = $2', [did, rkey])
+  }
+
   async setRepoStatus(did: string, handle: string | null, active: boolean, status?: string): Promise<void> {
     await this.pool.query(
       `INSERT INTO repos (did, handle, active, status) VALUES ($1, $2, $3, $4)

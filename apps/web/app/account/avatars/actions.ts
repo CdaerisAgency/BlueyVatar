@@ -23,6 +23,7 @@ export async function uploadImage(form: FormData): Promise<void> {
   if (!(file instanceof File) || file.size === 0) return back('error', 'Choose an image file.')
   // Reject oversized files before reading them into memory.
   if (file.size > 1_000_000) return back('error', 'The image is larger than 1,000,000 bytes. Resize or compress it and try again.')
+  // Size and minimum dimension (80px) are checked in validateImageBytes below.
   const bytes = new Uint8Array(await file.arrayBuffer())
   const img = validateImageBytes(bytes)
   if (!img.ok) return back('error', img.error)

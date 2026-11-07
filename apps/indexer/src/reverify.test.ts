@@ -218,7 +218,7 @@ describe.skipIf(!url)('pgReverifyStore', () => {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0004_verification.sql', '0007_reverify.sql']) await pool.query(sql(f))
+    for (const f of ['0001_init.sql', '0004_verification.sql', '0011_reverify.sql']) await pool.query(sql(f))
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
