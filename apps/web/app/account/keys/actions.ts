@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
 import { getDashboardStore, type KeyRow } from '../../../lib/dashboard-store'
+import { limited } from '../../../lib/rate-guard'
 import { checkKeyLimit, cleanLabel, displayPrefix, generateKey, hashKey, parseDomainList, type KeyKind } from '../../../lib/keys'
 
 export interface KeyState {
@@ -19,7 +20,7 @@ async function ctx() {
   const did = await currentDid()
   if (!did) return redirect('/login')
   const store = getDashboardStore()
-  return { store, license: await store.ensureLicense(did) }
+  return { did, store, license: await store.ensureLicense(did) }
 }
 
 const asKind = (v: FormDataEntryValue | null): KeyKind | null => (v === 'secret' || v === 'publishable' ? v : null)
@@ -29,7 +30,9 @@ const guardFor = (tier: Parameters<typeof checkKeyLimit>[0], kind: KeyKind, repl
 }
 
 async function issue(kind: KeyKind, label: string | null, domains: string[], replace?: string): Promise<KeyState> {
-  const { store, license } = await ctx()
+  const { did, store, license } = await ctx()
+  const wait = await limited(['key.did', 'key.ip'], did)
+  if (wait) return { error: wait }
   if (license.status !== 'active') return { error: `This license is ${license.status.replace('_', ' ')}. Keys cannot be issued.` }
   const key = generateKey(kind)
   const err = await store.createKey(
