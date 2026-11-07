@@ -1,7 +1,6 @@
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { MAX_INTERESTS } from '../../../lib/records'
 import AccountNav from '../AccountNav'
@@ -10,8 +9,7 @@ import { saveProfile } from './actions'
 export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/profile')
   const { error, done } = await searchParams
   let p: Partial<ProfileRecord> = {}
   let loadError: string | null = null

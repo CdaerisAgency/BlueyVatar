@@ -2,14 +2,13 @@ import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { redirect } from 'next/navigation'
 import { verifyCode } from '../../actions'
-import { currentDid } from '../../../lib/auth'
+import { requireDid } from '../../../lib/auth'
 import { getStore } from '../../../lib/store'
 
 export const dynamic = 'force-dynamic'
 
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/verify')
   const pending = await getStore().codes.get(did)
   if (!pending) redirect('/account')
   const { error } = await searchParams

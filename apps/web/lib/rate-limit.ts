@@ -36,6 +36,7 @@ export const BUCKETS = {
   'addEmail.did': { limit: 5, windowSec: HOUR },
   'addEmail.ip': { limit: 20, windowSec: HOUR },
   'codeFail.did': { limit: 10, windowSec: HOUR },
+  'session.did': { limit: 20, windowSec: HOUR },
 } as const satisfies Record<string, BucketConfig>
 
 export type BucketName = keyof typeof BUCKETS

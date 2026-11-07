@@ -1,7 +1,6 @@
 import { PageMain } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../../lib/auth'
+import { requireDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
 import { sourceLabel } from '../../../../lib/import'
 import { RepoError, listImages, repoSession } from '../../../../lib/repo'
@@ -14,8 +13,7 @@ import { confirmImport } from './actions'
 export const dynamic = 'force-dynamic'
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ source?: string; error?: string }> }) {
-  const did = await currentDid()
-  if (!did) redirect('/login')
+  const did = await requireDid('/account/avatars/import')
   const { source = '', error } = await searchParams
   const parsed = parseSourceParam(source)
   let problem: string | null = parsed ? null : 'Unknown import source.'
