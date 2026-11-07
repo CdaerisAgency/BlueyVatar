@@ -7,6 +7,8 @@ export interface Candidate {
   did: string
   blob: BlobRef
   rating: Rating
+  /** ISO time the image record was indexed. Absent for adapter images. */
+  updatedAt?: string
 }
 
 export type Resolution =

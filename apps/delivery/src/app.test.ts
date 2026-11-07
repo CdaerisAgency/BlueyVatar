@@ -262,6 +262,33 @@ describe('delivery API', () => {
     expect(sent.map((a) => a.threshold)).toEqual([80])
   })
 
+  it('derives initials from name= on hash lookups', async () => {
+    const { app } = setup()
+    const h = emailHash('nobody@example.com')
+    const r = await app.request(`/avatar/${h}?d=initials&name=${encodeURIComponent('Ada Lovelace King')}`)
+    expect(r.headers.get('location')).toBe(`/default/initials/80.png?seed=${h}&initials=AL`)
+    const one = await app.request(`/avatar/${h}?d=initials&name=grace`)
+    expect(one.headers.get('location')).toContain('&initials=G')
+    const none = await app.request(`/avatar/${h}?d=initials&name=%20%20`)
+    expect(none.headers.get('location')).not.toContain('initials=')
+  })
+
+  it('serves d=blank as a transparent PNG default, even when another format is asked', async () => {
+    const { app } = setup()
+    const h = emailHash('nobody@example.com')
+    const r = await app.request(`/avatar/${h}?d=blank&fmt=jpeg`)
+    expect(r.headers.get('location')).toBe(`/default/blank/80.png?seed=${h}`)
+    expect((await app.request('/default/blank/80.png')).status).toBe(200)
+  })
+
+  it('reports updatedDate in JSON mode', async () => {
+    const { app } = setup([{ source: 'blueyvatar', did: DID, blob: { cid: CID, mimeType: 'image/png' }, rating: 'g', updatedAt: '2026-01-02T03:04:05.000Z' }])
+    const json = await (await app.request('/u/alice.test?json=true')).json()
+    expect(json.updatedDate).toBe('2026-01-02T03:04:05.000Z')
+    const adapter = setup()
+    expect((await (await adapter.app.request('/u/alice.test?json=true')).json()).updatedDate).toBeNull()
+  })
+
   it('passes handle initials to the initials default, and none for hashes', async () => {
     const { app } = setup([])
     const byHandle = await app.request('/u/alice.test?d=initials')

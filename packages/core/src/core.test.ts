@@ -70,6 +70,13 @@ describe('params', () => {
   })
 })
 
+describe('default style blank', () => {
+  it('parses d=blank as a style', () => {
+    const p = parseAvatarParams(new URLSearchParams('d=blank'), opts)
+    expect(p.default).toEqual({ kind: 'style', style: 'blank' })
+  })
+})
+
 describe('resolution', () => {
   const c = (rating: Candidate['rating'], source: Candidate['source']): Candidate => ({
     source, did: 'did:plc:x', blob: { cid: 'bafy', mimeType: 'image/png' }, rating,
