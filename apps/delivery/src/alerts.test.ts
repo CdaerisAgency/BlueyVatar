@@ -25,7 +25,7 @@ describe('UsageAlerts', () => {
 
   it('fires each threshold once per period', async () => {
     const { sent, alerts } = setup()
-    for (const used of [39_999, 40_000, 40_001, 49_999, 50_000, 50_001, 50_000]) await alerts.check('L1', 'pro', used)
+    for (const used of [39_999, 40_000, 40_001, 49_999, 50_000, 50_001, 50_000]) await alerts.check('L1', 'plus', used)
     expect(sent.map((a) => a.threshold)).toEqual([80, 100])
     expect(sent[0]).toMatchObject({ licenseId: 'L1', included: 50_000, period: '2026-11-01' })
   })
@@ -77,7 +77,7 @@ describe('EmailAlertSink', () => {
   it('once per threshold through UsageAlerts, so repeats mail once', async () => {
     const { mail, sink } = setup()
     const alerts = new UsageAlerts(sink, new MemoryAlertLedger(), () => new Date('2026-11-15T00:00:00Z'))
-    for (const used of [40_000, 40_001, 40_000]) await alerts.check('L1', 'pro', used)
+    for (const used of [40_000, 40_001, 40_000]) await alerts.check('L1', 'plus', used)
     expect(mail).toHaveLength(1)
   })
 })

@@ -19,7 +19,7 @@ Build instructions live in the repository README at the repo root, and this spec
 
 1. "Licensing" covers two things: developer licenses (API keys with tier entitlements) and, removed since this version, a usage license that a user could declare on each image (section 10.4).
 2. "Permissions" covers two things: user-set rules on who can fetch avatar and profile data, and the OAuth permissions an app requests from the user.
-3. Tier names (Free, Pro, Business, Enterprise) and all prices are placeholders. No published basis exists for pricing this product, so section 11 lists competitor reference points only.
+3. Tier names (Free, Plus, Business, Enterprise) and all prices are placeholders. No published basis exists for pricing this product, so section 11 lists competitor reference points only.
 4. Version 1 targets web and API delivery. Mobile SDKs and WordPress plugins are listed as later phases.
 
 **Scope of this version**
@@ -267,7 +267,7 @@ The default list combines [Libravatar's special values](https://wiki.libravatar.
 | `priority` | Order in which adapters are tried | 1 |
 | `enabled` | Switch to turn the adapter off | on |
 
-The Bluesky values come from its [profile lexicon](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json). A second adapter could cover the Tangled profile, which atp.pics [already tries as a fallback](https://graham.leaflet.pub/3mhr36lsmo222) under the collection `sh.tangled.actor.profile`. Tangled's lexicon source confirms the field name: the [`sh.tangled.actor.profile` lexicon](https://tangled.org/tangled.org/core/blob/02d9ff54fcdb96ae5665feb794aa14ba24302a79~1/lexicons/actor/profile.json) keeps the avatar in a blob field named `avatar` that accepts PNG and JPEG up to 1,000,000 bytes, matching Bluesky's limits. A [commit to Tangled's core repo dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons it describes as unused, including that file, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json) with the same `avatar` field and limits. A Tangled adapter would use `avatarPath` `avatar` and `labelsPath` `labels` (the new lexicon adds self-labels). Live repos sampled on November 7, 2026 settled the collection question (section 13, item 13): both Tangled adapters are enabled, `org.tangled.actor.profile` first, with `sh.tangled.actor.profile` as a fallback that is read only when the new collection has no record for the account. The sample is in `docs/research/tangled-collection-v1.md`.
+The Bluesky values come from its [profile lexicon](https://github.com/bluesky-social/atproto/blob/main/lexicons/app/bsky/actor/profile.json). A second adapter could cover the Tangled profile, which atp.pics [already tries as a fallback](https://graham.leaflet.pub/3mhr36lsmo222) under the collection `sh.tangled.actor.profile`. Tangled's lexicon source confirms the field name: the [`sh.tangled.actor.profile` lexicon](https://tangled.org/tangled.org/core/blob/02d9ff54fcdb96ae5665feb794aa14ba24302a79~1/lexicons/actor/profile.json) keeps the avatar in a blob field named `avatar` that accepts PNG and JPEG up to 1,000,000 bytes, matching Bluesky's limits. A [commit to Tangled's core repo dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons it describes as unused, including that file, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json) with the same `avatar` field and limits. A Tangled adapter would use `avatarPath` `avatar` and `labelsPath` `labels` (the new lexicon adds self-labels). Live repos sampled on November 7, 2026 settled the collection question (section 13, item 13): both Tangled adapters are enabled, `org.tangled.actor.profile` first, with `sh.tangled.actor.profile` as a fallback that is read only when the new collection has no record for the account. The sample is in `docs/research/tangled-collection-v2.md`.
 
 **Adapter rules**
 
@@ -402,7 +402,7 @@ Each license holds these fields:
 | Field | Purpose |
 | --- | --- |
 | `license_id`, `owner` | Owner is a DID or an organization account |
-| `tier` | Free, Pro, Business, or Enterprise (section 11) |
+| `tier` | Free, Plus, Business, or Enterprise (section 11). The retired name `pro` reads as Plus. |
 | `entitlements` | Limits and feature flags copied from the tier at issue time |
 | `keys` | Secret and publishable keys with labels and domain lists |
 | `term`, `status` | Monthly or annual term; active, past due, suspended, canceled |
@@ -417,11 +417,11 @@ Owner decision (issue #227): blueyvatar does not ask for, check, or display an i
 
 ## 11. Service tiers
 
-The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. The owner approved the Pro ($9 per month) and Business ($49 per month) prices (issue #67). Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run. Plus is $9.99 per month, approved by the owner.
+The service has four tiers (Free, Plus, Business, Enterprise), with privacy and safety controls free in every plan. The owner approved Plus at $9 per month and Business at $49 per month. Plus is one combined plan: it replaces the former Plus ($9.99) and Pro ($9) plans, and Pro is no longer sold. Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run.
 
-### 11.1 Developer tiers
+### 11.1 Developer limits by tier
 
-| Capability | Free | Pro | Business | Enterprise |
+| Capability | Free | Plus | Business | Enterprise |
 | --- | --- | --- | --- | --- |
 | Price | $0 | $9 per month | $49 per month | Contract |
 | Intended for | Individuals, side projects | Indie developers, small sites | Companies, SaaS products | Platforms, white-label |
@@ -436,7 +436,9 @@ The proposal has four developer tiers and two user plans, with privacy and safet
 | Cache TTL (`ttl`) | Fixed 24h | 1h to 28d | 1h to 28d | 1h to 28d |
 | Custom default image URL | No | Yes | Yes | Yes |
 | Profile JSON | Basic, 4 verified accounts | Full | Full | Full |
-| Hovercards and QR codes | No | No | Yes | Yes |
+| Hovercards | No | Yes | Yes | Yes |
+| QR codes | Yes | Yes | Yes | Yes |
+| Priority cache warming | No | Yes | Yes | Yes |
 | Usage dashboard and API | No | 30 days | 12 months | Custom |
 | Delivery from your own domain or node | No | No | No | Yes |
 | Support | Community | Email | Priority email | Dedicated channel |
@@ -445,9 +447,9 @@ The row "Delivery from your own domain or node" is the Enterprise path to a fede
 
 ### 11.2 User plans
 
-Plus costs $9.99 per month through Stripe (section 12.1).
+Plus costs $9 per month and includes everything in the Free plan, all the user features below, and the Plus column of section 11.1. Business ($49 per month) includes everything in Plus. Both are bought through Stripe (section 12.1).
 
-| Capability | Free | Plus |
+| Capability | Free | Plus and Business |
 | --- | --- | --- |
 | Avatar images | 3 | 20 |
 | Profile fields and links | Full | Full |
@@ -497,19 +499,19 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 
 **Billing rules**
 
-- Plans bill monthly or annually. Overage on Pro and Business is metered at a published per-unit rate (to be set).
+- Plans bill monthly or annually. Overage on Plus and Business is metered at a published per-unit rate (to be set).
 - A past-due license gets a grace period, then drops to Free limits. A downgrade changes limits only and never deletes user data, user avatars, or profiles.
 - Keys can be rotated and revoked at any time, with usage alerts at 80 and 100 percent of included volume.
 - The payment processor is Stripe, decided by the owner on 2026-11-07 (issue #67). Tax is computed by Stripe Tax, and invoices come from Stripe Billing. Both are configured in the Stripe dashboard at deploy (docs/deploy.md, Stripe billing). The overage rate stays open until per-miss cost is measured.
 
 ### 12.1 Stripe billing
 
-- **Checkout and portal.** Plus, Pro, and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, and `STRIPE_PRICE_PLUS`. `STRIPE_PRICE_PLUS` is optional: with it unset Plus is not sold. With any other Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
+- **Checkout and portal.** Plus and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PLUS` and `STRIPE_PRICE_BUSINESS`. `STRIPE_PRICE_PLUS` may list retired Plus or Pro price ids after the first, which map to Plus but are never sold. With any other Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
 - **Webhook.** One endpoint verifies the Stripe signature against the raw body and handles `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`. Each event id is stored in the same transaction as its effects, so a redelivered event changes nothing, and a failed event leaves no trace so Stripe's retry applies it. An event older than the stored subscription state is ignored.
 - **Data.** Migration 0017 allows `plus` in `subscriptions.tier`. Migration 0015 adds `billing_customers` (DID to Stripe customer), `subscriptions` (a mirror of each Stripe subscription, keyed to the DID and the license), `stripe_events`, and `licenses.grace_ends_at`.
 - **Tier resolution.** A license's tier is derived from all of its subscriptions: the highest tier among `active`, `trialing`, and in-grace `past_due` subscriptions, else Free. The derived tier is written to `licenses` on every event. Enterprise licenses are contracts and are never changed by billing.
 - **Past due.** A past-due license keeps its paid tier for a grace period, then serves at Free limits. The grace period is a proposal of 7 days from the first failed payment (`PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts`), pending owner approval. Expiry is evaluated when a license is read (`effectiveTier`), so it needs no webhook and a missed event cannot extend paid limits. Recovery to `active` clears the grace period. A downgrade changes limits only, as stated above.
-- **Plus.** Plus is the user plan (section 11.2) at $9.99 per month. A Plus price maps to a subscription row with tier `plus`, which never changes a license. A DID has Plus while a Plus subscription is `active`, `trialing`, or `past_due` inside the grace period, or while it is listed in `PLUS_DIDS` (kept as a manual grant). A person can hold one Plus subscription and one developer subscription at once.
+- **Plus.** Plus is $9 per month and sets both the license tier and the user plan (section 11.2). A DID has Plus while a Plus subscription, or a Business subscription on its own license, is `active`, `trialing`, or `past_due` inside the grace period, or while it is listed in `PLUS_DIDS` (kept as a manual grant). The retired name `pro` in a stored license or subscription row reads as Plus. Migration 0036 renamed stored `pro` licenses to `plus`, and new Plus licenses are stored as `plus`.
 
 ## 13. Open questions and risks
 
@@ -529,7 +531,7 @@ Thirteen items in the table below need a decision or an answer before build, and
 | 10 | Legal review | Terms of service, privacy policy, image licenses, treatment of hashed emails | Needs a lawyer; I am not one |
 | 11 | Payment processor, taxes, invoicing, pricing | Section 12 depends on them | Decided (issue #67): Stripe, with Stripe Tax and Stripe invoices, and Pro $9 and Business $49 per month (section 12.1). Open: the past-due grace period (7 days proposed), a Plus price, and the overage rate, which needs the per-miss cost measured after deploy |
 | 12 | `/img` bypasses tier size caps | `/img` URLs carry no key and accept any size up to 2048 (section 7), so a Free caller can build a 2048 URL and skip the 512 cap in section 11 | Open risk. Mitigation ideas: sign image paths at the redirect route, or restrict `/img` to a fixed size ladder so tier caps map to a few cacheable sizes |
-| 13 | Which Tangled collection to read | A [Tangled core commit dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json). Both use an `avatar` blob field | Decided (issues #69 and #55, section 7): enable `org.tangled.actor.profile` and keep `sh.tangled.actor.profile` as a fallback read only when the new record is missing. A sample of 44 live repos on November 7, 2026, plus relay counts (3,000 repos with the new collection, 16,056 with the legacy one, 14,079 with only the legacy one), showed that most users have not migrated. Avatars in both collections are typed blobs that the adapter reads as is. The extra read costs one `getRecord` per miss for a migrated user and two for everyone else, about 0.12 s each at p50 from one container ([research](../research/tangled-collection-v1.md)). Tangled maintainers were not asked |
+| 13 | Which Tangled collection to read | A [Tangled core commit dated November 2, 2026](https://tangled.org/tangled.org/core/commit/02d9ff54fcdb96ae5665feb794aa14ba24302a79) removed the `sh.tangled.*` lexicons, and the main branch now defines [`org.tangled.actor.profile`](https://tangled.org/tangled.org/core/blob/master/lexicons/org/tangled/actor/profile.json). Both use an `avatar` blob field | Decided (issues #69 and #55, section 7): enable `org.tangled.actor.profile` and keep `sh.tangled.actor.profile` as a fallback read only when the new record is missing. A sample of 44 live repos on November 7, 2026, plus relay counts (3,000 repos with the new collection, 16,056 with the legacy one, 14,079 with only the legacy one), showed that most users have not migrated. Avatars in both collections are typed blobs that the adapter reads as is. The extra read costs one `getRecord` per miss for a migrated user and two for everyone else, about 0.12 s each at p50 from one container ([research](../research/tangled-collection-v2.md)). Tangled maintainers were not asked |
 
 **Name clearance for blueyvatar.** One search found no existing product with this name, which does not prove it is free. Two checks are needed before launch. First, Bluesky's [trademark policy](https://bsky.social/about/support/trademarks) prohibits using Bluesky, bsky, or any confusingly similar variation in a domain name or a product name without written authorization. Whether blueyvatar counts is a legal judgment, and trademarks@blueskyweb.xyz is the contact for permission questions. Second, Bluey is the name of a well-known children's series [produced by Ludo Studio for the ABC and BBC Studios](https://whatsondisneyplus.com/bluey-profile-avatars-added-to-disney/), so a clearance search for Bluey-based names is prudent. I have not checked whether blueyvatar.com is available to register. The [atproto trademark policy](https://atproto.com/about/trademarks/atproto-trademark-policy) covers the atproto marks separately and does not restrict ordinary use of domain names as NSIDs.
 

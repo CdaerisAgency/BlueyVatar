@@ -55,9 +55,9 @@ export default function GravatarAlternativePage() {
           <tbody>
             <tr><td>Storage</td><td>Your atproto repository. The image and profile live in an account you own.</td></tr>
             <tr><td>Ratings</td><td>Mapped from atproto self-labels so an image rates the same in both places. The definitions are blueyvatar&apos;s own and can differ from the ones on Gravatar&apos;s pages.</td></tr>
-            <tr><td>Size caps</td><td>Free 512, Pro 1024, Business and Enterprise 2048. Larger values are clamped and reported in the <code>x-adjusted-params</code> header.</td></tr>
+            <tr><td>Size caps</td><td>Free 512, Plus 1024, Business and Enterprise 2048. Larger values are clamped and reported in the <code>x-adjusted-params</code> header.</td></tr>
             <tr><td>Image count</td><td>Free 3 images, Plus 20.</td></tr>
-            <tr><td>Custom default URL</td><td>HTTPS only, on the service allowlist, with a Pro key or higher.</td></tr>
+            <tr><td>Custom default URL</td><td>HTTPS only, on the service allowlist, with a Plus key or higher.</td></tr>
             <tr><td>Email input</td><td>SHA-256 or MD5 hash only. A raw email is always rejected.</td></tr>
             <tr><td>Per-email images</td><td>One avatar per account, shared by every linked hash.</td></tr>
             <tr><td><code>d=color</code></td><td>Not supported. <code>d=pagan</code> is an extra style.</td></tr>

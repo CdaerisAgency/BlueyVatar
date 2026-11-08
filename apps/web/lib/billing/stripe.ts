@@ -2,7 +2,7 @@ import type { PaidPlan } from '@blueyvatar/core'
 import Stripe from 'stripe'
 import { PRICING } from '../pricing'
 import { NOT_CONFIGURED, missingForCheckout, priceFor, secretKey, type Env } from './config'
-import type { BillingStore, SubKind, SubscriptionRow } from './store'
+import type { BillingStore, SubscriptionRow } from './store'
 
 const g = globalThis as { __bvStripe?: { key: string; client: Stripe } }
 
@@ -48,9 +48,8 @@ export async function createCheckoutUrl(ctx: Ctx, did: string, licenseId: string
   const env = ctx.env ?? process.env
   if (!ctx.client || missingForCheckout(env, tier).length > 0) return { ok: false, error: NOT_CONFIGURED }
   const price = priceFor(tier, env)!
-  // A user can hold one developer subscription and one Plus subscription, never two of the same kind.
-  // Developer subscriptions are per license, so an organization license has its own.
-  const current = await ctx.store.subscriptionFor(did, tier === 'plus' ? 'plus' : 'developer', tier === 'plus' ? undefined : licenseId)
+  // One subscription per license. An organization license has its own, so it does not block the owner's personal plan.
+  const current = await ctx.store.subscriptionFor(did, licenseId)
   if (current) return { ok: false, error: 'You already have a subscription. Use Manage billing to change or cancel it.' }
   const session = await ctx.client.checkout.sessions.create(
     checkoutParams({ did, licenseId, price, customer: await ctx.store.customerFor(did), baseUrl: ctx.baseUrl, env }),
@@ -69,23 +68,15 @@ export async function createPortalUrl(ctx: Ctx, did: string): Promise<UrlResult>
 
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string }
 
-const PLAN_LABEL: Record<PaidPlan, string> = { plus: 'Plus', pro: 'Pro', business: 'Business' }
+const PLAN_LABEL: Record<PaidPlan, string> = { plus: 'Plus', business: 'Business' }
 const amountOf = (tier: PaidPlan) => PRICING.find((p) => p.id === tier)?.amount ?? 0
 const PAYMENT_HELP = 'Your plan was not changed and you were not charged. Check your card under Manage billing, then try again.'
 
-/**
- * Which subscription a plan switch applies to. A person normally holds one. Plus and a developer plan can coexist
- * from before plan switching existed: then a Pro or Business target changes the developer plan, and Plus is already held.
- */
-export function subscriptionToSwitch(held: { developer: SubscriptionRow | null; plus: SubscriptionRow | null }, target: PaidPlan): { sub: SubscriptionRow } | { error: string } {
-  const { developer, plus } = held
-  if (!developer && !plus) return { error: 'You do not have a paid plan yet. Choose a plan to subscribe.' }
-  if (target === 'plus') {
-    if (plus) return { error: 'You are already on Plus.' }
-    return { sub: developer! }
-  }
-  if (developer) return developer.tier === target ? { error: `You are already on ${PLAN_LABEL[target]}.` } : { sub: developer }
-  return { sub: plus! }
+/** Which subscription a plan switch applies to, or why none can be switched. Only Plus and Business are offered. */
+export function subscriptionToSwitch(held: SubscriptionRow | null, target: PaidPlan): { sub: SubscriptionRow } | { error: string } {
+  if (!held) return { error: 'You do not have a paid plan yet. Choose a plan to subscribe.' }
+  if (held.tier === target) return { error: `You are already on ${PLAN_LABEL[target]}.` }
+  return { sub: held }
 }
 
 /**
@@ -100,7 +91,7 @@ export function subscriptionToSwitch(held: { developer: SubscriptionRow | null; 
 export async function changePlan(ctx: Ctx, did: string, licenseId: string, target: PaidPlan): Promise<ActionResult> {
   const env = ctx.env ?? process.env
   if (!ctx.client || missingForCheckout(env, target).length > 0) return { ok: false, error: NOT_CONFIGURED }
-  const picked = subscriptionToSwitch({ developer: await ctx.store.subscriptionFor(did, 'developer', licenseId), plus: await ctx.store.subscriptionFor(did, 'plus') }, target)
+  const picked = subscriptionToSwitch(await ctx.store.subscriptionFor(did, licenseId), target)
   if ('error' in picked) return { ok: false, error: picked.error }
   const sub = picked.sub
   if (sub.status === 'past_due') return { ok: false, error: 'Your last payment failed. Update your payment method under Manage billing first, then change plans.' }
@@ -136,10 +127,10 @@ export async function changePlan(ctx: Ctx, did: string, licenseId: string, targe
  * Stripe allows resuming any time before the period ends and never after the subscription has ended
  * (https://docs.stripe.com/billing/subscriptions/cancel).
  */
-export async function setCancelAtPeriodEnd(ctx: Ctx, did: string, licenseId: string, kind: SubKind, cancel: boolean, now: Date = new Date()): Promise<ActionResult> {
+export async function setCancelAtPeriodEnd(ctx: Ctx, did: string, licenseId: string, cancel: boolean, now: Date = new Date()): Promise<ActionResult> {
   const env = ctx.env ?? process.env
   if (!ctx.client || !secretKey(env)) return { ok: false, error: NOT_CONFIGURED }
-  const sub = await ctx.store.subscriptionFor(did, kind, kind === 'developer' ? licenseId : undefined)
+  const sub = await ctx.store.subscriptionFor(did, licenseId)
   if (!sub) return { ok: false, error: 'You do not have a subscription to change.' }
   if (cancel && sub.cancelAtPeriodEnd) return { ok: false, error: 'Your subscription is already set to end.' }
   if (!cancel) {

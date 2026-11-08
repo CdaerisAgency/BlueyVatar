@@ -15,7 +15,7 @@ GET /avatar/{hash}?ttl=6h
 | Tier | `ttl` |
 | --- | --- |
 | Free (including anonymous) | Ignored. Fixed at 24h. The response carries `x-adjusted-params: ttl`. |
-| Pro, Business, Enterprise | Honored, 1h to 28d. |
+| Plus, Business, Enterprise | Honored, 1h to 28d. |
 
 The value is validated for every tier, so a malformed `ttl` fails with `invalid_ttl` even on Free.
 

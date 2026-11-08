@@ -18,7 +18,7 @@ x-api-key: sk_...
 
 ```json
 {
-  "tier": "pro",
+  "tier": "plus",
   "period": { "start": "2026-11-01", "end": "2026-11-30" },
   "included": { "volume": 50000, "per": "month" },
   "total": 1234,
@@ -37,9 +37,9 @@ x-api-key: sk_...
 
 | Field | Meaning |
 | --- | --- |
-| `tier` | `free`, `pro`, `business`, or `enterprise`. |
+| `tier` | `free`, `plus`, `business`, or `enterprise`. A license that still holds the retired name `pro` reports `plus`. |
 | `period` | The current billing period: the UTC calendar month, first and last day. |
-| `included` | Included keyed volume. `volume` is `null` for Enterprise (contract). `per` is `month` for Pro and Business, `day` for Free, and `null` for Enterprise. |
+| `included` | Included keyed volume. `volume` is `null` for Enterprise (contract). `per` is `month` for Plus and Business, `day` for Free, and `null` for Enterprise. |
 | `total` | Origin resolutions so far this period. This is the number that counts toward included volume. |
 | `meters` | This period's count for each meter: `origin_resolution`, `profile_json`, `transform`. |
 | `history.months` | Monthly counts, newest first, including the current month. |
@@ -50,7 +50,7 @@ x-api-key: sk_...
 | Tier | `history.months` | `history.days` |
 | --- | --- | --- |
 | Free | none (use `meters` for the current period) | none |
-| Pro | 2 months (this and last) | last 30 days |
+| Plus | 2 months (this and last) | last 30 days |
 | Business | 12 months | last 30 days |
 | Enterprise | 12 months | last 30 days |
 

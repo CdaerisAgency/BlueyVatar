@@ -4,7 +4,7 @@ Written November 4, 2026, from the cloud session that built phases 1 and 2. The 
 
 ## 1. What the project is
 
-blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v11.md`.
+blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v12.md`.
 
 - Repository: `CdaerisAgency/BlueyVatar` (the old lowercase URL redirects; set your remote to `https://github.com/CdaerisAgency/BlueyVatar.git`)
 - Local path: `C:\Users\super\OneDrive\Documents\GitHub\BlueyVatar`
@@ -77,7 +77,7 @@ After each step, update the "Provisioned resources" section of `docs/deploy.md` 
 | 42 | Live Tap test against the real firehose |
 | 52, 53 | Staging and production deploy, origin lockdown verified |
 | 54 | Publish the lexicons (needs the domain live and name clearance confirmed; the owner says clearance is done) |
-| 55 | Tangled adapter (`org.tangled.actor.profile` enabled, `sh.tangled.actor.profile` enabled as a fallback; see `docs/research/tangled-collection-v1.md`) |
+| 55 | Tangled adapter (`org.tangled.actor.profile` enabled, `sh.tangled.actor.profile` enabled as a fallback; see `docs/research/tangled-collection-v2.md`) |
 
 These need the owner's decision and are not your work: issue 67 (pricing) and issues 60 and 66 (legal).
 

@@ -1,21 +1,22 @@
+import type { PaidPlan } from '@blueyvatar/core'
 import { PRICING, formatPrice } from '../pricing'
 
 /** The fields of a subscription row that the Billing page shows. */
 export interface SubscriptionView {
-  tier: 'plus' | 'pro' | 'business'
+  tier: 'plus' | 'business'
   status: string
   currentPeriodEnd: Date | null
   cancelAtPeriodEnd: boolean
 }
 
 export interface PlanSummary {
-  /** "Pro" */
+  /** "Plus" */
   plan: string
   /** "$9 per month" */
   price: string
   /** "Active", "In trial", or "Payment failed" */
   status: string
-  /** "Renews on November 30, 2026", "Ends on November 30, 2026 (you keep Pro until then)", or null when Stripe gave no date. */
+  /** "Renews on November 30, 2026", "Ends on November 30, 2026 (you keep Plus until then)", or null when Stripe gave no date. */
   when: string | null
 }
 

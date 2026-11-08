@@ -17,7 +17,9 @@ const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_doma
 const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
 const migration24 = readFileSync(new URL('../../../db/migrations/0024_usage_daily.sql', import.meta.url), 'utf8')
 const migration25 = readFileSync(new URL('../../../db/migrations/0025_profile_view_counters.sql', import.meta.url), 'utf8')
+const migration26 = readFileSync(new URL('../../../db/migrations/0026_organizations.sql', import.meta.url), 'utf8')
 const migration35 = readFileSync(new URL('../../../db/migrations/0035_api_key_expiry.sql', import.meta.url), 'utf8')
+const migration36 = readFileSync(new URL('../../../db/migrations/0036_license_tier_plus.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -44,7 +46,9 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration17)
     await pool.query(migration24)
     await pool.query(migration25)
+    await pool.query(migration26)
     await pool.query(migration35)
+    await pool.query(migration36)
   }, 60_000)
 
   afterAll(async () => {
@@ -145,8 +149,9 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await index.hasPlusSubscription(did, new Date(t0.getTime() + 8 * day))).toBe(false)
     await put('canceled', null)
     expect(await index.hasPlusSubscription(did, t0)).toBe(false)
+    // The retired 'pro' name is Plus now, so an active 'pro' subscription still counts.
     await put('active', null, 'pro')
-    expect(await index.hasPlusSubscription(did, t0)).toBe(false)
+    expect(await index.hasPlusSubscription(did, t0)).toBe(true)
   })
 
   it('keeps gallery images out of avatar reads and orders them by sort, unset last, then newest', async () => {
@@ -171,17 +176,31 @@ describe.skipIf(!url)('postgres stores', () => {
   it('finds keys by SHA256 and ignores revoked keys', async () => {
     const licenses = new PgLicenseStore(pool)
     const raw = 'pk_test_123456'
-    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('lic1', $1, 'pro')`, [DID])
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('lic1', $1, 'plus')`, [DID])
     await pool.query(
       `INSERT INTO api_keys (key_hash, prefix, license_id, kind, domains) VALUES ($1, 'pk_test', 'lic1', 'publishable', '{*.example.com}')`,
       [hashApiKey(raw)],
     )
     const found = await licenses.findKey(raw)
-    expect(found?.license).toEqual({ licenseId: 'lic1', owner: DID, tier: 'pro', status: 'active' })
+    expect(found?.license).toEqual({ licenseId: 'lic1', owner: DID, tier: 'plus', status: 'active' })
     expect(found?.key).toEqual({ key: raw, kind: 'publishable', licenseId: 'lic1', domains: ['*.example.com'], expiresAt: null })
     expect(await licenses.findKey('pk_other')).toBeNull()
     await pool.query(`UPDATE api_keys SET revoked_at = now()`)
     expect(await licenses.findKey(raw)).toBeNull()
+  })
+
+  it('still reads an old pro license as Plus, and migration 0036 renames it and runs twice', async () => {
+    const licenses = new PgLicenseStore(pool)
+    // 'pro' stays allowed by the constraint during the transition (rolling deploys), and reads as Plus.
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('lic_old_pro', 'did:plc:oldpro', 'pro')`)
+    await pool.query(`INSERT INTO api_keys (key_hash, prefix, license_id, kind) VALUES ($1, 'sk_old', 'lic_old_pro', 'secret')`, [hashApiKey('sk_oldpro_1')])
+    expect((await licenses.findKey('sk_oldpro_1'))?.license).toMatchObject({ licenseId: 'lic_old_pro', tier: 'plus' })
+    await pool.query(migration36)
+    await pool.query(migration36)
+    expect((await pool.query(`SELECT tier FROM licenses WHERE license_id = 'lic_old_pro'`)).rows[0].tier).toBe('plus')
+    expect((await licenses.findKey('sk_oldpro_1'))?.license).toMatchObject({ tier: 'plus' })
+    await expect(pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('lic_bad', 'did:plc:bad', 'gold')`)).rejects.toThrow()
+    await pool.query(`DELETE FROM licenses WHERE license_id = 'lic_old_pro'`)
   })
 
   it('serves a past-due license at its paid tier during grace, then at Free, and still serves it (spec section 12)', async () => {
@@ -228,7 +247,7 @@ describe.skipIf(!url)('postgres stores', () => {
 
   it('records day rows for origin resolutions and profile JSON, and reads them back', async () => {
     const usage = new PgUsageMeter(pool)
-    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('licd', 'did:plc:d', 'pro')`)
+    await pool.query(`INSERT INTO licenses (license_id, owner, tier) VALUES ('licd', 'did:plc:d', 'plus')`)
     await usage.add('licd', 'origin_resolution', 2)
     await usage.add('licd', 'origin_resolution')
     await usage.add('licd', 'profile_json')
