@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto'
-import { ENTITLEMENTS, type Tier } from '@blueyvatar/core'
+import { entitlementsFor, type Tier } from '@blueyvatar/core'
 
 export type KeyKind = 'secret' | 'publishable'
 
@@ -35,9 +35,9 @@ export type LimitCheck = { ok: true } | { ok: false; error: string }
  * Checks whether a license may add a key of this kind. `active` lists unrevoked keys.
  * During a rotation, pass the key being replaced as `replacing` so the swap nets to zero.
  */
-export function checkKeyLimit(tier: Tier, kind: KeyKind, active: readonly ActiveKey[], replacing?: string): LimitCheck {
+export function checkKeyLimit(tier: Tier | string, kind: KeyKind, active: readonly ActiveKey[], replacing?: string): LimitCheck {
   const current = active.filter((k) => k.hash !== replacing)
-  const { maxKeys } = ENTITLEMENTS[tier]
+  const { maxKeys } = entitlementsFor(tier)
   if (tier === 'free') {
     if (kind === 'secret') return { ok: false, error: 'The Free tier includes one publishable key. Secret keys need a paid tier.' }
     if (current.some((k) => k.kind === 'publishable')) {
@@ -111,8 +111,8 @@ export { historyPeriods, includedVolume, periodStartOf, type Included } from '@b
 export type AlertState = 'ok' | 'warn80' | 'over100' | 'n/a'
 
 /** Alert thresholds are monthly (spec section 12), so only monthly-included tiers have one. */
-export function alertState(tier: Tier, used: number): AlertState {
-  const inc = ENTITLEMENTS[tier].keyedMonthly
+export function alertState(tier: Tier | string, used: number): AlertState {
+  const inc = entitlementsFor(tier).keyedMonthly
   if (!inc) return 'n/a'
   if (used >= inc) return 'over100'
   return used >= inc * 0.8 ? 'warn80' : 'ok'

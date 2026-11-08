@@ -1,7 +1,7 @@
 import { PAID_PLANS, PAST_DUE_GRACE_DAYS, effectiveTier, type PaidPlan } from '@blueyvatar/core'
 import { PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
-import { billingEnabled, plusEnabled } from '../../../lib/billing/config'
+import { billingEnabled, planEnabled } from '../../../lib/billing/config'
 import { longDate, summarize } from '../../../lib/billing/summary'
 import { getBillingStore } from '../../../lib/billing/store'
 import { getDashboardStore } from '../../../lib/dashboard-store'
@@ -20,7 +20,7 @@ const NOTICE: Record<string, string> = {
 }
 
 const UNAVAILABLE = 'Billing is not available yet on this deployment. To change your plan now, email support@blueyvatar.com.'
-const PLAN_NAME: Record<string, string> = { plus: 'Plus', pro: 'Pro', business: 'Business' }
+const PLAN_NAME: Record<string, string> = { plus: 'Plus', business: 'Business' }
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string; done?: string; change?: string; org?: string }> }) {
   const did = await requireDid('/account/billing')
@@ -29,17 +29,17 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   if (orgId) return <OrgBilling did={did} orgId={orgId} q={q} />
   const license = await getDashboardStore().ensureLicense(did)
   const billing = getBillingStore()
-  const [customer, sub, plusSub, plan] = await Promise.all([billing.customerFor(did), billing.subscriptionFor(did, 'developer', license.licenseId), billing.subscriptionFor(did, 'plus'), resolvePlan(did)])
+  const [customer, sub, plan] = await Promise.all([billing.customerFor(did), billing.subscriptionFor(did, license.licenseId), resolvePlan(did)])
   const enabled = billingEnabled()
   const now = new Date()
   const tier = effectiveTier(license, now)
   const pastDue = license.status === 'past_due' && license.graceEndsAt
-  const subs = [plusSub, sub].filter((x): x is NonNullable<typeof x> => !!x)
+  const subs = sub ? [sub] : []
   const enterprise = license.tier === 'enterprise'
   // The tier names a person currently holds, for the "(current)" marker. Enterprise is a contract and has no row on the list.
   const held = new Set<string>(subs.map((x) => x.tier))
   const target = q.change && (PAID_PLANS as readonly string[]).includes(q.change) ? (q.change as PaidPlan) : null
-  const canSwitchTo = (id: PaidPlan) => (id === 'plus' ? plusEnabled() : enabled) && !(enterprise && id !== 'plus')
+  const canSwitchTo = (id: PaidPlan) => planEnabled(id) && !enterprise
 
   return (
     <PageMain>
@@ -82,7 +82,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       <ul>
         {PRICING.map((p) => {
           const id = p.id
-          const isCurrent = id === 'free' ? subs.length === 0 && !enterprise && plan !== 'plus' : held.has(id) || (id === 'plus' && plan === 'plus')
+          const isCurrent = id === 'free' ? subs.length === 0 && !enterprise && plan !== 'plus' : held.has(id) || (id === 'plus' && plan === 'plus' && subs.length === 0)
           return (
             <li key={id}>
               <strong>{p.name}</strong>: {p.amount === 0 ? '$0' : `${formatPrice(p.amount)} per ${p.per === 'mo' ? 'month' : p.per}`}
@@ -93,7 +93,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                   <button type="submit">Subscribe to {p.name}</button>
                 </form>
               )}
-              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && !(id === 'plus' && plusSub) && (
+              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && (
                 <a href={`/account/billing?change=${id}`} style={{ marginLeft: 12 }}>
                   Switch to {p.name}
                 </a>
@@ -107,16 +107,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
       {enabled && subs.map((x) => (
         <section key={`manage-${x.id}`}>
-          <h2>{x.tier === 'plus' ? 'Plus subscription' : `${PLAN_NAME[x.tier]} subscription`}</h2>
+          <h2>{PLAN_NAME[x.tier]} subscription</h2>
           {x.cancelAtPeriodEnd ? (
             <form action={resumeSubscription}>
-              <input type="hidden" name="kind" value={x.tier === 'plus' ? 'plus' : 'developer'} />
               <p>Your subscription is set to end. You can keep it any time before it ends.</p>
               <button type="submit">Resume {PLAN_NAME[x.tier]}</button>
             </form>
           ) : (
             <form action={cancelSubscription}>
-              <input type="hidden" name="kind" value={x.tier === 'plus' ? 'plus' : 'developer'} />
               <p>Cancel any time. Your plan stays until the end of the period you paid for, and you are not charged again.</p>
               <button type="submit">Cancel {PLAN_NAME[x.tier]} at the end of the period</button>
             </form>
@@ -185,7 +183,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
     )
   }
   const license = await getDashboardStore().licenseById(lic.licenseId)
-  const sub = await getBillingStore().subscriptionFor(lic.billingDid, 'developer', lic.licenseId)
+  const sub = await getBillingStore().subscriptionFor(lic.billingDid, lic.licenseId)
   const enabled = billingEnabled()
   const business = PRICING.find((p) => p.id === 'business')
   return (

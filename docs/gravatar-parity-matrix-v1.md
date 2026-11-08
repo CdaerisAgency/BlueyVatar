@@ -69,7 +69,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 | Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | None. No logo, no avatar overlay |
 | Redirect to a social account | Unknown | n/a | `?to=<platform>` via `/go/:handle/:platform` (`apps/delivery/src/app.ts`) |
 | Encoded content | Link to the profile page only | n/a | Profile URL, or the `/go` redirect URL |
-| Access | Unknown (no tier restriction published on the pages read) | n/a | Business and Enterprise keys only (`apps/delivery/src/app.ts`) |
+| Access | Unknown (no tier restriction published on the pages read) | n/a | Every plan, including anonymous callers (`apps/delivery/src/app.ts`) |
 
 ## 5. Hovercards, embeds, widgets
 
@@ -117,8 +117,8 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 | Feature | Gravatar | Libravatar | blueyvatar today |
 | --- | --- | --- | --- |
-| End user | Free; paid details for end users Unknown | Free service; pricing not mentioned on the home page ([home](https://libravatar.org/)) | Free, Plus $9.99 per month (`apps/web/lib/pricing.ts`) |
-| Developer | Free tier with attribution; paid from $100 per month with SLA and support ([pricing](https://docs.gravatar.com/pricing)) | None published | Free, Pro $9, Business $49 per month, Enterprise by contract (`apps/web/lib/pricing.ts`, `packages/core/src/tiers.ts`) |
+| End user | Free; paid details for end users Unknown | Free service; pricing not mentioned on the home page ([home](https://libravatar.org/)) | Free, Plus $9 per month (`apps/web/lib/pricing.ts`) |
+| Developer | Free tier with attribution; paid from $100 per month with SLA and support ([pricing](https://docs.gravatar.com/pricing)) | None published | Free, Plus $9 (includes 50,000 keyed requests a month), Business $49 per month, Enterprise by contract (`apps/web/lib/pricing.ts`, `packages/core/src/tiers.ts`) |
 
 ## 10. Other features found
 

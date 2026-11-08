@@ -102,7 +102,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
             </tbody>
           </table>
           </TableBox>
-          <p>{license.tier === 'pro' ? 'Pro shows 30 days of history.' : 'Shows up to 12 months of history.'}</p>
+          <p>{license.tier === 'plus' ? 'Plus shows 30 days of history.' : 'Shows up to 12 months of history.'}</p>
           <h3>Last 30 days</h3>
           <TableBox label="Daily usage">
           <table>

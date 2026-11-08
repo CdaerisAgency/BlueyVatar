@@ -88,7 +88,7 @@ describe('fromGravatarUrl', () => {
   it('keeps custom default URLs with a tier note', () => {
     const r = fromGravatarUrl('https://gravatar.com/avatar/' + ADA + '?d=' + encodeURIComponent('https://cdn.example.com/a.png'))
     expect(r.options.default).toBe('https://cdn.example.com/a.png')
-    expect(r.notes[0]).toMatch(/Pro/)
+    expect(r.notes[0]).toMatch(/Plus/)
   })
   it('feeds avatarUrl and carries base options', () => {
     const { options } = fromGravatarUrl('https://gravatar.com/avatar/' + ADA + '?s=96', { baseUrl: 'https://img.example', key: 'pk_x' })

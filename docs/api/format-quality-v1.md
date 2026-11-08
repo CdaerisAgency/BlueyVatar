@@ -12,7 +12,7 @@ Output format and quality are chosen with `fmt` and `q` on `/avatar/{hash}` and 
 
 - Values are lowercase and exact. `gif`, `avif`, `jpg`, and `WEBP` return `400 invalid_format` on every tier.
 - Free tier (including anonymous) gets PNG only. A valid `jpeg` or `webp` is ignored, the response is PNG, and it carries `x-adjusted-params: fmt`.
-- Pro, Business, and Enterprise get all three formats.
+- Plus, Business, and Enterprise get all three formats.
 
 ## q
 

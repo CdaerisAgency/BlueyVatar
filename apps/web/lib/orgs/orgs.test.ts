@@ -113,8 +113,8 @@ describe.skipIf(!url)('organizations', () => {
     })
     expect((await pool.query('SELECT tier FROM licenses WHERE license_id = $1', [lic.licenseId])).rows[0].tier).toBe('business')
     expect((await pool.query("SELECT tier FROM licenses WHERE owner = $1 AND org_id IS NULL", [A])).rows[0].tier).toBe('free')
-    expect((await store.subscriptionFor(A, 'developer', lic.licenseId))?.id).toBe('sub_org')
-    expect(await store.subscriptionFor(A, 'developer', 'lic_other')).toBeNull()
+    expect((await store.subscriptionFor(A, lic.licenseId))?.id).toBe('sub_org')
+    expect(await store.subscriptionFor(A, 'lic_other')).toBeNull()
   })
 
   it('exports memberships and audit rows', async () => {
