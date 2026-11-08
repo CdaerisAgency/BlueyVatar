@@ -22,9 +22,9 @@ describe('keys', () => {
   })
   it('enforces maxKeys and allows unlimited Enterprise', () => {
     const five = Array.from({ length: 5 }, (_, i) => ({ hash: String(i), kind: 'secret' as const }))
-    expect(checkKeyLimit('pro', 'secret', five).ok).toBe(false)
-    expect(checkKeyLimit('pro', 'secret', five, '2').ok).toBe(true)
-    expect(checkKeyLimit('pro', 'secret', five.slice(0, 4)).ok).toBe(true)
+    expect(checkKeyLimit('plus', 'secret', five).ok).toBe(false)
+    expect(checkKeyLimit('plus', 'secret', five, '2').ok).toBe(true)
+    expect(checkKeyLimit('plus', 'secret', five.slice(0, 4)).ok).toBe(true)
     expect(checkKeyLimit('enterprise', 'secret', Array.from({ length: 500 }, (_, i) => ({ hash: String(i), kind: 'secret' as const }))).ok).toBe(true)
   })
   it('validates domains', () => {
@@ -41,15 +41,16 @@ describe('keys', () => {
   it('lists history periods per tier', () => {
     const now = new Date('2026-02-15T00:00:00Z')
     expect(historyPeriods('free', now)).toEqual([])
-    expect(historyPeriods('pro', now)).toEqual(['2026-02-01', '2026-01-01'])
+    expect(historyPeriods('plus', now)).toEqual(['2026-02-01', '2026-01-01'])
+    expect(historyPeriods('pro', now)).toEqual(historyPeriods('plus', now))
     const b = historyPeriods('business', now)
     expect(b).toHaveLength(12)
     expect(b[2]).toBe('2025-12-01')
   })
   it('computes alert state', () => {
-    expect(alertState('pro', 39_999)).toBe('ok')
-    expect(alertState('pro', 40_000)).toBe('warn80')
-    expect(alertState('pro', 50_000)).toBe('over100')
+    expect(alertState('plus', 39_999)).toBe('ok')
+    expect(alertState('plus', 40_000)).toBe('warn80')
+    expect(alertState('plus', 50_000)).toBe('over100')
     expect(alertState('free', 5)).toBe('n/a')
   })
 })

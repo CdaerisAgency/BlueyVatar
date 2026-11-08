@@ -32,11 +32,11 @@ async function orgBilling(did: string, orgId: string): Promise<{ ok: true; licen
   return lic ? { ok: true, licenseId: lic.licenseId, payer: lic.billingDid } : { ok: false, error: 'Organization not found.' }
 }
 
-/** Starts Stripe Checkout for Plus or a paid developer tier. Redirects to Stripe, or back with an error. */
+/** Starts Stripe Checkout for Plus or Business. Redirects to Stripe, or back with an error. */
 export async function startCheckout(form: FormData): Promise<void> {
   const tier = String(form.get('tier') ?? '')
   const org = String(form.get('org') ?? '') || null
-  if (!(PAID_PLANS as readonly string[]).includes(tier)) return back({ ok: false, error: 'Choose Plus, Pro, or Business.' }, org)
+  if (!(PAID_PLANS as readonly string[]).includes(tier)) return back({ ok: false, error: 'Choose Plus or Business.' }, org)
   const { did, c } = await ctx()
   if (org) {
     if (tier !== 'business') return back({ ok: false, error: 'Organizations subscribe to Business.' }, org)
@@ -46,10 +46,10 @@ export async function startCheckout(form: FormData): Promise<void> {
     return r.ok ? redirect(r.url) : back(r, org)
   }
   const license = await getDashboardStore().ensureLicense(did)
-  if (tier !== 'plus' && license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
+  if (license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
   // Someone who already pays changes plan instead of buying a second subscription. The Billing page asks them to confirm first.
   const store = getBillingStore()
-  if ((await store.subscriptionFor(did, 'developer', license.licenseId)) || (await store.subscriptionFor(did, 'plus'))) return redirect(`/account/billing?change=${tier}`)
+  if (await store.subscriptionFor(did, license.licenseId)) return redirect(`/account/billing?change=${tier}`)
   const r = await createCheckoutUrl(c, did, license.licenseId, tier as PaidPlan)
   return r.ok ? redirect(r.url) : back(r)
 }
@@ -70,26 +70,26 @@ export async function openPortal(form?: FormData): Promise<void> {
 
 const done = (r: ActionResult): never => redirect(`/account/billing?${r.ok ? `done=${encodeURIComponent(r.message)}` : `error=${encodeURIComponent(r.error)}`}`)
 
-/** Switches the signed-in person's own subscription to Plus, Pro, or Business. Personal billing only. */
+/** Switches the signed-in person's own subscription to Plus or Business. Personal billing only. */
 export async function switchPlan(form: FormData): Promise<void> {
   const tier = String(form.get('tier') ?? '')
-  if (!(PAID_PLANS as readonly string[]).includes(tier)) return back({ ok: false, error: 'Choose Plus, Pro, or Business.' })
+  if (!(PAID_PLANS as readonly string[]).includes(tier)) return back({ ok: false, error: 'Choose Plus or Business.' })
   const { did, c } = await ctx()
   const license = await getDashboardStore().ensureLicense(did)
-  if (tier !== 'plus' && license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
+  if (license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
   return done(await changePlan(c, did, license.licenseId, tier as PaidPlan))
 }
 
 /** Ends the person's subscription at the close of the paid period. */
-export async function cancelSubscription(form: FormData): Promise<void> {
+export async function cancelSubscription(): Promise<void> {
   const { did, c } = await ctx()
   const license = await getDashboardStore().ensureLicense(did)
-  return done(await setCancelAtPeriodEnd(c, did, license.licenseId, form.get('kind') === 'plus' ? 'plus' : 'developer', true))
+  return done(await setCancelAtPeriodEnd(c, did, license.licenseId, true))
 }
 
 /** Undoes a pending cancellation before the period ends. */
-export async function resumeSubscription(form: FormData): Promise<void> {
+export async function resumeSubscription(): Promise<void> {
   const { did, c } = await ctx()
   const license = await getDashboardStore().ensureLicense(did)
-  return done(await setCancelAtPeriodEnd(c, did, license.licenseId, form.get('kind') === 'plus' ? 'plus' : 'developer', false))
+  return done(await setCancelAtPeriodEnd(c, did, license.licenseId, false))
 }

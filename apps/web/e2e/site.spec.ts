@@ -16,6 +16,16 @@ test.describe('public pages', () => {
     await expect(page).toHaveTitle(/Pricing/)
   })
 
+  test('pricing page lists Free, Plus, and Business only, with Plus highlighted', async ({ page }) => {
+    await page.goto('/pricing')
+    // Exact names: the Business description also says "Everything in Plus", so a text match would find Plus twice.
+    for (const name of ['Free', 'Plus', 'Business']) await expect(page.getByRole('heading', { name, exact: true })).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Pro', exact: true })).toHaveCount(0)
+    await expect(page.getByText('Everything in Plus, plus 1 million requests a month')).toHaveCount(1)
+    await expect(page.getByText('Most popular')).toHaveCount(1)
+    await expect(page.getByRole('link', { name: 'Get a key' })).toHaveCount(1)
+  })
+
   test('login page renders and rejects a malformed handle', async ({ page }) => {
     await page.goto('/login')
     await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()

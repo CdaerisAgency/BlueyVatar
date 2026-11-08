@@ -1,4 +1,4 @@
-import { ANONYMOUS_DAILY_LIMIT, ENTITLEMENTS, type Tier } from '@blueyvatar/core'
+import { ANONYMOUS_DAILY_LIMIT, entitlementsFor, normalizeTier, type Tier } from '@blueyvatar/core'
 import type { ErrorCode } from './errors.js'
 import { hostAllowed, keyExpired, type LicenseStore, type RateLimiter, type RateWindow } from './licenses.js'
 
@@ -62,7 +62,7 @@ export async function checkEntitlement(
     return { ok: false, status: 401, code: 'invalid_key', message: 'Secret keys must be sent in the x-api-key header' }
   }
 
-  const ent = ENTITLEMENTS[license.tier]
+  const ent = entitlementsFor(license.tier)
   const window = ent.keyedDaily !== null
     ? await limiter.hit(`lic:${license.licenseId}:d`, ent.keyedDaily, 86400)
     : ent.keyedMonthly !== null
@@ -71,6 +71,6 @@ export async function checkEntitlement(
   if (ent.overage === 'blocked' && window.exceeded) {
     return { ok: false, status: 429, code: 'rate_limited', message: 'Included volume reached', window }
   }
-  return { ok: true, tier: license.tier, licenseId: license.licenseId, keyKind: key.kind, window }
+  return { ok: true, tier: normalizeTier(license.tier), licenseId: license.licenseId, keyKind: key.kind, window }
 }
 

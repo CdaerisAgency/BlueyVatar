@@ -8,7 +8,7 @@ import {
   type ProfileField, type ProfileErrors, type LanguageRow, type SocialLinkRow, type WalletRow,
 } from './profile-limits'
 import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE } from './upload-limits'
-import { RATINGS, isPlusDid, normalizeBackgroundColor, normalizeLanguageTag, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
+import { ENTITLEMENTS, RATINGS, isPlusDid, normalizeBackgroundColor, normalizeLanguageTag, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
 
 export const IMAGE_COLLECTION = 'com.blueyvatar.image'
 export const PROFILE_COLLECTION = 'com.blueyvatar.profile'
@@ -23,7 +23,7 @@ export type RLabel = (typeof R_LABELS)[number]
  * User plans from spec section 11.2. Plan storage does not exist yet, so everyone is Free,
  * except DIDs listed in the PLUS_DIDS env var (comma list, for testing).
  */
-export const PLAN_IMAGE_LIMITS = { free: 3, plus: 20 } as const
+export const PLAN_IMAGE_LIMITS = { free: ENTITLEMENTS.free.maxImages, plus: ENTITLEMENTS.plus.maxImages }
 export type Plan = keyof typeof PLAN_IMAGE_LIMITS
 export const planFor = (did: string): Plan => (isPlusDid(did, process.env.PLUS_DIDS) ? 'plus' : 'free')
 

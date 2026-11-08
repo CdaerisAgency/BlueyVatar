@@ -1,5 +1,5 @@
 import { isRating, type Rating } from './ratings.js'
-import { ENTITLEMENTS, type OutputFormat, type Tier } from './tiers.js'
+import { entitlementsFor, type OutputFormat, type Tier } from './tiers.js'
 
 /** Query parameters from spec section 7. */
 export const DEFAULT_STYLES = [
@@ -56,7 +56,7 @@ export interface ParseOptions {
 }
 
 export function parseAvatarParams(q: URLSearchParams, opts: ParseOptions): AvatarParams {
-  const ent = ENTITLEMENTS[opts.tier]
+  const ent = entitlementsFor(opts.tier)
   const adjusted: string[] = []
 
   let size = DEFAULT_SIZE

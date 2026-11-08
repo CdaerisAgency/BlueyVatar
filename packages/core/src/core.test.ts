@@ -59,12 +59,12 @@ describe('params', () => {
     expect(p.adjusted).toEqual(['fmt', 'ttl'])
   })
   it('honors gated parameters on pro', () => {
-    const p = parseAvatarParams(new URLSearchParams('fmt=webp&q=70&ttl=7d&d=https://example.com/x.png'), { ...opts, tier: 'pro' })
+    const p = parseAvatarParams(new URLSearchParams('fmt=webp&q=70&ttl=7d&d=https://example.com/x.png'), { ...opts, tier: 'plus' })
     expect(p).toMatchObject({ format: 'webp', quality: 70, ttlSeconds: 7 * 86400, default: { kind: 'url' } })
   })
   describe('fmt and q (F13)', () => {
-    const parse = (qs: string, tier: 'free' | 'pro' | 'business' | 'enterprise') => parseAvatarParams(new URLSearchParams(qs), { ...opts, tier })
-    const paid = ['pro', 'business', 'enterprise'] as const
+    const parse = (qs: string, tier: 'free' | 'plus' | 'business' | 'enterprise') => parseAvatarParams(new URLSearchParams(qs), { ...opts, tier })
+    const paid = ['plus', 'business', 'enterprise'] as const
 
     it('accepts png, jpeg, and webp on every paid tier with no adjustment', () => {
       for (const tier of paid) {
@@ -111,7 +111,7 @@ describe('params', () => {
     expect(() => parseAvatarParams(new URLSearchParams('r=nc17'), opts)).toThrow(ParamError)
     expect(() => parseAvatarParams(new URLSearchParams('d=http://example.com/x.png'), opts)).toThrow(ParamError)
     expect(() => parseAvatarParams(new URLSearchParams('d=https://evil.test/x.png'), opts)).toThrow(ParamError)
-    expect(() => parseAvatarParams(new URLSearchParams('ttl=30m'), { ...opts, tier: 'pro' })).toThrow(ParamError)
+    expect(() => parseAvatarParams(new URLSearchParams('ttl=30m'), { ...opts, tier: 'plus' })).toThrow(ParamError)
   })
 })
 
