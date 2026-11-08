@@ -2,7 +2,7 @@
 
 Hovercards for blueyvatar profiles. Hover or focus an element with `data-blueyvatar` and a small card shows the person's name, role, location, and verified accounts. If the person set a background color, the card uses it, with dark or white text chosen for a 4.5 to 1 contrast ratio (the default colors apply when neither passes). Accounts the person chose to hide are never shown.
 
-Hovercards require a publishable key (`pk_...`) from a Business or Enterprise license.
+Hovercards require a publishable key (`pk_...`) from a Plus, Business, or Enterprise license.
 
 Status: version 0.1.0 is not published yet. Publishing to npm is a later manual step. Until then, use the script served by the web app at `/embed/hovercard.js`, which is built from this package.
 
@@ -30,7 +30,7 @@ Or `import '@blueyvatar/hovercards/auto'` to read `data-key` from the page's scr
 
 ## Gating
 
-The card reads `GET /profile/:id` from delivery with the key as a `token` query parameter. When a request carries an `Origin` header that is not the delivery service's own host or the profile site's host, delivery requires a key whose tier has hovercards (Business or Enterprise). Other tiers, and requests without a key, get `403 tier_required`. Publishable keys also enforce their domain list (`origin_not_allowed`).
+The card reads `GET /profile/:id` from delivery with the key as a `token` query parameter. When a request carries an `Origin` header that is not the delivery service's own host or the profile site's host, delivery requires a key whose tier has hovercards (Plus, Business, or Enterprise). Other tiers, and requests without a key, get `403 tier_required`. Publishable keys also enforce their domain list (`origin_not_allowed`).
 
 Same-origin requests and server-to-server requests with no `Origin` header are not gated by this check.
 

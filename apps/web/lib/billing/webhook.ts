@@ -1,4 +1,4 @@
-import { graceEndsAt, isPaidTier, resolveLicenseBilling, type SubscriptionFacts, type SubscriptionStatus } from '@blueyvatar/core'
+import { graceEndsAt, normalizePaidPlan, resolveLicenseBilling, type SubscriptionFacts, type SubscriptionStatus } from '@blueyvatar/core'
 import { graceExpiredNotice, paymentFailedNotice, subscriptionCanceledNotice, type Notice, type Notifier } from '@blueyvatar/core/verification'
 import Stripe from 'stripe'
 import { missingForWebhook, tierForPrice, webhookSecret, type Env } from './config'
@@ -33,7 +33,7 @@ export interface WebhookDeps {
 }
 
 const DEFAULT_PUBLIC_URL = 'https://blueyvatar.com'
-const PLAN_NAME: Record<string, string> = { pro: 'Pro', business: 'Business', plus: 'Plus' }
+const PLAN_NAME: Record<string, string> = { business: 'Business', plus: 'Plus' }
 
 export interface WebhookResult {
   status: number
@@ -67,8 +67,8 @@ interface InvoiceObject {
 }
 
 async function recompute(tx: BillingTx, licenseId: string, now: Date) {
-  // Plus is a user plan and never changes the license. Only developer-tier subscriptions count here.
-  const subs = (await tx.subscriptionsForLicense(licenseId)).filter((s): s is SubscriptionRow & SubscriptionFacts => isPaidTier(s.tier))
+  // Plus and Business both set the license tier. A stored 'pro' reads as Plus.
+  const subs = (await tx.subscriptionsForLicense(licenseId)).filter((s): s is SubscriptionRow & SubscriptionFacts => normalizePaidPlan(s.tier) !== null)
   const state = resolveLicenseBilling(subs, now)
   await tx.applyLicense(licenseId, state)
   return state
@@ -88,7 +88,10 @@ async function onCheckoutCompleted(tx: BillingTx, s: SessionObject): Promise<str
 
 async function onSubscription(tx: BillingTx, type: string, sub: SubscriptionObject, at: Date, now: Date, env: Env, out: PendingNotice[], publicUrl: string): Promise<string> {
   const priceId = sub.items?.data?.[0]?.price?.id
-  const tier = priceId ? tierForPrice(priceId, env) : null
+  // A price that is no longer configured (the old Pro price, for instance) still updates a subscription we already
+  // hold, under the plan it was stored with, so a cancellation or payment failure on it is never dropped.
+  const known = sub.id ? await tx.getSubscription(sub.id) : null
+  const tier = priceId ? (tierForPrice(priceId, env) ?? (known ? normalizePaidPlan(known.tier) : null)) : null
   if (!priceId || !tier) return 'ignored: price is not one this deployment sells'
   const customer = idOf(sub.customer)
   if (!customer) return 'ignored: no customer'
@@ -124,12 +127,12 @@ async function onSubscription(tx: BillingTx, type: string, sub: SubscriptionObje
   await tx.putSubscription(row)
   const state = await recompute(tx, license.licenseId, now)
   // Tell the owner once, on the transition into an ending state. A subscription that was already past due and is
-  // now over means the grace period ran out; Plus ends the same way but has no license tier to drop.
+  // now over means the grace period ran out.
   const ended = status === 'canceled' || status === 'unpaid'
   const wasLive = existing ? ['active', 'trialing', 'past_due'].includes(existing.status) : false
   if (ended && wasLive) {
     const plan = PLAN_NAME[tier] ?? tier
-    const dropped = tier === 'plus' || state.tier === 'free'
+    const dropped = state.tier === 'free'
     out.push({
       did,
       notice:

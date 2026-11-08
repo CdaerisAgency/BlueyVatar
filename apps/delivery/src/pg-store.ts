@@ -84,12 +84,15 @@ export class PgIndexStore implements IndexStore {
     return rows
   }
 
+  /** Plus, the retired 'pro' name, and Business on the DID's own license entitle Plus. An organization's Business subscription does not. */
   async hasPlusSubscription(did: string, now: Date): Promise<boolean> {
-    const { rows } = await this.pool.query<{ status: SubscriptionStatus; past_due_since: Date | null }>(
-      `SELECT status, past_due_since FROM subscriptions WHERE did = $1 AND tier = 'plus' AND status IN ('active', 'trialing', 'past_due')`,
+    const { rows } = await this.pool.query<{ tier: string; status: SubscriptionStatus; past_due_since: Date | null }>(
+      `SELECT tier, status, past_due_since FROM subscriptions
+        WHERE did = $1 AND status IN ('active', 'trialing', 'past_due')
+          AND (tier IN ('plus', 'pro') OR license_id IN (SELECT license_id FROM licenses WHERE owner = $1 AND org_id IS NULL))`,
       [did],
     )
-    return plusEntitled(rows.map((r) => ({ tier: 'plus', status: r.status, pastDueSince: r.past_due_since })), now)
+    return plusEntitled(rows.map((r) => ({ tier: r.tier, status: r.status, pastDueSince: r.past_due_since })), now)
   }
 
   async visibility(did: string): Promise<Visibility> {

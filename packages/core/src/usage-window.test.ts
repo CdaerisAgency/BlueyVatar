@@ -13,7 +13,7 @@ describe('usage windows', () => {
 
   it('covers 2 months for Pro, 12 for Business, none for Free', () => {
     expect(historyPeriods('free', NOW)).toEqual([])
-    expect(historyPeriods('pro', NOW)).toEqual(['2026-03-01', '2026-02-01'])
+    expect(historyPeriods('plus', NOW)).toEqual(['2026-03-01', '2026-02-01'])
     const b = historyPeriods('business', NOW)
     expect(b).toHaveLength(12)
     expect(b[11]).toBe('2025-04-01')
@@ -21,7 +21,7 @@ describe('usage windows', () => {
 
   it('lists 30 UTC days newest first for paid tiers, none for Free', () => {
     expect(historyDays('free', NOW)).toEqual([])
-    const d = historyDays('pro', NOW)
+    const d = historyDays('plus', NOW)
     expect(d).toHaveLength(30)
     expect(d[0]).toBe('2026-03-02')
     expect(d[29]).toBe('2026-02-01')
