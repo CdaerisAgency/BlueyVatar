@@ -123,14 +123,14 @@ In this order, so deploys never break:
 
 1. Set the variable `DEPLOY_RUNNER` to the on-prem runner's label: Settings > Secrets and variables > Actions > Variables > New repository variable. Do this before merging the workflow change, since `deploy.yml` has no fallback.
 2. Restrict the runner: Settings > Actions > Runners (organization: Organization settings > Actions > Runner groups). Put the runner in a runner group that only this repository may use, and give the runner a label that only deploys target.
-3. Merge the workflow pull request. CI now runs on GitHub-hosted runners.
-4. Delete the retired variable `CI_RUNNER`: Settings > Secrets and variables > Actions > Variables.
+3. Merge the workflow pull request. CI runs on the runners named by the variable `CI_RUNNER` (owner decision, November 8, 2026), and on GitHub-hosted runners when the variable is unset. Step 6 below is then the only gate between an outside pull request and those machines, so approve a fork pull request only after reading its workflow, script, and test changes.
+4. Keep the variable `CI_RUNNER` set to the CI runner label. Only the deploy job uses `DEPLOY_RUNNER`.
 5. Add required reviewers to the `production` environment: Settings > Environments > production > Required reviewers (the environment is created on the first deploy run after the merge, or create it earlier under Settings > Environments > New environment). Optionally limit deployment branches to `main`.
 6. Settings > Actions > General > Fork pull request workflows from outside collaborators: choose "Require approval for all outside collaborators".
 7. Settings > Actions > General > Workflow permissions: choose "Read repository contents and packages permissions".
 8. Settings > Advanced Security (or Code security and analysis): enable Private vulnerability reporting, Secret scanning, and Push protection.
 
-Required reviewers on an environment do not make a self-hosted runner safe for untrusted code, which is why only the main-only deploy job uses one.
+Required reviewers on an environment do not make a self-hosted runner safe for untrusted code, which is why only the main-only deploy job holds secrets on one. CI also uses the owner’s runners, so keep fork approval on for all outside collaborators.
 
 ## Deploy from a local clone (localdeploy.bat)
 
