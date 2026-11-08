@@ -12,6 +12,7 @@ import { getDomainStore } from '../../../lib/domain-store'
 import { jsonLdString, personJsonLd, profileCanonical } from '../../../lib/seo'
 import { pageAtprotoApps, pageColors, pageAllLinks, pageGallery, pageInterests, pageLanguages, pageWallets, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
+import { ProfileShare } from '../../../components/ProfileShare'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
 // Link previews are fetched by outside crawlers, so the image needs the public delivery origin.
@@ -136,6 +137,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
           ))}
         </ul>
       )}
+      {p.handle && <ProfileShare handle={p.handle} deliveryBase={PUBLIC_DELIVERY_URL} profileUrl={await canonicalFor(p, handle)} />}
       <ReportForm did={p.did} source="profile" back={`/p/${encodeURIComponent(handle)}`} status={report} />
     </PageMain>
   )

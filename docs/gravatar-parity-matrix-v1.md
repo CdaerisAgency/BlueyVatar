@@ -29,7 +29,7 @@ Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://a
 | Display name, bio | `display_name`, `description` | None published | From `app.bsky.actor.profile`; shown on `/p/{handle}` (`apps/web/app/p/[handle]/page.tsx`) |
 | Links | `links` (label, url), auth | None published | Read from `app.bsky.actor.profile#links` (max 10, https only); shown on the page; no editor on `/account/profile` (`packages/core/src/links.ts`, `apps/web/app/account/profile/page.tsx`) |
 | Verified accounts | `verified_accounts`, capped at 4 unauthenticated | None published | Yes: attested claims, hide flag, Free JSON cap of 4 (`apps/delivery/src/app.ts`, `packages/core/src/tiers.ts`). Services supported: Unknown (not enumerated in files read) |
-| Wallet and crypto addresses | `payments.crypto_wallets` (label, address) and `payments.links`, auth | None published | None. Spec lists "Later" (`docs/spec/blueyvatar-product-spec-v9.md` line 304) |
+| Wallet and crypto addresses | `payments.crypto_wallets` (label, address) and `payments.links`, auth | None published | None. Spec lists "Later" (`docs/spec/blueyvatar-product-spec-v12.md` line 306) |
 | Languages | `languages` (code, name, is_primary, order), auth | None published | None. No field in `lexicons/com/blueyvatar/profile.json` |
 | Pronouns | `pronouns` | None published | Yes (`lexicons/com/blueyvatar/profile.json`) |
 | Pronunciation | `pronunciation` | None published | Yes |
@@ -50,9 +50,9 @@ Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://a
 
 | Format | Gravatar | Libravatar | blueyvatar today |
 | --- | --- | --- | --- |
-| JSON | `.json` suffix, PoCo format, JSONP `callback` ([JSON docs](https://docs.gravatar.com/profiles/json/)) | None published | `GET /profile/:id` returns JSON on delivery (`apps/delivery/src/app.ts`); no `.json` suffix route; no download button |
-| Markdown | `.md` suffix ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | None |
-| vCard | `.vcf` suffix; not all fields included, field list not published ([vCard docs](https://docs.gravatar.com/profiles/vcf-vcard/)) | None published | None |
+| JSON | `.json` suffix, PoCo format, JSONP `callback` ([JSON docs](https://docs.gravatar.com/profiles/json/)) | None published | `/profile/{id}.json` and `?format=json` download the public fields; `GET /profile/:id` still returns the full JSON (`apps/delivery/src/app.ts`, `docs/api/exports-and-qr-v1.md`) |
+| Markdown | `.md` suffix ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | `/profile/{id}.md` (`docs/api/exports-and-qr-v1.md`) |
+| vCard | `.vcf` suffix; not all fields included, field list not published ([vCard docs](https://docs.gravatar.com/profiles/vcf-vcard/)) | None published | `/profile/{id}.vcf`, vCard 4.0 (`docs/api/exports-and-qr-v1.md`) |
 | XML | `.xml` ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | None |
 | PHP serialized | `.php` ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | None |
 | Account data export (owner) | Unknown | Unknown | JSON download at `/account/data/export` (`apps/web/app/account/data/export/route.ts`) |
@@ -66,7 +66,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 | Profile QR | `https://gravatar.com/{hash}.qr` or `{username}.qr`; also `/qr-code/{sha256_hash}` in the API, PNG ([QR docs](https://docs.gravatar.com/sdk/qr-codes/), [OpenAPI](https://api.gravatar.com/v3/openapi)) | None published | `/qr/{id}.svg` and `.png` (`apps/delivery/src/app.ts`) |
 | Size | `s` or `size`, default 80 | n/a | `s`, default 256, tier clamped (`docs/api/gravatar-differences-v1.md`) |
 | Style | `version=1` standard, `version=3` small dots | n/a | One style, ECC M, 4 module quiet zone (`packages/core/src/qr.ts`) |
-| Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | None. No logo, no avatar overlay |
+| Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | `center=avatar`, `center=logo`, or `none`, with error correction level H (`docs/api/exports-and-qr-v1.md`) |
 | Redirect to a social account | Unknown | n/a | `?to=<platform>` via `/go/:handle/:platform` (`apps/delivery/src/app.ts`) |
 | Encoded content | Link to the profile page only | n/a | Profile URL, or the `/go` redirect URL |
 | Access | Unknown (no tier restriction published on the pages read) | n/a | Every plan, including anonymous callers (`apps/delivery/src/app.ts`) |

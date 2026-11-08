@@ -78,6 +78,7 @@ const app = createApp({
   }),
   defaultUrlAllowlist: (process.env.DEFAULT_URL_ALLOWLIST ?? '').split(',').filter(Boolean),
   profileBaseUrl: process.env.PROFILE_BASE_URL || undefined,
+  publicUrl: process.env.PUBLIC_DELIVERY_URL || undefined,
   originSecret: process.env.ORIGIN_SECRET || undefined,
   warmSecret: process.env.WARM_SECRET || undefined,
   imgSigningSecret,

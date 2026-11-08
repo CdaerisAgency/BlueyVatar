@@ -725,10 +725,11 @@ describe('delivery API', () => {
   describe('QR code (F23)', () => {
     const biz = { 'x-api-key': 'sk_biz' }
 
-    it('is available to every plan, anonymous callers included', async () => {
+    it('is available to everyone, with or without a key', async () => {
       const { app } = setup()
       expect((await app.request('/qr/alice.test.svg')).status).toBe(200)
       expect((await app.request('/qr/alice.test.svg', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(200)
+      expect((await app.request('/qr/alice.test.png')).status).toBe(200)
     })
 
     it('returns an SVG for a handle with the requested size and private caching', async () => {
