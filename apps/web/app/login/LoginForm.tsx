@@ -1,42 +1,43 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useActionState, useRef } from 'react'
 import { Button } from '../../components/Button'
+import { FieldError, FormNotices, fieldProps, useFocusResult } from '../../components/FormNotices'
 import { COPY } from '../../lib/copy'
+import type { LoginState } from '../../lib/login-form'
 import { loginWithHandle } from './actions'
-import { HANDLE_ERROR, normalizeHandle } from './handle'
+
+const ORDER = ['handle'] as const
 
 export function LoginForm({ next, serverError }: { next: string; serverError?: string }) {
-  const [clientError, setClientError] = useState<string | null>(null)
-  const error = clientError ?? serverError
-  const describedBy = ['login-help', error ? 'login-error' : null].filter(Boolean).join(' ')
-
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
-    const input = e.currentTarget.elements.namedItem('handle') as HTMLInputElement
-    const handle = normalizeHandle(input.value)
-    if (!handle) {
-      e.preventDefault()
-      setClientError(HANDLE_ERROR)
-      return
-    }
-    setClientError(null)
-    input.value = handle
-  }
-
+  const [state, action] = useActionState(loginWithHandle, {} as LoginState)
+  const summary = useRef<HTMLDivElement>(null)
+  useFocusResult(state, 'login', ORDER, summary)
+  const error = state.errors?.handle
   return (
-    <>
-      {error && <p role="alert" id="login-error">{error}</p>}
-      <form action={loginWithHandle} onSubmit={onSubmit} noValidate>
-        <input type="hidden" name="next" value={next} />
-        <label>
-          {COPY.login.label}{' '}
-          <input name="handle" aria-invalid={error ? true : undefined} aria-describedby={describedBy} placeholder={COPY.login.placeholder} required autoComplete="username" autoCapitalize="none" spellCheck={false} />
-        </label>
-        <p id="login-help">{COPY.login.help}</p>
-        <Button type="submit" variant="primary">
-          {COPY.login.submit}
-        </Button>
-      </form>
-    </>
+    <form action={action} noValidate>
+      {serverError && !state.values && <p role="alert">{serverError}</p>}
+      <FormNotices prefix="login" labels={ORDER} state={state} summary={summary} />
+      <input type="hidden" name="next" value={next} />
+      <label>
+        {COPY.login.label}{' '}
+        <input
+          {...fieldProps('login', 'handle', error, 'login-help')}
+          name="handle"
+          key={state.values ? 'r' : 'i'}
+          defaultValue={state.values?.handle ?? ''}
+          placeholder={COPY.login.placeholder}
+          required
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+        />
+        <FieldError prefix="login" name="handle" error={error} />
+      </label>
+      <p id="login-help">{COPY.login.help}</p>
+      <Button type="submit" variant="primary">
+        {COPY.login.submit}
+      </Button>
+    </form>
   )
 }

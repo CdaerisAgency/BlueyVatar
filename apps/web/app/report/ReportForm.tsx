@@ -1,8 +1,8 @@
-import { Button } from '../../components/Button'
 import { currentDid } from '../../lib/auth'
 import { loginPath } from '../../lib/next-path'
-import { REASONS, REASON_LABELS, MAX_DETAILS, MIN_DETAILS, type Source } from '../../lib/reports'
-import { submitReportAction } from './actions'
+import { MIN_DETAILS } from '../../lib/report-limits'
+import type { Source } from '../../lib/reports'
+import { ReportFields } from './ReportFields'
 
 const NOTES: Record<string, string> = {
   sent: 'Thanks. Your report was received.',
@@ -26,26 +26,7 @@ export async function ReportForm({ did, source, back, status }: { did: string; s
         {signedIn ? (
           <>
             <p>Reports are tied to your signed-in account and are never shown publicly. All fields are required. See the <a href="/policy">content policy</a>.</p>
-            <form action={submitReportAction}>
-              <input type="hidden" name="did" value={did} />
-              <input type="hidden" name="source" value={source} />
-              <input type="hidden" name="back" value={back} />
-              <p>
-                <label>Reason{' '}
-                  <select name="reason" required defaultValue="">
-                    <option value="" disabled>Choose one</option>
-                    {REASONS.map((r) => <option key={r} value={r}>{REASON_LABELS[r]}</option>)}
-                  </select>
-                </label>
-              </p>
-              <p><label>Details<br /><textarea name="details" rows={4} required minLength={MIN_DETAILS} maxLength={MAX_DETAILS} /></label></p>
-              <p>
-                <label>Your email, so we can follow up{' '}
-                  <input type="email" name="contact" required maxLength={254} autoComplete="email" />
-                </label>
-              </p>
-              <Button type="submit">Send report</Button>
-            </form>
+            <ReportFields did={did} source={source} />
           </>
         ) : (
           <>

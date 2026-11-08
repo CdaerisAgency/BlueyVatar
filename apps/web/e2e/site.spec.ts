@@ -21,7 +21,8 @@ test.describe('public pages', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Sign in' })).toBeVisible()
     await page.getByLabel(/handle/i).fill('not a handle')
     await page.getByRole('button', { name: /sign in|continue|log in/i }).click()
-    await expect(page.getByText('Enter a valid handle')).toBeVisible()
+    // The message appears twice on purpose: in the error summary link and under the field.
+    await expect(page.locator('#login-handle-error')).toContainText('Enter a valid handle')
     await expect(page.getByLabel(/handle/i)).toHaveAttribute('aria-describedby', /login-help/)
   })
 

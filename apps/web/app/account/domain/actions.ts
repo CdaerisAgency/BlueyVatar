@@ -7,6 +7,8 @@ import { getDomainStore } from '../../../lib/domain-store'
 import { validateCustomHostname } from '../../../lib/domains'
 import { resolvePlan } from '../../../lib/plan'
 import { limited } from '../../../lib/rate-guard'
+import { runAddDomain } from '../../../lib/domain-form'
+import type { DomainState } from '../../../lib/domain-limits'
 
 const back = (error?: string): never => redirect(error ? `/account/domain?error=${encodeURIComponent(error)}` : '/account/domain')
 
@@ -20,29 +22,32 @@ function reservedHosts(): string[] {
   return out
 }
 
-export async function addDomain(form: FormData): Promise<void> {
-  const did = await currentDid()
-  if (!did) return redirect('/login')
-  const wait = await limited(['domain.did', 'domain.ip'], did)
-  if (wait) return back(wait)
+/** Failures return to the form so the typed hostname stays. */
+export async function addDomain(_prev: DomainState, form: FormData): Promise<DomainState> {
   const cfg = cfSaasConfig()
-  if (!cfg) return back('Custom domains are not available yet.')
-  if ((await resolvePlan(did)) !== 'plus') return back('Custom profile domains are part of the Plus plan.')
   const store = getDomainStore()
-  if (await store.get(did)) return back('Remove your current domain before adding another.')
-  const v = validateCustomHostname(String(form.get('hostname') ?? ''), reservedHosts())
-  if (!v.ok) return back(v.error)
-  let id: string
-  try {
-    id = (await createHostname(cfg, v.value)).id
-  } catch (err) {
-    return back(err instanceof CfError ? `Cloudflare could not add that hostname: ${err.message}` : 'Could not reach Cloudflare. Try again later.')
-  }
-  if (!(await store.insert(did, v.value, id))) {
-    await deleteHostname(cfg, id).catch(() => undefined)
-    return back('That hostname is already in use.')
-  }
-  return back()
+  const r = await runAddDomain(await currentDid(), form, {
+    limited: (did) => limited(['domain.did', 'domain.ip'], did),
+    enabled: cfg !== null,
+    isPlus: async (did) => (await resolvePlan(did)) === 'plus',
+    hasDomain: async (did) => Boolean(await store.get(did)),
+    validate: (h) => validateCustomHostname(h, reservedHosts()),
+    add: async (did, hostname) => {
+      let id: string
+      try {
+        id = (await createHostname(cfg!, hostname)).id
+      } catch (err) {
+        return { ok: false, error: err instanceof CfError ? `Cloudflare could not add that hostname: ${err.message}` : 'Could not reach Cloudflare. Try again later.' }
+      }
+      if (!(await store.insert(did, hostname, id))) {
+        await deleteHostname(cfg!, id).catch(() => undefined)
+        return { ok: false, error: 'That hostname is already in use.', field: true }
+      }
+      return { ok: true }
+    },
+  })
+  if (r.done) return back()
+  return r
 }
 
 export async function removeDomain(): Promise<void> {

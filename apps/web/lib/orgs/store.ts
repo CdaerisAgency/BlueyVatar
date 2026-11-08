@@ -56,7 +56,7 @@ async function inTx<T>(pool: pg.Pool, orgId: string, fn: (c: pg.PoolClient) => P
   }
 }
 
-const cleanName = (raw: string): string | null => {
+export const cleanName = (raw: string): string | null => {
   const s = raw.trim().replace(/\s+/g, ' ')
   return s.length >= 1 && s.length <= 80 ? s : null
 }
