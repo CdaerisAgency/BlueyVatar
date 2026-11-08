@@ -4,7 +4,7 @@
   "defs": {
     "main": {
       "type": "record",
-      "description": "Extended profile fields. Display name, description, avatar, and links stay in app.bsky.actor.profile.",
+      "description": "Extended profile fields. Display name, description, and avatar stay in app.bsky.actor.profile. Links from app.bsky.actor.profile are still read; socialLinks adds links stored here.",
       "key": "literal:self",
       "record": {
         "type": "object",
@@ -19,8 +19,37 @@
           "timezone": { "type": "string", "maxLength": 64, "description": "IANA time zone name." },
           "interests": { "type": "array", "maxLength": 20, "items": { "type": "string", "maxGraphemes": 50, "maxLength": 500 } },
           "backgroundColor": { "type": "string", "maxLength": 7, "description": "Hex color, phase v2." },
+          "languages": { "type": "array", "maxLength": 10, "description": "Languages the person speaks, in display order. At most one entry has primary true.", "items": { "type": "ref", "ref": "#language" } },
+          "socialLinks": { "type": "array", "maxLength": 10, "description": "Other accounts and sites the person owns, in display order. https only. Self-declared, not verified.", "items": { "type": "ref", "ref": "#socialLink" } },
+          "wallets": { "type": "array", "maxLength": 10, "description": "Self-declared wallet addresses. Never verified. An entry shows publicly only when visible is true.", "items": { "type": "ref", "ref": "#wallet" } },
           "createdAt": { "type": "string", "format": "datetime" }
         }
+      }
+    },
+    "language": {
+      "type": "object",
+      "required": ["tag"],
+      "properties": {
+        "tag": { "type": "string", "format": "language", "maxLength": 35, "description": "BCP 47 language tag (RFC 5646), such as en, pt-BR, or zh-Hant." },
+        "primary": { "type": "boolean", "default": false }
+      }
+    },
+    "socialLink": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "label": { "type": "string", "maxGraphemes": 50, "maxLength": 500 },
+        "url": { "type": "string", "format": "uri", "maxLength": 2048, "description": "https URL." }
+      }
+    },
+    "wallet": {
+      "type": "object",
+      "required": ["chain", "address"],
+      "properties": {
+        "chain": { "type": "string", "maxGraphemes": 32, "maxLength": 320, "description": "Free-text chain name, such as Bitcoin or Ethereum." },
+        "address": { "type": "string", "maxGraphemes": 128, "maxLength": 512, "description": "Address as the person typed it. No whitespace or control characters." },
+        "label": { "type": "string", "maxGraphemes": 50, "maxLength": 500 },
+        "visible": { "type": "boolean", "default": false, "description": "Shown on the public profile only when true." }
       }
     }
   }

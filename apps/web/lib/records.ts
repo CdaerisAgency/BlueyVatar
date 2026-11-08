@@ -2,9 +2,13 @@
  * Pure validation and mapping for the record editor (spec sections 5, 9, 11.2).
  * Limits mirror lexicons/com/blueyvatar/*.json.
  */
-import { MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, type ProfileField, type ProfileErrors } from './profile-limits'
+import {
+  MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, MAX_LANGUAGES, MAX_SOCIAL_LINKS, MAX_SOCIAL_LABEL_GRAPHEMES, MAX_SOCIAL_URL_LENGTH,
+  MAX_WALLETS, MAX_WALLET_CHAIN_GRAPHEMES, MAX_WALLET_ADDRESS_GRAPHEMES, MAX_WALLET_LABEL_GRAPHEMES,
+  type ProfileField, type ProfileErrors, type LanguageRow, type SocialLinkRow, type WalletRow,
+} from './profile-limits'
 import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE } from './upload-limits'
-import { ENTITLEMENTS, RATINGS, isPlusDid, normalizeBackgroundColor, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
+import { ENTITLEMENTS, RATINGS, isPlusDid, normalizeBackgroundColor, normalizeLanguageTag, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
 
 export const IMAGE_COLLECTION = 'com.blueyvatar.image'
 export const PROFILE_COLLECTION = 'com.blueyvatar.profile'
@@ -217,6 +221,10 @@ export type ProfileInput = {
   interests: string
   /** `#rrggbb`, or blank to clear. */
   backgroundColor?: string
+  /** Row lists. Omitted lists leave the record without that field. */
+  languages?: LanguageRow[]
+  socialLinks?: SocialLinkRow[]
+  wallets?: WalletRow[]
 }
 
 export type ProfileFields = {
@@ -228,6 +236,9 @@ export type ProfileFields = {
   timezone?: string
   interests?: string[]
   backgroundColor?: string
+  languages?: { tag: string; primary?: boolean }[]
+  socialLinks?: { label?: string; url: string }[]
+  wallets?: { chain: string; address: string; label?: string; visible: boolean }[]
 }
 
 /** IANA zone check. Uses Intl.supportedValuesOf when available; UTC is always allowed. */
@@ -297,7 +308,87 @@ export function validateProfileAll(input: ProfileInput): { ok: true; value: Prof
     if (!normalized) errors.backgroundColor = 'Use a color like #3366cc.'
     else out.backgroundColor = normalized
   }
+  checkRows(input, out, errors)
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, value: out }
+}
+
+const CONTROL = /[\p{Cc}\p{Cf}\u2028\u2029]/u
+const CONTROL_OR_SPACE = /[\s\p{Cc}\p{Cf}\u2028\u2029]/u
+const blank = (...v: string[]) => v.every((x) => x.trim() === '')
+
+/** Languages, social links, and wallets. Fully blank rows are dropped. */
+function checkRows(input: ProfileInput, out: ProfileFields, errors: ProfileErrors): void {
+  const langs: NonNullable<ProfileFields['languages']> = []
+  const rows = (input.languages ?? []).map((r, idx) => ({ r, idx })).filter(({ r }) => !blank(r.tag))
+  if (rows.length > MAX_LANGUAGES) errors.languages = `Add at most ${MAX_LANGUAGES} languages.`
+  else {
+    rows.forEach(({ r, idx: i }) => {
+      const tag = normalizeLanguageTag(r.tag)
+      if (!tag) errors[`languages.${i}.tag`] = `Language ${i + 1}: use a language tag such as en, es, or pt-BR.`
+      else if (langs.some((l) => l.tag === tag)) errors[`languages.${i}.tag`] = `Language ${i + 1}: ${tag} is already in the list.`
+      else langs.push({ tag, ...(r.primary ? { primary: true } : {}) })
+    })
+    // One primary language at most: the first marked row wins.
+    let seen = false
+    for (const l of langs) {
+      if (l.primary) {
+        if (seen) delete l.primary
+        seen = true
+      }
+    }
+    if (langs.length) out.languages = langs
+  }
+
+  const links: NonNullable<ProfileFields['socialLinks']> = []
+  const lrows = (input.socialLinks ?? []).map((r, idx) => ({ r, idx })).filter(({ r }) => !blank(r.label, r.url))
+  if (lrows.length > MAX_SOCIAL_LINKS) errors.socialLinks = `Add at most ${MAX_SOCIAL_LINKS} links.`
+  else {
+    lrows.forEach(({ r, idx: i }) => {
+      const n = i + 1
+      const label = r.label.trim()
+      if (graphemeCount(label) > MAX_SOCIAL_LABEL_GRAPHEMES) errors[`socialLinks.${i}.label`] = `Link ${n}: the label can be at most ${MAX_SOCIAL_LABEL_GRAPHEMES} characters.`
+      const raw = r.url.trim()
+      let u: URL | null = null
+      try {
+        u = raw.length <= MAX_SOCIAL_URL_LENGTH ? new URL(raw) : null
+      } catch {
+        u = null
+      }
+      if (!u || u.protocol !== 'https:' || u.username || u.password || !u.hostname || raw.length > MAX_SOCIAL_URL_LENGTH) {
+        errors[`socialLinks.${i}.url`] = `Link ${n}: enter a full address that starts with https://.`
+      } else if (!errors[`socialLinks.${i}.label`]) {
+        links.push({ ...(label ? { label } : {}), url: u.href })
+      }
+    })
+    if (links.length) out.socialLinks = links
+  }
+
+  const wallets: NonNullable<ProfileFields['wallets']> = []
+  const wrows = (input.wallets ?? []).map((r, idx) => ({ r, idx })).filter(({ r }) => !blank(r.chain, r.address, r.label))
+  if (wrows.length > MAX_WALLETS) errors.wallets = `Add at most ${MAX_WALLETS} wallets.`
+  else {
+    wrows.forEach(({ r, idx: i }) => {
+      const n = i + 1
+      const chain = r.chain.trim()
+      const address = r.address.trim()
+      const label = r.label.trim()
+      let bad = false
+      if (!chain || graphemeCount(chain) > MAX_WALLET_CHAIN_GRAPHEMES || CONTROL.test(chain)) {
+        errors[`wallets.${i}.chain`] = `Wallet ${n}: enter a chain name of up to ${MAX_WALLET_CHAIN_GRAPHEMES} characters, such as Bitcoin.`
+        bad = true
+      }
+      if (!address || graphemeCount(address) > MAX_WALLET_ADDRESS_GRAPHEMES || CONTROL_OR_SPACE.test(address)) {
+        errors[`wallets.${i}.address`] = `Wallet ${n}: enter an address of up to ${MAX_WALLET_ADDRESS_GRAPHEMES} characters with no spaces.`
+        bad = true
+      }
+      if (graphemeCount(label) > MAX_WALLET_LABEL_GRAPHEMES || CONTROL.test(label)) {
+        errors[`wallets.${i}.label`] = `Wallet ${n}: the label can be at most ${MAX_WALLET_LABEL_GRAPHEMES} characters.`
+        bad = true
+      }
+      if (!bad) wallets.push({ chain, address, ...(label ? { label } : {}), visible: r.visible === true })
+    })
+    if (wallets.length) out.wallets = wallets
+  }
 }
 
 /** First problem only, for callers that show a single message. */

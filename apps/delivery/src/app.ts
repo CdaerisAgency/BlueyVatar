@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
   ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, historyDays, historyPeriods, includedVolume, periodEndOf, periodStartOf, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, entitlementsFor, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
-  isSha256Hex, parseAvatarParams, resolveProfileLinks,
+  isSha256Hex, parseAvatarParams, profileExtras, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
 } from '@blueyvatar/core'
@@ -456,6 +456,8 @@ export function createApp(deps: AppDeps) {
       pronunciation: own?.pronunciation ?? null,
       timezone: own?.timezone ?? null,
       interests: own?.interests ?? [],
+      // languages, socialLinks, and wallets. Wallets the owner did not opt in to show are never sent.
+      ...profileExtras(own),
       // #rrggbb or null. A stored value that is not exactly that shape is treated as unset.
       backgroundColor: normalizeBackgroundColor(own?.backgroundColor),
       gallery,
