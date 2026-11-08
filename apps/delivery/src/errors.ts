@@ -6,7 +6,7 @@ export const ERROR_CODES = [
   'invalid_rating', 'invalid_format', 'invalid_quality', 'invalid_ttl', 'invalid_platform',
   'invalid_key', 'license_inactive', 'origin_not_allowed', 'rate_limited',
   'tier_required', 'origin_forbidden', 'not_found', 'internal', 'access_denied', 'upstream_error',
-  'invalid_signature', 'signature_expired', 'not_ready', 'overloaded', 'secret_key_required',
+  'invalid_signature', 'signature_expired', 'not_ready', 'overloaded', 'secret_key_required', 'key_expired',
 ] as const
 
 export type ErrorCode = (typeof ERROR_CODES)[number]

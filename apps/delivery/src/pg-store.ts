@@ -158,9 +158,9 @@ export class PgLicenseStore implements LicenseStore {
 
   async findKey(key: string): Promise<{ key: ApiKey; license: License } | null> {
     const { rows } = await this.pool.query<{
-      kind: 'secret' | 'publishable'; domains: string[]; license_id: string; owner: string; tier: Tier; status: License['status']; grace_ends_at: Date | null
+      kind: 'secret' | 'publishable'; domains: string[]; license_id: string; owner: string; tier: Tier; status: License['status']; grace_ends_at: Date | null; expires_at: Date | null
     }>(
-      `SELECT k.kind, k.domains, l.license_id, l.owner, l.tier, l.status, l.grace_ends_at
+      `SELECT k.kind, k.domains, k.expires_at, l.license_id, l.owner, l.tier, l.status, l.grace_ends_at
          FROM api_keys k JOIN licenses l ON l.license_id = k.license_id
         WHERE k.key_hash = $1 AND k.revoked_at IS NULL`,
       [hashApiKey(key)],
@@ -168,7 +168,7 @@ export class PgLicenseStore implements LicenseStore {
     const r = rows[0]
     if (!r) return null
     return {
-      key: { key, kind: r.kind, licenseId: r.license_id, domains: r.domains },
+      key: { key, kind: r.kind, licenseId: r.license_id, domains: r.domains, expiresAt: r.expires_at },
       // Past due keeps the paid tier through the grace period, then reads as Free (spec section 12). No webhook is needed to expire it.
       license: { licenseId: r.license_id, owner: r.owner, tier: effectiveTier({ tier: r.tier, status: r.status, graceEndsAt: r.grace_ends_at }, new Date()), status: r.status },
     }

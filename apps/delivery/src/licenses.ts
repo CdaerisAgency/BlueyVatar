@@ -14,6 +14,8 @@ export interface ApiKey {
   licenseId: string
   /** Exact hosts, `*.example.com` wildcards, or `localhost`. Publishable keys only. */
   domains: string[]
+  /** After this instant the key is rejected with `key_expired`. Null or missing means it never expires. */
+  expiresAt?: Date | null
 }
 
 export interface LicenseStore {
@@ -32,6 +34,11 @@ export interface RateWindow {
 export interface RateLimiter {
   /** Counts `n` requests (default 1) in the bucket's fixed window and returns the window state. */
   hit(bucket: string, limit: number, windowSeconds: number, n?: number): Promise<RateWindow>
+}
+
+/** True once `expiresAt` has passed. A missing or null value never expires. The expiry instant itself counts as expired. */
+export function keyExpired(expiresAt: Date | null | undefined, now: Date): boolean {
+  return expiresAt != null && expiresAt.getTime() <= now.getTime()
 }
 
 export function hostAllowed(host: string, domains: readonly string[]): boolean {

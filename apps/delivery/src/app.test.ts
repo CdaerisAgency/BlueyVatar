@@ -2,7 +2,7 @@ import { BlobError } from './blob.js'
 import { describe, expect, it } from 'vitest'
 import { GALLERY_MAX, emailHash, emailMd5, imagePath, restrictedScope, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
-import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
+import { keyExpired, MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import type { AvatarResolver, Identity } from './resolver.js'
 import { MemoryIndexStore, PUBLIC_VISIBILITY } from './store.js'
 import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from './alerts.js'
@@ -36,6 +36,9 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
     licenses: new MemoryLicenseStore([
       { key: { key: 'pk_test', kind: 'publishable', licenseId: 'L1', domains: ['*.example.com'] }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
       { key: { key: 'sk_test', kind: 'secret', licenseId: 'L1', domains: [] }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
+      { key: { key: 'pk_old', kind: 'publishable', licenseId: 'L1', domains: [], expiresAt: new Date(Date.now() - 1000) }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
+      { key: { key: 'sk_old', kind: 'secret', licenseId: 'L1', domains: [], expiresAt: new Date(Date.now() - 1000) }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
+      { key: { key: 'pk_future', kind: 'publishable', licenseId: 'L1', domains: [], expiresAt: new Date(Date.now() + 86_400_000) }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
       { key: { key: 'sk_biz', kind: 'secret', licenseId: 'L3', domains: [] }, license: { licenseId: 'L3', owner: DID, tier: 'business', status: 'active' } },
       { key: { key: 'sk_legacy', kind: 'secret', licenseId: 'L4', domains: [] }, license: { licenseId: 'L4', owner: DID, tier: 'pro' as never, status: 'active' } },
       { key: { key: 'sk_dead', kind: 'secret', licenseId: 'L2', domains: [] }, license: { licenseId: 'L2', owner: DID, tier: 'plus', status: 'suspended' } },
@@ -919,6 +922,38 @@ describe('profile gallery (F21)', () => {
     const app = createApp({ ...deps, now: () => 0 })
     const res = await app.request('/profile/alice.test', { headers: { 'x-api-key': 'sk_test' } })
     expect((await res.json()).gallery[0].url).toBe(imagePath(SECRET, DID, 'bafygal0', 512, 'png', undefined, restrictedScope('k:L1', 0)))
+  })
+})
+
+describe('key expiry', () => {
+  const avatar = `/avatar/${emailHash('alice@example.com')}?s=64`
+  it('rejects an expired publishable key with 401 key_expired', async () => {
+    const { app } = setup()
+    const res = await app.request(`${avatar}&token=pk_old`)
+    expect(res.status).toBe(401)
+    expect((await res.json()).error.code).toBe('key_expired')
+  })
+  it('rejects an expired secret key on the header and on /usage', async () => {
+    const { app } = setup()
+    const a = await app.request(avatar, { headers: { 'x-api-key': 'sk_old' } })
+    expect(a.status).toBe(401)
+    expect((await a.json()).error.code).toBe('key_expired')
+    const u = await app.request('/usage', { headers: { 'x-api-key': 'sk_old' } })
+    expect(u.status).toBe(401)
+    expect((await u.json()).error.code).toBe('key_expired')
+  })
+  it('still serves a key that has not expired yet, and keys with no expiry', async () => {
+    const { app } = setup()
+    expect((await app.request(`${avatar}&token=pk_future`, { redirect: 'manual' })).status).toBeLessThan(400)
+    expect((await app.request(avatar, { headers: { 'x-api-key': 'sk_test' }, redirect: 'manual' })).status).toBeLessThan(400)
+  })
+  it('keyExpired treats the expiry instant as expired', () => {
+    const t = new Date('2026-11-08T00:00:00Z')
+    expect(keyExpired(null, t)).toBe(false)
+    expect(keyExpired(undefined, t)).toBe(false)
+    expect(keyExpired(new Date(t.getTime() + 1), t)).toBe(false)
+    expect(keyExpired(t, t)).toBe(true)
+    expect(keyExpired(new Date(t.getTime() - 1), t)).toBe(true)
   })
 })
 

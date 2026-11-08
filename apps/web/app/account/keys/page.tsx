@@ -1,11 +1,12 @@
 import { PageMain, TableBox } from '../../../components/Page'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
-import { ENTITLEMENTS, historyDays, TIERS, type Tier } from '@blueyvatar/core'
+import { ENTITLEMENTS, historyDays } from '@blueyvatar/core'
 import Link from 'next/link'
 import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
+import { isExpired } from '../../../lib/key-expiry'
 import { isScope, resolveScope } from '../../../lib/orgs/scope'
 import { getOrganization } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
@@ -42,7 +43,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   const ent = ENTITLEMENTS[license.tier]
   const inc = includedVolume(license.tier)
   const used = usage.get(`${period}|origin_resolution`) ?? 0
-  const active = keys.filter((k) => !k.revokedAt)
+  const active = keys.filter((k) => !k.revokedAt && !isExpired(k.expiresAt, now))
   const activeKeys = active.map((k) => ({ hash: k.hash, kind: k.kind }))
   const canPub = checkKeyLimit(license.tier, 'publishable', activeKeys).ok
   const canSec = checkKeyLimit(license.tier, 'secret', activeKeys).ok
@@ -74,7 +75,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
         </li>
         {inc.per === 'day' && <li>Free limits are per day, so the monthly total above is for reference.</li>}
       </ul>
-      <p>Change your plan on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Plan and billing</Link> page. The table below shows what each tier includes.</p>
+      <p>Change your plan on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Plan and billing</Link> page.</p>
 
       {periods.length > 0 && (
         <>
@@ -128,54 +129,20 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
       )}
 
       <h2>Keys ({active.length}{ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)</h2>
-      {keys.length === 0 && <p>You have no keys yet. Create a publishable key below to use blueyvatar from a website or app. Secret keys are for servers.</p>}
+      {keys.length === 0 && <p>You have no keys yet. Create a website key below to use blueyvatar from a web page or app. Server keys are for your own servers.</p>}
       <ul>
         {keys.map((k) => (
           <li key={k.hash} className="mb-4">
-            <code>{k.prefix}...</code> {k.kind} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
-            {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : ''}
-            {k.kind === 'publishable' && !k.revokedAt && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
-            {!k.revokedAt && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} orgId={orgId ?? ''} />}
+            <code>{k.prefix}...</code> {k.kind === 'secret' ? 'Server key' : 'Website key'} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
+            {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : isExpired(k.expiresAt, now) ? ` (Expired ${k.expiresAt!.toISOString().slice(0, 10)})` : k.expiresAt ? `. Expires ${k.expiresAt.toISOString().slice(0, 10)}` : '. Never expires'}
+            {k.kind === 'publishable' && !k.revokedAt && !isExpired(k.expiresAt, now) && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
+            {!k.revokedAt && !isExpired(k.expiresAt, now) && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} orgId={orgId ?? ''} />}
           </li>
         ))}
       </ul>
-      <p>Only a SHA256 hash and a short prefix are stored, so a lost key cannot be shown again. Rotate it instead.</p>
+      <p>Only a SHA256 hash and a short prefix are stored, so a lost key cannot be shown again. Revoke it and create a new one, or rotate it.</p>
 
       <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} orgId={orgId ?? ''} />
-
-      <h2>Tiers</h2>
-      <TableBox label="Tiers">
-      <table>
-        <thead>
-          <tr>
-            <th align="left">Capability</th>
-            {TIERS.map((t: Tier) => (
-              <th key={t} align="left">{t}{t === license.tier ? ' (yours)' : ''}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {(
-            [
-              ['Keyed volume', (e) => (e.keyedDaily ? `${n(e.keyedDaily)} per day` : e.keyedMonthly ? `${n(e.keyedMonthly)} per month` : 'Custom')],
-              ['API keys', (e) => (e.maxKeys === null ? 'Unlimited' : String(e.maxKeys))],
-              ['Domain restrictions', (e) => (e.domainRestrictions ? 'Yes' : 'No')],
-              ['Overage', (e) => e.overage],
-              ['Max size', (e) => String(e.maxSize)],
-              ['Formats', (e) => e.formats.join(', ')],
-              ['Hovercards', (e) => (e.hovercards ? 'Yes' : 'No')],
-            ] as [string, (e: (typeof ENTITLEMENTS)[Tier]) => string][]
-          ).map(([label, f]) => (
-            <tr key={label}>
-              <td>{label}</td>
-              {TIERS.map((t) => (
-                <td key={t}>{f(ENTITLEMENTS[t])}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </TableBox>
     </PageMain>
   )
 }

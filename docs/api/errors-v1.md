@@ -30,6 +30,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `invalid_ttl` | 400 | `ttl` is not `<n>h` or `<n>d` within 1h to 28d. |
 | `invalid_platform` | 400 | `to` on `/qr` is not a lowercase platform name such as `github`. |
 | `invalid_key` | 401 | Unknown API key, or a secret key sent outside the `x-api-key` header. |
+| `key_expired` | 401 | The key's expiration time has passed. Create a new key on the API keys page. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
 | `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise, and cross-origin `/profile` (hovercards) requires Plus or higher. |
