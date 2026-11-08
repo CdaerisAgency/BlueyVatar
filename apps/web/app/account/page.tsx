@@ -78,7 +78,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const url = primary ? ownerAvatarUrl(primary.emailHash) : null
   return (
     <PageMain>
-      <h1>Account</h1>
+      <h1>Overview</h1>
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {list && showChecklist(list.complete, prefs.showAgain) && (
         <section id="checklist" aria-labelledby="checklist-h">

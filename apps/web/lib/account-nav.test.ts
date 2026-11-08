@@ -1,18 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ACCOUNT_NAV, allItems, currentItemHref, groupIdFor, nextIndex, openGroupIds, parseStoredOpen } from './account-nav'
+import { ACCOUNT_HOME, ACCOUNT_NAV, allItems, currentItemHref, groupIdFor, nextIndex, openGroupIds, parseStoredOpen } from './account-nav'
 
 const accountDir = join(__dirname, '..', 'app', 'account')
 
 describe('group membership', () => {
   it('matches the approved grouping', () => {
     expect(ACCOUNT_NAV.map((g) => [g.label, g.items.map((i) => i.label)])).toEqual([
-      ['Profile', ['Profile', 'Avatars', 'Visibility']],
-      ['Identity', ['Verified accounts', 'Verify', 'Custom profile domain']],
+      ['Profile', ['Profile', 'Profile views', 'Avatars', 'Visibility']],
+      ['Identity', ['Organizations', 'Verified accounts', 'Verify', 'Custom profile domain']],
       ['Developers', ['API keys and license']],
       ['Billing', ['Plan and billing']],
-      ['Settings', ['Notifications', 'Sign-out options', 'Danger zone']],
+      ['Settings', ['Notifications', 'Sign-out options', 'Appeal', 'Danger zone']],
     ])
   })
   it('lists each route once and every route has a page', () => {
@@ -20,10 +20,17 @@ describe('group membership', () => {
     expect(new Set(hrefs).size).toBe(hrefs.length)
     for (const h of hrefs) expect(() => readFileSync(join(accountDir, h.replace('/account', ''), 'page.tsx'), 'utf8')).not.toThrow()
   })
+  it('puts Overview above the groups, outside them', () => {
+    expect(ACCOUNT_HOME).toEqual({ href: '/account', label: 'Overview' })
+    expect(ACCOUNT_NAV.flatMap((g) => g.items).some((i) => i.href === '/account')).toBe(false)
+  })
   it('finds the group for a page', () => {
     expect(groupIdFor('/account/domain')).toBe('identity')
     expect(groupIdFor('/account/settings/danger')).toBe('settings')
     expect(groupIdFor('/account')).toBeNull()
+    expect(groupIdFor('/account/orgs')).toBe('identity')
+    expect(groupIdFor('/account/stats')).toBe('profile')
+    expect(groupIdFor('/account/appeal')).toBe('settings')
   })
 })
 
@@ -34,9 +41,18 @@ describe('current page detection', () => {
     expect(currentItemHref('/account/avatars/import')).toBe('/account/avatars')
     expect(currentItemHref('/account/keys/')).toBe('/account/keys')
   })
+  it('highlights Overview only on /account itself', () => {
+    expect(currentItemHref('/account')).toBe('/account')
+    expect(currentItemHref('/account/')).toBe('/account')
+    expect(currentItemHref('/account/nope')).toBeNull()
+  })
+  it('keeps nested pages on their parent item', () => {
+    expect(currentItemHref('/account/orgs')).toBe('/account/orgs')
+    expect(currentItemHref('/account/orgs/abc-123')).toBe('/account/orgs')
+    expect(currentItemHref('/account/stats')).toBe('/account/stats')
+    expect(currentItemHref('/account/appeal')).toBe('/account/appeal')
+  })
   it('returns null for pages outside the menu', () => {
-    expect(currentItemHref('/account')).toBeNull()
-    expect(currentItemHref('/account/orgs')).toBeNull()
     expect(currentItemHref('/account/avatarsX')).toBeNull()
   })
 })
@@ -45,6 +61,8 @@ describe('open groups', () => {
   it('opens the group with the current page by default', () => {
     expect(openGroupIds('/account/claims', null)).toEqual(['identity'])
     expect(openGroupIds('/account', null)).toEqual([])
+    expect(openGroupIds('/account/orgs/abc-123', null)).toEqual(['identity'])
+    expect(openGroupIds('/account/appeal', null)).toEqual(['settings'])
   })
   it('keeps saved groups and always adds the current one', () => {
     expect(openGroupIds('/account/keys', ['profile', 'bogus'])).toEqual(['profile', 'developers'])

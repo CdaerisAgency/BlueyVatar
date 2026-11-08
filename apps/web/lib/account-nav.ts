@@ -4,6 +4,9 @@ import { currentHref } from './settings-hub'
 export type NavItem = { href: string; label: string }
 export type NavGroup = { id: string; label: string; items: NavItem[] }
 
+/** The account home page, shown as a link above the groups. */
+export const ACCOUNT_HOME: NavItem = { href: '/account', label: 'Overview' }
+
 /** Each label is exactly the page's visible h1. account-nav.test.ts checks that against the page source. */
 export const ACCOUNT_NAV: NavGroup[] = [
   {
@@ -11,6 +14,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
     label: 'Profile',
     items: [
       { href: '/account/profile', label: 'Profile' },
+      { href: '/account/stats', label: 'Profile views' },
       { href: '/account/avatars', label: 'Avatars' },
       { href: '/account/visibility', label: 'Visibility' },
     ],
@@ -19,6 +23,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
     id: 'identity',
     label: 'Identity',
     items: [
+      { href: '/account/orgs', label: 'Organizations' },
       { href: '/account/claims', label: 'Verified accounts' },
       { href: '/account/verify', label: 'Verify' },
       { href: '/account/domain', label: 'Custom profile domain' },
@@ -32,6 +37,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
     items: [
       { href: '/account/notifications', label: 'Notifications' },
       { href: '/account/settings', label: 'Sign-out options' },
+      { href: '/account/appeal', label: 'Appeal' },
       { href: '/account/settings/danger', label: 'Danger zone' },
     ],
   },
@@ -40,10 +46,10 @@ export const ACCOUNT_NAV: NavGroup[] = [
 export const NAV_STORAGE_KEY = 'bv-account-nav-open'
 
 export function allItems(groups: readonly NavGroup[] = ACCOUNT_NAV): NavItem[] {
-  return groups.flatMap((g) => g.items)
+  return [ACCOUNT_HOME, ...groups.flatMap((g) => g.items)]
 }
 
-/** The menu page for a pathname, or null for pages outside the menu (such as /account). Sub-pages such as /account/avatars/import count as their parent. */
+/** The menu page for a pathname, or null for pages outside the menu. /account is the Overview link and matches only exactly. Sub-pages such as /account/avatars/import count as their parent. */
 export function currentItemHref(pathname: string, groups: readonly NavGroup[] = ACCOUNT_NAV): string | null {
   return currentHref(pathname, allItems(groups).map((i) => i.href))
 }

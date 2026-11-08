@@ -785,3 +785,4 @@ Turn it on in this order:
 5. Only after steps 2 to 4 pass, set it on production. Existing users see "Sign in again to allow this" until their next sign-in.
 
 The migration `db/migrations/0033_bsky_avatar_sync.sql` adds the per-account switch, the saved previous avatar, and an insert-only log of every change to a Bluesky profile.
+The account data export lists both tables for the signed-in person only: the switch and previous avatar reference, and the change log (action and image references with times, no account ID or row ids). Account deletion removes them.

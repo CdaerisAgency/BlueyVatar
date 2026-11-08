@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 // Pure helpers only. Nothing here may reach @blueyvatar/core or a node: module.
-import { NAV_STORAGE_KEY, currentItemHref, nextIndex, openGroupIds, parseStoredOpen } from '../lib/account-nav'
+import { ACCOUNT_HOME, NAV_STORAGE_KEY, currentItemHref, nextIndex, openGroupIds, parseStoredOpen } from '../lib/account-nav'
 import type { NavGroup } from '../lib/account-nav'
 
 const target = 'flex min-h-11 w-full items-center rounded-xl px-3 py-2 text-left text-[15px] no-underline'
@@ -110,6 +110,16 @@ export default function SideNav({ groups }: { groups: NavGroup[] }) {
         </div>
         <nav aria-label="Account">
           <ul className="m-0 list-none p-0">
+            <li className="mb-1">
+              <Link
+                href={ACCOUNT_HOME.href}
+                data-nav-control
+                aria-current={here === ACCOUNT_HOME.href ? 'page' : undefined}
+                className={`${target} font-semibold ${here === ACCOUNT_HOME.href ? 'bg-bv-black text-bv-white hover:text-bv-white' : 'text-bv-black hover:bg-bv-line hover:text-bv-black'}`}
+              >
+                {ACCOUNT_HOME.label}
+              </Link>
+            </li>
             {groups.map((g) => {
               const isOpen = open.includes(g.id)
               const listId = `account-menu-${g.id}`
