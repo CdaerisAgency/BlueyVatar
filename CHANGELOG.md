@@ -2,6 +2,11 @@
 
 New features, changes, and fixes to blueyvatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-08
+
+### Changed
+- Reporting a profile or avatar now requires signing in with Bluesky, and the reason, details (at least 10 characters), and email are all required. Reports store the reporter's account, which is limited to 5 reports per hour in addition to the per-network limit and is shown to reviewers only. The content policy lists security@blueyvatar.com for legal or urgent notices from people who cannot sign in (#224).
+
 ## 2026-11-07
 
 ### Changed

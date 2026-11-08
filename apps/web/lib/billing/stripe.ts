@@ -24,13 +24,15 @@ interface Ctx {
 }
 
 /** Checkout parameters for a subscription. Stripe Tax computes tax from the address Checkout collects. */
-export function checkoutParams(opts: { did: string; licenseId: string; price: string; customer: string | null; baseUrl: string }): Stripe.Checkout.SessionCreateParams {
+export function checkoutParams(opts: { did: string; licenseId: string; price: string; customer: string | null; baseUrl: string; env?: Env }): Stripe.Checkout.SessionCreateParams {
   return {
     mode: 'subscription',
     line_items: [{ price: opts.price, quantity: 1 }],
     automatic_tax: { enabled: true },
     billing_address_collection: 'required',
     tax_id_collection: { enabled: true },
+    // Shows the promotion code box (https://docs.stripe.com/payments/checkout/discounts). Off unless STRIPE_ALLOW_PROMO_CODES is exactly "true".
+    ...((opts.env ?? process.env).STRIPE_ALLOW_PROMO_CODES === 'true' ? { allow_promotion_codes: true } : {}),
     client_reference_id: opts.did,
     metadata: { did: opts.did },
     subscription_data: { metadata: { did: opts.did, license_id: opts.licenseId } },
@@ -50,7 +52,7 @@ export async function createCheckoutUrl(ctx: Ctx, did: string, licenseId: string
   const current = await ctx.store.subscriptionFor(did, tier === 'plus' ? 'plus' : 'developer', tier === 'plus' ? undefined : licenseId)
   if (current) return { ok: false, error: 'You already have a subscription. Use Manage billing to change or cancel it.' }
   const session = await ctx.client.checkout.sessions.create(
-    checkoutParams({ did, licenseId, price, customer: await ctx.store.customerFor(did), baseUrl: ctx.baseUrl }),
+    checkoutParams({ did, licenseId, price, customer: await ctx.store.customerFor(did), baseUrl: ctx.baseUrl, env }),
   )
   return session.url ? { ok: true, url: session.url } : { ok: false, error: 'Stripe did not return a Checkout URL. Try again.' }
 }

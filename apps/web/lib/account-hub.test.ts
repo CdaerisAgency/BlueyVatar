@@ -12,6 +12,10 @@ const SID = 's' + 'A'.repeat(22)
 describe('safeNext', () => {
   it('keeps same-site account paths', () => {
     expect(safeNext('/account/keys')).toBe('/account/keys')
+    expect(safeNext('/p/alice.bsky.social')).toBe('/p/alice.bsky.social')
+    expect(safeNext('/a/alice.bsky.social')).toBe('/a/alice.bsky.social')
+    expect(safeNext('/p/a/b')).toBe(DEFAULT_NEXT)
+    expect(safeNext('/p//evil.test')).toBe(DEFAULT_NEXT)
     expect(safeNext('/account/avatars?error=x')).toBe('/account/avatars?error=x')
   })
   it('falls back for anything else', () => {
