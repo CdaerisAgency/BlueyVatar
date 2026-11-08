@@ -1,8 +1,7 @@
 'use client'
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '../../../components/Button'
-import { INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, MAX_INTEREST_CHARS, type ProfileField } from '../../../lib/records'
-import { interestStats, type ProfileFormState, type ProfileValues } from '../../../lib/profile-form'
+import { INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, MAX_INTEREST_CHARS, interestStats, type ProfileField, type ProfileFormState, type ProfileValues } from '../../../lib/profile-limits'
 import { saveProfile } from './actions'
 
 const NOT_SET = ''

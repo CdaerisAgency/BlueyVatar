@@ -2,6 +2,7 @@
  * Pure validation and mapping for the record editor (spec sections 5, 9, 11.2).
  * Limits mirror lexicons/com/blueyvatar/*.json.
  */
+import { MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, type ProfileField, type ProfileErrors } from './profile-limits'
 import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE } from './upload-limits'
 import { RATINGS, isPlusDid, normalizeBackgroundColor, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
 
@@ -204,10 +205,7 @@ export function validateNewImage(input: NewImageInput): Check<NewImageFields> {
 
 // ---------- profile ----------
 
-export const MAX_INTERESTS = 20
-export const MAX_INTEREST_CHARS = 50
-/** Room for every interest at full length plus a comma and space between them. */
-export const INTERESTS_BOX_MAX_LENGTH = MAX_INTERESTS * MAX_INTEREST_CHARS + (MAX_INTERESTS - 1) * 2
+export { MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, type ProfileField, type ProfileErrors }
 
 export type ProfileInput = {
   jobTitle: string
@@ -267,9 +265,6 @@ export function parseInterests(raw: string): Check<string[]> {
   if (out.length > MAX_INTERESTS) return fail(`Add at most ${MAX_INTERESTS} interests.`)
   return ok(out)
 }
-
-export type ProfileField = 'jobTitle' | 'company' | 'location' | 'pronouns' | 'pronunciation' | 'timezone' | 'interests' | 'backgroundColor'
-export type ProfileErrors = Partial<Record<ProfileField, string>>
 
 /** Checks every field and reports all problems at once. Blank fields are omitted from the record. */
 export function validateProfileAll(input: ProfileInput): { ok: true; value: ProfileFields } | { ok: false; errors: ProfileErrors } {
