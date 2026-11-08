@@ -1,11 +1,13 @@
 import { PageMain } from '../../components/Page'
-import { Button } from '../../components/Button'
+import { Button, ButtonLink } from '../../components/Button'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { qrSvg } from '@blueyvatar/core'
 import { addEmail, linkEmail, makePrimary, unlink } from '../actions'
 import { requireDid } from '../../lib/auth'
-import { avatarUrl, imgSnippet, markdownSnippet } from '../../lib/avatar-snippets'
+import { imgSnippet, markdownSnippet } from '../../lib/avatar-snippets'
+import { ownerAvatarUrl } from '../../lib/avatar-preview'
+import { describeLinkedEmails, readPrimaryAddress } from '../../lib/linked-emails'
 import { getDashboardStore } from '../../lib/dashboard-store'
 import { CHECKLIST_COOKIE, checklist, parsePrefs, showChecklist } from '../../lib/onboarding'
 import { getClaimStore } from '../../lib/claim-store'
@@ -18,6 +20,7 @@ import { getStore } from '../../lib/store'
 import AccountNav from './AccountNav'
 import CopyField from './CopyField'
 import GallerySection from './GallerySection'
+import LinkedEmail from './LinkedEmail'
 import { setChecklistShown } from './checklist/actions'
 
 export const dynamic = 'force-dynamic'
@@ -26,6 +29,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const did = await requireDid('/account')
   const { error, linked, qr, galleryError, galleryDone } = await searchParams
   const links = await getStore().links.list(did)
+  const emails = describeLinkedEmails(links, readPrimaryAddress(await getStore().links.noticeAddress(did).catch(() => undefined)))
 
   // QR code for the user's own profile. The target can be a verified, visible platform.
   let handle: string | null = null
@@ -70,7 +74,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           viewedPublicProfile: prefs.viewed,
         })
   const primary = links.find((l) => l.primary)
-  const url = primary ? avatarUrl(PUBLIC_URL, primary.emailHash) : null
+  const url = primary ? ownerAvatarUrl(primary.emailHash) : null
   return (
     <PageMain>
       <AccountNav />
@@ -102,15 +106,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {linked && <p>Linked {linked}. Only the hash is stored.</p>}
+      {linked && <p>Linked {linked}. A hash of it is stored, and an encrypted copy of your primary email.</p>}
       <h2>Linked emails ({links.length} of {MAX_LINKED_EMAILS})</h2>
       {links.length === 0 ? (
         <p>No email linked yet. <a href="#link-email">Link one below</a> so apps can find your avatar from your address.</p>
       ) : (
         <ul>
-          {links.map((l) => (
+          {links.map((l, i) => (
             <li key={l.emailHash}>
-              <code>{l.emailHash}</code> ({l.method}){l.primary && <strong> primary</strong>}{' '}
+              <LinkedEmail item={emails[i]!} />{' '}
               {!l.primary && (
                 <form action={makePrimary} className="inline">
                   <input type="hidden" name="hash" value={l.emailHash} />
@@ -136,7 +140,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         data.
       </p>
       <form action={linkEmail}>
-        <Button type="submit" variant="primary">Link the email from my PDS</Button>
+        <Button type="submit" variant="primary">Use the email from my Bluesky account</Button>
       </form>
       <form action={addEmail}>
         <label>
@@ -148,10 +152,20 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <h2>Your avatar URL</h2>
         {url ? (
           <>
-            <p>This is how apps see the avatar for your primary email. It never shows the address itself, only its hash.</p>
-            <p>
-              <img src={url} alt="Your avatar as served" width={80} height={80} />
-            </p>
+            <p>This is how apps see the avatar for your primary email. The link holds a hash of your address, not the address itself.</p>
+            <div className="flex items-center gap-3">
+              {avatarCount === 0 ? (
+                <span className="flex size-20 items-center justify-center rounded-full border border-solid border-bv-line text-sm" role="img" aria-label="No avatar yet">
+                  No avatar
+                </span>
+              ) : (
+                // Served by the delivery host, so next/image optimization does not apply. The square size comes from the class, not fixed attributes.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt="Your current avatar" className="size-20 rounded-full object-cover" referrerPolicy="no-referrer" />
+              )}
+              <ButtonLink href="/account/avatars" variant="primary">Change your avatar</ButtonLink>
+            </div>
+            {avatarCount === 0 && <p>You have not added an avatar here yet. Until you do, apps that ask for this link get your Bluesky avatar if you have one, or a default avatar.</p>}
             <CopyField label="URL" value={url} />
             <CopyField label="HTML" value={imgSnippet(url)} />
             <CopyField label="Markdown" value={markdownSnippet(url)} />
@@ -192,7 +206,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <h2>Your data</h2>
       <p>
         <Link href="/account/data">Download your data or delete it</Link>. Deleting removes what blueyvatar holds about you, except
-        billing records, which we keep for 7 years. Records in your own atproto repository stay on your PDS.
+        billing records, which we keep for 7 years. Records in your own atproto repository stay on your Bluesky account's home server.
       </p>
       <form action="/logout" method="post">
         <Button type="submit">Sign out</Button>

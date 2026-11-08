@@ -10,9 +10,6 @@ export const PROFILE_COLLECTION = 'com.blueyvatar.profile'
 export const SELF_LABELS_TYPE = 'com.atproto.label.defs#selfLabels'
 
 export { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE }
-export const LICENSES = ['personal', 'cc-by', 'cc-by-nc', 'all-rights-reserved'] as const
-export type License = (typeof LICENSES)[number]
-export const DEFAULT_LICENSE: License = 'personal'
 
 export const R_LABELS = ['sexual', 'graphic-media'] as const
 export type RLabel = (typeof R_LABELS)[number]
@@ -86,10 +83,6 @@ export function parseRating(raw: string): Check<Rating> {
 
 export function parseRLabel(raw: string): Check<RLabel> {
   return (R_LABELS as readonly string[]).includes(raw) ? ok(raw as RLabel) : fail('Choose sexual or graphic media for an R rating.')
-}
-
-export function parseLicense(raw: string): Check<License> {
-  return (LICENSES as readonly string[]).includes(raw) ? ok(raw as License) : fail('Choose a license from the list.')
 }
 
 // ---------- image upload ----------
@@ -175,7 +168,6 @@ export type NewImageInput = CropInput & {
   alt: string
   rating: string
   rLabel?: string
-  license: string
   isDefault: boolean
 }
 
@@ -184,7 +176,6 @@ export type NewImageFields = {
   /** Square region of the full original to show. Absent means the center crop. */
   crop?: CropParams
   labels?: ReturnType<typeof selfLabels>
-  license: License
   isDefault: boolean
 }
 
@@ -200,8 +191,6 @@ export function validateNewImage(input: NewImageInput): Check<NewImageFields> {
     if (!r.ok) return r
     rLabel = r.value
   }
-  const license = parseLicense(input.license)
-  if (!license.ok) return license
   const crop = parseCropFields(input)
   if (!crop.ok) return crop
   const labels = selfLabels(rating.value, rLabel)
@@ -209,7 +198,6 @@ export function validateNewImage(input: NewImageInput): Check<NewImageFields> {
     ...(alt.value ? { alt: alt.value } : {}),
     ...(crop.value ? { crop: crop.value } : {}),
     ...(labels ? { labels } : {}),
-    license: license.value,
     isDefault: input.isDefault,
   })
 }

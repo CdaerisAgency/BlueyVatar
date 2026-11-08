@@ -76,7 +76,7 @@ export async function addGalleryImage(session: OAuthSession, bytes: Uint8Array, 
   const existing = await gatedGallery(session)
   if (existing.length >= GALLERY_MAX) throw new RepoError(galleryFullMessage)
   const blob = await uploadBlob(session, bytes, mime)
-  const { alt, labels, license, caption, crop } = fields.value
+  const { alt, labels, caption, crop } = fields.value
   const sorts = existing.map((i) => i.value.sort).filter((n): n is number => typeof n === 'number')
   const sort = sorts.length ? Math.max(...sorts) + 1 : existing.length
   const value: ImageRecord = {
@@ -84,7 +84,6 @@ export async function addGalleryImage(session: OAuthSession, bytes: Uint8Array, 
     ...(alt ? { alt } : {}),
     ...(labels ? { labels } : {}),
     ...(crop ? { crop } : {}),
-    license,
     purpose: 'gallery',
     ...(caption ? { caption } : {}),
     sort,

@@ -90,7 +90,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(out.did).toBe(A)
     expect(out.emails.primaryMasked).toBe('j***@e***.com')
     expect(out.emails.links).toHaveLength(1)
-    expect(out.emails.links[0]).toMatchObject({ email_hash: H1, method: 'code', is_primary: true, email_domain: 'example.com' })
+    expect(out.emails.links[0]).toMatchObject({ email_hash: H1, method: 'code', is_primary: true, email_domain: 'e***.com' })
     expect(out.profileLinks).toHaveLength(1)
     expect(out.claims).toHaveLength(1)
     expect(out.attestations).toHaveLength(2)

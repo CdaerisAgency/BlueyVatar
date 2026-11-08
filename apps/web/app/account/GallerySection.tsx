@@ -1,7 +1,6 @@
 import { GALLERY_CAPTION_MAX, GALLERY_MAX, ratingFromLabels } from '@blueyvatar/core'
 import { Button } from '../../components/Button'
 import { GALLERY_PLUS_MESSAGE, isPlus, listGallery } from '../../lib/gallery'
-import { LICENSES } from '../../lib/records'
 import { RepoError, blobUrl, imageLabels, pdsUrl, repoSession, type StoredImage } from '../../lib/repo'
 import ImageFileInput from './avatars/ImageFileInput'
 import { moveGallery, removeGalleryImage, uploadGalleryImage } from './galleryActions'
@@ -46,7 +45,7 @@ export default async function GallerySection({ did, error, done }: { did: string
             <img src={blobUrl(pds, did, img.value.image.ref.$link)} alt={img.value.alt ?? ''} width={96} height={96} className="size-24 rounded-bv-card border border-bv-line object-cover" referrerPolicy="no-referrer" />
             <div>
               <div>
-                Position {i + 1}. Rating {ratingFromLabels(imageLabels(img)).toUpperCase()}, license {img.value.license ?? 'unset'}
+                Position {i + 1}. Rating {ratingFromLabels(imageLabels(img)).toUpperCase()}
               </div>
               {img.value.caption ? <div>{img.value.caption}</div> : null}
               <div className="mt-1 flex flex-wrap gap-2">
@@ -97,16 +96,6 @@ export default async function GallerySection({ did, error, done }: { did: string
             <select name="rLabel" defaultValue="sexual">
               <option value="sexual">Sexual</option>
               <option value="graphic-media">Graphic media</option>
-            </select>
-          </label>
-          <label>
-            License{' '}
-            <select name="license" defaultValue="personal">
-              {LICENSES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
             </select>
           </label>
           <Button type="submit" variant="primary">Upload to gallery</Button>
