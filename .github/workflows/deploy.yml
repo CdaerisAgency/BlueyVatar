@@ -60,7 +60,6 @@ jobs:
         env:
           SMOKE_HANDLE: ${{ vars.SMOKE_HANDLE }}
           SMOKE_OPTED_OUT_HASH: ${{ vars.SMOKE_OPTED_OUT_HASH }}
-          SMOKE_ORIGIN_SECRET: ${{ secrets.SMOKE_ORIGIN_SECRET }}
         run: |
           # New machines can take a moment to settle, so retry a few times before failing.
           for attempt in 1 2 3; do
