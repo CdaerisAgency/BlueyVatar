@@ -1,4 +1,4 @@
-# blueyvatar Phase 2 decisions (v1)
+# BlueyVatar Phase 2 decisions (v1)
 
 Checked: November 3, 2026. Scope: spec sections 8, 11 and 14.1 of `/home/user/blueyvatar/docs/spec/blueyvatar-product-spec-v13.md`. Issues #51, #28 (verified accounts) and #38 (custom profile domains).
 
@@ -20,7 +20,7 @@ Two families of mechanism exist. Each option below says which one it uses.
 
 **How it works.** The user puts a token or a link on a public surface they control. blueyvatar fetches that surface and checks for it.
 
-- **GitHub:** post a public gist named `proof.md` containing the proof, then add the gist link to the profile. The proof string is the one Keyoxide documents: `openpgp4fpr:FINGERPRINT`, `NAME@DOMAIN.TLD`, or `aspe:DOMAIN.TLD:FINGERPRINT` ([Keyoxide GitHub proof](https://docs.keyoxide.org/service-providers/github/)). For blueyvatar, the token would be a blueyvatar-issued string.
+- **GitHub:** post a public gist named `proof.md` containing the proof, then add the gist link to the profile. The proof string is the one Keyoxide documents: `openpgp4fpr:FINGERPRINT`, `NAME@DOMAIN.TLD`, or `aspe:DOMAIN.TLD:FINGERPRINT` ([Keyoxide GitHub proof](https://docs.keyoxide.org/service-providers/github/)). For BlueyVatar, the token would be a blueyvatar-issued string.
 - **Mastodon:** add an HTTPS link to the profile metadata. Mastodon checks that the linked page has an `a` or `link` tag with `rel="me"` whose `href` equals the Mastodon profile URL. If none exists, it checks whether the first link redirects to the profile URL. Verification runs when the profile is saved ([Mastodon profile docs](https://docs.joinmastodon.org/user/profile/)). This is platform-native, so the Mastodon side is the easiest to verify.
 - **Personal website:** the site links to the profile, and the profile links back. The reciprocal link must carry `rel="me"`. The IndieWeb wiki describes this as the basis for distributed verification, and says only mutual `rel="me"` pairs count as the same person ([IndieWeb rel=me](https://indieweb.org/rel-me)).
 - **DNS TXT (for a domain):** Keyoxide's DNS proof is a TXT record on the domain, with the value `aspe:` or `openpgp4fpr:` plus the identifier ([Keyoxide DNS proof](https://docs.keyoxide.org/service-providers/dns/)). Bluesky's handle spec uses the same idea with `_atproto` TXT records carrying `did=` ([atproto handle spec](https://atproto.com/specs/handle)).
@@ -31,7 +31,7 @@ Two families of mechanism exist. Each option below says which one it uses.
 
 **Risks.**
 - No documented public-surface check exists in the pages I opened for Instagram, TikTok, Threads or X. Their profile text is reachable only through an API (Option 1B) or by scraping, and I did not review platform terms for scraping. No published answer found on whether scraping is permitted.
-- Mastodon's verification runs when the profile is saved ([Mastodon profile docs](https://docs.joinmastodon.org/user/profile/)). My inference: a later removal of the link would go unnoticed unless blueyvatar re-checks it.
+- Mastodon's verification runs when the profile is saved ([Mastodon profile docs](https://docs.joinmastodon.org/user/profile/)). My inference: a later removal of the link would go unnoticed unless BlueyVatar re-checks it.
 - IndieWeb notes that X profile links are wrapped in t.co redirects, which can complicate checks ([IndieWeb rel=me](https://indieweb.org/rel-me)).
 
 ### Option 1B: OAuth sign-in per platform
@@ -119,7 +119,7 @@ Certificates: by default Cloudflare issues an ECDSA P-256 primary certificate an
 **Effort.** Low. One TXT record or one static endpoint.
 
 **Risks.**
-- The user does not get a page on their own domain. This covers identity, and the profile display stays on blueyvatar.
+- The user does not get a page on their own domain. This covers identity, and the profile display stays on BlueyVatar.
 - Valid records that name different DIDs make resolution fail ([atproto handle spec](https://atproto.com/specs/handle)).
 - My inference: the `/p/{handle}` route would need to accept domain handles.
 

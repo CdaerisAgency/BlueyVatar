@@ -37,7 +37,7 @@ export async function sendCode(
   const masked = maskEmail(email)
   await sender.send({
     to: email.trim(),
-    subject: 'Your blueyvatar verification code',
+    subject: 'Your BlueyVatar verification code',
     text: `Your code is ${code}. It expires in 15 minutes.\n\nYour email address is used to notify you of changes to your handle or avatar.\n\nIf you did not ask to link this address on ${PUBLIC_URL}, ignore this message.`,
   })
   // The encrypted address lives in the pending row for at most the life of this code. Confirming stores it as

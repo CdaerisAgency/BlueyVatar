@@ -7,7 +7,7 @@ import { exampleMigration, EXAMPLE_GRAVATAR_URL, FAQS, faqJsonLd, GRAVATAR_DOCS 
 
 export const metadata = pageMetadata(
   '/migrate-from-gravatar',
-  'Migrate from Gravatar to blueyvatar',
+  'Migrate from Gravatar to BlueyVatar',
   'Four steps: sign in, link your email, import your image, and change the base URL in your site. Includes copy-ready snippets.',
 )
 
@@ -15,7 +15,7 @@ export default function MigratePage() {
   const ex = exampleMigration()
   return (
     <PageMain>
-      <h1>Migrate from Gravatar to blueyvatar</h1>
+      <h1>Migrate from Gravatar to BlueyVatar</h1>
       <p>
         This takes a few minutes. Your image moves into your own atproto repository, and your site points at a new base URL. See{' '}
         <Link href="/gravatar-alternative">what stays the same and what differs</Link> first if you want the details.
@@ -27,7 +27,7 @@ export default function MigratePage() {
       </p>
 
       <h2>2. Link your email</h2>
-      <p>Add the email you used for your avatar. blueyvatar checks it with a one-time code, then serves your image for that email hash.</p>
+      <p>Add the email you used for your avatar. BlueyVatar checks it with a one-time code, then serves your image for that email hash.</p>
 
       <h2>3. Import from Gravatar</h2>
       <p>
@@ -58,7 +58,7 @@ export default function MigratePage() {
           </li>
         ))}
       </ul>
-      <p>blueyvatar is not affiliated with Gravatar.</p>
+      <p>BlueyVatar is not affiliated with Gravatar.</p>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd()) }} />
     </PageMain>
   )

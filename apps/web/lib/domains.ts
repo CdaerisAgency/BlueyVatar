@@ -13,7 +13,7 @@ const fail = (error: string): Check<never> => ({ ok: false, error })
 export const APEX_MESSAGE =
   'That is a root domain. Custom profile domains work for subdomains such as me.example.com. ' +
   'To use your root domain, set your account handle to that domain instead (look for a change-handle option in the app or on the server that hosts your account). ' +
-  'Once your handle is the domain, /p/{domain} on blueyvatar shows your profile.'
+  'Once your handle is the domain, /p/{domain} on BlueyVatar shows your profile.'
 
 const LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
 
@@ -43,7 +43,7 @@ export function validateCustomHostname(raw: string, reserved: readonly string[] 
   if (info.hostname === info.publicSuffix) return fail('That is a public suffix, not a domain you can own.')
   if (host === info.domain) return fail(APEX_MESSAGE)
   for (const r of reserved.map(normalizeHostname).filter(Boolean)) {
-    if (host === r || host.endsWith(`.${r}`)) return fail('That hostname belongs to blueyvatar and cannot be used.')
+    if (host === r || host.endsWith(`.${r}`)) return fail('That hostname belongs to BlueyVatar and cannot be used.')
   }
   return ok(host)
 }

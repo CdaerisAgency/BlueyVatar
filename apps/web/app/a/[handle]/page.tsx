@@ -18,10 +18,10 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
   const url = absoluteUrl(`/a/${encodeURIComponent(handle)}`)
   const images = [`${PUBLIC_DELIVERY_URL.replace(/\/+$/, '')}${p.avatar.url}`]
   return {
-    title: `${title} | blueyvatar`,
-    description: `${title}'s avatar on blueyvatar.`,
+    title: `${title} | BlueyVatar`,
+    description: `${title}'s avatar on BlueyVatar.`,
     alternates: { canonical: url },
-    openGraph: { title, url, siteName: 'blueyvatar', type: 'website', images: images.length ? images : [defaultOgImage()] },
+    openGraph: { title, url, siteName: 'BlueyVatar', type: 'website', images: images.length ? images : [defaultOgImage()] },
     twitter: { card: 'summary', title, images },
   }
 }

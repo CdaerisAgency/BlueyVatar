@@ -1,4 +1,4 @@
-# blueyvatar terms and refund wording (DRAFT for counsel review)
+# BlueyVatar terms and refund wording (DRAFT for counsel review)
 
 **DRAFT for counsel review. Not approved by the owner. Not live.** Nothing in this file is published, linked from the site, or policy. Square brackets mark choices the owner has not made. Counsel should rewrite freely. Version 1.
 
@@ -10,7 +10,7 @@ Subscriptions to Plus ($9 per month) and Business ($49 per month), changing plan
 
 ## 1. Plans and prices
 
-1.1 blueyvatar offers a Free plan, a Plus plan at $9 per month, and a Business plan at $49 per month. Prices are in U.S. dollars and exclude tax.
+1.1 BlueyVatar offers a Free plan, a Plus plan at $9 per month, and a Business plan at $49 per month. Prices are in U.S. dollars and exclude tax.
 
 1.2 Paid plans are monthly subscriptions that renew automatically until cancelled. The renewal date is the same day each month as your first payment [counsel: confirm wording for months that lack that day].
 

@@ -2,7 +2,7 @@
   "name": "@blueyvatar/hovercards",
   "version": "0.1.0",
   "private": false,
-  "description": "Embeddable blueyvatar hovercards. Requires a Plus, Business, or Enterprise publishable key.",
+  "description": "Embeddable BlueyVatar hovercards. Requires a Plus, Business, or Enterprise publishable key.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "main": "./dist/index.js",

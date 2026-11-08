@@ -6,8 +6,8 @@ import { exampleMigration, EXAMPLE_GRAVATAR_URL, FAQS, faqJsonLd, GRAVATAR_DOCS 
 
 export const metadata = pageMetadata(
   '/gravatar-alternative',
-  'A Gravatar alternative on atproto | blueyvatar',
-  'How blueyvatar matches the Gravatar avatar URL shape and where it differs: atproto storage, rating mapping, and size caps by plan.',
+  'A Gravatar alternative on atproto | BlueyVatar',
+  'How BlueyVatar matches the Gravatar avatar URL shape and where it differs: atproto storage, rating mapping, and size caps by plan.',
 )
 
 export default function GravatarAlternativePage() {
@@ -16,20 +16,20 @@ export default function GravatarAlternativePage() {
     <PageMain>
       <h1>A Gravatar alternative on atproto</h1>
       <p>
-        blueyvatar serves avatars from an image URL built from an email hash, like other avatar services, and keeps the image in your own atproto repository. This page
-        lists what stays the same and what differs. blueyvatar is not affiliated with Gravatar.
+        BlueyVatar serves avatars from an image URL built from an email hash, like other avatar services, and keeps the image in your own atproto repository. This page
+        lists what stays the same and what differs. BlueyVatar is not affiliated with Gravatar.
       </p>
 
       <h2>What stays the same</h2>
       <p>
         Gravatar documents an avatar URL of the form <code>https://gravatar.com/avatar/HASH</code>, with an optional <code>.jpg</code> extension and query parameters (
         <a href={GRAVATAR_DOCS.images} rel="noopener">Gravatar images documentation</a>,{' '}
-        <a href={GRAVATAR_DOCS.sdkImages} rel="noopener">Gravatar avatars component</a>). blueyvatar accepts the same parameters.
+        <a href={GRAVATAR_DOCS.sdkImages} rel="noopener">Gravatar avatars component</a>). BlueyVatar accepts the same parameters.
       </p>
       <TableBox label="Matching parameters">
         <table>
           <thead>
-            <tr><th>Parameter</th><th>Gravatar documents</th><th>blueyvatar</th></tr>
+            <tr><th>Parameter</th><th>Gravatar documents</th><th>BlueyVatar</th></tr>
           </thead>
           <tbody>
             <tr><td><code>s</code> or <code>size</code></td><td>1 to 2048 pixels, 80 by default</td><td>Same parameter. Caps by plan, see below.</td></tr>
@@ -41,7 +41,7 @@ export default function GravatarAlternativePage() {
         </table>
       </TableBox>
       <p>
-        Here is a sample Gravatar-style URL and the same request on blueyvatar, converted by the <code>@blueyvatar/avatar</code> package:
+        Here is a sample Gravatar-style URL and the same request on BlueyVatar, converted by the <code>@blueyvatar/avatar</code> package:
       </p>
       <pre><code>{EXAMPLE_GRAVATAR_URL}</code></pre>
       <pre><code>{ex.url}</code></pre>
@@ -50,11 +50,11 @@ export default function GravatarAlternativePage() {
       <TableBox label="Differences">
         <table>
           <thead>
-            <tr><th>Area</th><th>blueyvatar</th></tr>
+            <tr><th>Area</th><th>BlueyVatar</th></tr>
           </thead>
           <tbody>
             <tr><td>Storage</td><td>Your atproto repository. The image and profile live in an account you own.</td></tr>
-            <tr><td>Ratings</td><td>Mapped from atproto self-labels so an image rates the same in both places. The definitions are blueyvatar&apos;s own and can differ from the ones on Gravatar&apos;s pages.</td></tr>
+            <tr><td>Ratings</td><td>Mapped from atproto self-labels so an image rates the same in both places. The definitions are BlueyVatar&apos;s own and can differ from the ones on Gravatar&apos;s pages.</td></tr>
             <tr><td>Size caps</td><td>Free 512, Plus 1024, Business and Enterprise 2048. Larger values are clamped and reported in the <code>x-adjusted-params</code> header.</td></tr>
             <tr><td>Image count</td><td>Free 3 images, Plus 20.</td></tr>
             <tr><td>Custom default URL</td><td>HTTPS only, on the service allowlist, with a Plus key or higher.</td></tr>

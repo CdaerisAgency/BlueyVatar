@@ -34,7 +34,7 @@ export function pageMetadata(path: string, title: string, description: string, b
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, siteName: 'blueyvatar', type: 'website' as const, images },
+    openGraph: { title, description, url, siteName: 'BlueyVatar', type: 'website' as const, images },
     twitter: { card: 'summary' as const, title, description, images },
   }
 }
@@ -42,5 +42,5 @@ export function pageMetadata(path: string, title: string, description: string, b
 /** Search description for /pricing, built from the same table the page renders. */
 export function pricingDescription(): string {
   const tiers = PRICING.map((t) => `${t.name} ${formatPrice(t.amount)}${t.per ? `/${t.per}` : ''}`).join(', ')
-  return `blueyvatar pricing: ${tiers}. Being seen is always free.`
+  return `BlueyVatar pricing: ${tiers}. Being seen is always free.`
 }

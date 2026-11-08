@@ -1,10 +1,10 @@
-# blueyvatar handoff for the local agent (v6)
+# BlueyVatar handoff for the local agent (v6)
 
 Written November 4, 2026, from the cloud session that built phases 1 and 2. The step-by-step commands are in `docs/deploy.md`, and that runbook wins if anything here conflicts with it. This file explains where things stand, what you are expected to do, and the rules the owner has set.
 
 ## 1. What the project is
 
-blueyvatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v13.md`.
+BlueyVatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v13.md`.
 
 - Repository: `CdaerisAgency/BlueyVatar` (the old lowercase URL redirects; set your remote to `https://github.com/CdaerisAgency/BlueyVatar.git`)
 - Local path: `C:\Users\super\OneDrive\Documents\GitHub\BlueyVatar`

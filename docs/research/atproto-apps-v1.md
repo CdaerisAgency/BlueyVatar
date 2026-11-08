@@ -1,6 +1,6 @@
 # atproto apps for the integrations page (issue #155)
 
-Checked: November 7, 2026. Scope: which atproto apps blueyvatar lists on `/integrations` and detects on a signed-in account.
+Checked: November 7, 2026. Scope: which atproto apps BlueyVatar lists on `/integrations` and detects on a signed-in account.
 
 ## Owner request
 

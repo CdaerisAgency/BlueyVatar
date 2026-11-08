@@ -1,6 +1,6 @@
 # Moderation review guide (v1)
 
-For the people who review reports on blueyvatar. It explains how to use the portal at `/admin`, what the severity levels and timers mean, and how to look after yourself while doing this work. The settings an operator changes are in `docs/deploy.md` under "Web admin page".
+For the people who review reports on BlueyVatar. It explains how to use the portal at `/admin`, what the severity levels and timers mean, and how to look after yourself while doing this work. The settings an operator changes are in `docs/deploy.md` under "Web admin page".
 
 The portal follows published designs instead of a process invented for this project: Ozone (Bluesky's open source moderation tool), ROOST Coop (queues, blur, one reviewer per job), and the statement of reasons in Article 17 of the EU Digital Services Act. Where a rule here is our own choice, it says so. This guide is not legal advice. Counsel must confirm the child-safety steps and the notice wording.
 
@@ -119,4 +119,4 @@ Once a day (from 13:00 UTC by default) the indexer emails counts to the admin ad
 - Keyboard shortcuts, video and audio handling: not needed while the service holds only images.
 - Roles beyond "admin" and the child-safety list: the portal has no separate roles for a triage-only reviewer. Add them if the team grows.
 - Quality audit samples (second review of a share of decisions): suggested by the research, not built.
-- Whether blueyvatar is a hosting service or online platform under the DSA, and which transparency and complaint-handling duties apply, is for counsel.
+- Whether BlueyVatar is a hosting service or online platform under the DSA, and which transparency and complaint-handling duties apply, is for counsel.

@@ -149,7 +149,7 @@ export function init(opts: HovercardOptions): () => void {
     observer = new MutationObserver(() => arm(document))
     observer.observe(document.body, { childList: true, subtree: true })
   }
-  if (!token) console.warn('blueyvatar hovercards: a key is required (Plus, Business, or Enterprise publishable key).')
+  if (!token) console.warn('BlueyVatar hovercards: a key is required (Plus, Business, or Enterprise publishable key).')
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true, ...on })
   else start()
   return () => {

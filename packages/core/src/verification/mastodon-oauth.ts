@@ -17,7 +17,7 @@ const FORM = { 'content-type': 'application/x-www-form-urlencoded' }
 export async function registerApp(instance: string, redirectUri: string, website: string, f: Fetcher): Promise<MastodonApp | null> {
   const r = await f(`https://${instance}/api/v1/apps`, {
     method: 'POST', headers: FORM, maxBytes: 100_000,
-    body: form({ client_name: 'blueyvatar', redirect_uris: redirectUri, scopes: MASTODON_SCOPE, website }),
+    body: form({ client_name: 'BlueyVatar', redirect_uris: redirectUri, scopes: MASTODON_SCOPE, website }),
   })
   const j = safeJson(r.text) as { client_id?: unknown; client_secret?: unknown }
   if (r.status !== 200 || typeof j.client_id !== 'string' || typeof j.client_secret !== 'string') return null

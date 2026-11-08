@@ -3,7 +3,7 @@ export interface EmailSender {
   send(msg: { to: string; subject: string; text: string }): Promise<void>
 }
 
-export const DEFAULT_FROM = 'blueyvatar <support@blueyvatar.com>'
+export const DEFAULT_FROM = 'BlueyVatar <support@blueyvatar.com>'
 
 export class ResendSender implements EmailSender {
   constructor(

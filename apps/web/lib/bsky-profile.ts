@@ -22,7 +22,7 @@ export type BskyAvatarResult =
 const SERVER_SENTENCE = `Y${HOME_SERVER_TERM.slice(1)}` // HOME_SERVER_TERM begins with "your"
 
 export const BSKY_MESSAGES: Record<BskyAvatarFailure, string> = {
-  no_permission: 'Sign in again to allow this. blueyvatar needs your permission to change the picture on your profile.',
+  no_permission: 'Sign in again to allow this. BlueyVatar needs your permission to change the picture on your profile.',
   no_profile: `${SERVER_SENTENCE} has no app.bsky.actor.profile record for you yet, so there is no profile picture to change. Save your profile once in an app that uses it, then try again.`,
   conflict: 'Your profile changed while this was saving, so nothing was changed. Check the picture your profile shows now, then try again.',
   too_large: 'This image is still larger than the 1 MB limit for profile avatars after shrinking it. Choose a simpler or smaller image.',

@@ -59,7 +59,7 @@ The lexicon spec bears on the profile-record option. Unexpected fields "should b
 | A. SRV (recommended) | `_avatars-sec._tcp.<domain>` | Email domain; also handle domain | Works with existing Libravatar zones. Carries host and port. Priority and weight give failover ([RFC 2782](https://www.rfc-editor.org/rfc/rfc2782)). | SRV is awkward in some DNS dashboards. Not usable from browser JavaScript, so lookups run server side or in a library. |
 | B. TXT in the style of `_atproto` | `_blueyvatar.<domain>` with `url=...` | Any domain | Same shape domain owners already use for `_atproto` ([handle spec](https://atproto.com/specs/handle)). Easy in every DNS dashboard. | New format. No Libravatar compatibility. No priority or weight. |
 | C. Well-known URL | `https://<domain>/.well-known/...` | Handle domain, owners with a web server | Needs no DNS access. Matches the atproto HTTPS method. | Every lookup costs an HTTPS fetch to a host the requester does not control (SSRF surface). Needs a web server on the domain. Gives nothing for email domains that host mail only. |
-| D. Field in the user's atproto profile | New field in `com.blueyvatar.profile` | One user, not a domain | User controls it without DNS access. blueyvatar owns that lexicon, so it avoids editing another app's record ([lexicon spec](https://atproto.com/specs/lexicon)). | Per-user, not per-domain. A user could point lookups for their own DID at any host they like, so every request is a fetch to a user-chosen host. Adds an indexing path. The profile route already starts from the DID, so it needs no DNS at all. |
+| D. Field in the user's atproto profile | New field in `com.blueyvatar.profile` | One user, not a domain | User controls it without DNS access. BlueyVatar owns that lexicon, so it avoids editing another app's record ([lexicon spec](https://atproto.com/specs/lexicon)). | Per-user, not per-domain. A user could point lookups for their own DID at any host they like, so every request is a fetch to a user-chosen host. Adds an indexing path. The profile route already starts from the DID, so it needs no DNS at all. |
 | E. DID document `service` entry | `#blueyvatar` service | One user | Signed by the DID's keys. Permitted by the DID spec ([DID spec](https://atproto.com/specs/did)). | Most users cannot edit their DID document. No published answer on how PDS software exposes edits to custom service entries. |
 
 Decision: option A for domain delegation. Options D and E are per-user pointers, a different feature ("my avatar lives on my own server"), and are out of scope for F7. They are listed only to show the choice was weighed.
@@ -68,7 +68,7 @@ Discovery order (Proposal):
 
 1. Local registration check. If the domain is not registered to an Enterprise account, stop. Delegation is off.
 2. SRV `_avatars-sec._tcp.<domain>`. Use only the highest-priority group and pick by weight, as Libravatar requires. A target of "." means no delegation.
-3. If the delegated server answers 404 or errors, continue with the normal local resolution order (spec section 7) and apply the caller's `d=` default last. Libravatar's page does not say what to do here (see above), so this is a blueyvatar choice. The reason: a broken self-hosted server should not turn every avatar in the domain into the default image.
+3. If the delegated server answers 404 or errors, continue with the normal local resolution order (spec section 7) and apply the caller's `d=` default last. Libravatar's page does not say what to do here (see above), so this is a BlueyVatar choice. The reason: a broken self-hosted server should not turn every avatar in the domain into the default image.
 
 The HTTP variant `_avatars._tcp` is not used. The hosted service only fetches over HTTPS.
 
@@ -109,7 +109,7 @@ Fetch from the delegate server side, pass the bytes through the sandboxed resize
 
 Entitlement: delegation is an Enterprise capability (spec section 11.1). Registration, challenge status, and the delegate's last-seen health live with the account's license record.
 
-Relation to custom profile domains: Cloudflare for SaaS (deploy.md, step 6, and Decision 2 in [decisions-phase2-v1.md](decisions-phase2-v1.md)) serves blueyvatar profile pages on a customer's hostname, which is inbound traffic to blueyvatar. Delegation is outbound traffic from blueyvatar to the customer. They share only the TXT proof idea. The Cloudflare path does not touch delegation, and Fly's outbound fetches do not pass through Cloudflare's proxy.
+Relation to custom profile domains: Cloudflare for SaaS (deploy.md, step 6, and Decision 2 in [decisions-phase2-v1.md](decisions-phase2-v1.md)) serves BlueyVatar profile pages on a customer's hostname, which is inbound traffic to BlueyVatar. Delegation is outbound traffic from BlueyVatar to the customer. They share only the TXT proof idea. The Cloudflare path does not touch delegation, and Fly's outbound fetches do not pass through Cloudflare's proxy.
 
 ## Caching and TTL rules (Proposal)
 

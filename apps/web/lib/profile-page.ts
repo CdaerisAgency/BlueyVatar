@@ -139,7 +139,7 @@ export function profileMetadata(p: PublicProfile, handle: string, imageBase: str
     title,
     description,
     ...(canonical ? { alternates: { canonical } } : {}),
-    openGraph: { title, description, type: 'profile' as const, siteName: 'blueyvatar', ...(canonical ? { url: canonical } : {}), images },
+    openGraph: { title, description, type: 'profile' as const, siteName: 'BlueyVatar', ...(canonical ? { url: canonical } : {}), images },
     twitter: { card: 'summary' as const, title, description, images },
   }
 }

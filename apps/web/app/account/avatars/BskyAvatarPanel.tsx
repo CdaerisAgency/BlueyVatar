@@ -15,7 +15,7 @@ export default async function BskyAvatarPanel({ session, state, server }: { sess
       <h2 id="bsky-avatar-heading">Keep your profile avatar in sync</h2>
       {!granted ? (
         <p role="status">
-          <a href="/login?next=/account/avatars">Sign in again to allow this.</a> blueyvatar needs your permission to change the picture on your profile on {server}. It changes nothing else.
+          <a href="/login?next=/account/avatars">Sign in again to allow this.</a> BlueyVatar needs your permission to change the picture on your profile on {server}. It changes nothing else.
         </p>
       ) : (
         <>

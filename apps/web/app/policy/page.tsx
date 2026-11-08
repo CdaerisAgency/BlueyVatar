@@ -1,12 +1,12 @@
 import { PageMain } from '../../components/Page'
 import { pageMetadata } from '../../lib/site'
-export const metadata = pageMetadata('/policy', 'Content policy | blueyvatar', 'What blueyvatar does not allow, how to report content, and what we can and cannot remove.')
+export const metadata = pageMetadata('/policy', 'Content policy | BlueyVatar', 'What BlueyVatar does not allow, how to report content, and what we can and cannot remove.')
 
 export default function PolicyPage() {
   return (
     <PageMain>
       <h1>Content policy</h1>
-      <p>blueyvatar serves avatars and profiles that live in your own atproto repository. We can stop serving an image or profile from our service. We never edit your repository ourselves. The only change we make outside our own records is the picture on your profile, and only when you allow it.</p>
+      <p>BlueyVatar serves avatars and profiles that live in your own atproto repository. We can stop serving an image or profile from our service. We never edit your repository ourselves. The only change we make outside our own records is the picture on your profile, and only when you allow it.</p>
       <h2>Not allowed</h2>
       <ul>
         <li>Illegal content, including child sexual abuse material</li>

@@ -66,7 +66,7 @@ export function emailLinkScope(permissionSet: boolean = usePermissionSet(), bsky
 export function clientMetadata() {
   return {
     client_id: `${PUBLIC_URL}/oauth-client-metadata.json`,
-    client_name: 'blueyvatar',
+    client_name: 'BlueyVatar',
     client_uri: PUBLIC_URL,
     redirect_uris: [`${PUBLIC_URL}/oauth/callback`],
     scope: emailLinkScope(),

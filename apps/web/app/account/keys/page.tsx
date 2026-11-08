@@ -129,7 +129,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
       )}
 
       <h2>Keys ({active.length}{ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)</h2>
-      {keys.length === 0 && <p>You have no keys yet. Create a website key below to use blueyvatar from a web page or app. Server keys are for your own servers.</p>}
+      {keys.length === 0 && <p>You have no keys yet. Create a website key below to use BlueyVatar from a web page or app. Server keys are for your own servers.</p>}
       <ul>
         {keys.map((k) => (
           <li key={k.hash} className="mb-4">

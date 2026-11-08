@@ -1,6 +1,6 @@
 # @blueyvatar/avatar
 
-Avatar URL builder, email hashing, a Gravatar migration helper, and an optional React component for blueyvatar. It has no server dependencies and runs in browsers and Node 18 or newer.
+Avatar URL builder, email hashing, a Gravatar migration helper, and an optional React component for BlueyVatar. It has no server dependencies and runs in browsers and Node 18 or newer.
 
 Status: version 0.1.0 is not published yet. Publishing is a manual, tag-triggered step (see docs/deploy.md, "Publish the npm packages").
 
@@ -44,7 +44,7 @@ const { options, notes } = fromGravatarUrl('https://gravatar.com/avatar/<hash>?s
 const url = avatarUrl(options) // notes lists the differences
 ```
 
-`s`, `d`, `r`, and `f` are mapped (`d=mm` becomes `mp`). `d=color` is dropped. Ratings differ: Gravatar rates images by its own rules, and blueyvatar derives the rating from atproto self-labels, so the same image can rate differently. See docs/api/gravatar-differences-v1.md.
+`s`, `d`, `r`, and `f` are mapped (`d=mm` becomes `mp`). `d=color` is dropped. Ratings differ: Gravatar rates images by its own rules, and BlueyVatar derives the rating from atproto self-labels, so the same image can rate differently. See docs/api/gravatar-differences-v1.md.
 
 ## Size and tiers
 

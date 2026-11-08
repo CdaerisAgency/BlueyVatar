@@ -580,7 +580,7 @@ Thresholds are starting points to tune after a week of real traffic. "Page" mean
 
 ### Service status (outside Fly)
 
-Issue 179. The owner chose to watch blueyvatar from the Cdaeris uptime dashboard (`CdaerisAgency/uptime`, Gatus, `uptime.cdaeris.com`, internal) instead of a separate status page. Design and open items: `docs/research/status-page-v1.md`.
+Issue 179. The owner chose to watch BlueyVatar from the Cdaeris uptime dashboard (`CdaerisAgency/uptime`, Gatus, `uptime.cdaeris.com`, internal) instead of a separate status page. Design and open items: `docs/research/status-page-v1.md`.
 
 | Gatus row | Probe | Green means |
 | --- | --- | --- |
@@ -596,7 +596,7 @@ The rows ship disabled and need `enabled: true` after the first production deplo
 2. Generate a metrics token per app (`openssl rand -hex 32`) and set `METRICS_TOKEN` on delivery and web. Store it in Infisical.
 3. Create the alerts in the table in Sentry, Grafana, or Fly's managed Prometheus. Nothing is created automatically.
 4. After the first deploy, check `curl https://<delivery host>/readyz`, `curl https://<web host>/api/health`, and `fly ssh console --app blueyvatar-indexer -C "node -e \"fetch('http://localhost:8080/readyz').then(r=>r.text()).then(console.log)\""`, and confirm the `outboxBuffer` value in the indexer response is a number.
-5. After the first production deploy, set `enabled: true` on the three blueyvatar rows in `CdaerisAgency/uptime` `config.yaml` and redeploy that dashboard, and confirm the Trigger.dev watchdog alert exists there (see Service status above).
+5. After the first production deploy, set `enabled: true` on the three BlueyVatar rows in `CdaerisAgency/uptime` `config.yaml` and redeploy that dashboard, and confirm the Trigger.dev watchdog alert exists there (see Service status above).
 
 ## Log retention
 
@@ -791,7 +791,7 @@ Signed-in users can download their data and delete it at `/account/data`. Deleti
 
 ## Profile avatar permission
 
-Letting users change their profile avatar from blueyvatar needs one more sign-in scope, `repo:app.bsky.actor.profile?action=update` (issue #241, spec section 10.1). It is behind `OAUTH_REQUEST_BSKY_PROFILE`, which is off by default, because the permission spec does not say whether Bluesky's authorization server lets a third-party app request write access to an `app.bsky.*` collection. A refused scope would break sign-in for everyone.
+Letting users change their profile avatar from BlueyVatar needs one more sign-in scope, `repo:app.bsky.actor.profile?action=update` (issue #241, spec section 10.1). It is behind `OAUTH_REQUEST_BSKY_PROFILE`, which is off by default, because the permission spec does not say whether Bluesky's authorization server lets a third-party app request write access to an `app.bsky.*` collection. A refused scope would break sign-in for everyone.
 
 | Setting | Where | Notes |
 | --- | --- | --- |

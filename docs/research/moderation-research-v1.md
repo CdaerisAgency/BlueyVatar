@@ -1,4 +1,4 @@
-# blueyvatar moderation research (v1)
+# BlueyVatar moderation research (v1)
 
 Date: 2026-11-07. Research only, no code. Not legal advice; counsel must confirm everything in section 4. "Not documented" means I could not find it in the official source fetched. Several pages (docs.bsky.app moderation guide, Hive/Thorn pricing, TSPA chapter text, Tech Coalition resilience guidebook, HCOMP blur paper) could not be read directly; those gaps are marked.
 
@@ -73,7 +73,7 @@ Notes:
 **Does Bluesky scan blobs?**
 - 2024 moderation report: Bluesky subscribes to hashes of known CSAM, and matches are "immediately removed from the site and our infrastructure without the need for a human to view the content." https://bsky.social/about/blog/01-17-2025-moderation-2024
 - 2025 transparency report: Thorn's Safer supplies hash databases; matches are "immediately diverted"; 12,647 items diverted, 5,238 NCMEC reports. https://bsky.social/about/blog/01-29-2026-transparency-report-2025. It also describes automated labeling of all uploaded images through Hive.
-- Not documented: whether this runs in the PDS (bsky.social) or the AppView, and whether it covers blobs on third-party or self-hosted PDSes. Do not assume a user's PDS has screened an image blueyvatar fetches.
+- Not documented: whether this runs in the PDS (bsky.social) or the AppView, and whether it covers blobs on third-party or self-hosted PDSes. Do not assume a user's PDS has screened an image BlueyVatar fetches.
 
 ## 4. Legal framing (counsel must confirm)
 
@@ -94,7 +94,7 @@ Notes:
 - Art 16: easy electronic notice-and-action; notices contain explanation, exact URL, submitter name and email (not required for child abuse offences), and a good-faith statement.
 - Art 17: statement of reasons to affected users (contents in section 5).
 - Art 18: promptly inform law enforcement of suspected offences threatening life or safety.
-- Art 20 internal complaints and Art 24 transparency reports are platform obligations; micro and small enterprises are exempted from some online platform duties (Art 19). Whether blueyvatar is a "hosting service" or "online platform", and whether it qualifies as small, is for counsel.
+- Art 20 internal complaints and Art 24 transparency reports are platform obligations; micro and small enterprises are exempted from some online platform duties (Art 19). Whether BlueyVatar is a "hosting service" or "online platform", and whether it qualifies as small, is for counsel.
 
 **Open questions for counsel.** (a) Is blueyvatar a "provider" under 2258A given the image lives on the user's PDS but is cached and served by you? (b) What may staff view or retain, and the preservation setup. (c) NCMEC ESP registration. (d) DSA establishment and legal representative. (e) Terms of service and privacy wording about screening and the vendor's name. (f) Vendor contract data-processing terms.
 
