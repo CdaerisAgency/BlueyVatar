@@ -7,6 +7,7 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 ### Changed
 - `localdeploy.bat` (v3) now ends a production run with `pnpm lexicons:publish`, asking first unless `--yes` is given. It checks the three `LEXICON_PUBLISH_` variables and `pnpm` before any deploy starts. Staging-only runs skip it, and `--no-lexicons` turns it off.
 - The Deploy workflow now deploys in one run when started by hand (Actions > Deploy > Run workflow, or by asking in chat): staging, a smoke test against staging, production, then a smoke test against production. Production is skipped if staging fails. Merging does not deploy. The `target` choice can be `staging` only. Tap is still deployed by hand, and `localdeploy.bat` stays for emergencies. Rollback steps are in `docs/deploy.md`.
+- The default sender address for one-time-code emails is now support@blueyvatar.com.
 
 ### Added
 - Account menu: an Overview link above the groups, Organizations under Identity, Profile views under Profile, and Appeal under Settings (part of #243). The home page heading is now Overview and the appeal page heading is Appeal. Nested pages such as an organization's page keep the right item highlighted.
