@@ -81,9 +81,26 @@ The indexer needs the `--env` override because `fly/indexer.toml` points at the 
 
 ## CI deploys
 
-`.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch, but only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. The job runs only on the owner's CI runner, named by the repository variable `CI_RUNNER`, and has no GitHub-hosted fallback because it holds `FLY_API_TOKEN`. If `CI_RUNNER` is missing, the job fails instead of running elsewhere. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
+`.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch, but only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. The job runs only on the owner's runner, named by the repository variable `DEPLOY_RUNNER`, and has no GitHub-hosted fallback because it holds `FLY_API_TOKEN`. It also runs only for `refs/heads/main` and uses `environment: production`, which GitHub creates on first use with no reviewers. CI (`ci.yml`), the npm publish and Live Tap workflows run on GitHub-hosted `ubuntu-latest`; the old `CI_RUNNER` variable is retired. If `DEPLOY_RUNNER` is missing, the job fails instead of running elsewhere. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
 
 **Tap is deployed by hand.** Restarting Tap interrupts the firehose connection, and an image upgrade can force a re-backfill, so someone should watch each Tap deploy. It also changes rarely.
+
+### Public repository checklist (owner)
+
+The workflows are written for a public repository, but these GitHub settings cannot be changed from a workflow. The owner must do them; the pull request that added this list changed none of them. Menu paths are as documented by GitHub at <https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions>, <https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment>, <https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/managing-access-to-self-hosted-runners-using-groups>, <https://docs.github.com/en/code-security/security-advisories/working-with-repository-security-advisories/configuring-private-vulnerability-reporting-for-a-repository>, and <https://docs.github.com/en/code-security/secret-scanning/enabling-secret-scanning-features/enabling-push-protection-for-your-repository>.
+
+In this order, so deploys never break:
+
+1. Set the variable `DEPLOY_RUNNER` to the on-prem runner's label: Settings > Secrets and variables > Actions > Variables > New repository variable. Do this before merging the workflow change, since `deploy.yml` has no fallback.
+2. Restrict the runner: Settings > Actions > Runners (organization: Organization settings > Actions > Runner groups). Put the runner in a runner group that only this repository may use, and give the runner a label that only deploys target.
+3. Merge the workflow pull request. CI now runs on GitHub-hosted runners.
+4. Delete the retired variable `CI_RUNNER`: Settings > Secrets and variables > Actions > Variables.
+5. Add required reviewers to the `production` environment: Settings > Environments > production > Required reviewers (the environment is created on the first deploy run after the merge, or create it earlier under Settings > Environments > New environment). Optionally limit deployment branches to `main`.
+6. Settings > Actions > General > Fork pull request workflows from outside collaborators: choose "Require approval for all outside collaborators".
+7. Settings > Actions > General > Workflow permissions: choose "Read repository contents and packages permissions".
+8. Settings > Advanced Security (or Code security and analysis): enable Private vulnerability reporting, Secret scanning, and Push protection.
+
+Required reviewers on an environment do not make a self-hosted runner safe for untrusted code, which is why only the main-only deploy job uses one.
 
 ## Deploy from a local clone (localdeploy.bat)
 
