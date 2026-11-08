@@ -636,7 +636,7 @@ Two public packages ship from `packages/`: `@blueyvatar/avatar` (URL builder, ha
 1. Create the `blueyvatar` organization on npmjs.com (owner decision on issue #153). Packages under the `@blueyvatar` scope are public, so the free plan is enough.
 2. Create a granular access token on npmjs.com with read and write access to the `@blueyvatar` packages, and an expiry you will track. Store it in Infisical as `NPM_TOKEN`.
 3. Add the same value as the GitHub repository secret `NPM_TOKEN` (Settings, Secrets and variables, Actions). Infisical stays the source of truth. Whether an Infisical to GitHub sync is set up here was not verified.
-4. Provenance needs a public source repository when npm verifies the build. The repository is private today (see docs/licensing-v1.md), and npm rejects `--provenance` from a private repository. Make the repository public first, or remove `--provenance` from the workflow and from `publishConfig` in `packages/avatar/package.json` for a private-repo publish. This was not tested here.
+4. Provenance needs a public source repository when npm verifies the build. The repository is private today (see docs/licensing-v2.md), and npm rejects `--provenance` from a private repository. Make the repository public first, or remove `--provenance` from the workflow and from `publishConfig` in `packages/avatar/package.json` for a private-repo publish. This was not tested here.
 
 ### Release steps
 

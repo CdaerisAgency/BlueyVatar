@@ -52,7 +52,7 @@ describe('AtprotoResolver !no-unauthenticated label', () => {
   })
 })
 
-// Record shapes seen in live repos on Nov 7, 2026 (docs/research/tangled-collection-v1.md).
+// Record shapes seen in live repos on Nov 7, 2026 (docs/research/tangled-collection-v2.md).
 // DIDs and CIDs are fake. Key order and field names match the live records.
 const tangledBlob = (cid: string, mimeType: string, size: number) =>
   ({ ref: { $link: cid }, size, $type: 'blob', mimeType })

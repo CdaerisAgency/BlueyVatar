@@ -1,4 +1,4 @@
-# Which Tangled collection to read (v1)
+# Which Tangled collection to read (v2)
 
 Checked: November 7, 2026. Scope: issues #69 and #55, spec sections 7 and 13 (item 13) of `docs/spec/blueyvatar-product-spec-v12.md`, and `packages/core/src/adapters.ts`. Everything below was measured from live repos on that date, except where marked **not done**.
 
@@ -49,56 +49,7 @@ The relay index can lag the PDS: 3 of the 44 sampled repos had no record in eith
 
 Record shapes seen: the new record carries `$type`, `avatar`, `createdAt`, plus optional `pronouns`, `description`, `links`, `stats`, `location`, `pinnedRepositories`, `isOrganization`. The legacy record carries `$type`, `avatar`, `bluesky`, `links`, `stats`, `location`, `pronouns`, `description`, `preferredHandle`, `pinnedRepositories`. Neither sample record had a `labels` field. A new record can be only `{ "$type": "org.tangled.actor.profile" }`, which means a profile with no avatar.
 
-### Per-account table
-
-Stratum A is listed under the new collection, B only under the legacy collection. Avatar cells show MIME type and bytes. The last two columns are `getRecord` time in milliseconds with the HTTP status in parentheses (400 is RecordNotFound; 500 is an upstream error). DIDs are shortened.
-
-| # | Stratum | DID | PDS host | `org.tangled.actor.profile` | `sh.tangled.actor.profile` | getRecord org (ms) | getRecord sh (ms) |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | A | `did:plc:joetykgy...` | tngl.sh | record, no avatar | no record | 120 (200) | 120 (400) |
-| 2 | A | `did:plc:lh6pwykj...` | tngl.sh | blob jpeg 44622 | blob jpeg 44622 | 121 (200) | 120 (200) |
-| 3 | A | `did:plc:3txwypzi...` | bsky host | blob png 202766 | blob png 202766 | 82 (200) | 74 (200) |
-| 4 | A | `did:plc:mye5bv54...` | tngl.sh | record, no avatar | record, no avatar | 119 (200) | 119 (200) |
-| 5 | A | `did:plc:2rts6ksd...` | tngl.sh | blob png 39045 | no record | 118 (200) | 119 (400) |
-| 6 | A | `did:plc:jps5v54e...` | tngl.sh | record, no avatar | no record | 119 (200) | 124 (400) |
-| 7 | A | `did:plc:7gilsvvm...` | bsky host | blob jpeg 10897 | record, no avatar | 72 (200) | 70 (200) |
-| 8 | A | `did:plc:bej2ilqw...` | tngl.sh | record, no avatar | record, no avatar | 119 (200) | 119 (200) |
-| 9 | A | `did:plc:fneqyvm4...` | tngl.sh | blob png 194386 | blob png 194386 | 119 (200) | 120 (200) |
-| 10 | A | `did:plc:vhwsdz6p...` | bsky host | blob png 403561 | blob png 403561 | 41 (200) | 38 (200) |
-| 11 | A | `did:plc:shyznj72...` | tngl.sh | blob jpeg 10909 | blob jpeg 10909 | 120 (200) | 124 (200) |
-| 12 | A | `did:plc:caapew7y...` | tngl.sh | blob png 99999 | no record | 121 (200) | 129 (400) |
-| 13 | A | `did:plc:hic6geqp...` | tngl.sh | record, no avatar | record, no avatar | 125 (200) | 121 (200) |
-| 14 | A | `did:plc:dwpwoizi...` | bsky host | no record | no record | 114 (400) | 113 (400) |
-| 15 | A | `did:plc:xq27otqu...` | bsky host | blob jpeg 221281 | record, no avatar | 79 (200) | 73 (200) |
-| 16 | A | `did:plc:bqhabx5y...` | bsky host | blob jpeg 104219 | record, no avatar | 38 (200) | 38 (200) |
-| 17 | A | `did:plc:rbqsyfls...` | bsky host | blob png 70800 | no record | 40 (200) | 41 (400) |
-| 18 | A | `did:plc:ign2srfq...` | self-hosted | blob png 853649 | record, no avatar | 46 (200) | 51 (200) |
-| 19 | A | `did:plc:ev4gssjh...` | tngl.sh | record, no avatar | record, no avatar | 122 (200) | 154 (200) |
-| 20 | A | `did:plc:wwpcqbb6...` | tngl.sh | record, no avatar | no record | 121 (200) | 122 (400) |
-| 21 | A | `did:plc:6mytglxb...` | self-hosted | blob png 12374 | blob png 12374 | 124 (200) | 124 (200) |
-| 22 | A | `did:plc:lgeayh75...` | tngl.sh | record, no avatar | no record | 119 (200) | 127 (400) |
-| 23 | B | `did:plc:g7caa4il...` | bsky host | no record | record, no avatar | 38 (400) | 37 (200) |
-| 24 | B | `did:plc:kgrm34ie...` | bsky host | no record | record, no avatar | 71 (400) | 77 (200) |
-| 25 | B | `did:plc:a3to7f5a...` | tngl.sh | no record | record, no avatar | 119 (400) | 119 (200) |
-| 26 | B | `did:plc:benehogq...` | tngl.sh | no record | blob jpeg 2533667 | 120 (400) | 123 (200) |
-| 27 | B | `did:plc:mp5tjflb...` | bsky host | no record | record, no avatar | 76 (400) | 76 (200) |
-| 28 | B | `did:plc:si57mnfp...` | tngl.sh | no record | record, no avatar | 131 (400) | 120 (200) |
-| 29 | B | `did:plc:4ahko5bv...` | tngl.sh | no record | record, no avatar | 125 (400) | 123 (200) |
-| 30 | B | `did:plc:z6ql5nxo...` | tngl.sh | no record | record, no avatar | 156 (400) | 280 (200) |
-| 31 | B | `did:plc:snuedk4n...` | tngl.sh | no record | record, no avatar | 126 (400) | 139 (200) |
-| 32 | B | `did:plc:4rwmxefa...` | tngl.sh | no record | blob jpeg 101822 | 123 (400) | 147 (200) |
-| 33 | B | `did:plc:yswqeh3v...` | bsky host | no record | blob png 18520 | 74 (400) | 75 (200) |
-| 34 | B | `did:plc:zb5haso7...` | tngl.sh | no record | record, no avatar | 120 (400) | 120 (200) |
-| 35 | B | `did:plc:lllgm3bc...` | bsky host | no record | record, no avatar | 72 (400) | 78 (200) |
-| 36 | B | `did:plc:7xwow4eh...` | bsky host | no record | record, no avatar | 77 (400) | 76 (200) |
-| 37 | B | `did:plc:5xkbeoqs...` | bsky host | no record | record, no avatar | 39 (400) | 38 (200) |
-| 38 | B | `did:plc:pvabpocf...` | bsky host | no record | blob jpeg 10835 | 39 (400) | 38 (200) |
-| 39 | B | `did:plc:4pyrsvde...` | tngl.sh | no record | record, no avatar | 349 (400) | 1266 (200) |
-| 40 | B | `did:plc:au47z4qx...` | tngl.sh | no record | no record | 812 (400) | 679 (200) |
-| 41 | B | `did:plc:eqjqbmbd...` | tngl.sh | no record | record, no avatar | 1673 (400) | 1185 (200) |
-| 42 | B | `did:plc:pbz6etvk...` | tngl.sh | no record | record, no avatar | 576 (500) | 116 (500) |
-| 43 | B | `did:plc:snj6tlps...` | bsky host | no record | record, no avatar | 38 (400) | 38 (200) |
-| 44 | B | `did:plc:utgeyhly...` | tngl.sh | no record | no record | 1647 (400) | 1119 (400) |
+The per-account table from v1 listed shortened DIDs of the sampled accounts. It was removed in v2 so the repository does not list other people's identifiers. The counts above are unchanged.
 
 ## Measured extra read cost
 
