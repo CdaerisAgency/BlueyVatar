@@ -26,7 +26,7 @@ export const FAQS: readonly Faq[] = [
   },
   {
     q: 'Where is my avatar stored?',
-    a: 'In your own atproto repository, as a record you control. Sign in with the Bluesky account you already have.',
+    a: 'In your own atproto repository, as a record you control. Sign in with the atproto account you already have.',
   },
   {
     q: 'How do I bring my image over?',

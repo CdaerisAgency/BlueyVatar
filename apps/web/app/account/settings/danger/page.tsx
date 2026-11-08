@@ -64,8 +64,8 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
         </ul>
         <p>
           Your avatars, profile, gallery, and verified accounts are saved on {homeServer}. A home server is the service
-          that stores your Bluesky account and everything you post. They belong to you, and blueyvatar does not delete them. To
-          remove them, use your Bluesky app or your home server&apos;s tools. Until you do, blueyvatar may show them again if you
+          that stores your account and everything you post. They belong to you, and blueyvatar does not delete them. To
+          remove them, use an app that manages your repository or your home server&apos;s tools. Until you do, blueyvatar may show them again if you
           sign in later.
         </p>
         <form action={deleteMyData}>

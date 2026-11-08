@@ -1,6 +1,7 @@
 import type { CropParams } from '@blueyvatar/core'
 import { BSKY_PROFILE_COLLECTION } from './oauth'
 import { prepareBlueskyAvatar } from './bsky-avatar-image'
+import { HOME_SERVER_TERM } from './home-server'
 import type { BlobRef } from './repo'
 
 /**
@@ -18,14 +19,16 @@ export type BskyAvatarResult =
   | { ok: true; avatar: BlobRef | null; previous: BlobRef | null }
   | { ok: false; code: BskyAvatarFailure; message: string }
 
+const SERVER_SENTENCE = `Y${HOME_SERVER_TERM.slice(1)}` // HOME_SERVER_TERM begins with "your"
+
 export const BSKY_MESSAGES: Record<BskyAvatarFailure, string> = {
-  no_permission: 'Sign in again to allow this. blueyvatar needs your permission to change the picture on your Bluesky profile.',
-  no_profile: 'Your Bluesky profile has not been set up yet. Open Bluesky, save your profile once, then try again.',
-  conflict: 'Your Bluesky profile changed while this was saving, so nothing was changed. Check the picture Bluesky shows now, then try again.',
-  too_large: 'This image is still larger than the 1 MB Bluesky allows after shrinking it. Choose a simpler or smaller image for your Bluesky avatar.',
-  bad_image: 'The image could not be prepared for Bluesky. Choose a different PNG or JPEG.',
-  blob_gone: 'Your previous Bluesky picture is no longer stored on your Bluesky account\'s home server, so it cannot be restored.',
-  home_server: 'Your Bluesky account\'s home server could not be reached or refused the change. Try again in a few minutes.',
+  no_permission: 'Sign in again to allow this. blueyvatar needs your permission to change the picture on your profile.',
+  no_profile: `${SERVER_SENTENCE} has no app.bsky.actor.profile record for you yet, so there is no profile picture to change. Save your profile once in an app that uses it, then try again.`,
+  conflict: 'Your profile changed while this was saving, so nothing was changed. Check the picture your profile shows now, then try again.',
+  too_large: 'This image is still larger than the 1 MB limit for profile avatars after shrinking it. Choose a simpler or smaller image.',
+  bad_image: 'The image could not be prepared as a profile avatar. Choose a different PNG or JPEG.',
+  blob_gone: `Your previous profile picture is no longer stored on ${HOME_SERVER_TERM}, so it cannot be restored.`,
+  home_server: `${SERVER_SENTENCE} could not be reached or refused the change. Try again in a few minutes.`,
 }
 const fail = (code: BskyAvatarFailure): BskyAvatarResult => ({ ok: false, code, message: BSKY_MESSAGES[code] })
 
@@ -88,7 +91,7 @@ export async function currentBlueskyAvatar(server: HomeServer): Promise<{ ok: tr
   return { ok: true, avatar: r.value.avatar ?? null }
 }
 
-/** Shrinks the stored image to a square under 1,000,000 bytes, uploads it, and sets it as the Bluesky avatar. */
+/** Shrinks the stored image to a square under 1,000,000 bytes, uploads it, and sets it as the profile avatar. */
 export async function setBlueskyAvatar(server: HomeServer, image: { bytes: Uint8Array; crop?: CropParams | null }): Promise<BskyAvatarResult> {
   const current = await readProfile(server)
   if (current === 'none') return fail('no_profile')

@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   return (
     <PageMain>
       <h1>Profile</h1>
-      <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your Bluesky profile.</p>
+      <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your atproto profile.</p>
       {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
       {loadError === null && (
         <ProfileForm

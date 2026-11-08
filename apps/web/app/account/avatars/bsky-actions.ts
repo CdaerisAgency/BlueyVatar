@@ -15,7 +15,7 @@ async function signedIn(): Promise<string> {
   return (await currentDid()) ?? redirect('/login')
 }
 
-/** The "Use as my Bluesky avatar" button on one image. */
+/** The "Use as my avatar" button on one image. */
 export async function useAsBskyAvatar(form: FormData): Promise<void> {
   const did = await signedIn()
   let outcome: SyncOutcome
@@ -31,7 +31,7 @@ export async function useAsBskyAvatar(form: FormData): Promise<void> {
   return finish(outcome)
 }
 
-/** The "Restore my previous Bluesky avatar" undo. */
+/** The "Restore my previous avatar" undo. */
 export async function restoreBskyAvatar(): Promise<void> {
   const did = await signedIn()
   let outcome: SyncOutcome
@@ -44,12 +44,12 @@ export async function restoreBskyAvatar(): Promise<void> {
   return finish(outcome)
 }
 
-/** The switch "Keep my Bluesky avatar the same as my default image". An unchecked box is off. */
+/** The switch "Keep my avatar the same as my default image". An unchecked box is off. */
 export async function saveBskyAutoSync(form: FormData): Promise<void> {
   const did = await signedIn()
   const on = form.get('autoSync') === 'on'
   await getSyncStore().setAutoSync(did, on)
-  return back('done', on ? 'Your Bluesky avatar will follow your default image.' : 'Your Bluesky avatar will stay as it is when you change your default image.')
+  return back('done', on ? 'Your profile avatar will follow your default image.' : 'Your profile avatar will stay as it is when you change your default image.')
 }
 
 export async function dismissBskyNotice(): Promise<void> {

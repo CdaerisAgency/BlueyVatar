@@ -5,20 +5,20 @@
  */
 export const COPY = {
   brand: 'blueyvatar',
-  nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in with Bluesky' },
+  nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in' },
   hero: {
     eyebrow: 'One avatar. Every app.',
     title: 'Your face, carried by your own account.',
     lead: 'blueyvatar stores your avatar and profile in your atproto repository, so any site that knows your email or handle can show the real you. Change it once and it changes everywhere.',
     primary: 'Claim your avatar',
     secondary: 'Read the docs',
-    note: 'Free for everyone. No password, no new account. Sign in with the Bluesky account you already have.',
+    note: 'Free for everyone. No password, no new account. Sign in with the atproto account you already have.',
     avatarAlt: 'Example avatar',
   },
   how: {
     title: 'You own it. We just deliver it.',
     steps: [
-      { title: 'Sign in with Bluesky', body: 'Log in with your existing handle. blueyvatar asks for permission to save its own records and to change the picture on your Bluesky profile. It does not change anything else on your Bluesky profile.' },
+      { title: 'Sign in with your account', body: 'Log in with your existing handle, on any atproto server. blueyvatar asks for permission to save its own records and to change the picture on your profile. It does not change anything else on your profile.' },
       { title: 'Upload and rate', body: 'Add one avatar or several, pick a default, add alt text, and set a rating so sites can request only what fits their audience.' },
       { title: 'Show up everywhere', body: 'Any site that supports blueyvatar can fetch your avatar by email hash or handle, resized and cached at the edge.' },
     ],
@@ -67,7 +67,7 @@ export const COPY = {
   },
   login: {
     title: 'Sign in',
-    lead: 'Use the Bluesky account you already have.',
+    lead: 'Use the atproto account you already have, on any server.',
     label: 'Your atproto handle. Format: username.server.server',
     placeholder: 'username.bsky.social',
     help: 'Example: username.bsky.social. If you use your own domain as a handle, enter it the same way, such as alice.example.com.',

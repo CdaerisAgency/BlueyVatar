@@ -78,7 +78,7 @@ test.describe('report form', () => {
   test('a signed-out visitor sees a sign-in prompt and a contact address, not the form', async ({ page }) => {
     await page.goto(`/p/${SEEDED.handle}`)
     await page.getByText('Report this profile', { exact: true }).click()
-    await expect(page.getByRole('link', { name: 'Sign in with Bluesky to report this profile' })).toHaveAttribute('href', `/login?next=${encodeURIComponent(`/p/${SEEDED.handle}`)}`)
+    await expect(page.getByRole('link', { name: 'Sign in to report this profile' })).toHaveAttribute('href', `/login?next=${encodeURIComponent(`/p/${SEEDED.handle}`)}`)
     await expect(page.getByRole('link', { name: 'security@blueyvatar.com' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0)
   })
