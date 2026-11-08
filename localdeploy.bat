@@ -129,12 +129,14 @@ git status --short
 goto :fail
 :clean
 
+rem Automatic cleanup is turned off for these commands. On Windows it can stop with a "Should I try again?" prompt when
+rem another program (antivirus, an editor, a file indexer) holds a Git file open, which blocks an unattended run.
 echo Syncing with origin/main...
-git fetch origin main
+git -c gc.auto=0 -c maintenance.auto=false fetch origin main
 if errorlevel 1 goto :fail
-git checkout main
+git -c gc.auto=0 -c maintenance.auto=false checkout main
 if errorlevel 1 goto :fail
-git pull --ff-only origin main
+git -c gc.auto=0 -c maintenance.auto=false pull --ff-only origin main
 if errorlevel 1 goto :fail
 :synced
 
