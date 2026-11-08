@@ -6,7 +6,6 @@ import { getStore } from '../../../lib/store'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
 import { DANGER_ZONE, SETTINGS_GROUPS } from '../../../lib/settings-hub'
-import AccountNav from '../AccountNav'
 import { signOutEverywhere, signOutSession } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -21,8 +20,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sessions = await getStore().sessions.list(did)
   return (
     <PageMain>
-      <AccountNav />
-      <h1>Settings</h1>
+      <h1>Sign-out options</h1>
       <p>Signed in as {displayName(viewer)}</p>
       {SETTINGS_GROUPS.map((g) => (
         <section key={g.title} aria-labelledby={`g-${g.title}`}>

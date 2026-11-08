@@ -3,7 +3,6 @@ import { Button } from '../../../components/Button'
 import { MAX_STATEMENT, appealableActions } from '../../../lib/appeals'
 import { requireDid } from '../../../lib/auth'
 import { getPool } from '../../../lib/store'
-import AccountNav from '../AccountNav'
 import { submitAppealAction } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +18,6 @@ export default async function AppealPage({ searchParams }: { searchParams: Promi
   const chosen = actions.find((a) => String(a.id) === sp.action)
   return (
     <PageMain>
-      <AccountNav />
       <h1>Appeal a decision</h1>
       <p>Signed in as {did}</p>
       <p>You can appeal a takedown, a suspension, a warning, or a rating change on your account. Each action can be appealed once. See the <a href="/policy#appeals">content policy</a>.</p>

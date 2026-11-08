@@ -6,8 +6,8 @@ import { RepoError, listImages, repoSession } from '../../../../lib/repo'
 import { canAddImage, limitMessage } from '../../../../lib/records'
 import { resolvePlan } from '../../../../lib/plan'
 import { limited } from '../../../../lib/rate-guard'
-import AccountNav from '../../AccountNav'
 import { ImportForm } from './ImportForm'
+
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +32,6 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
 
   return (
     <PageMain>
-      <AccountNav />
       <h1>Import an avatar</h1>
       {error && <p role="alert">{error}</p>}
       {problem && <p role="alert">{problem}</p>}

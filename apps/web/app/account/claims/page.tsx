@@ -1,6 +1,5 @@
 import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
-import AccountNav from '../AccountNav'
 import { requireDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
 import { DNS_PROOF_LABEL, PLATFORMS, PLATFORM_LABELS, isPlatform, profileLinkFor, proofToken } from '../../../lib/claims'
@@ -58,7 +57,6 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
   return (
     <PageMain>
       <h1>Verified accounts</h1>
-      <AccountNav />
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}

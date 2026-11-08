@@ -14,7 +14,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   const { error } = await searchParams
   return (
     <PageMain narrow>
-      <h1>Enter your code</h1>
+      <h1>Verify</h1>
       <p>We sent a 6-digit code to {pending.masked}. It expires in 15 minutes.</p>
       {error && <p role="alert" id="verify-error">{error}</p>}
       <form action={verifyCode}>
