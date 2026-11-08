@@ -292,6 +292,7 @@ Stripe is the payment processor (issue #67). The web app sells Plus ($9.99 per m
 | `STRIPE_PRICE_PRO` | Price id (`price_...`) of the Pro monthly price. |
 | `STRIPE_PRICE_BUSINESS` | Price id (`price_...`) of the Business monthly price. |
 | `STRIPE_PRICE_PLUS` | Price id (`price_...`) of the Plus monthly price. Optional: with it unset, Plus is not offered and the other tiers work as before. |
+| `STRIPE_ALLOW_PROMO_CODES` | Optional. Set to `true` to show the promotion code box in Checkout. Any other value or unset keeps it hidden. |
 
 Keep them in Infisical and push them with `fly secrets set --app <web app>`. They are never committed. `PUBLIC_URL` must be `https://blueyvatar.com` in production, since Checkout and portal return URLs are built from it.
 
@@ -305,6 +306,16 @@ Keep them in Infisical and push them with `fly secrets set --app <web app>`. The
 6. **Payment retries.** Settings, Billing, Subscriptions and emails: use Smart Retries and email customers about failed payments. Set "If all retries for a payment fail" to cancel the subscription, and keep the retry window within the 7 day grace period below.
 7. **Migrations.** Migration 0015 (billing tables and `licenses.grace_ends_at`) and migration 0017 (allows `plus` in `subscriptions.tier`) run with the delivery release command, along with 0016 (`email_links.email_domain`). Deploy delivery first, then web.
 8. **Smoke test in test mode.** Subscribe with card 4242 4242 4242 4242, confirm the license shows Pro on `/account/keys`, cancel in the portal, and confirm it returns to Free. Repeat with the Plus price and confirm `/account/billing` shows Plan: Plus and the gallery section on `/account` unlocks. Use card 4000 0000 0000 0341 to see a failed renewal move the license to past due.
+
+### Testing with a free coupon
+
+1. In Stripe test mode, open Product catalog, Coupons, and create a coupon with 100% off.
+2. Choose a duration: "Once" covers the first invoice only, "Forever" covers every renewal.
+3. Under redemption limits, set a maximum number of redemptions, for example 5.
+4. Set a redeem-by date so the coupon expires on its own.
+5. Open the coupon and create a promotion code for it. Optionally limit it to first-time customers.
+6. Set `STRIPE_ALLOW_PROMO_CODES=true` on the web app. Checkout now shows the promotion code box.
+7. Subscribe with the code, then unset the variable (or set it to `false`) when testing is done.
 
 ### Behavior to know
 
