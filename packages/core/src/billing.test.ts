@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PAID_PLANS, PAID_TIERS, PAST_DUE_GRACE_DAYS, PAST_DUE_GRACE_MS, effectiveTier, entitles, graceEndsAt, isPaidTier, normalizePaidPlan, normalizeTier, entitlementsFor, ENTITLEMENTS, storedLicenseTier, plusEntitled, resolveLicenseBilling, type SubscriptionFacts } from './index.js'
+import { PAID_PLANS, PAID_TIERS, PAST_DUE_GRACE_DAYS, PAST_DUE_GRACE_MS, effectiveTier, entitles, graceEndsAt, isPaidTier, normalizePaidPlan, normalizeTier, entitlementsFor, ENTITLEMENTS, TIERS, storedLicenseTier, plusEntitled, resolveLicenseBilling, type SubscriptionFacts } from './index.js'
 
 const T0 = new Date('2026-11-01T00:00:00Z')
 const day = 24 * 60 * 60 * 1000
@@ -82,7 +82,9 @@ describe('Plus plan', () => {
     expect(ENTITLEMENTS.business.maxImages).toBeGreaterThanOrEqual(20)
     expect(ENTITLEMENTS.business.keyedMonthly).toBe(1_000_000)
     expect(ENTITLEMENTS.free.maxImages).toBe(3)
-    expect(storedLicenseTier('plus')).toBe('pro')
+    expect(storedLicenseTier('plus')).toBe('plus')
+    for (const t of TIERS) expect(storedLicenseTier(t)).toBe(t)
+    expect(storedLicenseTier(normalizeTier('pro'))).toBe('plus')
   })
   it('a stored pro subscription resolves to the Plus license tier', () => {
     expect(resolveLicenseBilling([sub({ tier: 'pro' })], T0).tier).toBe('plus')

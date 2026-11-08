@@ -72,7 +72,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     await q("INSERT INTO profiles (did, record) VALUES ($1, '{}')", [did])
     await q("INSERT INTO claims (did, rkey, record) VALUES ($1, 'c1', '{}')", [did])
     await q("INSERT INTO attestations (uri, cid, claim_did, claim_rkey, claim_cid, result) VALUES ($1, 'x', $2, 'c1', 'y', 'verified'), ($3, 'x', $2, 'c1', 'y', 'revoked')", [`at://svc/a/${tag}1`, did, `at://svc/a/${tag}2`])
-    await q("INSERT INTO licenses (license_id, owner, tier) VALUES ($1, $2, 'pro')", [`lic_${tag}`, did])
+    await q("INSERT INTO licenses (license_id, owner, tier) VALUES ($1, $2, 'plus')", [`lic_${tag}`, did])
     await q("INSERT INTO api_keys (key_hash, prefix, license_id, kind) VALUES ($1, 'bv_pk', $2, 'publishable')", [hash.replace(/^./, 'e'), `lic_${tag}`])
     await q("INSERT INTO usage_counters (license_id, meter, period_start, count) VALUES ($1, 'transform', '2026-11-01', 3)", [`lic_${tag}`])
     await q("INSERT INTO billing_customers (did, license_id, stripe_customer_id) VALUES ($1, $2, $3)", [did, `lic_${tag}`, `cus_${tag}`])
