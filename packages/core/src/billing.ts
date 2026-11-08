@@ -1,4 +1,4 @@
-import type { Tier } from './tiers.js'
+import { normalizeTier, type Tier } from './tiers.js'
 
 /**
  * How long a past-due license keeps its paid tier before dropping to Free limits (spec section 12).
@@ -8,21 +8,25 @@ import type { Tier } from './tiers.js'
 export const PAST_DUE_GRACE_DAYS = 7
 export const PAST_DUE_GRACE_MS = PAST_DUE_GRACE_DAYS * 24 * 60 * 60 * 1000
 
-/** Paid developer tiers sold through Stripe Checkout. Enterprise is a contract and never self-serve. */
-export const PAID_TIERS = ['pro', 'business'] as const satisfies readonly Tier[]
-export type PaidTier = (typeof PAID_TIERS)[number]
-
 /**
- * Plus is the paid user plan (spec section 11.2, $9.99 per month). It is sold through the same Stripe Checkout and
- * webhook as the developer tiers but is not a developer tier: it never changes a license, only the user's plan.
+ * Plans sold through Stripe Checkout: Plus ($9 per month) and Business ($49 per month). Enterprise is a contract and
+ * never self-serve. Pro is retired: a stored 'pro' resolves to Plus (see normalizePaidPlan).
  */
+export const PAID_TIERS = ['plus', 'business'] as const satisfies readonly Tier[]
+export type PaidTier = (typeof PAID_TIERS)[number]
 export const PLUS_PLAN = 'plus' as const
 /** Everything a Stripe price can map to. */
-export const PAID_PLANS = [...PAID_TIERS, PLUS_PLAN] as const
-export type PaidPlan = (typeof PAID_PLANS)[number]
+export const PAID_PLANS = PAID_TIERS
+export type PaidPlan = PaidTier
 export const isPaidTier = (v: unknown): v is PaidTier => (PAID_TIERS as readonly unknown[]).includes(v)
 
-const RANK: Record<Tier, number> = { free: 0, pro: 1, business: 2, enterprise: 3 }
+/** A stored subscription plan value as a sellable plan: 'pro' (retired) becomes Plus, unknown values give null. */
+export function normalizePaidPlan(v: unknown): PaidPlan | null {
+  const t = typeof v === 'string' ? normalizeTier(v) : 'free'
+  return isPaidTier(t) ? t : null
+}
+
+const RANK: Record<Tier, number> = { free: 0, plus: 1, business: 2, enterprise: 3 }
 
 /** The Stripe subscription statuses, as sent in webhook payloads. */
 export type SubscriptionStatus =
@@ -30,7 +34,8 @@ export type SubscriptionStatus =
 
 /** What billing knows about one subscription. `tier` is the tier its price maps to. */
 export interface SubscriptionFacts {
-  tier: PaidTier
+  /** A plan value as stored. The retired 'pro' reads as Plus. */
+  tier: PaidTier | 'pro'
   status: SubscriptionStatus
   /** When the subscription first went past due, or null. Starts the grace period. */
   pastDueSince: Date | null
@@ -47,9 +52,12 @@ export function entitles(sub: SubscriptionFacts, now: Date): boolean {
   return false
 }
 
-/** Whether any Plus subscription still entitles the user's Plus plan at `now`. Same status and grace rules as the developer tiers. */
+/**
+ * Whether any subscription still entitles the user plan Plus at `now`. Plus, Business (which includes everything in
+ * Plus), and the retired 'pro' name all count. Same status and grace rules as the license tiers.
+ */
 export function plusEntitled(subs: readonly { tier: string; status: SubscriptionStatus; pastDueSince: Date | null }[], now: Date): boolean {
-  return subs.some((s) => s.tier === PLUS_PLAN && entitles({ tier: 'pro', status: s.status, pastDueSince: s.pastDueSince }, now))
+  return subs.some((s) => normalizePaidPlan(s.tier) !== null && entitles({ tier: 'plus', status: s.status, pastDueSince: s.pastDueSince }, now))
 }
 
 export interface LicenseBilling {
@@ -65,8 +73,9 @@ export interface LicenseBilling {
  * A license is `past_due` only while its winning subscription is past due.
  */
 export function resolveLicenseBilling(subs: readonly SubscriptionFacts[], now: Date): LicenseBilling {
-  let best: SubscriptionFacts | null = null
-  for (const s of subs) {
+  let best: (SubscriptionFacts & { tier: PaidTier }) | null = null
+  for (const raw of subs) {
+    const s = { ...raw, tier: normalizePaidPlan(raw.tier) ?? 'plus' }
     if (!entitles(s, now)) continue
     if (!best || RANK[s.tier] > RANK[best.tier] || (RANK[s.tier] === RANK[best.tier] && s.status !== 'past_due' && best.status === 'past_due')) best = s
   }
@@ -79,8 +88,9 @@ export function resolveLicenseBilling(subs: readonly SubscriptionFacts[], now: D
  * The tier a request is served at. A past-due license keeps its tier until `graceEndsAt`, then reads as Free
  * with no further webhook needed, so a missed event cannot extend paid limits. Enterprise is never touched.
  */
-export function effectiveTier(license: { tier: Tier; status: string; graceEndsAt?: Date | null }, now: Date): Tier {
-  if (license.tier === 'enterprise') return 'enterprise'
+export function effectiveTier(license: { tier: Tier | string; status: string; graceEndsAt?: Date | null }, now: Date): Tier {
+  const tier = normalizeTier(license.tier)
+  if (tier === 'enterprise') return 'enterprise'
   if (license.status === 'past_due' && license.graceEndsAt && now >= license.graceEndsAt) return 'free'
-  return license.tier
+  return tier
 }

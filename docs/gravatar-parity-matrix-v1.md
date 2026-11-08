@@ -29,7 +29,7 @@ Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://a
 | Display name, bio | `display_name`, `description` | None published | From `app.bsky.actor.profile`; shown on `/p/{handle}` (`apps/web/app/p/[handle]/page.tsx`) |
 | Links | `links` (label, url), auth | None published | Read from `app.bsky.actor.profile#links` (max 10, https only); shown on the page; no editor on `/account/profile` (`packages/core/src/links.ts`, `apps/web/app/account/profile/page.tsx`) |
 | Verified accounts | `verified_accounts`, capped at 4 unauthenticated | None published | Yes: attested claims, hide flag, Free JSON cap of 4 (`apps/delivery/src/app.ts`, `packages/core/src/tiers.ts`). Services supported: Unknown (not enumerated in files read) |
-| Wallet and crypto addresses | `payments.crypto_wallets` (label, address) and `payments.links`, auth | None published | None. Spec lists "Later" (`docs/spec/blueyvatar-product-spec-v9.md` line 304) |
+| Wallet and crypto addresses | `payments.crypto_wallets` (label, address) and `payments.links`, auth | None published | None. Spec lists "Later" (`docs/spec/blueyvatar-product-spec-v12.md` line 306) |
 | Languages | `languages` (code, name, is_primary, order), auth | None published | None. No field in `lexicons/com/blueyvatar/profile.json` |
 | Pronouns | `pronouns` | None published | Yes (`lexicons/com/blueyvatar/profile.json`) |
 | Pronunciation | `pronunciation` | None published | Yes |
@@ -69,7 +69,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 | Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | `center=avatar`, `center=logo`, or `none`, with error correction level H (`docs/api/exports-and-qr-v1.md`) |
 | Redirect to a social account | Unknown | n/a | `?to=<platform>` via `/go/:handle/:platform` (`apps/delivery/src/app.ts`) |
 | Encoded content | Link to the profile page only | n/a | Profile URL, or the `/go` redirect URL |
-| Access | Unknown (no tier restriction published on the pages read) | n/a | Every plan (`apps/delivery/src/app.ts`) |
+| Access | Unknown (no tier restriction published on the pages read) | n/a | Every plan, including anonymous callers (`apps/delivery/src/app.ts`) |
 
 ## 5. Hovercards, embeds, widgets
 
@@ -117,8 +117,8 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 | Feature | Gravatar | Libravatar | blueyvatar today |
 | --- | --- | --- | --- |
-| End user | Free; paid details for end users Unknown | Free service; pricing not mentioned on the home page ([home](https://libravatar.org/)) | Free, Plus $9.99 per month (`apps/web/lib/pricing.ts`) |
-| Developer | Free tier with attribution; paid from $100 per month with SLA and support ([pricing](https://docs.gravatar.com/pricing)) | None published | Free, Pro $9, Business $49 per month, Enterprise by contract (`apps/web/lib/pricing.ts`, `packages/core/src/tiers.ts`) |
+| End user | Free; paid details for end users Unknown | Free service; pricing not mentioned on the home page ([home](https://libravatar.org/)) | Free, Plus $9 per month (`apps/web/lib/pricing.ts`) |
+| Developer | Free tier with attribution; paid from $100 per month with SLA and support ([pricing](https://docs.gravatar.com/pricing)) | None published | Free, Plus $9 (includes 50,000 keyed requests a month), Business $49 per month, Enterprise by contract (`apps/web/lib/pricing.ts`, `packages/core/src/tiers.ts`) |
 
 ## 10. Other features found
 

@@ -13,7 +13,7 @@ export default async function HovercardDemo({ searchParams }: { searchParams: Pr
     <PageMain>
       <h1>Hovercard demo</h1>
       <p>
-        Hover or focus the avatar below. Press Enter to move into the card, and Escape to close it. Hovercards need a publishable key from a Business or Enterprise license,
+        Hover or focus the avatar below. Press Enter to move into the card, and Escape to close it. Hovercards need a publishable key from a Plus, Business, or Enterprise license,
         passed as <code>data-token</code>. {token ? null : 'Add ?token=pk_... to this page URL to try it.'}
       </p>
       {/* The embed marks avatars with data-blueyvatar. Its value is a handle, a DID, or an email hash. */}

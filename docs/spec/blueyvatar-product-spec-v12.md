@@ -19,7 +19,7 @@ Build instructions live in the repository README at the repo root, and this spec
 
 1. "Licensing" covers two things: developer licenses (API keys with tier entitlements) and, removed since this version, a usage license that a user could declare on each image (section 10.4).
 2. "Permissions" covers two things: user-set rules on who can fetch avatar and profile data, and the OAuth permissions an app requests from the user.
-3. Tier names (Free, Pro, Business, Enterprise) and all prices are placeholders. No published basis exists for pricing this product, so section 11 lists competitor reference points only.
+3. Tier names (Free, Plus, Business, Enterprise) and all prices are placeholders. No published basis exists for pricing this product, so section 11 lists competitor reference points only.
 4. Version 1 targets web and API delivery. Mobile SDKs and WordPress plugins are listed as later phases.
 
 **Scope of this version**
@@ -402,7 +402,7 @@ Each license holds these fields:
 | Field | Purpose |
 | --- | --- |
 | `license_id`, `owner` | Owner is a DID or an organization account |
-| `tier` | Free, Pro, Business, or Enterprise (section 11) |
+| `tier` | Free, Plus, Business, or Enterprise (section 11). The retired name `pro` reads as Plus. |
 | `entitlements` | Limits and feature flags copied from the tier at issue time |
 | `keys` | Secret and publishable keys with labels and domain lists |
 | `term`, `status` | Monthly or annual term; active, past due, suspended, canceled |
@@ -417,11 +417,11 @@ Owner decision (issue #227): blueyvatar does not ask for, check, or display an i
 
 ## 11. Service tiers
 
-The proposal has four developer tiers and two user plans, with privacy and safety controls free in every plan. The owner approved the Pro ($9 per month) and Business ($49 per month) prices (issue #67). Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run. Plus is $9.99 per month, approved by the owner.
+The service has four tiers (Free, Plus, Business, Enterprise), with privacy and safety controls free in every plan. The owner approved Plus at $9 per month and Business at $49 per month. Plus is one combined plan: it replaces the former Plus ($9.99) and Pro ($9) plans, and Pro is no longer sold. Every other number below is a proposed placeholder to validate with cost modeling, and no published data exists for what this product costs to run.
 
-### 11.1 Developer tiers
+### 11.1 Developer limits by tier
 
-| Capability | Free | Pro | Business | Enterprise |
+| Capability | Free | Plus | Business | Enterprise |
 | --- | --- | --- | --- | --- |
 | Price | $0 | $9 per month | $49 per month | Contract |
 | Intended for | Individuals, side projects | Indie developers, small sites | Companies, SaaS products | Platforms, white-label |
@@ -436,7 +436,9 @@ The proposal has four developer tiers and two user plans, with privacy and safet
 | Cache TTL (`ttl`) | Fixed 24h | 1h to 28d | 1h to 28d | 1h to 28d |
 | Custom default image URL | No | Yes | Yes | Yes |
 | Profile JSON | Basic, 4 verified accounts | Full | Full | Full |
-| Hovercards and QR codes | No | No | Yes | Yes |
+| Hovercards | No | Yes | Yes | Yes |
+| QR codes | Yes | Yes | Yes | Yes |
+| Priority cache warming | No | Yes | Yes | Yes |
 | Usage dashboard and API | No | 30 days | 12 months | Custom |
 | Delivery from your own domain or node | No | No | No | Yes |
 | Support | Community | Email | Priority email | Dedicated channel |
@@ -445,9 +447,9 @@ The row "Delivery from your own domain or node" is the Enterprise path to a fede
 
 ### 11.2 User plans
 
-Plus costs $9.99 per month through Stripe (section 12.1).
+Plus costs $9 per month and includes everything in the Free plan, all the user features below, and the Plus column of section 11.1. Business ($49 per month) includes everything in Plus. Both are bought through Stripe (section 12.1).
 
-| Capability | Free | Plus |
+| Capability | Free | Plus and Business |
 | --- | --- | --- |
 | Avatar images | 3 | 20 |
 | Profile fields and links | Full | Full |
@@ -497,19 +499,19 @@ Keyed responses carry rate-limit headers like Unavatar's and a usage cost header
 
 **Billing rules**
 
-- Plans bill monthly or annually. Overage on Pro and Business is metered at a published per-unit rate (to be set).
+- Plans bill monthly or annually. Overage on Plus and Business is metered at a published per-unit rate (to be set).
 - A past-due license gets a grace period, then drops to Free limits. A downgrade changes limits only and never deletes user data, user avatars, or profiles.
 - Keys can be rotated and revoked at any time, with usage alerts at 80 and 100 percent of included volume.
 - The payment processor is Stripe, decided by the owner on 2026-11-07 (issue #67). Tax is computed by Stripe Tax, and invoices come from Stripe Billing. Both are configured in the Stripe dashboard at deploy (docs/deploy.md, Stripe billing). The overage rate stays open until per-miss cost is measured.
 
 ### 12.1 Stripe billing
 
-- **Checkout and portal.** Plus, Pro, and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, and `STRIPE_PRICE_PLUS`. `STRIPE_PRICE_PLUS` is optional: with it unset Plus is not sold. With any other Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
+- **Checkout and portal.** Plus and Business are bought through Stripe Checkout in subscription mode, with `automatic_tax` enabled. Changing plan, updating the card, downloading invoices, and canceling happen in the Stripe Customer Portal. Prices come from `STRIPE_PRICE_PLUS` and `STRIPE_PRICE_BUSINESS`. `STRIPE_PRICE_PLUS` may list retired Plus or Pro price ids after the first, which map to Plus but are never sold. With any other Stripe variable unset, billing pages say so, the webhook answers 503 with the missing names, and no Stripe call is made.
 - **Webhook.** One endpoint verifies the Stripe signature against the raw body and handles `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, and `invoice.payment_failed`. Each event id is stored in the same transaction as its effects, so a redelivered event changes nothing, and a failed event leaves no trace so Stripe's retry applies it. An event older than the stored subscription state is ignored.
 - **Data.** Migration 0017 allows `plus` in `subscriptions.tier`. Migration 0015 adds `billing_customers` (DID to Stripe customer), `subscriptions` (a mirror of each Stripe subscription, keyed to the DID and the license), `stripe_events`, and `licenses.grace_ends_at`.
 - **Tier resolution.** A license's tier is derived from all of its subscriptions: the highest tier among `active`, `trialing`, and in-grace `past_due` subscriptions, else Free. The derived tier is written to `licenses` on every event. Enterprise licenses are contracts and are never changed by billing.
 - **Past due.** A past-due license keeps its paid tier for a grace period, then serves at Free limits. The grace period is a proposal of 7 days from the first failed payment (`PAST_DUE_GRACE_DAYS` in `packages/core/src/billing.ts`), pending owner approval. Expiry is evaluated when a license is read (`effectiveTier`), so it needs no webhook and a missed event cannot extend paid limits. Recovery to `active` clears the grace period. A downgrade changes limits only, as stated above.
-- **Plus.** Plus is the user plan (section 11.2) at $9.99 per month. A Plus price maps to a subscription row with tier `plus`, which never changes a license. A DID has Plus while a Plus subscription is `active`, `trialing`, or `past_due` inside the grace period, or while it is listed in `PLUS_DIDS` (kept as a manual grant). A person can hold one Plus subscription and one developer subscription at once.
+- **Plus.** Plus is $9 per month and sets both the license tier and the user plan (section 11.2). A DID has Plus while a Plus subscription, or a Business subscription on its own license, is `active`, `trialing`, or `past_due` inside the grace period, or while it is listed in `PLUS_DIDS` (kept as a manual grant). The retired name `pro` in a stored license or subscription row reads as Plus; no data is rewritten.
 
 ## 13. Open questions and risks
 

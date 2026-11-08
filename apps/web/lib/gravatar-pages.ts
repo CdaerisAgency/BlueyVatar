@@ -38,7 +38,7 @@ export const FAQS: readonly Faq[] = [
   },
   {
     q: 'Are there size limits?',
-    a: 'Sizes run from 1 to 2048 pixels on Business and Enterprise. Free is capped at 512 and Pro at 1024. Gravatar documents a range of 1 to 2048 pixels.',
+    a: 'Sizes run from 1 to 2048 pixels on Business and Enterprise. Free is capped at 512 and Plus at 1024. Gravatar documents a range of 1 to 2048 pixels.',
   },
   {
     q: 'Do ratings map one to one?',

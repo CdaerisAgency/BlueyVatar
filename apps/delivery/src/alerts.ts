@@ -1,4 +1,4 @@
-import { ENTITLEMENTS, type Tier } from '@blueyvatar/core'
+import { entitlementsFor, type Tier } from '@blueyvatar/core'
 import { usageNotice, type Notifier } from '@blueyvatar/core/verification'
 import { periodStart } from './usage.js'
 import { errors, log } from './obs.js'
@@ -90,7 +90,7 @@ export class UsageAlerts {
 
   /** Call after an origin resolution raised a license's counter to `used`. Never throws. */
   async check(licenseId: string, tier: Tier, used: number): Promise<void> {
-    const included = ENTITLEMENTS[tier].keyedMonthly
+    const included = entitlementsFor(tier).keyedMonthly
     const period = periodStart(this.now())
     try {
       for (const threshold of reachedThresholds(used, included)) {

@@ -1,5 +1,5 @@
 /**
- * blueyvatar hovercards. Hovercards need a publishable key from a Business or Enterprise license.
+ * blueyvatar hovercards. Hovercards need a publishable key from a Plus, Business, or Enterprise license.
  *   import { init } from '@blueyvatar/hovercards'
  *   init({ key: 'pk_...' })
  *   <img src="..." data-blueyvatar="alice.example.com">
@@ -8,7 +8,7 @@
 import { buildCard, cleanId, profileEndpoint, type Card } from './model.js'
 
 export interface HovercardOptions {
-  /** Publishable key (pk_...) from a Business or Enterprise license. */
+  /** Publishable key (pk_...) from a Plus, Business, or Enterprise license. */
   key: string
   /** Delivery origin. Defaults to `web`. */
   api?: string | undefined
@@ -149,7 +149,7 @@ export function init(opts: HovercardOptions): () => void {
     observer = new MutationObserver(() => arm(document))
     observer.observe(document.body, { childList: true, subtree: true })
   }
-  if (!token) console.warn('blueyvatar hovercards: a key is required (Business or Enterprise publishable key).')
+  if (!token) console.warn('blueyvatar hovercards: a key is required (Plus, Business, or Enterprise publishable key).')
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true, ...on })
   else start()
   return () => {

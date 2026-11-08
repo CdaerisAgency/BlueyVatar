@@ -48,7 +48,7 @@ const url = avatarUrl(options) // notes lists the differences
 
 ## Size and tiers
 
-The package is a few kilobytes with no runtime dependencies. Server tiers still apply to the URLs it builds: the Free tier serves PNG only and caps size at 512, custom `default` URLs need Pro or higher, and a publishable key is needed for tier features. The server clamps or ignores values and reports them in `x-adjusted-params`.
+The package is a few kilobytes with no runtime dependencies. Server tiers still apply to the URLs it builds: the Free tier serves PNG only and caps size at 512, custom `default` URLs need Plus or higher, and a publishable key is needed for tier features. The server clamps or ignores values and reports them in `x-adjusted-params`.
 
 ## Versioning policy
 
