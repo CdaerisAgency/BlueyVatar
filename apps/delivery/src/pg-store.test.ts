@@ -147,8 +147,9 @@ describe.skipIf(!url)('postgres stores', () => {
     expect(await index.hasPlusSubscription(did, new Date(t0.getTime() + 8 * day))).toBe(false)
     await put('canceled', null)
     expect(await index.hasPlusSubscription(did, t0)).toBe(false)
+    // The retired 'pro' name is Plus now, so an active 'pro' subscription still counts.
     await put('active', null, 'pro')
-    expect(await index.hasPlusSubscription(did, t0)).toBe(false)
+    expect(await index.hasPlusSubscription(did, t0)).toBe(true)
   })
 
   it('keeps gallery images out of avatar reads and orders them by sort, unset last, then newest', async () => {
