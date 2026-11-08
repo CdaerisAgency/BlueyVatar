@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { deviceHint } from './device'
 import { avatarUrl, imgSnippet, markdownSnippet } from './avatar-snippets'
 import { DEFAULT_NEXT, loginPath, safeNext } from './next-path'
-import { SETTINGS_GROUPS, SETTINGS_LINKS, currentHref } from './settings-hub'
+import { DANGER_ZONE, SETTINGS_GROUPS, SETTINGS_LINKS, currentHref } from './settings-hub'
 import { memoryStore, SESSION_TOUCH_MS } from './store'
 import { SESSION_TTL_MS, parseSession, readSession, signSession } from './session-cookie'
 
@@ -109,8 +109,9 @@ describe('deviceHint', () => {
 })
 
 describe('settings hub', () => {
-  it('lists each route once in the five groups', () => {
-    expect(SETTINGS_GROUPS.map((g) => g.title)).toEqual(['Profile', 'Privacy', 'Developer', 'Billing', 'Data'])
+  it('lists each route once in the four groups plus the danger zone', () => {
+    expect(SETTINGS_GROUPS.map((g) => g.title)).toEqual(['Profile', 'Privacy', 'Developer', 'Billing'])
+    expect(SETTINGS_LINKS).toContain(DANGER_ZONE)
     const hrefs = SETTINGS_LINKS.map((l) => l.href)
     expect(new Set(hrefs).size).toBe(hrefs.length)
     for (const l of SETTINGS_LINKS) expect(l.description.length).toBeGreaterThan(10)
