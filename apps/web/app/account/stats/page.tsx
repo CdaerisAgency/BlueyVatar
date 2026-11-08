@@ -5,7 +5,6 @@ import { resolvePlan } from '../../../lib/plan'
 import { STATS_DAYS, statsForPlan } from '../../../lib/profile-views'
 import { limited } from '../../../lib/rate-guard'
 import { getPool } from '../../../lib/store'
-import AccountNav from '../AccountNav'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Profile views' }
@@ -20,7 +19,6 @@ export default async function StatsPage() {
 
   return (
     <PageMain>
-      <AccountNav />
       <h1>Profile views</h1>
       {!plus && (
         <Note>

@@ -4,7 +4,6 @@ import { requireDid } from '../../../../lib/auth'
 import { canManageMembership } from '../../../../lib/orgs/roles'
 import { getOrganization, listAudit, listMembers, memberRole, orgLicense } from '../../../../lib/orgs/store'
 import { getPool } from '../../../../lib/store'
-import AccountNav from '../../AccountNav'
 import { addOrgMember, changeOrgRole, removeOrgMember } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +19,6 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   if (!pool || !org || !role) {
     return (
       <PageMain>
-        <AccountNav />
         <h1>Organization</h1>
         <p role="alert">You are not a member of that organization.</p>
       </PageMain>
@@ -30,7 +28,6 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   const [members, lic, audit] = await Promise.all([listMembers(pool, id), orgLicense(pool, id), owner ? listAudit(pool, id) : Promise.resolve([])])
   return (
     <PageMain>
-      <AccountNav />
       <h1>{org.name}</h1>
       <p>Signed in as {did}. Your role: {role}.</p>
       {q.error && <p role="alert">{q.error}</p>}

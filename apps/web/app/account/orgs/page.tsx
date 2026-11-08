@@ -3,7 +3,6 @@ import { PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { listOrganizations } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
-import AccountNav from '../AccountNav'
 import { createOrg } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +15,6 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const orgs = pool ? await listOrganizations(pool, did) : []
   return (
     <PageMain>
-      <AccountNav />
       <h1>Organizations</h1>
       <p>Signed in as {did}</p>
       {error && <p role="alert">{error}</p>}
