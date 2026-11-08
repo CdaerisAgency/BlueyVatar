@@ -98,12 +98,13 @@ describe.skipIf(!url)('postgres index writes', () => {
 
   it('stores profiles, claims, and repo status', async () => {
     const db = new PgIndexWrites(pool)
-    await db.upsertProfile(DID, { jobTitle: 'Engineer', backgroundColor: '#1f4e9b', createdAt: '2026-01-01T00:00:00Z' })
+    await db.upsertProfile(DID, { jobTitle: 'Engineer', backgroundColor: '#1f4e9b', languages: [{ tag: 'en', primary: true }], wallets: [{ chain: 'Bitcoin', address: 'abc', visible: false }], createdAt: '2026-01-01T00:00:00Z' })
     await db.upsertClaim(DID, 'c1', { platform: 'github', uri: 'https://github.com/alice', createdAt: '2026-01-01T00:00:00Z' })
     await db.setRepoStatus(DID, 'alice.test', true)
     await db.setRepoStatus(DID, 'alice.test', false, 'takendown')
     expect((await pool.query('SELECT record FROM profiles')).rows[0].record.jobTitle).toBe('Engineer')
     expect((await pool.query('SELECT record FROM profiles')).rows[0].record.backgroundColor).toBe('#1f4e9b')
+    expect((await pool.query('SELECT record FROM profiles')).rows[0].record.wallets).toEqual([{ chain: 'Bitcoin', address: 'abc', visible: false }])
     expect((await pool.query('SELECT platform, uri FROM claims')).rows).toEqual([{ platform: 'github', uri: 'https://github.com/alice' }])
     expect((await pool.query('SELECT handle, active, status FROM repos')).rows).toEqual([{ handle: 'alice.test', active: false, status: 'takendown' }])
     await db.deleteProfile(DID)

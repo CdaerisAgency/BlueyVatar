@@ -33,6 +33,9 @@ export type ProfileRecord = {
   timezone?: string
   interests?: string[]
   backgroundColor?: string
+  languages?: { tag: string; primary?: boolean }[]
+  socialLinks?: { label?: string; url: string }[]
+  wallets?: { chain: string; address: string; label?: string; visible?: boolean }[]
   createdAt: string
   [k: string]: unknown
 }
