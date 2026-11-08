@@ -1,6 +1,6 @@
 # PDS original bucket: measurements and options (v1)
 
-Checked: November 7, 2026. Scope: issue #71 and its triage comment, spec sections 4, 14, and 14.1 of `docs/spec/blueyvatar-product-spec-v12.md`, and the delivery code in `apps/delivery/src` (read only). This memo adds the measurement that `docs/research/originals-bucket-v1.md` (PR #84) listed as missing. Read that memo for the protocol and Cloudflare sources and for R2 prices. This one does not repeat them.
+Checked: November 7, 2026. Scope: issue #71 and its triage comment, spec sections 4, 14, and 14.1 of `docs/spec/blueyvatar-product-spec-v13.md`, and the delivery code in `apps/delivery/src` (read only). This memo adds the measurement that `docs/research/originals-bucket-v1.md` (PR #84) listed as missing. Read that memo for the protocol and Cloudflare sources and for R2 prices. This one does not repeat them.
 
 ## Summary
 

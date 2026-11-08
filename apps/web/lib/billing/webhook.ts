@@ -12,6 +12,10 @@ export const HANDLED_EVENTS = [
   'customer.subscription.updated',
   'customer.subscription.deleted',
   'invoice.payment_failed',
+  // A scheduled downgrade moves the subscription to the next phase. Stripe's pages do not say whether that also sends
+  // customer.subscription.updated (Unknown), so the schedule events are handled too. Both paths are idempotent.
+  'subscription_schedule.updated',
+  'subscription_schedule.completed',
 ] as const
 
 /** Thrown when an event cannot be applied yet (for example its customer is not linked). The endpoint answers 500 so Stripe retries. */
@@ -144,6 +148,37 @@ async function onSubscription(tx: BillingTx, type: string, sub: SubscriptionObje
   return `subscription ${status}, tier ${tier}`
 }
 
+interface ScheduleObject {
+  subscription?: Id
+  status?: string
+  current_phase?: { start_date?: number } | null
+  phases?: Array<{ start_date?: number; items?: Array<{ price?: Id }> }>
+}
+
+/**
+ * A schedule moved the subscription into another phase. The stored plan changes only when the phase's price differs from
+ * the stored one, so creating, editing, or releasing a schedule, and any redelivery, leave it alone.
+ */
+async function onSchedule(tx: BillingTx, s: ScheduleObject, at: Date, now: Date, env: Env): Promise<string> {
+  const subId = idOf(s.subscription)
+  if (!subId) return 'ignored: schedule has no subscription'
+  if (s.status !== 'active' && s.status !== 'completed') return 'ignored: schedule is not running'
+  const existing = await tx.getSubscription(subId)
+  if (!existing || !['active', 'trialing', 'past_due'].includes(existing.status)) return 'ignored: subscription is not entitled'
+  if (at < existing.lastEventAt) return 'ignored: older than the stored state'
+  const phases = s.phases ?? []
+  const start = s.current_phase?.start_date
+  // A completed schedule has no current phase; its last phase is the one the subscription was left in.
+  const phase = typeof start === 'number' ? phases.find((p) => p.start_date === start) : phases[phases.length - 1]
+  const priceId = idOf(phase?.items?.[0]?.price)
+  const tier = priceId ? tierForPrice(priceId, env) : null
+  if (!priceId || !tier) return 'ignored: price is not one this deployment sells'
+  if (priceId === existing.priceId) return 'no plan change'
+  await tx.putSubscription({ ...existing, priceId, tier, lastEventAt: at })
+  await recompute(tx, existing.licenseId, now)
+  return `schedule moved subscription to ${tier}`
+}
+
 async function onPaymentFailed(tx: BillingTx, inv: InvoiceObject, at: Date, now: Date, out: PendingNotice[], publicUrl: string): Promise<string> {
   const id = idOf(inv.subscription) ?? idOf(inv.parent?.subscription_details?.subscription)
   if (!id) return 'ignored: invoice has no subscription'
@@ -169,6 +204,9 @@ export async function applyEvent(tx: BillingTx, event: Stripe.Event, now: Date, 
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted':
       return onSubscription(tx, event.type, event.data.object as unknown as SubscriptionObject, at, now, env, out, publicUrl)
+    case 'subscription_schedule.updated':
+    case 'subscription_schedule.completed':
+      return onSchedule(tx, event.data.object as unknown as ScheduleObject, at, now, env)
     case 'invoice.payment_failed':
       return onPaymentFailed(tx, event.data.object as unknown as InvoiceObject, at, now, out, publicUrl)
     default:

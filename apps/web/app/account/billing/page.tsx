@@ -4,13 +4,14 @@ import { requireDid } from '../../../lib/auth'
 import { billingEnabled, planEnabled } from '../../../lib/billing/config'
 import { longDate, summarize } from '../../../lib/billing/summary'
 import { getBillingStore } from '../../../lib/billing/store'
+import { getPendingChange, stripeClient } from '../../../lib/billing/stripe'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { resolvePlan } from '../../../lib/plan'
 import { PRICING, formatPrice } from '../../../lib/pricing'
 import { canManageBilling } from '../../../lib/orgs/roles'
 import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
-import { cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
+import { cancelPlanChange, cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const tier = effectiveTier(license, now)
   const pastDue = license.status === 'past_due' && license.graceEndsAt
   const subs = sub ? [sub] : []
+  // A downgrade waiting for the period to end lives in Stripe as a schedule. Read it each time, so a reload shows it.
+  const pending = sub && enabled ? await getPendingChange({ store: billing, client: stripeClient(), baseUrl: '' }, sub, now) : null
   const enterprise = license.tier === 'enterprise'
   // The tier names a person currently holds, for the "(current)" marker. Enterprise is a contract and has no row on the list.
   const held = new Set<string>(subs.map((x) => x.tier))
@@ -57,12 +60,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
         </ul>
       )}
       {subs.map((x) => {
-        const m = summarize(x)
+        const m = summarize(x, pending)
         return (
           <ul key={x.id}>
             <li>Plan: {m.plan} ({m.price})</li>
             <li>Status: {m.status}</li>
             {m.when && <li>{m.when}</li>}
+            {m.change && <li>{m.change}. You keep {m.plan} until then.</li>}
           </ul>
         )
       })}
@@ -76,7 +80,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       {!enabled && <p>{UNAVAILABLE}</p>}
 
       {target && held.has(target) && <p role="status">You are already on {PLAN_NAME[target]}.</p>}
-      {target && !held.has(target) && canSwitchTo(target) && subs.length > 0 && <ConfirmSwitch target={target} subs={subs} />}
+      {target && !held.has(target) && canSwitchTo(target) && subs.length > 0 && <ConfirmSwitch target={target} subs={subs} endsOn={subs[0]!.currentPeriodEnd} />}
 
       <h2>Plans</h2>
       <ul>
@@ -93,7 +97,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                   <button type="submit">Subscribe to {p.name}</button>
                 </form>
               )}
-              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && (
+              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && !pending && (
                 <a href={`/account/billing?change=${id}`} style={{ marginLeft: 12 }}>
                   Switch to {p.name}
                 </a>
@@ -104,6 +108,23 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </ul>
       {subs.length > 0 && <p>To go back to Free, cancel your subscription below. You keep your paid plan until the end of the period you paid for.</p>}
       <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout based on your billing address.</p>
+      <h2>How changes work</h2>
+      <ul>
+        <li>Upgrades apply now, and you are charged the difference for the rest of the period.</li>
+        <li>Downgrades apply at the end of the current period. You keep your plan until then.</li>
+        <li>Cancellations end at the end of the period you paid for.</li>
+        <li>Partial periods are not refunded.</li>
+      </ul>
+
+      {enabled && pending && (
+        <section aria-label="Scheduled plan change">
+          <h2>Scheduled plan change</h2>
+          <form action={cancelPlanChange}>
+            <p>Your plan changes to {PLAN_NAME[pending.tier]} on {longDate(pending.at)}. To keep {PLAN_NAME[subs[0]!.tier]}, cancel the scheduled change.</p>
+            <button type="submit">Cancel the scheduled change (keep {PLAN_NAME[subs[0]!.tier]})</button>
+          </form>
+        </section>
+      )}
 
       {enabled && subs.map((x) => (
         <section key={`manage-${x.id}`}>
@@ -134,7 +155,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 }
 
 /** Asks for confirmation before a plan switch, with the proration rule in plain words. */
-function ConfirmSwitch({ target, subs }: { target: PaidPlan; subs: Array<{ tier: PaidPlan }> }) {
+function ConfirmSwitch({ target, subs, endsOn }: { target: PaidPlan; subs: Array<{ tier: PaidPlan }>; endsOn: Date | null }) {
   const name = PLAN_NAME[target]!
   const from = subs.length === 1 ? subs[0]!.tier : null
   const t = PRICING.find((p) => p.id === target)!
@@ -145,13 +166,12 @@ function ConfirmSwitch({ target, subs }: { target: PaidPlan; subs: Array<{ tier:
       <p>
         {name} is {formatPrice(t.amount)} per month, plus tax.{' '}
         {upgrade
-          ? 'You are charged the difference for the rest of this period now, and the full price at each renewal.'
-          : 'You get a credit for the unused part of your current plan. It is applied to your next invoice, not refunded to your card.'}{' '}
-        Your renewal date stays the same.
+          ? 'You are charged the difference for the rest of this period now, and the full price at each renewal. Your renewal date stays the same.'
+          : `The change happens at the end of your current period${endsOn ? ` (${longDate(endsOn)})` : ''}. You keep your current plan until then, are not charged today, and get no credit or refund for the rest of the period.`}
       </p>
       <form action={switchPlan}>
         <input type="hidden" name="tier" value={target} />
-        <button type="submit">Confirm switch to {name}</button>
+        <button type="submit">{upgrade ? `Confirm switch to ${name}` : `Schedule the change to ${name}`}</button>
         <a href="/account/billing" style={{ marginLeft: 12 }}>Keep my current plan</a>
       </form>
     </section>
