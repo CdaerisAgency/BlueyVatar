@@ -22,6 +22,7 @@ test.describe('public pages', () => {
     await page.getByLabel(/handle/i).fill('not a handle')
     await page.getByRole('button', { name: /sign in|continue|log in/i }).click()
     await expect(page.getByText('Enter a valid handle')).toBeVisible()
+    await expect(page.getByLabel(/handle/i)).toHaveAttribute('aria-describedby', /login-help/)
   })
 
   test('unknown paths show the 404 page', async ({ page }) => {

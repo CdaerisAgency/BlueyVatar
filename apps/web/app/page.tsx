@@ -3,6 +3,7 @@ import AvatarRing from '../components/AvatarRing'
 import { ButtonLink } from '../components/Button'
 import { Eyebrow, SectionTitle } from '../components/Type'
 import { PricingHashRedirect } from '../components/PricingHashRedirect'
+import { currentDid } from '../lib/auth'
 import { COPY } from '../lib/copy'
 import { pageMetadata } from '../lib/site'
 
@@ -10,7 +11,8 @@ const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
 export const metadata = pageMetadata('/', 'blueyvatar | Avatars and profiles in your atproto repository', 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.')
 
-export default function Home() {
+export default async function Home() {
+  const signedIn = Boolean(await currentDid())
   return (
     <main id="main" tabIndex={-1} className="focus:outline-none">
       <PricingHashRedirect />
@@ -20,7 +22,7 @@ export default function Home() {
           <h1 className="m-0 text-[clamp(38px,9vw,64px)]">{COPY.hero.title}</h1>
           <p className="m-0 max-w-[520px] text-lg sm:text-xl">{COPY.hero.lead}</p>
           <div className="flex flex-wrap gap-3.5">
-            <ButtonLink href="/login" variant="primary" size="lg">
+            <ButtonLink href={signedIn ? '/account' : '/login'} variant="primary" size="lg">
               {COPY.hero.primary}
             </ButtonLink>
             <ButtonLink href="/docs" size="lg">
@@ -32,10 +34,6 @@ export default function Home() {
         <div className="order-first flex justify-center md:order-none">
           <div className="relative w-[380px] max-w-full">
             <AvatarRing src="/logo.jpg" alt={COPY.hero.avatarAlt} size={380} />
-            <span className="absolute right-0 bottom-[11%] flex items-center gap-2 rounded-bv-pill border-[1.5px] border-bv-black bg-bv-white px-3.5 py-2 text-[13px] font-semibold text-bv-black">
-              <span aria-hidden="true" className="size-2.5 flex-none rounded-full bg-bv-orange" />
-              {COPY.hero.chip}
-            </span>
           </div>
         </div>
       </div>
