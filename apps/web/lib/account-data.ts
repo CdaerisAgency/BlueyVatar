@@ -19,11 +19,11 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  * Everything blueyvatar holds about one DID, as plain JSON. Never includes key hashes or secrets, the stored
  * primary email beyond a masked form, reports filed against the DID, or an admin's internal decision note on an appeal. Billing rows are included as a summary.
  * Beyond the fields most people expect, the file also holds email holds, organization memberships and their audit history, the Stripe
- * customer ID, and the indexed copy of avatars and profile (the data page text should list them; issue #223).
+ * customer ID, and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
-  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals] = await Promise.all([
+  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog] = await Promise.all([
     q('SELECT email_hash, method, is_primary, email_domain, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
     q('SELECT email_hash, reason, released_at FROM email_holds WHERE did = $1 ORDER BY released_at'),
     q('SELECT email_enc FROM notice_emails WHERE did = $1'),
@@ -42,6 +42,8 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q('SELECT o.org_id, o.name, m.role, m.added_at FROM organization_members m JOIN organizations o ON o.org_id = m.org_id WHERE m.did = $1 ORDER BY m.added_at, o.org_id'),
     q('SELECT org_id, actor, action, target_did, detail, created_at FROM organization_audit WHERE actor = $1 OR target_did = $1 ORDER BY id'),
     q("SELECT p.id, a.action AS appealed_action, p.action_id, p.statement, p.status, p.created_at, p.decided_at FROM appeals p JOIN admin_actions a ON a.id = p.action_id WHERE p.did = $1 ORDER BY p.id"),
+    q('SELECT auto_sync, previous_avatar, has_previous, last_source_cid, last_sent_cid, auto_notice_pending, auto_count, updated_at FROM bsky_avatar_sync WHERE did = $1'),
+    q('SELECT action, from_cid, to_cid, source_cid, created_at FROM bsky_avatar_log WHERE did = $1 ORDER BY id'),
   ])
   let primaryEmail: string | null = null
   if (notice[0]) {
@@ -68,6 +70,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     customDomain: dates(domains)[0] ?? null,
     organizations: { memberships: dates(orgs), audit: dates(orgAudit) },
     appeals: dates(appeals),
+    avatarSync: { settings: dates(avatarSync)[0] ?? null, log: dates(avatarLog) },
     billing: { customers: dates(customers), subscriptions: dates(subs) },
     profileViews: views.map((r) => ({ day: r.day, views: Number(r.views), jsonCalls: Number(r.json_calls) })),
     indexed: { images: dates(images), profile: profile[0]?.record ?? null },
