@@ -1,31 +1,33 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Where to deploy. "both" runs staging, its smoke test, then production. "staging" stops after staging.'
+        type: choice
+        options: [both, staging]
+        default: both
 
 permissions:
   contents: read
 
+# Started only by hand (Actions tab > Deploy > Run workflow, or the Actions API). Runs from main only.
 # Never cancel a running deploy; later runs queue behind it.
 concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    # Opt-in: set the repository variable FLY_DEPLOY_ENABLED=true after the
-    # first manual deploy creates the Fly apps (docs/deploy.md).
+  deploy-staging:
+    # Opt-in: set the repository variable FLY_DEPLOY_ENABLED=true (docs/deploy.md).
     if: vars.FLY_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
     # Runs only on the owner's runner, named by the repository variable DEPLOY_RUNNER.
     # There is no GitHub-hosted fallback on purpose: this job holds FLY_API_TOKEN, so if
-    # the variable is missing the job fails instead of running somewhere else. Restrict
-    # the runner to this repository with a runner group (docs/deploy.md).
+    # the variable is missing the job fails instead of running somewhere else.
     runs-on: ${{ vars.DEPLOY_RUNNER }}
-    # GitHub creates this environment on first use, with no reviewers. Add required
-    # reviewers in Settings > Environments > production (docs/deploy.md).
-    environment: production
+    # GitHub creates this environment on first use, with no reviewers.
+    environment: staging
     timeout-minutes: 30
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -38,7 +40,53 @@ jobs:
           # TODO: pin an exact flyctl release (the README recommends it); the current tag was not verified.
           version: latest
 
-      # Delivery goes first: its release_command applies pending migrations.
+      # Same commands as localdeploy.bat. Delivery goes first: its release_command applies pending migrations.
+      - name: Deploy delivery (staging)
+        run: flyctl deploy --remote-only --config fly/delivery.toml --app blueyvatar-delivery-staging --dockerfile Dockerfile
+
+      - name: Deploy web (staging)
+        run: flyctl deploy --remote-only --config fly/web.toml --app blueyvatar-web-staging --dockerfile Dockerfile
+
+      - name: Deploy indexer (staging)
+        run: flyctl deploy --remote-only --config fly/indexer.toml --app blueyvatar-indexer-staging --dockerfile Dockerfile --env TAP_URL=http://blueyvatar-tap-staging.internal:2480
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Production only starts if this step passes (needs: deploy-staging).
+      - name: Smoke test staging
+        env:
+          SMOKE_HANDLE: ${{ vars.SMOKE_HANDLE }}
+          SMOKE_OPTED_OUT_HASH: ${{ vars.SMOKE_OPTED_OUT_HASH }}
+        run: |
+          # New machines can take a moment to settle, so retry a few times before failing.
+          for attempt in 1 2 3; do
+            if node --experimental-strip-types tools/smoke/smoke.ts --env staging; then exit 0; fi
+            echo "Smoke test failed (attempt $attempt of 3)"
+            [ "$attempt" -lt 3 ] && sleep 30
+          done
+          exit 1
+
+  deploy-production:
+    needs: deploy-staging
+    # Runs only after deploy-staging succeeded (deploy and smoke test). A manual run with target=staging stops before here.
+    if: vars.FLY_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && inputs.target == 'both'
+    runs-on: ${{ vars.DEPLOY_RUNNER }}
+    # Add required reviewers in Settings > Environments > production if you want a manual gate (docs/deploy.md).
+    environment: production
+    timeout-minutes: 30
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+        with:
+          # TODO: pin an exact flyctl release (see above).
+          version: latest
+
+      # No automatic rollback: if a step fails, the workflow fails. See "Roll back production" in docs/deploy.md.
       - name: Deploy delivery
         run: flyctl deploy --remote-only --config fly/delivery.toml --dockerfile Dockerfile
 
@@ -48,8 +96,6 @@ jobs:
       - name: Deploy indexer
         run: flyctl deploy --remote-only --config fly/indexer.toml --dockerfile Dockerfile
 
-      # Smoke test of the live apps (tools/smoke/smoke.ts). It needs only Node. A failure fails the workflow.
-      # Set the repository variable SMOKE_HANDLE to an account with an avatar to enable the cache and profile checks.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -59,7 +105,6 @@ jobs:
           SMOKE_HANDLE: ${{ vars.SMOKE_HANDLE }}
           SMOKE_OPTED_OUT_HASH: ${{ vars.SMOKE_OPTED_OUT_HASH }}
         run: |
-          # New machines and the edge can take a moment to settle, so retry a few times before failing.
           for attempt in 1 2 3; do
             if node --experimental-strip-types tools/smoke/smoke.ts --env production; then exit 0; fi
             echo "Smoke test failed (attempt $attempt of 3)"
