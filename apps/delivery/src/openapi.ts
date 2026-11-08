@@ -20,7 +20,7 @@ const avatarQuery = ['s', 'd', 'f', 'r', 'fmt', 'q', 'ttl', 'json'].map(q)
 
 const errors = {
   '400': errRef('Malformed identifier or parameter. Codes: invalid_identifier, invalid_size, invalid_default, default_url_not_allowed, invalid_rating, invalid_format, invalid_quality, invalid_ttl, invalid_platform.'),
-  '401': errRef('invalid_key'),
+  '401': errRef('invalid_key or key_expired.'),
   '402': errRef('license_inactive'),
   '403': errRef('origin_not_allowed, tier_required, origin_forbidden, access_denied, or secret_key_required.'),
   '429': { description: 'rate_limited. Wait retry-after seconds.', headers: { ...rateHeaders, 'retry-after': hdr('RetryAfter') }, content: { 'application/json': { schema: ref('schemas/Error') } } },
@@ -70,7 +70,7 @@ export const openApiDocument = {
         security: [{ apiKeyHeader: [] }],
         responses: {
           '200': { description: 'Usage document.', headers: { ...rateHeaders, 'x-tier': hdr('Tier') }, content: { 'application/json': { schema: ref('schemas/Usage') } } },
-          '401': errRef('invalid_key, including a missing key or a key sent only as the token query parameter.'),
+          '401': errRef('invalid_key or key_expired, including a missing key or a key sent only as the token query parameter.'),
           '402': errors['402'],
           '403': errRef('secret_key_required: a publishable key was used.'),
           '429': errors['429'],

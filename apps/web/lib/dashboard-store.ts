@@ -23,6 +23,8 @@ export interface KeyRow {
   domains: string[]
   createdAt: Date
   revokedAt: Date | null
+  /** Null means the key never expires. */
+  expiresAt: Date | null
 }
 
 export interface NewKey {
@@ -31,6 +33,7 @@ export interface NewKey {
   hash: string
   prefix: string
   domains: string[]
+  expiresAt: Date | null
 }
 
 /** Runs inside the same lock as the insert so two requests cannot both pass the limit. */
@@ -63,7 +66,7 @@ function memory(): DashboardStore {
   const licenses = new Map<string, LicenseRow>()
   const keys = new Map<string, KeyRow & { licenseId: string }>()
   const rules = new Map<string, VisibilityRules>()
-  const active = (id: string) => [...keys.values()].filter((k) => k.licenseId === id && !k.revokedAt)
+  const active = (id: string) => [...keys.values()].filter((k) => k.licenseId === id && !k.revokedAt && !(k.expiresAt && k.expiresAt.getTime() <= Date.now()))
   return {
     async ensureLicense(did) {
       let l = licenses.get(did)
@@ -120,7 +123,7 @@ function memory(): DashboardStore {
   }
 }
 
-const keyCols = 'key_hash, prefix, kind, label, domains, created_at, revoked_at'
+const keyCols = 'key_hash, prefix, kind, label, domains, created_at, revoked_at, expires_at'
 const toKey = (r: Record<string, unknown>): KeyRow => ({
   hash: r.key_hash as string,
   prefix: r.prefix as string,
@@ -129,6 +132,7 @@ const toKey = (r: Record<string, unknown>): KeyRow => ({
   domains: r.domains as string[],
   createdAt: r.created_at as Date,
   revokedAt: (r.revoked_at as Date | null) ?? null,
+  expiresAt: (r.expires_at as Date | null) ?? null,
 })
 
 async function inTx<T>(pool: pg.Pool, did: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
@@ -208,12 +212,12 @@ function postgres(pool: pg.Pool): DashboardStore {
       const owner = (await pool.query('SELECT owner FROM licenses WHERE license_id = $1', [id])).rows[0]?.owner as string | undefined
       if (!owner) return 'License not found.'
       return inTx(pool, owner, async (c) => {
-        const cur = await c.query(`SELECT ${keyCols} FROM api_keys WHERE license_id = $1 AND revoked_at IS NULL`, [id])
+        const cur = await c.query(`SELECT ${keyCols} FROM api_keys WHERE license_id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, [id])
         const err = guard(cur.rows.map(toKey))
         if (err) return err
         await c.query(
-          'INSERT INTO api_keys (key_hash, prefix, license_id, kind, label, domains) VALUES ($1, $2, $3, $4, $5, $6)',
-          [key.hash, key.prefix, id, key.kind, key.label, key.domains],
+          'INSERT INTO api_keys (key_hash, prefix, license_id, kind, label, domains, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [key.hash, key.prefix, id, key.kind, key.label, key.domains, key.expiresAt],
         )
         if (replace) await c.query('UPDATE api_keys SET revoked_at = now() WHERE license_id = $1 AND key_hash = $2 AND revoked_at IS NULL', [id, replace])
         return null

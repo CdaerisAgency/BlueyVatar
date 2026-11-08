@@ -96,7 +96,7 @@ export function keyRevokedNotice(i: { did: string; prefix: string; label?: strin
   const body =
     `The key ${name} was revoked and no longer works.\n\n` +
     `If you did not do this, sign in at ${base(i.publicUrl)}/account/keys, review your keys, and issue a new one.`
-  return { subject: 'A blueyvatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: i.label ? 'Your blueyvatar key "' + i.label + '" was revoked' : 'A blueyvatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
 /**
