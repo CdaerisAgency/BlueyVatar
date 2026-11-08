@@ -26,4 +26,4 @@ The avatar routes accept the same query parameters as Gravatar, so most drop-in 
 
 ## QR default size
 
-Gravatar's QR endpoint defaults to 80 pixels. `/qr/{id}.svg` and `/qr/{id}.png` default to 256 pixels, because a QR code at 80 pixels is hard to scan from a screen. This is a deliberate departure. Send `s=80` to match Gravatar. Tier size caps apply.
+Gravatar's QR endpoint defaults to 80 pixels. `/qr/{id}.svg` and `/qr/{id}.png` default to 256 pixels, because a QR code at 80 pixels is hard to scan from a screen. This is a deliberate departure. Send `s=80` to match Gravatar. Tier size caps apply, and a PNG is never drawn below 4 pixels per module, so a very small `s` returns a slightly larger image. Gravatar's `type=user` and `type=gravatar` center images map to `center=avatar` and `center=logo`. See [exports-and-qr-v1.md](exports-and-qr-v1.md).

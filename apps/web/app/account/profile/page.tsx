@@ -3,6 +3,12 @@ import { PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { ProfileForm } from './ProfileForm'
+import { ProfileShare } from '../../../components/ProfileShare'
+import { repoHandle } from '../../../lib/claims-repo'
+import { siteUrl } from '../../../lib/site'
+
+const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
+const PUBLIC_DELIVERY_URL = process.env.PUBLIC_DELIVERY_URL || DELIVERY_URL
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +16,11 @@ export default async function ProfilePage() {
   const did = await requireDid('/account/profile')
   let p: Partial<ProfileRecord> = {}
   let loadError: string | null = null
+  let handle: string | null = null
   try {
-    p = (await getProfile(await repoSession(did)))?.value ?? {}
+    const session = await repoSession(did)
+    p = (await getProfile(session))?.value ?? {}
+    handle = await repoHandle(session).catch(() => null)
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
   }
@@ -39,6 +48,13 @@ export default async function ProfilePage() {
             wallets: (p.wallets ?? []).map((w) => ({ chain: w.chain, address: w.address, label: w.label ?? '', visible: w.visible === true })),
           }}
         />
+      )}
+      {handle && (
+        <>
+          <h2>Download and QR code</h2>
+          <p>These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.</p>
+          <ProfileShare handle={handle} deliveryBase={PUBLIC_DELIVERY_URL} profileUrl={`${siteUrl()}/p/${encodeURIComponent(handle)}`} />
+        </>
       )}
     </PageMain>
   )

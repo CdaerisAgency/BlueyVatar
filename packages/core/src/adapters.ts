@@ -42,7 +42,7 @@ export const BLUESKY_PROFILE_ADAPTER: ProfileAdapter = {
  * Tangled profile adapters. The avatar field is `avatar` (PNG or JPEG, up to
  * 1,000,000 bytes) in both collections. Tangled replaced sh.tangled.actor.profile
  * with org.tangled.actor.profile on Nov 2, 2026. A sample of live repos on
- * Nov 7, 2026 (docs/research/tangled-collection-v1.md) found that most users
+ * Nov 7, 2026 (docs/research/tangled-collection-v2.md) found that most users
  * still have only the legacy record, so the legacy adapter stays on as a
  * fallback that is read only when the new record is missing.
  */

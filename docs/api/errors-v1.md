@@ -29,11 +29,12 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `invalid_quality` | 400 (404 on `/img`) | `q` is not an integer from 1 to 100. On `/img`, a `-q` value outside 1 to 100 returns this code with status 404. |
 | `invalid_ttl` | 400 | `ttl` is not `<n>h` or `<n>d` within 1h to 28d. |
 | `invalid_platform` | 400 | `to` on `/qr` is not a lowercase platform name such as `github`. |
+| `invalid_qr_option` | 400 | On `/qr`, `center` is not `none`, `logo`, or `avatar`, `quiet` is not a whole number from 4 to 16, or the profile URL is too long for a QR code. |
 | `invalid_key` | 401 | Unknown API key, or a secret key sent outside the `x-api-key` header. |
 | `key_expired` | 401 | The key's expiration time has passed. Create a new key on the API keys page. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
-| `tier_required` | 403 | The route needs a higher tier. QR codes (`/qr`) are available on every plan, and cross-origin `/profile` (hovercards) requires Plus or higher. |
+| `tier_required` | 403 | The route needs a higher tier. QR codes (`/qr`) and the profile exports are available on every plan, and cross-origin `/profile` (hovercards) requires Plus or higher. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
 | `secret_key_required` | 403 | `GET /usage` was called with a publishable key. Use a secret key in the `x-api-key` header. See [usage-v1.md](usage-v1.md). |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |
@@ -83,7 +84,7 @@ Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. 
 | --- | --- | --- |
 | `x-tier` | Successful responses | `free`, `plus`, `business`, or `enterprise`. |
 | `x-usage-cost` | Successful keyed requests | `1`, the metered units for the request. Absent for anonymous requests. |
-| `x-adjusted-params` | A tier clamped or ignored a parameter | Comma-separated names, for example `s,fmt,ttl`. Possible names: `s`, `d`, `fmt`, `q`, `ttl`. On `/qr`, only `s` is reported. |
+| `x-adjusted-params` | A tier clamped or ignored a parameter | Comma-separated names, for example `s,fmt,ttl`. Possible names: `s`, `d`, `fmt`, `q`, `ttl`. On `/qr`, only `s` is reported. `/qr` PNGs also send `x-qr-version`, `x-qr-modules`, and `x-qr-pixels`; see [exports-and-qr-v1.md](exports-and-qr-v1.md). |
 | `retry-after` | `429` responses with a counted window | Seconds to wait before retrying. |
 | `x-content-type-options` | Every response | `nosniff`. |
 | `cache-control` | Avatar, JSON, and QR responses | `private, max-age=<ttl>`. See [cache-ttl-v1.md](cache-ttl-v1.md). |

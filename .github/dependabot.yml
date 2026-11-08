@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # One npm entry at the root. pnpm projects use the "npm" ecosystem value,
+  # and the root holds pnpm-lock.yaml and pnpm-workspace.yaml.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
