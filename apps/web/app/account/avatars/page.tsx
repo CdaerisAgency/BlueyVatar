@@ -8,6 +8,12 @@ import { resolvePlan } from '../../../lib/plan'
 import { getStore } from '../../../lib/store'
 import AccountNav from '../AccountNav'
 import ImageFileInput from './ImageFileInput'
+import BskyAvatarPanel from './BskyAvatarPanel'
+import UseAsBskyAvatar from './UseAsBskyAvatar'
+import { currentBlueskyAvatar } from '../../../lib/bsky-profile'
+import { bskyBlockReason, hasBskyPermission, type SyncSession } from '../../../lib/bsky-sync'
+import { getSyncStore } from '../../../lib/bsky-sync-store'
+import { useBskyProfileScope } from '../../../lib/oauth'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -19,8 +25,13 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   let images: StoredImage[] = []
   let pds = ''
   let loadError: string | null = null
+  let bsky: { session: SyncSession; shownCid: string | null } | null = null
   try {
     const session = await repoSession(did)
+    if (useBskyProfileScope() || (await hasBskyPermission(session))) {
+      const shown = await currentBlueskyAvatar(session)
+      bsky = { session, shownCid: shown.ok ? (shown.avatar?.ref.$link ?? null) : null }
+    }
     ;[images, pds] = await Promise.all([listImages(session), pdsUrl(session)])
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
@@ -35,6 +46,8 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
+
+      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} pds={pds} shownCid={bsky.shownCid} />}
 
       <h2>
         Your images ({images.length} of {imageLimit(plan)})
@@ -60,6 +73,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                       <Button type="submit">Set as default</Button>
                     </form>
                   )}
+                  {bsky && <UseAsBskyAvatar rkey={img.rkey} blockedReason={bskyBlockReason(img)} />}
                   <form action={removeImage}>
                     <input type="hidden" name="rkey" value={img.rkey} />
                     <Button type="submit">Delete</Button>

@@ -1,6 +1,6 @@
 # Which Tangled collection to read (v1)
 
-Checked: November 7, 2026. Scope: issues #69 and #55, spec sections 7 and 13 (item 13) of `docs/spec/blueyvatar-product-spec-v9.md`, and `packages/core/src/adapters.ts`. Everything below was measured from live repos on that date, except where marked **not done**.
+Checked: November 7, 2026. Scope: issues #69 and #55, spec sections 7 and 13 (item 13) of `docs/spec/blueyvatar-product-spec-v10.md`, and `packages/core/src/adapters.ts`. Everything below was measured from live repos on that date, except where marked **not done**.
 
 ## Question
 

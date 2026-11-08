@@ -9,6 +9,7 @@ import { prepareUpload } from '../../../lib/server-resize'
 import { reportError } from '../../../lib/obs'
 import { checkUploadForm } from '../../../lib/upload-caps'
 import { screenUpload } from '../../../lib/upload-screen'
+import { syncBlueskyAfterDefaultChange } from '../../../lib/bsky-sync-server'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -52,7 +53,8 @@ export async function uploadImage(form: FormData): Promise<void> {
   } catch (err) {
     return fail(err)
   }
-  return back('done', 'Image added.')
+  const note = fields.value.isDefault ? await syncBlueskyAfterDefaultChange(did) : null
+  return back('done', note ? `Image added. ${note}` : 'Image added.')
 }
 
 export async function makeDefault(form: FormData): Promise<void> {
@@ -65,7 +67,8 @@ export async function makeDefault(form: FormData): Promise<void> {
   } catch (err) {
     return fail(err)
   }
-  return back('done', 'Default image updated.')
+  const note = await syncBlueskyAfterDefaultChange(did)
+  return back('done', note ? `Default image updated. ${note}` : 'Default image updated.')
 }
 
 export async function removeImage(form: FormData): Promise<void> {

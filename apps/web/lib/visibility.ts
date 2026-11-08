@@ -38,4 +38,4 @@ export function isPublic(r: VisibilityRules): boolean {
 }
 
 export const PUBLIC_DATA_NOTICE =
-  'Important limit: these rules apply only to what this service serves. Everything in your atproto repo is public today, so your avatar blob stays readable from your PDS no matter what you choose here. For real access control you would need an avatar stored by this service outside your repo (you lose portability), or atproto spaces, which are still in alpha.'
+  'Important limit: these rules apply only to what this service serves. Everything in your atproto repo is public today, so your avatar blob stays readable from your PDS no matter what you choose here. For real access control you would need an avatar stored by this service outside your repo (you lose portability), or atproto spaces, which are still in alpha. With your permission, blueyvatar can also change the picture on your Bluesky profile to match your default image, and only that picture.'

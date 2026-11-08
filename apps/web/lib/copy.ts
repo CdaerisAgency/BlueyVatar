@@ -19,7 +19,7 @@ export const COPY = {
   how: {
     title: 'You own it. We just deliver it.',
     steps: [
-      { title: 'Sign in with Bluesky', body: 'Log in with your existing handle. blueyvatar asks only for permission to write its own records to your repository.' },
+      { title: 'Sign in with Bluesky', body: 'Log in with your existing handle. blueyvatar asks for permission to save its own records and to change the picture on your Bluesky profile. It does not change anything else on your Bluesky profile.' },
       { title: 'Upload and rate', body: 'Add one avatar or several, pick a default, add alt text, and set a rating so sites can request only what fits their audience.' },
       { title: 'Show up everywhere', body: 'Any site that supports blueyvatar can fetch your avatar by email hash or handle, resized and cached at the edge.' },
     ],

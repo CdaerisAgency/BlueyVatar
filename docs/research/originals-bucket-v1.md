@@ -1,6 +1,6 @@
 # Originals bucket when a PDS is slow or down (v1)
 
-Checked: November 6, 2026. Scope: issue #71, spec sections 4, 7, 13 (Cloudflare and image items, item 4), and 14 and 14.1 of `docs/spec/blueyvatar-product-spec-v9.md`, plus the delivery code in `apps/delivery/src` (read only). Items marked **unconfirmed** have no published answer in the pages I opened.
+Checked: November 6, 2026. Scope: issue #71, spec sections 4, 7, 13 (Cloudflare and image items, item 4), and 14 and 14.1 of `docs/spec/blueyvatar-product-spec-v10.md`, plus the delivery code in `apps/delivery/src` (read only). Items marked **unconfirmed** have no published answer in the pages I opened.
 
 ## Question
 

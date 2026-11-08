@@ -18,22 +18,49 @@ export function usePermissionSet(env: Record<string, string | undefined> = proce
   return v === 'true' || v === '1'
 }
 
+/** The one collection blueyvatar may change that it does not own: the user's Bluesky profile (spec section 10.1). */
+export const BSKY_PROFILE_COLLECTION = 'app.bsky.actor.profile'
+/** Only `update`: blueyvatar never creates or deletes the Bluesky profile record. */
+export const BSKY_PROFILE_SCOPE = `repo:${BSKY_PROFILE_COLLECTION}?action=update`
+
+/**
+ * Adds the Bluesky profile scope to the sign-in request. Off by default: whether Bluesky's authorization
+ * server lets a third-party app ask for write access to an `app.bsky.*` collection is untested, and a refused
+ * scope would break sign-in for everyone. Test on staging with the owner's account first (docs/deploy.md).
+ */
+export function useBskyProfileScope(env: Record<string, string | undefined> = process.env): boolean {
+  const v = env.OAUTH_REQUEST_BSKY_PROFILE?.trim().toLowerCase()
+  return v === 'true' || v === '1'
+}
+
+/** True when a granted scope string lets blueyvatar update the Bluesky profile record. */
+export function grantsBskyProfileUpdate(granted: string | undefined): boolean {
+  for (const token of (granted ?? '').split(/\s+/)) {
+    if (token === `repo:${BSKY_PROFILE_COLLECTION}` || token === 'repo:*') return true
+    if (!token.startsWith(`repo:${BSKY_PROFILE_COLLECTION}?`)) continue
+    const actions = new URLSearchParams(token.slice(token.indexOf('?') + 1)).getAll('action')
+    if (actions.length === 0 || actions.includes('update')) return true
+  }
+  return false
+}
+
 /**
  * Scopes from spec section 10.1. The permission set bundles the three user-repo collections.
  * `blob:image/*` stays separate because blob permissions cannot be included in a set.
  * account:email is requested only during email linking.
  */
-export function signInScope(permissionSet: boolean = usePermissionSet()): string {
+export function signInScope(permissionSet: boolean = usePermissionSet(), bskyProfile: boolean = useBskyProfileScope()): string {
   return [
     'atproto',
     ...(permissionSet
       ? [`include:${PERMISSION_SET_NSID}`]
       : ['repo:com.blueyvatar.image', 'repo:com.blueyvatar.profile', 'repo:com.blueyvatar.claim']),
+    ...(bskyProfile ? [BSKY_PROFILE_SCOPE] : []),
     'blob:image/*',
   ].join(' ')
 }
-export function emailLinkScope(permissionSet: boolean = usePermissionSet()): string {
-  return `${signInScope(permissionSet)} account:email`
+export function emailLinkScope(permissionSet: boolean = usePermissionSet(), bskyProfile: boolean = useBskyProfileScope()): string {
+  return `${signInScope(permissionSet, bskyProfile)} account:email`
 }
 
 export function clientMetadata() {
