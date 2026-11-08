@@ -85,6 +85,30 @@ The indexer needs the `--env` override because `fly/indexer.toml` points at the 
 
 **Tap is deployed by hand.** Restarting Tap interrupts the firehose connection, and an image upgrade can force a re-backfill, so someone should watch each Tap deploy. It also changes rarely.
 
+## Deploy from a local clone (localdeploy.bat)
+
+`localdeploy.bat` at the repo root deploys from a Windows machine that has flyctl signed in. It syncs a clone (default `C:\dev\blueyvatar`, cloned if missing) with `origin/main`, stops on uncommitted changes, then deploys delivery, web, and indexer in that order. Delivery goes first because its release command runs the migrations. Tap is not included.
+
+Run it with no options for a menu: staging, production, both, or quit. Production asks for the typed phrase `DEPLOY PRODUCTION`. Each app asks for a Y or N before it deploys.
+
+For a command line or a scheduled run, pass options so it never waits for input:
+
+| Option | Meaning |
+| --- | --- |
+| `--env staging`, `--env production`, `--env both` | Where to deploy. `both` runs staging first, then production, and stops if staging fails. |
+| `--yes` | No prompts. Needs `--env`. |
+| `--confirm-production` | Required with `--yes` when production is included. It replaces the typed phrase. |
+| `--repo PATH` | Use another clone. |
+| `--no-sync` | Skip the fetch and pull and deploy what is checked out. |
+| `--no-pause` | Do not wait for a key at the end. |
+
+```
+localdeploy.bat --env staging --yes
+localdeploy.bat --env both --yes --confirm-production
+```
+
+Exit codes: 0 done, 1 failed, 2 bad usage, 3 stopped by the user. Without `--yes`, a failure or a declined step stops the run and later steps do not run. Check each site and `fly status` afterward.
+
 ## Tap
 
 Tap is a separate app that the indexer connects to (`TAP_URL`).

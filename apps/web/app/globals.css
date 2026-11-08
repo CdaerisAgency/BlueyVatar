@@ -23,7 +23,7 @@
   h1,
   h2,
   h3 {
-    margin: 0 0 16px;
+    margin: 0 0 var(--spacing-bv-title);
     font-family: var(--font-display);
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -31,12 +31,12 @@
   }
 
   h1 {
-    font-size: clamp(34px, 8vw, 48px);
+    font-size: var(--text-bv-title);
   }
 
   h2 {
-    margin-top: 40px;
-    font-size: clamp(26px, 6vw, 32px);
+    margin-top: var(--spacing-bv-section);
+    font-size: var(--text-bv-section);
   }
 
   h3 {

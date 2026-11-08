@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
   try {
     const claim = await getClaim(await repoSession(pending.did), pending.rkey)
-    if (!claim) return back('error', 'That claim no longer exists.')
+    if (!claim) return back('error', 'That account no longer exists.')
     const norm = normalizeClaim(claim.value.platform, claim.value.uri)
     if (!norm.ok || norm.value.uri !== claim.value.uri) return back('error', 'This claim cannot be verified.')
 

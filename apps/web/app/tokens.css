@@ -21,6 +21,14 @@
   --radius-bv-card: 16px;
 
   --breakpoint-sm: 30rem;
+
+  /* Page standard for account pages: content widths, type scale, and vertical rhythm. */
+  --container-bv-page: 860px; /* default content width */
+  --container-bv-narrow: 540px; /* sign-in and profile pages that hold one short form */
+  --text-bv-title: clamp(34px, 8vw, 48px); /* page title, the one h1 */
+  --text-bv-section: clamp(26px, 6vw, 32px); /* section title, h2 */
+  --spacing-bv-title: 16px; /* space under a title */
+  --spacing-bv-section: 40px; /* space above a section title */
 }
 
 /* The next/font variables are set on <html> at runtime, so these must not be inlined at build time. */

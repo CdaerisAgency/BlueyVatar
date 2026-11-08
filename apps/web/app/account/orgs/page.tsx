@@ -25,8 +25,8 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
         <ul>
           {orgs.map((o) => (
             <li key={o.orgId}>
-              <Link href={`/account/orgs/${o.orgId}`}>{o.name}</Link> ({o.role}) - <Link href={`/account/keys?org=${o.orgId}`}>Keys</Link>
-              {o.role === 'owner' && <> - <Link href={`/account/billing?org=${o.orgId}`}>Billing</Link></>}
+              <Link href={`/account/orgs/${o.orgId}`}>{o.name}</Link> ({o.role}) - <Link href={`/account/keys?org=${o.orgId}`}>API keys and license</Link>
+              {o.role === 'owner' && <> - <Link href={`/account/billing?org=${o.orgId}`}>Plan and billing</Link></>}
             </li>
           ))}
         </ul>

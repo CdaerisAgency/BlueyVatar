@@ -205,7 +205,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       )}
       <h2>Your data</h2>
       <p>
-        <Link href="/account/data">Download your data or delete it</Link>. Deleting removes what blueyvatar holds about you, except
+        Go to <Link href="/account/settings/danger">Danger zone</Link> to download your data or delete it. Deleting removes what blueyvatar holds about you, except
         billing records, which we keep for 7 years. Records in your own atproto repository stay on your account's home server.
       </p>
       <form action="/logout" method="post">

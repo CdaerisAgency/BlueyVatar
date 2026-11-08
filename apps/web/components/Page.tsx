@@ -12,9 +12,9 @@ const autoCards = [
 /** The id the skip link in SiteNav points at. */
 export const MAIN_ID = 'main'
 
-/** The page container for login, account, profile, and demo pages. */
+/** The page container for login, account, profile, and demo pages. Width, title size, and spacing come from the page standard in tokens.css. Account pages use the default width. */
 export function PageMain({ narrow = false, children }: { narrow?: boolean; children: ReactNode }) {
-  const width = narrow ? 'max-w-[540px]' : 'max-w-[860px]'
+  const width = narrow ? 'max-w-bv-narrow' : 'max-w-bv-page'
   return (
     <main id={MAIN_ID} tabIndex={-1} className={`focus:outline-none mx-auto w-full flex-auto px-4 pt-7 pb-14 sm:px-5 sm:pt-10 sm:pb-[72px] ${width} ${autoCards}`}>{children}</main>
   )

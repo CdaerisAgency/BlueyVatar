@@ -35,8 +35,8 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
       {q.error && <p role="alert">{q.error}</p>}
       {q.done && <p role="status">{q.done}</p>}
       <p>
-        <Link href={`/account/keys?org=${id}`}>API keys</Link>
-        {owner && <> - <Link href={`/account/billing?org=${id}`}>Billing</Link></>}
+        <Link href={`/account/keys?org=${id}`}>API keys and license</Link>
+        {owner && <> - <Link href={`/account/billing?org=${id}`}>Plan and billing</Link></>}
       </p>
       <p>Members manage keys. Only owners manage billing and membership. Billing stays with the billing owner{lic ? `, ${lic.billingDid}` : ''}.</p>
 
