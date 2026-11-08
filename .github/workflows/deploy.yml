@@ -18,7 +18,10 @@ jobs:
     # Opt-in: set the repository variable FLY_DEPLOY_ENABLED=true after the
     # first manual deploy creates the Fly apps (docs/deploy.md).
     if: vars.FLY_DEPLOY_ENABLED == 'true'
-    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # Runs only on the owner's CI runner (repository variable CI_RUNNER). There is
+    # no GitHub-hosted fallback on purpose: this job holds FLY_API_TOKEN, so if the
+    # variable is missing the job fails instead of running somewhere else.
+    runs-on: ${{ vars.CI_RUNNER }}
     timeout-minutes: 30
     env:
       FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
