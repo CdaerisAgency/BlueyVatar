@@ -1,15 +1,16 @@
-import { PAST_DUE_GRACE_DAYS, effectiveTier } from '@blueyvatar/core'
+import { PAID_PLANS, PAST_DUE_GRACE_DAYS, effectiveTier, type PaidPlan } from '@blueyvatar/core'
 import { PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { billingEnabled, plusEnabled } from '../../../lib/billing/config'
+import { longDate, summarize } from '../../../lib/billing/summary'
 import { getBillingStore } from '../../../lib/billing/store'
 import { getDashboardStore } from '../../../lib/dashboard-store'
-import { PRICING, formatPrice } from '../../../lib/pricing'
 import { resolvePlan } from '../../../lib/plan'
+import { PRICING, formatPrice } from '../../../lib/pricing'
 import { canManageBilling } from '../../../lib/orgs/roles'
 import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
-import { openPortal, startCheckout } from './actions'
+import { cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,7 +19,10 @@ const NOTICE: Record<string, string> = {
   canceled: 'Checkout was canceled. You were not charged.',
 }
 
-export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string; org?: string }> }) {
+const UNAVAILABLE = 'Billing is not available yet on this deployment. To change your plan now, email support@blueyvatar.com.'
+const PLAN_NAME: Record<string, string> = { plus: 'Plus', pro: 'Pro', business: 'Business' }
+
+export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string; done?: string; change?: string; org?: string }> }) {
   const did = await requireDid('/account/billing')
   const q = await searchParams
   const orgId = q.org || null
@@ -27,65 +31,132 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const billing = getBillingStore()
   const [customer, sub, plusSub, plan] = await Promise.all([billing.customerFor(did), billing.subscriptionFor(did, 'developer', license.licenseId), billing.subscriptionFor(did, 'plus'), resolvePlan(did)])
   const enabled = billingEnabled()
-  const plusOn = plusEnabled()
   const now = new Date()
   const tier = effectiveTier(license, now)
   const pastDue = license.status === 'past_due' && license.graceEndsAt
-  const dateText = (d: Date) => d.toISOString().slice(0, 10)
+  const subs = [plusSub, sub].filter((x): x is NonNullable<typeof x> => !!x)
+  const enterprise = license.tier === 'enterprise'
+  // The tier names a person currently holds, for the "(current)" marker. Enterprise is a contract and has no row on the list.
+  const held = new Set<string>(subs.map((x) => x.tier))
+  const target = q.change && (PAID_PLANS as readonly string[]).includes(q.change) ? (q.change as PaidPlan) : null
+  const canSwitchTo = (id: PaidPlan) => (id === 'plus' ? plusEnabled() : enabled) && !(enterprise && id !== 'plus')
 
   return (
     <PageMain>
       <h1>Plan and billing</h1>
       <p>Signed in as {did}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
+      {q.done && <p role="status">{q.done}</p>}
       {q.error && <p role="alert">{q.error}</p>}
 
       <h2>Your plan</h2>
-      <ul>
-        <li>Plan: {plan === 'plus' ? 'Plus' : 'Free'}</li>
-        <li>Developer tier: {tier}</li>
-        {plusSub && <li>Plus subscription: {plusSub.status.replace('_', ' ')}{plusSub.currentPeriodEnd ? `, ${plusSub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateText(plusSub.currentPeriodEnd)}` : ''}</li>}
-        {sub && <li>Subscription: {sub.status.replace('_', ' ')}{sub.currentPeriodEnd ? `, ${sub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateText(sub.currentPeriodEnd)}` : ''}</li>}
-        {pastDue && (
-          <li>
-            Your last payment failed. Paid limits continue until {dateText(license.graceEndsAt!)} ({PAST_DUE_GRACE_DAYS} days after the first failure), then the
-            account returns to Free limits. Update your payment method in Manage billing. Your data, avatars, and profile are never deleted.
-          </li>
-        )}
-      </ul>
+      {subs.length === 0 && (
+        <ul>
+          <li>Plan: {enterprise ? 'Enterprise (set by contract)' : plan === 'plus' ? 'Plus (included with your account)' : 'Free ($0)'}</li>
+          {!enterprise && tier !== 'free' && <li>Developer tier: {tier}</li>}
+        </ul>
+      )}
+      {subs.map((x) => {
+        const m = summarize(x)
+        return (
+          <ul key={x.id}>
+            <li>Plan: {m.plan} ({m.price})</li>
+            <li>Status: {m.status}</li>
+            {m.when && <li>{m.when}</li>}
+          </ul>
+        )
+      })}
+      {pastDue && (
+        <p role="alert">
+          Your last payment failed. Paid limits continue until {longDate(license.graceEndsAt!)} ({PAST_DUE_GRACE_DAYS} days after the first failure), then the
+          account returns to Free limits. Update your payment method in Manage billing. Your data, avatars, and profile are never deleted.
+        </p>
+      )}
 
-      {!enabled && <p>Billing is not available yet on this deployment.</p>}
+      {!enabled && <p>{UNAVAILABLE}</p>}
+
+      {target && held.has(target) && <p role="status">You are already on {PLAN_NAME[target]}.</p>}
+      {target && !held.has(target) && canSwitchTo(target) && subs.length > 0 && <ConfirmSwitch target={target} subs={subs} />}
 
       <h2>Plans</h2>
       <ul>
-        {PRICING.map((p) => (
-          <li key={p.id}>
-            <strong>{p.name}</strong>: {p.amount === 0 ? '$0' : `${formatPrice(p.amount)} per ${p.per === 'mo' ? 'month' : p.per}`}
-            {(p.id === 'plus' ? plan === 'plus' : p.id === tier) && ' (current)'}
-            {p.id === 'plus' && plusOn && !plusSub && plan !== 'plus' && (
-              <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
-                <input type="hidden" name="tier" value="plus" />
-                <button type="submit">Subscribe to Plus</button>
-              </form>
-            )}
-            {enabled && p.id !== 'free' && p.id !== 'plus' && !sub && license.tier !== 'enterprise' && (
-              <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
-                <input type="hidden" name="tier" value={p.id} />
-                <button type="submit">Subscribe to {p.name}</button>
-              </form>
-            )}
-          </li>
-        ))}
+        {PRICING.map((p) => {
+          const id = p.id
+          const isCurrent = id === 'free' ? subs.length === 0 && !enterprise && plan !== 'plus' : held.has(id) || (id === 'plus' && plan === 'plus')
+          return (
+            <li key={id}>
+              <strong>{p.name}</strong>: {p.amount === 0 ? '$0' : `${formatPrice(p.amount)} per ${p.per === 'mo' ? 'month' : p.per}`}
+              {isCurrent && ' (current)'}
+              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length === 0 && (
+                <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
+                  <input type="hidden" name="tier" value={id} />
+                  <button type="submit">Subscribe to {p.name}</button>
+                </form>
+              )}
+              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && !(id === 'plus' && plusSub) && (
+                <a href={`/account/billing?change=${id}`} style={{ marginLeft: 12 }}>
+                  Switch to {p.name}
+                </a>
+              )}
+            </li>
+          )
+        })}
       </ul>
+      {subs.length > 0 && <p>To go back to Free, cancel your subscription below. You keep your paid plan until the end of the period you paid for.</p>}
       <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout based on your billing address.</p>
 
-      {enabled && (customer || sub || plusSub) && (
+      {enabled && subs.map((x) => (
+        <section key={`manage-${x.id}`}>
+          <h2>{x.tier === 'plus' ? 'Plus subscription' : `${PLAN_NAME[x.tier]} subscription`}</h2>
+          {x.cancelAtPeriodEnd ? (
+            <form action={resumeSubscription}>
+              <input type="hidden" name="kind" value={x.tier === 'plus' ? 'plus' : 'developer'} />
+              <p>Your subscription is set to end. You can keep it any time before it ends.</p>
+              <button type="submit">Resume {PLAN_NAME[x.tier]}</button>
+            </form>
+          ) : (
+            <form action={cancelSubscription}>
+              <input type="hidden" name="kind" value={x.tier === 'plus' ? 'plus' : 'developer'} />
+              <p>Cancel any time. Your plan stays until the end of the period you paid for, and you are not charged again.</p>
+              <button type="submit">Cancel {PLAN_NAME[x.tier]} at the end of the period</button>
+            </form>
+          )}
+        </section>
+      ))}
+
+      {enabled && (customer || subs.length > 0) && (
         <form action={openPortal}>
-          <p>Update your card, switch plans, download invoices, or cancel in the Stripe customer portal.</p>
+          <h2>Payment method and invoices</h2>
+          <p>Update your card, see past invoices, and download receipts in the Stripe customer portal.</p>
           <button type="submit">Manage billing</button>
         </form>
       )}
     </PageMain>
+  )
+}
+
+/** Asks for confirmation before a plan switch, with the proration rule in plain words. */
+function ConfirmSwitch({ target, subs }: { target: PaidPlan; subs: Array<{ tier: PaidPlan }> }) {
+  const name = PLAN_NAME[target]!
+  const from = subs.length === 1 ? subs[0]!.tier : null
+  const t = PRICING.find((p) => p.id === target)!
+  const upgrade = from ? t.amount > (PRICING.find((p) => p.id === from)?.amount ?? 0) : true
+  return (
+    <section aria-label={`Switch to ${name}`}>
+      <h2>Switch to {name}</h2>
+      <p>
+        {name} is {formatPrice(t.amount)} per month, plus tax.{' '}
+        {upgrade
+          ? 'You are charged the difference for the rest of this period now, and the full price at each renewal.'
+          : 'You get a credit for the unused part of your current plan. It is applied to your next invoice, not refunded to your card.'}{' '}
+        Your renewal date stays the same.
+      </p>
+      <form action={switchPlan}>
+        <input type="hidden" name="tier" value={target} />
+        <button type="submit">Confirm switch to {name}</button>
+        <a href="/account/billing" style={{ marginLeft: 12 }}>Keep my current plan</a>
+      </form>
+    </section>
   )
 }
 
@@ -128,7 +199,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
         <li>Developer tier: {license?.tier ?? 'free'}</li>
         {sub && <li>Subscription: {sub.status.replace('_', ' ')}{sub.currentPeriodEnd ? `, ${sub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateOf(sub.currentPeriodEnd)}` : ''}</li>}
       </ul>
-      {!enabled && <p>Billing is not available yet on this deployment.</p>}
+      {!enabled && <p>{UNAVAILABLE}</p>}
       {enabled && !sub && business && (
         <form action={startCheckout}>
           <input type="hidden" name="tier" value="business" />

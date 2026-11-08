@@ -5,6 +5,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ## 2026-11-08
 
 ### Added
+- Plan and billing: people with a paid plan can switch between Plus, Pro, and Business, cancel at the end of the period, and resume before it ends (#237). The page shows your plan, price, status, and renewal or end date in plain words, and the pricing page buttons send paid members to the same confirm step. Upgrades charge the difference now, and downgrades add a credit to the next invoice. Card and invoices stay under Manage billing. When billing is not set up, the page says so and gives support@blueyvatar.com.
 - Change your Bluesky profile avatar from blueyvatar (#241). A "Use as my Bluesky avatar" button on each G or PG image, a switch to keep your Bluesky avatar the same as your default image (on by default once you allow it), and "Restore my previous Bluesky avatar". blueyvatar changes only the picture, keeps the rest of your profile exactly as it is, and never overwrites a change you made on Bluesky in the meantime. R and X images are never sent. The permission is requested at sign-in once the `OAUTH_REQUEST_BSKY_PROFILE` setting is on, which stays off until it is tested on staging. Until then, and for existing sessions, the page says "Sign in again to allow this".
 
 ### Changed
