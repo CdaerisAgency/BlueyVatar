@@ -8,7 +8,7 @@ The avatar routes accept the same query parameters as Gravatar, so most drop-in 
 | --- | --- |
 | `d=blank` | Returns a fully transparent PNG. The response is always PNG, even when `fmt=jpeg` or `fmt=webp` is sent, because JPEG has no transparency. |
 | `name=` | On `/avatar/{hash}`, `d=initials` draws the first letters of the first two words of `name` (for `Ada Lovelace`, `AL`). Letters and digits only, uppercased. Names are cut at 100 characters. Without `name`, a hash lookup draws the silhouette. `/u/{id}` takes initials from the handle and ignores `name`. |
-| `updatedDate` | Added to the JSON response. See [json-mode-v2.md](json-mode-v2.md). |
+| `updatedDate` | Added to the JSON response. See [json-mode-v1.md](json-mode-v1.md). |
 
 ## Deliberate departures
 
