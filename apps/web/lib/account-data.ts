@@ -57,7 +57,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
   return {
     exportedAt: now.toISOString(),
     did,
-    note: "Records in your own atproto repository (avatars, profile, claims, links, gallery) are stored by your Bluesky account's home server and are not part of this file.",
+    note: "Records in your own atproto repository (avatars, profile, claims, links, gallery) are stored by your account's home server and are not part of this file.",
     emails: { primaryMasked: primaryEmail, links: dates(maskedLinks), holds: dates(holds) },
     profileLinks: dates(profileLinks),
     claims: dates(claims),

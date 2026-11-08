@@ -721,9 +721,9 @@ No cost estimate is given here beyond Fly's published list prices: a continuousl
 
 Signed-in users can download their data and delete it at `/account/data`. Deletion removes everything except Stripe billing rows (`billing_customers`, `subscriptions`), which are marked `deleted_at` and kept for 7 years for tax and accounting. It cancels active Stripe subscriptions first, so `STRIPE_SECRET_KEY` must be set on web for that step. The indexer runs a daily job (`apps/indexer/src/billing-retention.ts`) that deletes billing rows 7 years after `deleted_at`, and `stripe_events` rows 7 years after they were processed (they hold no DID). Email hashes stay as 30-day holds, as for any deleted account.
 
-## Bluesky avatar permission
+## Profile avatar permission
 
-Letting users change their Bluesky avatar from blueyvatar needs one more sign-in scope, `repo:app.bsky.actor.profile?action=update` (issue #241, spec section 10.1). It is behind `OAUTH_REQUEST_BSKY_PROFILE`, which is off by default, because the permission spec does not say whether Bluesky's authorization server lets a third-party app request write access to an `app.bsky.*` collection. A refused scope would break sign-in for everyone.
+Letting users change their profile avatar from blueyvatar needs one more sign-in scope, `repo:app.bsky.actor.profile?action=update` (issue #241, spec section 10.1). It is behind `OAUTH_REQUEST_BSKY_PROFILE`, which is off by default, because the permission spec does not say whether Bluesky's authorization server lets a third-party app request write access to an `app.bsky.*` collection. A refused scope would break sign-in for everyone.
 
 | Setting | Where | Notes |
 | --- | --- | --- |
@@ -733,8 +733,8 @@ Turn it on in this order:
 
 1. Set it on staging only, with the staging web app's secrets.
 2. Sign in on staging with the owner's account. Confirm the consent screen lists the Bluesky profile permission and the sign-in succeeds.
-3. On the Avatars page, use "Use as my Bluesky avatar" on a G image, confirm the picture changes on Bluesky and the rest of the profile is unchanged, then use "Restore my previous Bluesky avatar".
-4. Also test an account with no profile record yet. The code never creates the record and asks the user to save their Bluesky profile once, so confirm that message appears. If Bluesky requires `create` for that case, the scope needs `action=create` added and this page updated.
+3. On the Avatars page, use "Use as my avatar on <server name>" on a G image, confirm the picture changes on the profile and the rest of the profile is unchanged, then use "Restore my previous avatar". Repeat once with an account hosted on a non-Bluesky server.
+4. Also test an account with no profile record yet. The code never creates the record and tells the user to save their profile once in an app that uses it, so confirm that message appears. If Bluesky requires `create` for that case, the scope needs `action=create` added and this page updated.
 5. Only after steps 2 to 4 pass, set it on production. Existing users see "Sign in again to allow this" until their next sign-in.
 
 The migration `db/migrations/0033_bsky_avatar_sync.sql` adds the per-account switch, the saved previous avatar, and an insert-only log of every change to a Bluesky profile.

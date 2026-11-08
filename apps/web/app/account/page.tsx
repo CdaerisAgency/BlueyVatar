@@ -140,7 +140,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         data.
       </p>
       <form action={linkEmail}>
-        <Button type="submit" variant="primary">Use the email from my Bluesky account</Button>
+        <Button type="submit" variant="primary">Use the email from my account</Button>
       </form>
       <form action={addEmail}>
         <label>
@@ -165,7 +165,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               )}
               <ButtonLink href="/account/avatars" variant="primary">Change your avatar</ButtonLink>
             </div>
-            {avatarCount === 0 && <p>You have not added an avatar here yet. Until you do, apps that ask for this link get your Bluesky avatar if you have one, or a default avatar.</p>}
+            {avatarCount === 0 && <p>You have not added an avatar here yet. Until you do, apps that ask for this link get the avatar on your profile if you have one, or a default avatar.</p>}
             <CopyField label="URL" value={url} />
             <CopyField label="HTML" value={imgSnippet(url)} />
             <CopyField label="Markdown" value={markdownSnippet(url)} />
@@ -206,7 +206,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <h2>Your data</h2>
       <p>
         <Link href="/account/data">Download your data or delete it</Link>. Deleting removes what blueyvatar holds about you, except
-        billing records, which we keep for 7 years. Records in your own atproto repository stay on your Bluesky account's home server.
+        billing records, which we keep for 7 years. Records in your own atproto repository stay on your account's home server.
       </p>
       <form action="/logout" method="post">
         <Button type="submit">Sign out</Button>

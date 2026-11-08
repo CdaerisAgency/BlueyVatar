@@ -70,7 +70,7 @@ export async function confirmLink(
 export async function linkFromSession(session: OAuthSession): Promise<LinkOutcome> {
   const did = session.did
   const res = await session.fetchHandler('/xrpc/com.atproto.server.getSession')
-  if (!res.ok) return { kind: 'error', message: "Your Bluesky account's home server did not return an email address." }
+  if (!res.ok) return { kind: 'error', message: "Your account's home server did not return an email address." }
   const body = (await res.json()) as { email?: string; emailConfirmed?: boolean }
   const email = body.email
   if (!email) return { kind: 'error', message: 'Your account has no email address, or the email permission was not granted.' }

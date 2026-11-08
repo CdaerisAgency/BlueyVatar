@@ -49,7 +49,7 @@ export function libravatarUrl(hash: string): string {
 
 export const parseImportSource = (raw: string): ImportSource | null => ((IMPORT_SOURCES as readonly string[]).includes(raw) ? (raw as ImportSource) : null)
 
-export const sourceLabel = (s: ImportSource): string => ({ bluesky: 'Bluesky', gravatar: 'Gravatar', libravatar: 'Libravatar' })[s]
+export const sourceLabel = (s: ImportSource): string => ({ bluesky: 'Your profile', gravatar: 'Gravatar', libravatar: 'Libravatar' })[s]
 
 /**
  * Rating to preselect on the confirm form, or null when the user must choose.
@@ -68,11 +68,11 @@ export type BlobMeta = { cid: string; mimeType: string; size: number }
 export function bskyAvatarBlob(record: unknown): Check<BlobMeta> {
   const av = (record as { avatar?: { ref?: { $link?: unknown }; mimeType?: unknown; size?: unknown } } | null)?.avatar
   const cid = av?.ref?.$link
-  if (typeof cid !== 'string' || !/^[a-z0-9]{10,100}$/.test(cid)) return { ok: false, error: 'Your Bluesky profile has no avatar to import.' }
+  if (typeof cid !== 'string' || !/^[a-z0-9]{10,100}$/.test(cid)) return { ok: false, error: 'Your profile has no avatar to import.' }
   const mimeType = typeof av?.mimeType === 'string' ? av.mimeType : ''
   const size = typeof av?.size === 'number' ? av.size : 0
-  if (mimeType !== 'image/png' && mimeType !== 'image/jpeg') return { ok: false, error: 'Only PNG and JPEG images are supported. Your Bluesky avatar is a different type.' }
-  if (size > MAX_BLOB_BYTES) return { ok: false, error: `Your Bluesky avatar is larger than 5 MB (${MAX_BLOB_BYTES.toLocaleString('en-US')} bytes). Upload a smaller file directly instead.` }
+  if (mimeType !== 'image/png' && mimeType !== 'image/jpeg') return { ok: false, error: 'Only PNG and JPEG images are supported. Your profile avatar is a different type.' }
+  if (size > MAX_BLOB_BYTES) return { ok: false, error: `Your profile avatar is larger than 5 MB (${MAX_BLOB_BYTES.toLocaleString('en-US')} bytes). Upload a smaller file directly instead.` }
   return { ok: true, value: { cid, mimeType, size } }
 }
 

@@ -1,6 +1,6 @@
 # blueyvatar Phase 2 decisions (v1)
 
-Checked: November 3, 2026. Scope: spec sections 8, 11 and 14.1 of `/home/user/blueyvatar/docs/spec/blueyvatar-product-spec-v10.md`. Issues #51, #28 (verified accounts) and #38 (custom profile domains).
+Checked: November 3, 2026. Scope: spec sections 8, 11 and 14.1 of `/home/user/blueyvatar/docs/spec/blueyvatar-product-spec-v11.md`. Issues #51, #28 (verified accounts) and #38 (custom profile domains).
 
 ## Decisions needed
 

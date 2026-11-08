@@ -3,10 +3,13 @@ import type { BlobRef } from './repo'
 import type { HomeServer } from './bsky-profile'
 
 /** A mock home server for tests: one Bluesky profile record, a blob store, and the three XRPC calls this feature makes. Never touches the network. */
-export function mockHomeServer(opts: { did?: string; profile?: Record<string, unknown> | null; scope?: string; failWith?: Record<string, number> } = {}) {
+export function mockHomeServer(opts: { did?: string; serverUrl?: string; profile?: Record<string, unknown> | null; scope?: string; failWith?: Record<string, number> } = {}) {
   const did = opts.did ?? 'did:plc:alice'
   let profile: { cid: string; value: Record<string, unknown> } | null = opts.profile === null ? null : { cid: 'cid-v1', value: opts.profile ?? { $type: 'app.bsky.actor.profile', displayName: 'Alice' } }
   const blobs = new Map<string, { bytes: Uint8Array; mime: string }>()
+  const serverUrl = opts.serverUrl ?? 'https://pds.test'
+  /** The origin every call went to. A relative path resolves to the session's own server; an absolute URL would show another host here. */
+  const origins = new Set<string>()
   const calls: { nsid: string; body?: unknown }[] = []
   let version = 1
   let blobCount = 0
@@ -18,7 +21,8 @@ export function mockHomeServer(opts: { did?: string; profile?: Record<string, un
       return { scope: opts.scope ?? 'atproto repo:app.bsky.actor.profile?action=update blob:image/*' }
     },
     async fetchHandler(pathname, init) {
-      const url = new URL(pathname, 'https://pds.test')
+      const url = new URL(pathname, serverUrl)
+      origins.add(url.origin)
       const nsid = url.pathname.replace('/xrpc/', '')
       const body = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined
       calls.push({ nsid, ...(body ? { body } : {}) })
@@ -48,6 +52,7 @@ export function mockHomeServer(opts: { did?: string; profile?: Record<string, un
   return {
     server,
     calls,
+    origins,
     blobs,
     writes: () => calls.filter((c) => c.nsid === 'com.atproto.repo.putRecord'),
     profile: () => profile,

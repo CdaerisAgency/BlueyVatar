@@ -4,6 +4,8 @@ import { ratingFromLabels } from '@blueyvatar/core'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, blobUrl, blueskyAvatarCid, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
 import { canAddImage, imageLimit, limitMessage } from '../../../lib/records'
+import { pdsHost } from '../../../lib/pds'
+import { serverLabel } from '../../../lib/home-server'
 import { resolvePlan } from '../../../lib/plan'
 import { getStore } from '../../../lib/store'
 import { describeLinkedEmails, readPrimaryAddress } from '../../../lib/linked-emails'
@@ -46,7 +48,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
 
-      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} />}
+      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} server={serverLabel(pdsHost(pds))} />}
 
       <h2>
         Your images ({images.length} of {imageLimit(plan)})
@@ -69,19 +71,19 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
             <>
               {/* The blob is served by the user's home server, so next/image optimization does not apply. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={blobUrl(pds, did, bskyCid)} alt="Your Bluesky avatar" className="size-24 object-cover" referrerPolicy="no-referrer" />
+              <img src={blobUrl(pds, did, bskyCid)} alt="Your profile avatar" className="size-24 object-cover" referrerPolicy="no-referrer" />
               <div>
-                <div>Your Bluesky avatar{images.length === 0 ? ' (currently shown)' : ''}</div>
+                <div>Your profile avatar{images.length === 0 ? ' (currently shown)' : ''}</div>
                 {canAdd && (
                   <p>
                     <ButtonLink href="/account/avatars/import?source=bluesky">Use this as my blueyvatar avatar</ButtonLink>
                   </p>
                 )}
-                <p>Bluesky accepts avatars up to 1,000,000 bytes, and blueyvatar accepts up to 5 MiB, so blueyvatar shrinks a large image when you send it to Bluesky.</p>
+                <p>Profile avatars accept up to 1,000,000 bytes, and blueyvatar accepts up to 5 MiB, so blueyvatar shrinks a large image when you send it to your profile.</p>
               </div>
             </>
           ) : (
-            <p>You have no avatar on Bluesky.</p>
+            <p>Your profile has no avatar.</p>
           )}
         </div>
       )}
@@ -105,7 +107,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                       <Button type="submit">Set as default</Button>
                     </form>
                   )}
-                  {bsky && <UseAsBskyAvatar rkey={img.rkey} blockedReason={bskyBlockReason(img)} />}
+                  {bsky && <UseAsBskyAvatar rkey={img.rkey} blockedReason={bskyBlockReason(img)} server={serverLabel(pdsHost(pds))} />}
                   <form action={removeImage}>
                     <input type="hidden" name="rkey" value={img.rkey} />
                     <Button type="submit">Delete</Button>
@@ -123,7 +125,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           <p>Copy an avatar you already use into your repository. The image must be PNG or JPEG and at most 5 MB. Images above 4096 pixels on the long side are shrunk to fit.</p>
           <ul>
             <li>
-              <a href="/account/avatars/import?source=bluesky">Import my Bluesky profile avatar</a>
+              <a href="/account/avatars/import?source=bluesky">Import my profile avatar</a>
             </li>
             {links.map((l, i) => (
               <li key={l.emailHash}>

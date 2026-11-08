@@ -45,7 +45,7 @@ export async function repoSession(did: string): Promise<OAuthSession> {
   try {
     return await (await oauthClient()).restore(did)
   } catch {
-    throw new RepoError("Your session with your Bluesky account's home server expired. Sign in again.")
+    throw new RepoError("Your session with your account's home server expired. Sign in again.")
   }
 }
 
@@ -57,7 +57,7 @@ export async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsi
   })
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-    throw new RepoError(err.error ?? `Your Bluesky account's home server returned an error (${res.status})`)
+    throw new RepoError(err.error ?? `Your account's home server returned an error (${res.status})`)
   }
   return (await res.json()) as T
 }
@@ -95,7 +95,7 @@ export async function getProfile(session: OAuthSession): Promise<{ cid: string; 
   if (res.ok) return (await res.json()) as { cid: string; value: ProfileRecord }
   const err = (await res.json().catch(() => ({}))) as { error?: string }
   if (err.error === 'RecordNotFound') return null
-  throw new RepoError(err.error ?? `Your Bluesky account's home server returned an error (${res.status})`)
+  throw new RepoError(err.error ?? `Your account's home server returned an error (${res.status})`)
 }
 
 export async function uploadBlob(session: OAuthSession, bytes: Uint8Array, mime: ImageMime): Promise<BlobRef> {
@@ -104,7 +104,7 @@ export async function uploadBlob(session: OAuthSession, bytes: Uint8Array, mime:
     headers: { 'content-type': mime },
     body: bytes as BodyInit,
   })
-  if (!res.ok) throw new RepoError("Your Bluesky account's home server rejected the upload.")
+  if (!res.ok) throw new RepoError("Your account's home server rejected the upload.")
   return ((await res.json()) as { blob: BlobRef }).blob
 }
 
@@ -190,14 +190,14 @@ export async function saveNewImage(session: OAuthSession, bytes: Uint8Array, mim
  */
 export async function fetchBlueskyAvatar(session: OAuthSession): Promise<{ bytes: Uint8Array; mime: ImageMime; labels: unknown }> {
   const rec = await session.fetchHandler(`/xrpc/com.atproto.repo.getRecord?${new URLSearchParams({ repo: session.did, collection: 'app.bsky.actor.profile', rkey: 'self' })}`)
-  if (!rec.ok) throw new RepoError('Your Bluesky profile could not be read.')
+  if (!rec.ok) throw new RepoError("Your profile could not be read from your account's home server.")
   const value = ((await rec.json()) as { value?: { labels?: unknown } }).value
   const meta = bskyAvatarBlob(value)
   if (!meta.ok) throw new RepoError(meta.error)
   const res = await session.fetchHandler(`/xrpc/com.atproto.sync.getBlob?${new URLSearchParams({ did: session.did, cid: meta.value.cid })}`, { signal: AbortSignal.timeout(8000) })
-  if (!res.ok) throw new RepoError("Your Bluesky account's home server did not return the Bluesky avatar.")
+  if (!res.ok) throw new RepoError("Your account's home server did not return your profile avatar.")
   const bytes = await readCapped(res, MAX_BLOB_BYTES)
-  if (!bytes) throw new RepoError('Your Bluesky avatar is larger than 5 MB. Upload a smaller file directly instead.')
+  if (!bytes) throw new RepoError('Your profile avatar is larger than 5 MB. Upload a smaller file directly instead.')
   const v = validateImageBytes(bytes)
   if (!v.ok) throw new RepoError(v.error)
   return { bytes, mime: v.value.mime, labels: value?.labels }

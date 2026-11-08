@@ -13,7 +13,7 @@ describe('validateCustomHostname', () => {
     for (const h of ['example.com', 'example.co.uk']) {
       expect(validateCustomHostname(h)).toEqual({ ok: false, error: APEX_MESSAGE })
     }
-    expect(APEX_MESSAGE).toContain('Bluesky handle')
+    expect(APEX_MESSAGE).toContain('account handle')
   })
   it('rejects bad input', () => {
     for (const h of ['', 'localhost', 'https://me.example.com', 'me.example.com/x', 'me.example.com:8080', '1.2.3.4', 'com', 'co.uk', '-a.example.com', 'a_b.example.com', 'me.example.invalidtld']) {

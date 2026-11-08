@@ -13,7 +13,7 @@ const JPEG_QUALITIES = [90, 80, 70] as const
 export type BskyAvatarImage = { bytes: Uint8Array; mime: ImageMime; side: number }
 export type BskyAvatarImageResult = { ok: true; value: BskyAvatarImage } | { ok: false; error: string }
 
-export const BSKY_AVATAR_TOO_LARGE = 'This image is still larger than the 1 MB Bluesky allows after shrinking it. Choose a simpler or smaller image for your Bluesky avatar.'
+export const BSKY_AVATAR_TOO_LARGE = 'This image is still larger than the 1 MB limit for profile avatars after shrinking it. Choose a simpler or smaller image.'
 
 /**
  * Turns a stored avatar into what Bluesky accepts: the square region the user chose (or the center square),
@@ -38,6 +38,6 @@ export async function prepareBlueskyAvatar(source: Uint8Array, crop?: CropParams
     }
     return { ok: false, error: BSKY_AVATAR_TOO_LARGE }
   } catch {
-    return { ok: false, error: 'The image could not be prepared for Bluesky. Choose a different PNG or JPEG.' }
+    return { ok: false, error: 'The image could not be prepared as a profile avatar. Choose a different PNG or JPEG.' }
   }
 }

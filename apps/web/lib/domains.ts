@@ -12,7 +12,7 @@ const fail = (error: string): Check<never> => ({ ok: false, error })
 
 export const APEX_MESSAGE =
   'That is a root domain. Custom profile domains work for subdomains such as me.example.com. ' +
-  'To use your root domain, set your Bluesky handle to that domain instead (Settings, Change Handle, "I have my own domain"). ' +
+  'To use your root domain, set your account handle to that domain instead (look for a change-handle option in the app or on the server that hosts your account). ' +
   'Once your handle is the domain, /p/{domain} on blueyvatar shows your profile.'
 
 const LABEL = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/

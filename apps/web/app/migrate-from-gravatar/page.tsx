@@ -23,7 +23,7 @@ export default function MigratePage() {
 
       <h2>1. Sign in</h2>
       <p>
-        <Link href="/login">Sign in</Link> with the Bluesky account you already have. There is no password and no new account.
+        <Link href="/login">Sign in</Link> with the atproto account you already have. There is no password and no new account.
       </p>
 
       <h2>2. Link your email</h2>

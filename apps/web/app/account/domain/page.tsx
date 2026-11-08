@@ -121,7 +121,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
 
       <h2>Using a root domain</h2>
       <p>
-        Root domains such as example.com cannot be served this way. Instead, set your Bluesky handle to your domain. Once your handle is the domain,
+        Root domains such as example.com cannot be served this way. Instead, set your account handle to your domain. Once your handle is the domain,
         /p/{'{domain}'} on blueyvatar shows your profile.
       </p>
     </PageMain>

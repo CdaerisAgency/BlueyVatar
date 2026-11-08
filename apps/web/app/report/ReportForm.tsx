@@ -10,7 +10,7 @@ const NOTES: Record<string, string> = {
   invalid_reason: 'Choose a reason for the report.',
   invalid_details: `Add details about the problem, at least ${MIN_DETAILS} characters.`,
   invalid_contact: 'Enter a valid email address so we can follow up.',
-  signin: 'Sign in with Bluesky to send a report.',
+  signin: 'Sign in to send a report.',
   limited: 'Too many reports from this network or account. Try again later.',
   error: 'Something went wrong. Try again later.',
 }
@@ -31,7 +31,7 @@ export async function ReportForm({ did, source, back, status }: { did: string; s
         ) : (
           <>
             <p>Sign in to send a report. See the <a href="/policy">content policy</a>.</p>
-            <p><a href={loginPath(back)}>Sign in with Bluesky to report this {noun}</a></p>
+            <p><a href={loginPath(back)}>Sign in to report this {noun}</a></p>
             <p>Cannot sign in? For legal or urgent notices, write to <a href="mailto:security@blueyvatar.com">security@blueyvatar.com</a>.</p>
           </>
         )}
