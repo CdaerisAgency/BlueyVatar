@@ -2,7 +2,6 @@ import { normalizeBackgroundColor } from '@blueyvatar/core'
 import { PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
-import AccountNav from '../AccountNav'
 import { ProfileForm } from './ProfileForm'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +18,6 @@ export default async function ProfilePage() {
   const color = normalizeBackgroundColor(p.backgroundColor)
   return (
     <PageMain>
-      <AccountNav />
       <h1>Profile</h1>
       <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your Bluesky profile.</p>
       {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}

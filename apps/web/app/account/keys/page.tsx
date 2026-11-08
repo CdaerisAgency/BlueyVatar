@@ -9,7 +9,6 @@ import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartO
 import { isScope, resolveScope } from '../../../lib/orgs/scope'
 import { getOrganization } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
-import AccountNav from '../AccountNav'
 import { CreateKeyForm, KeyActions } from './KeyControls'
 
 export const dynamic = 'force-dynamic'
@@ -25,8 +24,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   if (!isScope(scope)) {
     return (
       <PageMain>
-        <AccountNav />
-        <h1>License and API keys</h1>
+        <h1>API keys and license</h1>
         <p role="alert">{scope.error}</p>
       </PageMain>
     )
@@ -53,8 +51,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
 
   return (
     <PageMain>
-      <AccountNav />
-      <h1>License and API keys</h1>
+      <h1>API keys and license</h1>
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
 

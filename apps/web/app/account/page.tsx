@@ -19,7 +19,6 @@ import { getProfile, listImages, repoSession, type ProfileRecord } from '../../l
 import { getStore } from '../../lib/store'
 import { viewerFor } from '../../lib/viewer'
 import { displayName } from '../../lib/viewer-core'
-import AccountNav from './AccountNav'
 import CopyField from './CopyField'
 import GallerySection from './GallerySection'
 import LinkedEmail from './LinkedEmail'
@@ -79,7 +78,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const url = primary ? ownerAvatarUrl(primary.emailHash) : null
   return (
     <PageMain>
-      <AccountNav />
       <h1>Account</h1>
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {list && showChecklist(list.complete, prefs.showAgain) && (

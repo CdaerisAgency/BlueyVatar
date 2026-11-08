@@ -6,11 +6,10 @@ import { HOLD_DAYS } from '../../../../lib/email-policy'
 import { homeServerFor } from '../../../../lib/home-server'
 import { viewerFor } from '../../../../lib/viewer'
 import { displayName } from '../../../../lib/viewer-core'
-import AccountNav from '../../AccountNav'
 import { deleteMyData } from './actions'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Your data' }
+export const metadata = { title: 'Danger zone' }
 
 export default async function DangerZonePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const did = await requireDid('/account/settings/danger')
@@ -19,8 +18,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
   const { error } = await searchParams
   return (
     <PageMain>
-      <AccountNav />
-      <h1>Your data</h1>
+      <h1>Danger zone</h1>
       <p>
         Signed in as {displayName(viewer)}
         {viewer.handle && <small className="block text-bv-ink-3">Account ID: {did}</small>}

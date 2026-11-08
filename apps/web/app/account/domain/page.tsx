@@ -5,7 +5,6 @@ import { cfSaasConfig, fallbackOrigin, getHostname, type HostnameState } from '.
 import { getDomainStore } from '../../../lib/domain-store'
 import { resolvePlan } from '../../../lib/plan'
 import { limited } from '../../../lib/rate-guard'
-import AccountNav from '../AccountNav'
 import { addDomain, removeDomain } from './actions'
 import { PollRefresh } from './PollRefresh'
 
@@ -37,7 +36,6 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
 
   return (
     <PageMain>
-      <AccountNav />
       <h1>Custom profile domain</h1>
       <p>Serve your profile from your own subdomain, such as me.example.com.</p>
       {error && <p role="alert">{error}</p>}

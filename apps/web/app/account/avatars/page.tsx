@@ -7,7 +7,6 @@ import { canAddImage, imageLimit, limitMessage } from '../../../lib/records'
 import { resolvePlan } from '../../../lib/plan'
 import { getStore } from '../../../lib/store'
 import { describeLinkedEmails, readPrimaryAddress } from '../../../lib/linked-emails'
-import AccountNav from '../AccountNav'
 import ImageFileInput from './ImageFileInput'
 import RatingFields from './RatingFields'
 import BskyAvatarPanel from './BskyAvatarPanel'
@@ -42,7 +41,6 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageMain>
-      <AccountNav />
       <h1>Avatars</h1>
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}

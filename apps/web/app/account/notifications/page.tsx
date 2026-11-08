@@ -4,7 +4,6 @@ import { PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { getNoticeDirectory } from '../../../lib/notify'
 import { getStore } from '../../../lib/store'
-import AccountNav from '../AccountNav'
 import { NotificationsForm } from './NotificationsForm'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +13,6 @@ export default async function NotificationsPage() {
   const [prefs, address] = await Promise.all([getNoticeDirectory().prefs(did), getStore().links.noticeAddress(did)])
   return (
     <PageMain>
-      <AccountNav />
       <h1>Notifications</h1>
       <p>Signed in as {did}</p>
       {!address && <p role="status">No primary email is on file, so no notices can be sent. Link an email on the <Link href="/account/verify">verify page</Link> to receive them.</p>}

@@ -9,7 +9,6 @@ import { resolvePlan } from '../../../lib/plan'
 import { canManageBilling } from '../../../lib/orgs/roles'
 import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
-import AccountNav from '../AccountNav'
 import { openPortal, startCheckout } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -36,8 +35,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageMain>
-      <AccountNav />
-      <h1>Billing</h1>
+      <h1>Plan and billing</h1>
       <p>Signed in as {did}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.error && <p role="alert">{q.error}</p>}
@@ -102,8 +100,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   if (!pool || !org || !lic) {
     return (
       <PageMain>
-        <AccountNav />
-        <h1>Billing</h1>
+        <h1>Plan and billing</h1>
         <p role="alert">You are not a member of that organization.</p>
       </PageMain>
     )
@@ -111,8 +108,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   if (!canManageBilling(role)) {
     return (
       <PageMain>
-        <AccountNav />
-        <h1>Billing: {org.name}</h1>
+        <h1>Plan and billing: {org.name}</h1>
         <p role="alert">Only organization owners can manage billing.</p>
       </PageMain>
     )
@@ -123,8 +119,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   const business = PRICING.find((p) => p.id === 'business')
   return (
     <PageMain>
-      <AccountNav />
-      <h1>Billing: {org.name}</h1>
+      <h1>Plan and billing: {org.name}</h1>
       <p>Signed in as {did}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.error && <p role="alert">{q.error}</p>}
