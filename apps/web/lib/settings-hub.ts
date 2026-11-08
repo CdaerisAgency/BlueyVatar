@@ -1,4 +1,4 @@
-/** Every settings route, grouped for /account/settings (issue #152). AccountNav reads the same list to find the current route. */
+/** Every settings route, grouped for /account/settings (issue #152). AccountNav finds the current route from its own list. Settings itself lives in the profile menu. */
 export type SettingsLink = { href: string; label: string; description: string }
 export type SettingsGroup = { title: string; links: SettingsLink[] }
 
@@ -28,10 +28,12 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     ],
   },
   { title: 'Billing', links: [{ href: '/account/billing', label: 'Billing', description: 'Your plan, payment method, and invoices.' }] },
-  { title: 'Data', links: [{ href: '/account/data', label: 'Your data', description: 'Download a copy of what we hold, or delete it.' }] },
 ]
 
-export const SETTINGS_LINKS: SettingsLink[] = SETTINGS_GROUPS.flatMap((g) => g.links)
+/** Shown last on the settings page, styled as destructive. */
+export const DANGER_ZONE: SettingsLink = { href: '/account/settings/danger', label: 'Your data', description: 'Download a copy of what we store, or delete it.' }
+
+export const SETTINGS_LINKS: SettingsLink[] = [...SETTINGS_GROUPS.flatMap((g) => g.links), DANGER_ZONE]
 
 /** The nav entry for a pathname: an exact match, else the longest entry the path sits under. /account itself only matches exactly. */
 export function currentHref(pathname: string, hrefs: readonly string[]): string | null {

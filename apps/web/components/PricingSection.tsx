@@ -1,3 +1,4 @@
+import { currentDid } from '../lib/auth'
 import { COPY } from '../lib/copy'
 import { PRICING, formatPrice } from '../lib/pricing'
 import { ButtonLink } from './Button'
@@ -6,8 +7,9 @@ import { SectionTitle } from './Type'
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
 /** The price cards. Prices come from lib/pricing.ts only. */
-export function PricingSection({ headingAs = 'h2' }: { headingAs?: 'h1' | 'h2' }) {
+export async function PricingSection({ headingAs = 'h2' }: { headingAs?: 'h1' | 'h2' }) {
   // Tier names sit one level below the section title so headings never skip a level.
+  const signedIn = (await currentDid().catch(() => null)) !== null
   const Tier = headingAs === 'h1' ? 'h2' : 'h3'
   return (
     <div className={`${inner} py-16`}>
@@ -33,7 +35,7 @@ export function PricingSection({ headingAs = 'h2' }: { headingAs?: 'h1' | 'h2' }
                 {t.per && <small className="font-sans text-lg font-normal text-bv-ink-3">{COPY.pricing.perMonth}</small>}
               </span>
               <p className="m-0">{COPY.pricing.tiers[t.id].body}</p>
-              <ButtonLink href="/login" variant={t.highlighted ? 'primary' : 'secondary'} className="mt-auto">
+              <ButtonLink href={signedIn ? (t.id === 'free' ? '/account/keys' : '/account/billing') : '/login'} variant={t.highlighted ? 'primary' : 'secondary'} className="mt-auto">
                 {COPY.pricing.tiers[t.id].cta}
               </ButtonLink>
             </li>

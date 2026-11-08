@@ -15,6 +15,8 @@ import { MAX_LINKED_EMAILS, HOLD_DAYS } from '../../lib/email-policy'
 import { PUBLIC_URL } from '../../lib/oauth'
 import { getProfile, listImages, repoSession, type ProfileRecord } from '../../lib/repo'
 import { getStore } from '../../lib/store'
+import { viewerFor } from '../../lib/viewer'
+import { displayName } from '../../lib/viewer-core'
 import AccountNav from './AccountNav'
 import CopyField from './CopyField'
 import GallerySection from './GallerySection'
@@ -75,7 +77,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     <PageMain>
       <AccountNav />
       <h1>Account</h1>
-      <p>Signed in as {did}</p>
+      <p>Signed in as {displayName(await viewerFor(did))}</p>
       {list && showChecklist(list.complete, prefs.showAgain) && (
         <section id="checklist" aria-labelledby="checklist-h">
           <h2 id="checklist-h">Get started ({list.done} of {list.total} done)</h2>

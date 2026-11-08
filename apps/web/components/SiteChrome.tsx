@@ -1,10 +1,16 @@
 import Link from 'next/link'
 import { COPY } from '../lib/copy'
+import { currentDid } from '../lib/auth'
+import { currentViewer } from '../lib/viewer'
+import { avatarInitial, displayName } from '../lib/viewer-core'
 import { ButtonLink } from './Button'
+import ProfileMenu from './ProfileMenu'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
-export function SiteNav() {
+/** Reads the session cookie, so every page that renders the header is per-visitor. Next marks such responses `Cache-Control: private, no-store`; /img and static assets are served elsewhere and stay cached. */
+export async function SiteNav() {
+  const viewer = await currentViewer().catch(() => null)
   const link = 'text-bv-black no-underline hover:text-bv-blue hover:underline'
   return (
     <header>
@@ -36,22 +42,28 @@ export function SiteNav() {
           <Link href="/integrations" className={link}>
             {COPY.nav.integrations}
           </Link>
-          <ButtonLink href="/login" variant="primary">
-            {COPY.nav.signIn}
-          </ButtonLink>
+          {viewer ? (
+            <ProfileMenu name={displayName(viewer)} initial={avatarInitial(viewer)} />
+          ) : (
+            <ButtonLink href="/login" variant="primary">
+              {COPY.nav.signIn}
+            </ButtonLink>
+          )}
         </nav>
       </div>
     </header>
   )
 }
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const signedIn = await currentDid().catch(() => null)
+  const links = COPY.footer.links.filter((l) => !(signedIn && l.href === '/login'))
   return (
     <footer className="border-t-[1.5px] border-bv-line text-sm text-bv-ink-3">
       <div className={`${inner} flex flex-wrap justify-between gap-x-6 gap-y-3 py-7`}>
         <span>{COPY.footer.tagline}</span>
         <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
-          {COPY.footer.links.map((l) => (
+          {links.map((l) => (
             <Link key={l.href} href={l.href} className="text-bv-ink-3 no-underline hover:text-bv-blue hover:underline">
               {l.label}
             </Link>
