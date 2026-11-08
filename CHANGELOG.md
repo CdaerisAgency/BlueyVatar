@@ -5,6 +5,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ## 2026-11-08
 
 ### Changed
+- Reporting a profile or avatar now requires signing in with Bluesky, and the reason, details (at least 10 characters), and email are all required. Reports store the reporter's account, which is limited to 5 reports per hour in addition to the per-network limit and is shown to reviewers only. The content policy lists security@blueyvatar.com for legal or urgent notices from people who cannot sign in (#224).
 - The avatars page has an Upload an image button, shows your Bluesky avatar with a button to use it, shows linked emails (your primary in full, others masked), and hides "If R, label as" unless R is chosen. The limit message names the right plan (#227).
 - blueyvatar no longer asks for or stores an image license. Existing records keep working and nothing is deleted from your repository (#227).
 - The link email explains how your address is used, and the account page and privacy page say "your Bluesky account's home server" instead of "PDS" (#223).

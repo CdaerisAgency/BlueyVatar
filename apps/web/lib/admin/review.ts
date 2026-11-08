@@ -110,7 +110,7 @@ export async function nextCase(pool: pg.Pool, queue: QueueName, actor: string, n
 // ---------------------------------------------------------------- case detail
 
 export type SignalRow = { id: number; kind: SignalKind; category: string; source: string | null; report_id: number | null; created_at: Date }
-export type ReportNote = { id: number; reason: string; source: string; details: string | null; created_at: Date }
+export type ReportNote = { id: number; reason: string; source: string; details: string | null; reporter_did: string | null; created_at: Date }
 export type CaseDetail = {
   c: CaseRow
   signals: SignalRow[]
@@ -135,7 +135,7 @@ export async function caseDetail(q: Q, id: number): Promise<CaseDetail | null> {
   const [signals, notes, other, hashCases, hashBlocks, hashActions, hashAccts, images, blocked, overrides, susp, events, appeal, acts] = await Promise.all([
     one<SignalRow>('SELECT id::int AS id, kind, category, source, report_id::int AS report_id, created_at FROM case_signals WHERE case_id = $1 ORDER BY created_at, id', [id]),
     c.child_safety ? Promise.resolve([] as ReportNote[]) : one<ReportNote>(
-      `SELECT r.id::int AS id, r.reason, r.source, r.details, r.created_at FROM reports r JOIN case_signals s ON s.report_id = r.id WHERE s.case_id = $1 ORDER BY r.created_at`, [id]),
+      `SELECT r.id::int AS id, r.reason, r.source, r.details, r.reporter_did, r.created_at FROM reports r JOIN case_signals s ON s.report_id = r.id WHERE s.case_id = $1 ORDER BY r.created_at`, [id]),
     one<CaseDetail['otherCases'][number]>('SELECT id::int AS id, status, severity, opened_at, resolved_at FROM review_cases WHERE subject_did = $1 AND id <> $2 ORDER BY opened_at DESC LIMIT 20', [did, id]),
     c.subject_cid ? one<{ id: number; subject_did: string; status: string }>('SELECT id::int AS id, subject_did, status FROM review_cases WHERE subject_cid = $1 AND id <> $2 ORDER BY opened_at DESC LIMIT 20', [c.subject_cid, id]) : Promise.resolve([]),
     c.subject_cid ? one<{ n: number }>('SELECT count(*)::int AS n FROM blocked_images WHERE cid = $1', [c.subject_cid]) : Promise.resolve([{ n: 0 }]),
