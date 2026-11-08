@@ -2,6 +2,12 @@
 
 New features, changes, and fixes to blueyvatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-08
+
+### Changed
+- Landing page: removed the handle pill from the hero graphic, and the developer samples use a neutral example handle. "Claim your avatar" goes to your account when you are signed in.
+- Sign-in page: clearer handle help with an example and a note about custom domains, and the handle is checked in the browser and on the server. Signed-in visitors go straight to their account.
+
 ## 2026-11-07
 
 ### Changed

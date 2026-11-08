@@ -13,7 +13,6 @@ export const COPY = {
     primary: 'Claim your avatar',
     secondary: 'Read the docs',
     note: 'Free for everyone. No password, no new account. Sign in with the Bluesky account you already have.',
-    chip: '@chris.cdaeris.com',
     avatarAlt: 'Example avatar',
   },
   how: {
@@ -31,8 +30,8 @@ export const COPY = {
     link: 'Open the API reference',
     samples: [
       { comment: '// avatar by email hash', url: 'https://img.blueyvatar.com/avatar/<sha256>?s=128&r=pg' },
-      { comment: '// avatar by handle', url: 'https://img.blueyvatar.com/u/chris.cdaeris.com?s=256' },
-      { comment: '// profile card JSON', url: 'https://img.blueyvatar.com/profile/chris.cdaeris.com' },
+      { comment: '// avatar by handle', url: 'https://img.blueyvatar.com/u/alice.example.com?s=256' },
+      { comment: '// profile card JSON', url: 'https://img.blueyvatar.com/profile/alice.example.com' },
     ],
   },
   pricing: {
@@ -69,8 +68,9 @@ export const COPY = {
   login: {
     title: 'Sign in',
     lead: 'Use the Bluesky account you already have.',
-    label: 'Your atproto handle',
-    placeholder: 'alice.bsky.social',
+    label: 'Your atproto handle. Format: username.server.server',
+    placeholder: 'username.bsky.social',
+    help: 'Example: username.bsky.social. If you use your own domain as a handle, enter it the same way, such as alice.example.com.',
     submit: 'Continue',
   },
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
