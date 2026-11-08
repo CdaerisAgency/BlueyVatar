@@ -4,10 +4,11 @@ import { requireDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
 import { sourceLabel } from '../../../../lib/import'
 import { RepoError, listImages, repoSession } from '../../../../lib/repo'
-import { LICENSES, canAddImage, limitMessage } from '../../../../lib/records'
+import { canAddImage, limitMessage } from '../../../../lib/records'
 import { resolvePlan } from '../../../../lib/plan'
 import { limited } from '../../../../lib/rate-guard'
 import AccountNav from '../../AccountNav'
+import RatingFields from '../RatingFields'
 import { confirmImport } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -43,36 +44,10 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={preview.uri} alt="Preview of the image to import" width={160} height={160} className="object-cover" />
           <p>
-            This image comes from {preview.label}. Confirm its rating and license before it is saved to your repository, where it will be public.
+            This image comes from {preview.label}. Confirm its rating before it is saved to your repository, where it will be public.
             {preview.suggested === null ? ' We cannot see how the image was rated, so choose a rating.' : ''}
           </p>
-          <label>
-            Rating{' '}
-            <select name="rating" defaultValue={preview.suggested ?? ''} required>
-              {preview.suggested === null && <option value="">Choose a rating</option>}
-              <option value="g">G: suitable for all audiences</option>
-              <option value="pg">PG: non-sexual nudity or mild content</option>
-              <option value="r">R: sexually suggestive or graphic media</option>
-              <option value="x">X: adult content</option>
-            </select>
-          </label>
-          <label>
-            If R, label as{' '}
-            <select name="rLabel" defaultValue="sexual">
-              <option value="sexual">Sexual</option>
-              <option value="graphic-media">Graphic media</option>
-            </select>
-          </label>
-          <label>
-            License{' '}
-            <select name="license" defaultValue="personal">
-              {LICENSES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
+          <RatingFields defaultRating={preview.suggested ?? ''} needsChoice={preview.suggested === null} />
           <label>
             Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
           </label>

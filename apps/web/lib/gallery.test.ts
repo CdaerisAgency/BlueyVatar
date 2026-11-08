@@ -17,7 +17,7 @@ function pngBytes(w: number, h: number): Uint8Array {
   return b
 }
 const PNG = pngBytes(100, 100)
-const fields = { alt: '', caption: '', rating: 'g', rLabel: '', license: 'personal' }
+const fields = { alt: '', caption: '', rating: 'g', rLabel: '' }
 
 type Rec = { uri: string; cid: string; value: Record<string, unknown> }
 
@@ -91,7 +91,8 @@ describe('addGalleryImage', () => {
     pds.put('avatar1', avatarValue())
     await addGalleryImage(pds.session, PNG, 'image/png', { ...fields, caption: 'A caption', rating: 'pg' })
     const created = [...pds.records.values()].find((r) => r.value.purpose === 'gallery')!
-    expect(created.value).toMatchObject({ purpose: 'gallery', caption: 'A caption', sort: 0, license: 'personal' })
+    expect(created.value).toMatchObject({ purpose: 'gallery', caption: 'A caption', sort: 0 })
+    expect(created.value).not.toHaveProperty('license')
     expect(created.value.isDefault).toBeUndefined()
     expect(created.value.labels).toMatchObject({ values: [{ val: 'nudity' }] })
     const avatars = await listImages(pds.session)

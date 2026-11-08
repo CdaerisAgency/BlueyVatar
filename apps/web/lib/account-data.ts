@@ -1,5 +1,6 @@
 import type pg from 'pg'
 import { maskEmail } from './mask'
+import { maskDomain } from './linked-emails'
 import { decryptJson } from './token-crypto'
 import { releaseAllPg } from './store'
 
@@ -17,6 +18,8 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
 /**
  * Everything blueyvatar holds about one DID, as plain JSON. Never includes key hashes or secrets, the stored
  * primary email beyond a masked form, reports filed against the DID, or an admin's internal decision note on an appeal. Billing rows are included as a summary.
+ * Beyond the fields most people expect, the file also holds email holds, organization memberships and their audit history, the Stripe
+ * customer ID, and the indexed copy of avatars and profile (the data page text should list them; issue #223).
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
@@ -48,12 +51,14 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
       primaryEmail = null
     }
   }
+  // The primary link's domain is masked like primaryMasked, because the account page promises the primary address only in masked form.
+  const maskedLinks = links.map((r) => (r.is_primary === true && typeof r.email_domain === 'string' ? { ...r, email_domain: maskDomain(r.email_domain) } : r))
   const dates = <T extends Record<string, unknown>>(rows: T[]) => rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v instanceof Date ? iso(v) : v])))
   return {
     exportedAt: now.toISOString(),
     did,
-    note: 'Records in your own atproto repository (avatars, profile, claims, links, gallery) are stored by your PDS and are not part of this file.',
-    emails: { primaryMasked: primaryEmail, links: dates(links), holds: dates(holds) },
+    note: "Records in your own atproto repository (avatars, profile, claims, links, gallery) are stored by your Bluesky account's home server and are not part of this file.",
+    emails: { primaryMasked: primaryEmail, links: dates(maskedLinks), holds: dates(holds) },
     profileLinks: dates(profileLinks),
     claims: dates(claims),
     attestations: dates(attestations),

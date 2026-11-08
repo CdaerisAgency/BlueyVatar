@@ -40,7 +40,6 @@ export async function uploadGalleryImage(form: FormData): Promise<void> {
     caption: String(form.get('caption') ?? ''),
     rating: String(form.get('rating') ?? ''),
     rLabel: String(form.get('rLabel') ?? ''),
-    license: String(form.get('license') ?? ''),
     cropX: String(form.get('cropX') ?? ''),
     cropY: String(form.get('cropY') ?? ''),
     cropSize: String(form.get('cropSize') ?? ''),
