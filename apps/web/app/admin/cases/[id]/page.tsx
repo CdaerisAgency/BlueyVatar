@@ -98,14 +98,14 @@ export default async function CasePage({ params, searchParams }: { params: Promi
       <section aria-label="Signals">
         <h2>Why this case exists</h2>
         <ul>
-          {byKind('report').length > 0 && <li>{byKind('report').length} report{byKind('report').length === 1 ? '' : 's'}: {reportCats.map(([k, n]) => `${label(k)} (${n})`).join(', ')}. Reporter identity is hidden.</li>}
+          {byKind('report').length > 0 && <li>{byKind('report').length} report{byKind('report').length === 1 ? '' : 's'}: {reportCats.map(([k, n]) => `${label(k)} (${n})`).join(', ')}. Reporter email and IP are hidden.</li>}
           {byKind('scanner').map((x) => <li key={x.id}>Scanner result at upload: {x.source ?? 'unknown service'}, {x.category}, {fmt(x.created_at)}</li>)}
           {byKind('label').map((x) => <li key={x.id}>Label: {x.category}{x.source && <> (from <code>{x.source}</code>)</>}, {fmt(x.created_at)}</li>)}
           {byKind('manual').length > 0 && <li>Opened by a reviewer.</li>}
           {d.appeal && <li>Appeal #{d.appeal.id} against {d.appeal.action} #{d.appeal.action_id} by {d.appeal.action_by}: {d.appeal.action_reason}</li>}
         </ul>
         {d.appeal && <p>Appellant statement: {d.appeal.statement}</p>}
-        {d.reportNotes.filter((r) => r.details).map((r) => <p key={r.id}>Report #{r.id} ({label(r.reason)}, {r.source}): {r.details}</p>)}
+        {d.reportNotes.filter((r) => r.details).map((r) => <p key={r.id}>Report #{r.id} ({label(r.reason)}, {r.source}, reporter {r.reporter_did ?? 'not recorded'}): {r.details}</p>)}
       </section>
 
       {c.child_safety ? (

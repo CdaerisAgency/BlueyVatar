@@ -73,36 +73,11 @@ test.describe('signed-out redirects', () => {
 })
 
 test.describe('report form', () => {
-  // The limit is per client address (fly-client-ip), so every test run uses a fresh one.
-  const freshIp = () => `10.${randomBytes(1)[0]}.${randomBytes(1)[0]}.${randomBytes(1)[0]}`
-
-  async function submit(page: import('@playwright/test').Page) {
+  test('a signed-out visitor sees a sign-in prompt and a contact address, not the form', async ({ page }) => {
     await page.goto(`/p/${SEEDED.handle}`)
     await page.getByText('Report this profile').click()
-    await page.getByLabel('Reason').selectOption('spam')
-    await page.getByLabel('Details').fill('E2E test report')
-    await page.getByRole('button', { name: 'Send report' }).click()
-  }
-
-  test('a report is accepted, then the sixth in an hour is limited', async ({ browser }) => {
-    const context = await browser.newContext({ extraHTTPHeaders: { 'fly-client-ip': freshIp() } })
-    const page = await context.newPage()
-    for (let i = 1; i <= 5; i++) {
-      await submit(page)
-      await expect(page).toHaveURL(/report=sent$/)
-      await expect(page.getByRole('status')).toContainText('Your report was received')
-    }
-    await submit(page)
-    await expect(page).toHaveURL(/report=limited$/)
-    await expect(page.getByRole('status')).toContainText('Too many reports')
-    await context.close()
-  })
-
-  test('a report without a reason is refused by the form', async ({ page }) => {
-    await page.goto(`/p/${SEEDED.handle}`)
-    await page.getByText('Report this profile').click()
-    await page.getByRole('button', { name: 'Send report' }).click()
-    await expect(page).not.toHaveURL(/report=/)
-    await expect(page.getByLabel('Reason')).toBeFocused()
+    await expect(page.getByRole('link', { name: 'Sign in with Bluesky to report this profile' })).toHaveAttribute('href', `/login?next=${encodeURIComponent(`/p/${SEEDED.handle}`)}`)
+    await expect(page.getByRole('link', { name: 'security@blueyvatar.com' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send report' })).toHaveCount(0)
   })
 })
