@@ -437,7 +437,7 @@ The service has four tiers (Free, Plus, Business, Enterprise), with privacy and 
 | Custom default image URL | No | Yes | Yes | Yes |
 | Profile JSON | Basic, 4 verified accounts | Full | Full | Full |
 | Hovercards | No | Yes | Yes | Yes |
-| QR codes | No | No | Yes | Yes |
+| QR codes | Yes | Yes | Yes | Yes |
 | Priority cache warming | No | Yes | Yes | Yes |
 | Usage dashboard and API | No | 30 days | 12 months | Custom |
 | Delivery from your own domain or node | No | No | No | Yes |

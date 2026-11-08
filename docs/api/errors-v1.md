@@ -33,7 +33,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `key_expired` | 401 | The key's expiration time has passed. Create a new key on the API keys page. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
-| `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise, and cross-origin `/profile` (hovercards) requires Plus or higher. |
+| `tier_required` | 403 | The route needs a higher tier. QR codes (`/qr`) are available on every plan, and cross-origin `/profile` (hovercards) requires Plus or higher. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
 | `secret_key_required` | 403 | `GET /usage` was called with a publishable key. Use a secret key in the `x-api-key` header. See [usage-v1.md](usage-v1.md). |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |

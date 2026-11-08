@@ -495,12 +495,12 @@ describe.skipIf(!url)('postgres billing store', () => {
     expect(results.filter((r) => r.body.result?.startsWith('duplicate')).length).toBe(2)
     const lic = await pool.query('SELECT tier, status, grace_ends_at, term FROM licenses WHERE owner = $1', [DID])
     expect(lic.rows).toHaveLength(1)
-    expect(lic.rows[0]).toMatchObject({ tier: 'plus', status: 'active', grace_ends_at: null, term: 'monthly' })
+    expect(lic.rows[0]).toMatchObject({ tier: 'pro', status: 'active', grace_ends_at: null, term: 'monthly' }) // stored under the legacy name; reads as Plus
     expect((await pool.query('SELECT count(*)::int AS c FROM stripe_events')).rows[0].c).toBe(1)
 
     await send(ev('invoice.payment_failed', { subscription: 'sub_1' }, T0 + DAY), T0 + DAY)
     const past = (await pool.query('SELECT tier, status, grace_ends_at FROM licenses WHERE owner = $1', [DID])).rows[0]
-    expect(past).toMatchObject({ tier: 'plus', status: 'past_due' })
+    expect(past).toMatchObject({ tier: 'pro', status: 'past_due' })
     expect(new Date(past.grace_ends_at).getTime()).toBe(T0 + 8 * DAY)
     expect((await store.subscriptionFor(DID))?.status).toBe('past_due')
 
@@ -517,17 +517,16 @@ describe.skipIf(!url)('postgres billing store', () => {
     expect(await store.process('evt_fail', 'x', async () => {})).toBe('duplicate')
   })
 
-  it('stores a Plus subscription, grants Plus, and leaves the license tier alone', async () => {
+  it('stores a Plus subscription, grants Plus, and sets the license tier (stored as pro, read as Plus)', async () => {
     const store = postgresBillingStore(pool)
     const did = 'did:plc:plusbuyer'
     const send = (e: { payload: string }, at = T0) => handleStripeWebhook(e.payload, sign(e.payload), { store, env, now: () => new Date(at) })
     const o = { id: 'sub_pg_plus', customer: 'cus_pg_plus', status: 'active', metadata: { did }, items: { data: [{ price: { id: 'price_plus' }, current_period_end: sec(T0 + 30 * DAY) }] } }
     expect((await send(ev('customer.subscription.created', o, T0))).body.result).toBe('subscription active, tier plus')
     expect((await pool.query("SELECT tier FROM subscriptions WHERE stripe_subscription_id = 'sub_pg_plus'")).rows[0].tier).toBe('plus')
-    expect((await pool.query('SELECT tier FROM licenses WHERE owner = $1', [did])).rows[0].tier).toBe('free')
+    expect((await pool.query('SELECT tier FROM licenses WHERE owner = $1', [did])).rows[0].tier).toBe('pro')
     expect(await store.hasPlus(did, new Date(T0))).toBe(true)
-    expect((await store.subscriptionFor(did, 'plus'))?.tier).toBe('plus')
-    expect(await store.subscriptionFor(did)).toBeNull()
+    expect((await store.subscriptionFor(did))?.tier).toBe('plus')
     await send(ev('invoice.payment_failed', { subscription: 'sub_pg_plus' }, T0 + DAY), T0 + DAY)
     expect(await store.hasPlus(did, new Date(T0 + 7 * DAY))).toBe(true)
     expect(await store.hasPlus(did, new Date(T0 + 9 * DAY))).toBe(false)

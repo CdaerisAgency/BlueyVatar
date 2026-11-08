@@ -69,7 +69,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 | Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | None. No logo, no avatar overlay |
 | Redirect to a social account | Unknown | n/a | `?to=<platform>` via `/go/:handle/:platform` (`apps/delivery/src/app.ts`) |
 | Encoded content | Link to the profile page only | n/a | Profile URL, or the `/go` redirect URL |
-| Access | Unknown (no tier restriction published on the pages read) | n/a | Business and Enterprise keys only (`apps/delivery/src/app.ts`) |
+| Access | Unknown (no tier restriction published on the pages read) | n/a | Every plan, including anonymous callers (`apps/delivery/src/app.ts`) |
 
 ## 5. Hovercards, embeds, widgets
 

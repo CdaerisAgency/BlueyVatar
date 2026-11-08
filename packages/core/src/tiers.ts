@@ -37,7 +37,7 @@ export interface Entitlements {
   keyedMonthly: number | null
   overage: 'blocked' | 'metered' | 'contract'
   hovercards: boolean
-  /** QR code endpoint. Kept to Business and Enterprise, as before (Plus gets hovercards but not QR codes). */
+  /** QR code endpoint. Owner decision: available to every plan. The flag stays so the gate can be restored. */
   qrCodes: boolean
   /** Avatar images one account may hold. */
   maxImages: number
@@ -48,13 +48,13 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   free: {
     maxSize: 512, formats: ['png'], ttlControl: false, customDefaultUrl: false,
     domainRestrictions: false, maxKeys: 1,
-    keyedDaily: 1_000, keyedMonthly: null, overage: 'blocked', hovercards: false, qrCodes: false, maxImages: 3,
+    keyedDaily: 1_000, keyedMonthly: null, overage: 'blocked', hovercards: false, qrCodes: true, maxImages: 3,
     maxVerifiedAccountsInJson: 4,
   },
   plus: {
     maxSize: 1024, formats: ['png', 'jpeg', 'webp'], ttlControl: true, customDefaultUrl: true,
     domainRestrictions: true, maxKeys: 5,
-    keyedDaily: null, keyedMonthly: 50_000, overage: 'metered', hovercards: true, qrCodes: false, maxImages: 20,
+    keyedDaily: null, keyedMonthly: 50_000, overage: 'metered', hovercards: true, qrCodes: true, maxImages: 20,
     maxVerifiedAccountsInJson: null,
   },
   business: {

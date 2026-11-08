@@ -271,11 +271,11 @@ describe('delivery API', () => {
       expect(res.status).toBe(403)
       expect((await res.json()).error.code).toBe('tier_required')
     })
-    it('allows cross-origin callers with a Plus key, and keeps QR codes to Business', async () => {
+    it('allows cross-origin callers with a Plus key, and can fetch QR codes', async () => {
       const { app } = setup()
       const res = await app.request('/profile/alice.test', { headers: { ...cross, 'x-api-key': 'sk_test' } })
       expect(res.status).toBe(200)
-      expect((await app.request('/qr/alice.test.png', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(403)
+      expect((await app.request('/qr/alice.test.png', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(200)
     })
     it('treats a legacy pro license as Plus everywhere', async () => {
       const { app } = setup()
@@ -725,12 +725,10 @@ describe('delivery API', () => {
   describe('QR code (F23)', () => {
     const biz = { 'x-api-key': 'sk_biz' }
 
-    it('requires a Business or Enterprise key', async () => {
+    it('is available to every plan, anonymous callers included', async () => {
       const { app } = setup()
-      const anon = await app.request('/qr/alice.test.svg')
-      expect(anon.status).toBe(403)
-      expect((await anon.json()).error.code).toBe('tier_required')
-      expect((await app.request('/qr/alice.test.svg', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(403)
+      expect((await app.request('/qr/alice.test.svg')).status).toBe(200)
+      expect((await app.request('/qr/alice.test.svg', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(200)
     })
 
     it('returns an SVG for a handle with the requested size and private caching', async () => {

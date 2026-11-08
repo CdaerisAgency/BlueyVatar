@@ -96,7 +96,7 @@ export const openApiDocument = {
     '/qr/{file}': {
       get: {
         summary: 'Profile QR code',
-        description: 'Business and Enterprise only. The file is {id}.svg or {id}.png. Default size is 256. With to=github the QR points at /go/{handle}/github.',
+        description: 'Available on every plan. The file is {id}.svg or {id}.png. Default size is 256. With to=github the QR points at /go/{handle}/github.',
         tags: ['Profile'],
         security: [{ apiKeyHeader: [] }, { apiKeyQuery: [] }],
         parameters: [ref('parameters/QrFile'), q('s'), ref('parameters/To'), q('ttl')],

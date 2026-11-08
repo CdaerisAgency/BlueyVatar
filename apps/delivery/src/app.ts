@@ -467,13 +467,13 @@ export function createApp(deps: AppDeps) {
     })
   })
 
-  // QR code for the profile URL. Business and Enterprise only (spec sections 8 and 11.1).
+  // QR code for the profile URL. Available on every plan (spec sections 8 and 11.1).
   // The response needs a key check, so it is private to the browser, like the redirects.
   app.get('/qr/:file', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
     if (!entitlementsFor(e.tier).qrCodes) {
-      return fail(c, 403, 'tier_required', 'QR codes require a Business or Enterprise key')
+      return fail(c, 403, 'tier_required', 'QR codes are not available for this key')
     }
     const file = c.req.param('file')
     const dot = file.lastIndexOf('.')
