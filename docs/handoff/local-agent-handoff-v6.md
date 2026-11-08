@@ -7,7 +7,6 @@ Written November 4, 2026, from the cloud session that built phases 1 and 2. The 
 BlueyVatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v13.md`.
 
 - Repository: `CdaerisAgency/BlueyVatar` (the old lowercase URL redirects; set your remote to `https://github.com/CdaerisAgency/BlueyVatar.git`)
-- Local path: `C:\Users\super\OneDrive\Documents\GitHub\BlueyVatar`
 - Do not touch `CdaerisAgency/atlas`. It is a different project.
 
 ## 2. Owner's standing rules
