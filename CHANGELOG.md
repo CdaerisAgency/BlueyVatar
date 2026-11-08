@@ -5,6 +5,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ## 2026-11-08
 
 ### Changed
+- Reporting a profile or avatar now requires signing in with Bluesky, and the reason, details (at least 10 characters), and email are all required. Reports store the reporter's account, which is limited to 5 reports per hour in addition to the per-network limit and is shown to reviewers only. The content policy lists security@blueyvatar.com for legal or urgent notices from people who cannot sign in (#224).
 - Landing page: removed the handle pill from the hero graphic, and the developer samples use a neutral example handle. "Claim your avatar" goes to your account when you are signed in.
 - Sign-in page: clearer handle help with an example and a note about custom domains, and the handle is checked in the browser and on the server. Signed-in visitors go straight to their account.
 
