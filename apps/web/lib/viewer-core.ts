@@ -30,3 +30,10 @@ export function makeTtlCache<V>(ttlMs: number, max = 500, now: () => number = Da
     },
   }
 }
+
+export type ViewerPayload = { signedIn: false } | { signedIn: true; name: string; initial: string }
+
+/** What /api/viewer returns. Only what the header needs: no DID unless the handle is missing. */
+export function viewerPayload(v: { did: string; handle: string | null } | null): ViewerPayload {
+  return v ? { signedIn: true, name: displayName(v), initial: avatarInitial(v) } : { signedIn: false }
+}

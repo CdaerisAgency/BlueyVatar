@@ -3,6 +3,7 @@ import { Button } from '../../../../components/Button'
 import { BILLING_RETENTION_YEARS, DELETE_CONFIRMATION } from '../../../../lib/account-data'
 import { requireDid } from '../../../../lib/auth'
 import { HOLD_DAYS } from '../../../../lib/email-policy'
+import { homeServerFor } from '../../../../lib/home-server'
 import { viewerFor } from '../../../../lib/viewer'
 import { displayName } from '../../../../lib/viewer-core'
 import AccountNav from '../../AccountNav'
@@ -14,12 +15,16 @@ export const metadata = { title: 'Your data' }
 export default async function DangerZonePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const did = await requireDid('/account/settings/danger')
   const viewer = await viewerFor(did)
+  const homeServer = await homeServerFor(did)
   const { error } = await searchParams
   return (
     <PageMain>
       <AccountNav />
       <h1>Your data</h1>
-      <p>Signed in as {displayName(viewer)}</p>
+      <p>
+        Signed in as {displayName(viewer)}
+        {viewer.handle && <small className="block text-bv-ink-3">Account ID: {did}</small>}
+      </p>
       {error && <p role="alert">{error}</p>}
 
       <section aria-labelledby="download">
@@ -60,7 +65,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
           <li>Moderation records, such as blocks on images and reports about your account.</li>
         </ul>
         <p>
-          Your avatars, profile, gallery, and verified accounts are saved on your Bluesky account&apos;s home server, the service
+          Your avatars, profile, gallery, and verified accounts are saved on {homeServer}. A home server is the service
           that stores your Bluesky account and everything you post. They belong to you, and blueyvatar does not delete them. To
           remove them, use your Bluesky app or your home server&apos;s tools. Until you do, blueyvatar may show them again if you
           sign in later.
