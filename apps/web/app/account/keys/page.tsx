@@ -74,7 +74,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
         </li>
         {inc.per === 'day' && <li>Free limits are per day, so the monthly total above is for reference.</li>}
       </ul>
-      <p>Change your plan on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Billing</Link> page. The table below shows what each tier includes.</p>
+      <p>Change your plan on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Plan and billing</Link> page. The table below shows what each tier includes.</p>
 
       {periods.length > 0 && (
         <>

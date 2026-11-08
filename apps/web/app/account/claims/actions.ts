@@ -32,7 +32,7 @@ export async function addClaim(form: FormData): Promise<void> {
     const session = await repoSession(did)
     const existing = await listClaims(session)
     // The database count is checked too, so rows written outside the repo list cannot grow past the cap.
-    if (existing.length >= MAX_CLAIMS || (await getClaimStore().countClaims(did)) >= MAX_CLAIMS) return back('error', `You can keep up to ${MAX_CLAIMS} claims. Delete one first.`)
+    if (existing.length >= MAX_CLAIMS || (await getClaimStore().countClaims(did)) >= MAX_CLAIMS) return back('error', `You can keep up to ${MAX_CLAIMS} accounts. Delete one first.`)
     if (existing.some((c) => c.value.uri === checked.value.uri)) return back('error', 'You already added that account.')
     const record: ClaimRecord = { ...checked.value, createdAt: new Date().toISOString() }
     const ref = await createClaim(session, record)
@@ -41,7 +41,7 @@ export async function addClaim(form: FormData): Promise<void> {
     reportError('claim add failed', err)
     return back('error', message(err))
   }
-  return back('done', 'Claim added. Run verification to show it on your profile.')
+  return back('done', 'Account added. Follow the next step under it, then check it to show it on your profile.')
 }
 
 export async function deleteClaimAction(form: FormData): Promise<void> {
@@ -52,7 +52,7 @@ export async function deleteClaimAction(form: FormData): Promise<void> {
     reportError('claim delete failed', err)
     return back('error', message(err))
   }
-  return back('done', 'Claim deleted and its attestation removed.')
+  return back('done', 'Account deleted and its verification removed.')
 }
 
 export async function setHidden(form: FormData): Promise<void> {
@@ -61,7 +61,7 @@ export async function setHidden(form: FormData): Promise<void> {
   try {
     const session = await repoSession(did)
     const claim = await getClaim(session, String(form.get('rkey') ?? ''))
-    if (!claim) return back('error', 'That claim no longer exists.')
+    if (!claim) return back('error', 'That account no longer exists.')
     const value: ClaimRecord = { ...claim.value, hidden }
     await putClaim(session, claim.rkey, value, claim.cid)
     await getClaimStore().upsertClaim(did, claim.rkey, value)
@@ -69,7 +69,7 @@ export async function setHidden(form: FormData): Promise<void> {
     reportError('claim hide failed', err)
     return back('error', message(err))
   }
-  return back('done', hidden ? 'Hidden from hovercards.' : 'Shown in hovercards.')
+  return back('done', hidden ? 'Hidden from your profile.' : 'Shown on your profile.')
 }
 
 /** Starts the right verification for the claim. OAuth methods redirect away; rel="me" answers at once. */
@@ -82,10 +82,10 @@ export async function verifyClaim(form: FormData): Promise<void> {
   try {
     const session = await repoSession(did)
     const claim = await getClaim(session, rkey)
-    if (!claim) return back('error', 'That claim no longer exists.')
+    if (!claim) return back('error', 'That account no longer exists.')
     // The stored record must still be a canonical claim, whatever was written to the repo directly.
     const norm = isPlatform(claim.value.platform) ? normalizeClaim(claim.value.platform, claim.value.uri) : null
-    if (!norm?.ok || norm.value.uri !== claim.value.uri) return back('error', 'This claim cannot be verified. Delete it and add it again.')
+    if (!norm?.ok || norm.value.uri !== claim.value.uri) return back('error', 'This account cannot be verified. Delete it and add it again.')
     const platform = norm.value.platform
     const method = methodFor(platform)
     const store = getClaimStore()
@@ -129,7 +129,7 @@ export async function verifyClaim(form: FormData): Promise<void> {
       target = githubAuthorizeUrl(cfg, redirectUri, state)
     } else {
       const m = parseMastodonUri(claim.value.uri)
-      if (!m) return back('error', 'This Mastodon claim is malformed.')
+      if (!m) return back('error', 'This Mastodon address is malformed.')
       if (coolingDown(`mastodon:${did}:${rkey}`, 5_000)) return back('error', 'Wait a few seconds and try again.')
       const app = (await store.mastodonApp(m.instance)) ?? (await registerApp(m.instance, redirectUri, PUBLIC_URL, safeFetch))
       if (!app) return back('error', `${m.instance} did not accept the app registration.`)

@@ -15,7 +15,7 @@ export default async function NotificationsPage() {
     <PageMain>
       <h1>Notifications</h1>
       <p>Signed in as {did}</p>
-      {!address && <p role="status">No primary email is on file, so no notices can be sent. Link an email on the <Link href="/account/verify">verify page</Link> to receive them.</p>}
+      {!address && <p role="status">No primary email is on file, so no notices can be sent. Link an email on the <Link href="/account/verify">Verify</Link> page to receive them.</p>}
       <h2>Optional</h2>
       <NotificationsForm usageAlerts={prefs.usageAlerts} billingNotices={prefs.billingNotices} />
       <h2>Always sent</h2>
