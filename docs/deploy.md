@@ -130,7 +130,7 @@ In this order, so deploys never break:
 7. Settings > Actions > General > Workflow permissions: choose "Read repository contents and packages permissions".
 8. Settings > Advanced Security (or Code security and analysis): enable Private vulnerability reporting, Secret scanning, and Push protection.
 
-Required reviewers on an environment do not make a self-hosted runner safe for untrusted code, which is why only the main-only deploy job uses one.
+Required reviewers on an environment do not make a self-hosted runner safe for untrusted code, which is why only the main-only deploy job holds secrets on one. CI also uses the owner’s runners, so keep fork approval on for all outside collaborators.
 
 ## Deploy from a local clone (localdeploy.bat)
 
