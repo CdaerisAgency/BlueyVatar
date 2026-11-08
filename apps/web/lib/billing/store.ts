@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { ENTITLEMENTS, plusEntitled, type PaidPlan, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
+import { ENTITLEMENTS, normalizePaidPlan, normalizeTier, plusEntitled, storedLicenseTier, type PaidPlan, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
 import { getPool } from '../store'
 
@@ -53,14 +53,11 @@ export interface BillingStore {
    */
   process(eventId: string, type: string, fn: (tx: BillingTx) => Promise<void>): Promise<'processed' | 'duplicate'>
   customerFor(did: string): Promise<string | null>
-  /** The newest entitled subscription of one kind: a developer tier (Pro or Business, the default) or Plus. With `licenseId`, only that license's subscriptions, so an organization license and a personal one each hold their own. */
-  subscriptionFor(did: string, kind?: SubKind, licenseId?: string): Promise<SubscriptionRow | null>
-  /** True when the DID holds a Plus subscription that entitles Plus at `now` (active, trialing, or past due inside the grace period). */
+  /** The newest entitled subscription. With `licenseId`, only that license's subscriptions, so an organization license and a personal one each hold their own. */
+  subscriptionFor(did: string, licenseId?: string): Promise<SubscriptionRow | null>
+  /** True when the DID holds a subscription that entitles the Plus user plan at `now`: Plus or Business on their own license (active, trialing, or past due inside the grace period). */
   hasPlus(did: string, now?: Date): Promise<boolean>
 }
-
-export type SubKind = 'developer' | 'plus'
-const kindOf = (tier: string): SubKind => (tier === 'plus' ? 'plus' : 'developer')
 
 const newLicenseId = () => `lic_${randomUUID()}`
 const ENTITLED = new Set(['active', 'trialing', 'past_due'])
@@ -124,8 +121,8 @@ export function memoryBillingStore() {
     async customerFor(did) {
       return customers.get(did) ?? null
     },
-    async subscriptionFor(did, kind = 'developer', licenseId) {
-      return [...subs.values()].filter((s) => s.did === did && (!licenseId || s.licenseId === licenseId) && kindOf(s.tier) === kind && ENTITLED.has(s.status)).sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())[0] ?? null
+    async subscriptionFor(did, licenseId) {
+      return [...subs.values()].filter((s) => s.did === did && (!licenseId || s.licenseId === licenseId) && ENTITLED.has(s.status)).sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())[0] ?? null
     },
     async hasPlus(did, now = new Date()) {
       return plusEntitled([...subs.values()].filter((s) => s.did === did), now)
@@ -148,7 +145,7 @@ const toSub = (r: Record<string, unknown>): SubscriptionRow => ({
   did: r.did as string,
   licenseId: r.license_id as string,
   priceId: r.price_id as string,
-  tier: r.tier as PaidPlan,
+  tier: normalizePaidPlan(r.tier) ?? 'plus',
   status: r.status as SubscriptionStatus,
   currentPeriodEnd: (r.current_period_end as Date | null) ?? null,
   cancelAtPeriodEnd: r.cancel_at_period_end as boolean,
@@ -162,7 +159,7 @@ function pgTx(c: pg.PoolClient): BillingTx {
       // Same per-owner lock the dashboard uses, so a first dashboard visit and a first webhook cannot both issue a license.
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
       const r = await c.query('SELECT license_id, tier FROM licenses WHERE owner = $1 AND org_id IS NULL ORDER BY created_at LIMIT 1', [did])
-      if (r.rows[0]) return { licenseId: r.rows[0].license_id, tier: r.rows[0].tier }
+      if (r.rows[0]) return { licenseId: r.rows[0].license_id, tier: normalizeTier(r.rows[0].tier) }
       const id = newLicenseId()
       await c.query(
         `INSERT INTO licenses (license_id, owner, tier, status, term, entitlements)
@@ -173,7 +170,7 @@ function pgTx(c: pg.PoolClient): BillingTx {
     },
     async ownedLicense(did, licenseId) {
       const r = await c.query('SELECT license_id, tier FROM licenses WHERE license_id = $1 AND owner = $2', [licenseId, did])
-      return r.rows[0] ? { licenseId: r.rows[0].license_id, tier: r.rows[0].tier } : null
+      return r.rows[0] ? { licenseId: r.rows[0].license_id, tier: normalizeTier(r.rows[0].tier) } : null
     },
     async linkCustomer(did, licenseId, customerId) {
       await c.query(
@@ -214,7 +211,7 @@ function pgTx(c: pg.PoolClient): BillingTx {
         `UPDATE licenses SET tier = $2, status = $3, grace_ends_at = $4, term = 'monthly',
            entitlements = $5
          WHERE license_id = $1 AND tier <> 'enterprise'`,
-        [licenseId, s.tier, s.status, s.graceEndsAt, JSON.stringify(ENTITLEMENTS[s.tier])],
+        [licenseId, storedLicenseTier(s.tier), s.status, s.graceEndsAt, JSON.stringify(ENTITLEMENTS[s.tier])],
       )
     },
   }
@@ -245,16 +242,21 @@ export function postgresBillingStore(pool: pg.Pool): BillingStore {
     async customerFor(did) {
       return (await pool.query('SELECT stripe_customer_id FROM billing_customers WHERE did = $1', [did])).rows[0]?.stripe_customer_id ?? null
     },
-    async subscriptionFor(did, kind = 'developer', licenseId) {
+    async subscriptionFor(did, licenseId) {
       const r = await pool.query(
-        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND (tier = 'plus') = ($2 = 'plus') AND ($3::text IS NULL OR license_id = $3)
+        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND ($2::text IS NULL OR license_id = $2)
            AND status IN ('active', 'trialing', 'past_due') ORDER BY last_event_at DESC LIMIT 1`,
-        [did, kind, licenseId ?? null],
+        [did, licenseId ?? null],
       )
       return r.rows[0] ? toSub(r.rows[0]) : null
     },
     async hasPlus(did, now = new Date()) {
-      const r = await pool.query(`SELECT ${subCols} FROM subscriptions WHERE did = $1 AND tier = 'plus' AND status IN ('active', 'trialing', 'past_due')`, [did])
+      // An organization's Business subscription is billed to its owner but does not give the owner's own account Plus.
+      const r = await pool.query(
+        `SELECT ${subCols} FROM subscriptions WHERE did = $1 AND status IN ('active', 'trialing', 'past_due')
+           AND (tier IN ('plus', 'pro') OR license_id IN (SELECT license_id FROM licenses WHERE owner = $1 AND org_id IS NULL))`,
+        [did],
+      )
       return plusEntitled(r.rows.map(toSub), now)
     },
   }

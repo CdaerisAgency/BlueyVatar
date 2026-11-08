@@ -2,7 +2,7 @@ import { createLogger, Metrics, normalizeBackgroundColor } from '@blueyvatar/cor
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
-  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, historyDays, historyPeriods, includedVolume, periodEndOf, periodStartOf, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, ENTITLEMENTS, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
+  ABSOLUTE_MAX_SIZE, CANONICAL_QUALITY, historyDays, historyPeriods, includedVolume, periodEndOf, periodStartOf, GALLERY_MAX, isPlusDid, ratingAllowed, DEFAULT_STYLES, entitlementsFor, IMMUTABLE_CACHE_CONTROL, ParamError, imagePath, isMd5Hex,
   isSha256Hex, parseAvatarParams, resolveProfileLinks,
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
@@ -396,10 +396,10 @@ export function createApp(deps: AppDeps) {
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
-    // Cross-origin browser callers are hovercards embedded on other sites (Business and Enterprise).
+    // Cross-origin browser callers are hovercards embedded on other sites (Plus, Business, and Enterprise).
     // Same-origin pages and server-to-server calls without an Origin header are not gated.
-    if (isCrossOrigin(c) && !ENTITLEMENTS[e.tier].hovercards) {
-      return fail(c, 403, 'tier_required', 'Hovercards require a Business or Enterprise key')
+    if (isCrossOrigin(c) && !entitlementsFor(e.tier).hovercards) {
+      return fail(c, 403, 'tier_required', 'Hovercards require a Plus, Business, or Enterprise key')
     }
     const id = parseIdentifier(c.req.param('id'))
     if (!id) return fail(c, 400, 'invalid_identifier', 'Expected a hash, handle, or DID')
@@ -429,7 +429,7 @@ export function createApp(deps: AppDeps) {
     const picked = pickCandidate(await deps.resolver.candidates(identity), 'g', false)
     // Attested claims only. The Free tier cap applies to the JSON (spec section 11.1); the
     // oldest verifications are kept. Hidden accounts stay in the list with hidden: true.
-    const cap = ENTITLEMENTS[e.tier].maxVerifiedAccountsInJson
+    const cap = entitlementsFor(e.tier).maxVerifiedAccountsInJson
     const verified = await deps.index.verifiedAccounts(identity.did)
     const atprotoApps = (await deps.resolver.repoApps?.(identity).catch(() => [])) ?? []
     // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:
@@ -470,7 +470,7 @@ export function createApp(deps: AppDeps) {
   app.get('/qr/:file', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
-    if (!ENTITLEMENTS[e.tier].hovercards) {
+    if (!entitlementsFor(e.tier).qrCodes) {
       return fail(c, 403, 'tier_required', 'QR codes require a Business or Enterprise key')
     }
     const file = c.req.param('file')

@@ -1,6 +1,6 @@
 # /img access rules and size caps (v1)
 
-Checked: November 6, 2026. Scope: issues #72 (Keyed only and Domain allowlist rules versus cached image URLs) and #68 (Q12, `/img` bypasses tier size caps). Spec references are to `docs/spec/blueyvatar-product-spec-v11.md` (sections 7, 10.2, 11.1, 13 and 14.1). Code references are to `origin/main` at commit `013b5b5`. I read the code and the existing tests. I did not run the service.
+Checked: November 6, 2026. Scope: issues #72 (Keyed only and Domain allowlist rules versus cached image URLs) and #68 (Q12, `/img` bypasses tier size caps). Spec references are to `docs/spec/blueyvatar-product-spec-v12.md` (sections 7, 10.2, 11.1, 13 and 14.1). Code references are to `origin/main` at commit `013b5b5`. I read the code and the existing tests. I did not run the service.
 
 ## Decisions needed
 

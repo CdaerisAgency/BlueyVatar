@@ -34,10 +34,11 @@ function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', did: DID,
   const deps: AppDeps = {
     index, resolver, usage,
     licenses: new MemoryLicenseStore([
-      { key: { key: 'pk_test', kind: 'publishable', licenseId: 'L1', domains: ['*.example.com'] }, license: { licenseId: 'L1', owner: DID, tier: 'pro', status: 'active' } },
-      { key: { key: 'sk_test', kind: 'secret', licenseId: 'L1', domains: [] }, license: { licenseId: 'L1', owner: DID, tier: 'pro', status: 'active' } },
+      { key: { key: 'pk_test', kind: 'publishable', licenseId: 'L1', domains: ['*.example.com'] }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
+      { key: { key: 'sk_test', kind: 'secret', licenseId: 'L1', domains: [] }, license: { licenseId: 'L1', owner: DID, tier: 'plus', status: 'active' } },
       { key: { key: 'sk_biz', kind: 'secret', licenseId: 'L3', domains: [] }, license: { licenseId: 'L3', owner: DID, tier: 'business', status: 'active' } },
-      { key: { key: 'sk_dead', kind: 'secret', licenseId: 'L2', domains: [] }, license: { licenseId: 'L2', owner: DID, tier: 'pro', status: 'suspended' } },
+      { key: { key: 'sk_legacy', kind: 'secret', licenseId: 'L4', domains: [] }, license: { licenseId: 'L4', owner: DID, tier: 'pro' as never, status: 'active' } },
+      { key: { key: 'sk_dead', kind: 'secret', licenseId: 'L2', domains: [] }, license: { licenseId: 'L2', owner: DID, tier: 'plus', status: 'suspended' } },
     ]),
     limiter: new MemoryRateLimiter(),
     resize: async () => new Uint8Array([9, 9]),
@@ -191,7 +192,7 @@ describe('delivery API', () => {
     const { app, usage } = setup()
     const res = await app.request('/u/did:plc:abc123?fmt=webp&q=70', { headers: { 'x-api-key': 'sk_test' } })
     expect(res.headers.get('location')).toBe(img(80, 'webp', 70))
-    expect(res.headers.get('x-tier')).toBe('pro')
+    expect(res.headers.get('x-tier')).toBe('plus')
     expect(usage.counts.get('L1:origin_resolution')).toBe(1)
   })
 
@@ -261,13 +262,23 @@ describe('delivery API', () => {
 
   describe('profile hovercard gating', () => {
     const cross = { origin: 'https://site.test' }
-    it('rejects cross-origin callers without a Business key', async () => {
+    it('rejects anonymous cross-origin callers', async () => {
       const { app } = setup()
-      for (const headers of [cross, { ...cross, 'x-api-key': 'sk_test' }]) {
-        const res = await app.request('/profile/alice.test', { headers })
-        expect(res.status).toBe(403)
-        expect((await res.json()).error.code).toBe('tier_required')
-      }
+      const res = await app.request('/profile/alice.test', { headers: cross })
+      expect(res.status).toBe(403)
+      expect((await res.json()).error.code).toBe('tier_required')
+    })
+    it('allows cross-origin callers with a Plus key, and keeps QR codes to Business', async () => {
+      const { app } = setup()
+      const res = await app.request('/profile/alice.test', { headers: { ...cross, 'x-api-key': 'sk_test' } })
+      expect(res.status).toBe(200)
+      expect((await app.request('/qr/alice.test.png', { headers: { 'x-api-key': 'sk_test' } })).status).toBe(403)
+    })
+    it('treats a legacy pro license as Plus everywhere', async () => {
+      const { app } = setup()
+      const res = await app.request('/profile/alice.test', { headers: { ...cross, 'x-api-key': 'sk_legacy' } })
+      expect(res.status).toBe(200)
+      expect(res.headers.get('x-tier')).toBe('plus')
     })
     it('allows cross-origin callers with a Business key', async () => {
       const { app } = setup()
@@ -927,19 +938,19 @@ describe('GET /usage', () => {
     expect((await app.request('/usage', { headers: { 'x-api-key': 'sk_dead' } })).status).toBe(402)
   })
 
-  it('reports the current period, included volume, and per-meter counts for a Pro key', async () => {
+  it('reports the current period, included volume, and per-meter counts for a Plus key', async () => {
     const { app } = setup()
     for (let i = 0; i < 3; i++) await app.request('/u/alice.test', { headers: { 'x-api-key': 'sk_test' } })
     await app.request('/profile/did:plc:abc123', { headers: { 'x-api-key': 'sk_test' } })
     const res = await app.request('/usage', { headers: { 'x-api-key': 'sk_test' } })
     expect(res.status).toBe(200)
     expect(res.headers.get('cache-control')).toBe('private, no-store')
-    expect(res.headers.get('x-tier')).toBe('pro')
+    expect(res.headers.get('x-tier')).toBe('plus')
     expect(res.headers.get('x-rate-limit-limit')).toBe('50000')
     const body = await res.json()
     const now = new Date()
     const period = `${now.toISOString().slice(0, 7)}-01`
-    expect(body.tier).toBe('pro')
+    expect(body.tier).toBe('plus')
     expect(body.period.start).toBe(period)
     expect(body.included).toEqual({ volume: 50_000, per: 'month' })
     expect(body.total).toBe(3)
@@ -950,7 +961,7 @@ describe('GET /usage', () => {
     expect(body.history.days[0]).toEqual({ date: now.toISOString().slice(0, 10), origin_resolution: 3, profile_json: 1 })
   })
 
-  it('gives Business 12 months and Pro 30 days of history', async () => {
+  it('gives Business 12 months and Plus 30 days of history', async () => {
     const { app } = setup()
     const biz = await (await app.request('/usage', { headers: { 'x-api-key': 'sk_biz' } })).json()
     expect(biz.history.months).toHaveLength(12)

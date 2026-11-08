@@ -56,10 +56,10 @@ describe('pricing metadata', () => {
   it('lists every tier from the pricing table', () => {
     const d = pricingDescription()
     expect(d).toContain('Free $0')
-    expect(d).toContain('Plus $9.99/mo')
-    expect(d).toContain('Pro $9/mo')
+    expect(d).toContain('Plus $9/mo')
+    expect(d).not.toContain('Pro')
     expect(d).toContain('Business $49/mo')
-    expect(PRICING).toHaveLength(4)
+    expect(PRICING).toHaveLength(3)
   })
 })
 

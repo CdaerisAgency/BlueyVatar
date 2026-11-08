@@ -32,7 +32,7 @@ export interface AvatarUrlOptions {
   did?: string
   /** Square size in pixels, 1 to 2048. Tier caps apply on the server. */
   size?: number
-  /** Default style, or an HTTPS URL on the service allowlist (Pro and higher). */
+  /** Default style, or an HTTPS URL on the service allowlist (Plus and higher). */
   default?: DefaultStyle | (string & {})
   /** Always return the default image. */
   forceDefault?: boolean
@@ -151,7 +151,7 @@ export function fromGravatarUrl(url: string | URL, base: { baseUrl?: string; key
     else if (STYLES.includes(d)) options.default = d as DefaultStyle
     else if (/^https:\/\//i.test(d)) {
       options.default = d
-      notes.push('Custom default URLs need an HTTPS host on the service allowlist and a Pro key or higher. Otherwise the style default is used.')
+      notes.push('Custom default URLs need an HTTPS host on the service allowlist and a Plus key or higher. Otherwise the style default is used.')
     } else if (d === 'color') notes.push('Dropped d=color: blueyvatar does not support it.')
     else notes.push(`Dropped default "${d}": not a blueyvatar style or an HTTPS URL.`)
   }

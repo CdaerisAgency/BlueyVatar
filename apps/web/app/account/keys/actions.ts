@@ -1,6 +1,6 @@
 'use server'
 
-import { ENTITLEMENTS } from '@blueyvatar/core'
+import { entitlementsFor } from '@blueyvatar/core'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
@@ -92,7 +92,7 @@ export async function saveDomains(_prev: KeyState, form: FormData): Promise<KeyS
   const c = await ctx(orgOf(form))
   if (!c.scope) return { error: c.error }
   const { did, store, license, scope } = c
-  if (!ENTITLEMENTS[license.tier].domainRestrictions) return { error: 'Domain restrictions are not included in this tier.' }
+  if (!entitlementsFor(license.tier).domainRestrictions) return { error: 'Domain restrictions are not included in this tier.' }
   const parsed = parseDomainList(String(form.get('domains') ?? ''))
   if (!parsed.ok) return { error: parsed.errors.join(' ') }
   const ok = await store.setDomains(license.licenseId, String(form.get('hash') ?? ''), parsed.domains)

@@ -3,7 +3,7 @@ import pg from 'pg'
 import Stripe from 'stripe'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { effectiveTier } from '@blueyvatar/core'
-import { NOT_CONFIGURED, billingEnabled, missingForCheckout, missingForWebhook, plusEnabled, tierForPrice } from './config'
+import { NOT_CONFIGURED, billingEnabled, missingForCheckout, missingForWebhook, planEnabled, priceFor, tierForPrice } from './config'
 import { memoryBillingStore, postgresBillingStore } from './store'
 import { checkoutParams, createCheckoutUrl, createPortalUrl } from './stripe'
 import { handleStripeWebhook } from './webhook'
@@ -15,7 +15,7 @@ vi.spyOn(console, 'info').mockImplementation(() => {})
 vi.spyOn(console, 'error').mockImplementation(() => {})
 
 const SECRET = 'whsec_test_secret'
-const env = { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_PRICE_PRO: 'price_pro', STRIPE_PRICE_BUSINESS: 'price_biz', STRIPE_PRICE_PLUS: 'price_plus' }
+const env = { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_PRICE_BUSINESS: 'price_biz', STRIPE_PRICE_PLUS: 'price_plus,price_pro' }
 const DID = 'did:plc:alice'
 const DAY = 86_400_000
 const T0 = Date.parse('2026-11-01T00:00:00Z')
@@ -42,8 +42,8 @@ function setup(now = T0) {
 
 describe('config', () => {
   it('reports what is missing and no-ops cleanly', async () => {
-    expect(missingForCheckout({})).toEqual(['STRIPE_SECRET_KEY', 'STRIPE_PRICE_PRO', 'STRIPE_PRICE_BUSINESS'])
-    expect(missingForWebhook({})).toEqual(['STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_PRO or STRIPE_PRICE_BUSINESS'])
+    expect(missingForCheckout({})).toEqual(['STRIPE_SECRET_KEY', 'STRIPE_PRICE_PLUS', 'STRIPE_PRICE_BUSINESS'])
+    expect(missingForWebhook({})).toEqual(['STRIPE_WEBHOOK_SECRET', 'STRIPE_PRICE_PLUS or STRIPE_PRICE_BUSINESS'])
     expect(billingEnabled({})).toBe(false)
     expect(billingEnabled(env)).toBe(true)
     expect(tierForPrice('price_biz', env)).toBe('business')
@@ -58,7 +58,7 @@ describe('config', () => {
   })
   it('checkout and portal return the not-configured message without calling Stripe', async () => {
     const ctx = { store: memoryBillingStore(), client: null, env: {}, baseUrl: 'https://blueyvatar.com' }
-    expect(await createCheckoutUrl(ctx, DID, 'lic_1', 'pro')).toEqual({ ok: false, error: NOT_CONFIGURED })
+    expect(await createCheckoutUrl(ctx, DID, 'lic_1', 'plus')).toEqual({ ok: false, error: NOT_CONFIGURED })
     expect(await createPortalUrl(ctx, DID)).toEqual({ ok: false, error: NOT_CONFIGURED })
   })
 })
@@ -102,11 +102,11 @@ describe('event mapping', () => {
     expect((await send(ev('checkout.session.completed', { mode: 'subscription', customer: 'cus_1' }))).body.result).toContain('ignored')
     expect(await store.customerFor(DID)).toBeNull()
   })
-  it('subscription.created maps the Pro price to the pro tier and copies entitlements', async () => {
+  it('subscription.created maps the retired Pro price to the plus tier and copies entitlements', async () => {
     const { send, store } = setup()
     await send(ev('customer.subscription.created', subObj()))
     const l = store.licenseOf(DID)!
-    expect(l.tier).toBe('pro')
+    expect(l.tier).toBe('plus')
     expect(l.status).toBe('active')
     expect((l.entitlements as { maxKeys: number }).maxKeys).toBe(5)
   })
@@ -144,7 +144,7 @@ describe('event mapping', () => {
     const { send, store } = setup()
     await send(ev('checkout.session.completed', { mode: 'subscription', customer: 'cus_1', client_reference_id: DID }))
     await send(ev('customer.subscription.created', subObj({ metadata: {} }), T0 + 1000))
-    expect(store.licenseOf(DID)?.tier).toBe('pro')
+    expect(store.licenseOf(DID)?.tier).toBe('plus')
   })
   it('answers 500 so Stripe retries when the customer is not linked yet, and succeeds on redelivery', async () => {
     const { send, store } = setup()
@@ -153,7 +153,7 @@ describe('event mapping', () => {
     expect(store.eventCount()).toBe(0)
     await send(ev('checkout.session.completed', { mode: 'subscription', customer: 'cus_1', client_reference_id: DID }))
     expect((await send(e)).status).toBe(200)
-    expect(store.licenseOf(DID)?.tier).toBe('pro')
+    expect(store.licenseOf(DID)?.tier).toBe('plus')
   })
   it('ignores an event older than the stored state', async () => {
     const { send, store } = setup()
@@ -186,7 +186,7 @@ describe('invoice.payment_failed and grace', () => {
     await send(ev('customer.subscription.created', subObj(), T0))
     await send(fail('sub_1', T0 + DAY))
     const l = store.licenseOf(DID)!
-    expect(l).toMatchObject({ tier: 'pro', status: 'past_due' })
+    expect(l).toMatchObject({ tier: 'plus', status: 'past_due' })
     expect(l.graceEndsAt?.getTime()).toBe(T0 + DAY + 7 * DAY)
   })
   it('reads the subscription from the newer invoice parent shape', async () => {
@@ -207,7 +207,7 @@ describe('invoice.payment_failed and grace', () => {
     await send(ev('customer.subscription.created', subObj(), T0))
     await send(fail('sub_1', T0 + DAY))
     await send(ev('customer.subscription.updated', subObj({ status: 'active' }), T0 + 2 * DAY))
-    expect(store.licenseOf(DID)).toMatchObject({ tier: 'pro', status: 'active', graceEndsAt: null })
+    expect(store.licenseOf(DID)).toMatchObject({ tier: 'plus', status: 'active', graceEndsAt: null })
   })
   it('a late event after the grace period expires reads as Free', async () => {
     const { send, store } = setup()
@@ -215,7 +215,7 @@ describe('invoice.payment_failed and grace', () => {
     await send(fail('sub_1', T0 + DAY))
     const l = store.licenseOf(DID)!
     // Read time: tier is served as Free with no webhook, exactly as delivery and the dashboard do.
-    expect(effectiveTier(l as never, new Date(T0 + 7 * DAY))).toBe('pro')
+    expect(effectiveTier(l as never, new Date(T0 + 7 * DAY))).toBe('plus')
     expect(effectiveTier(l as never, new Date(T0 + 8 * DAY))).toBe('free')
     // A later webhook that recomputes after expiry stores Free.
     await send(ev('customer.subscription.updated', subObj({ status: 'past_due' }), T0 + 9 * DAY), undefined, T0 + 9 * DAY)
@@ -285,7 +285,7 @@ describe('billing notices', () => {
     await send(end)
     await send(end)
     expect(mail).toHaveLength(1)
-    expect(mail[0]!.subject).toBe('Your blueyvatar Pro plan has ended')
+    expect(mail[0]!.subject).toBe('Your blueyvatar Plus plan has ended')
   })
   it('mails cancellation once for an active subscription, and nothing for ordinary updates', async () => {
     const { mail, send } = withMail()
@@ -293,7 +293,7 @@ describe('billing notices', () => {
     await send(ev('customer.subscription.updated', subObj({ cancel_at_period_end: true }), T0 + DAY))
     expect(mail).toEqual([])
     await send(ev('customer.subscription.deleted', subObj({ status: 'canceled' }), T0 + 2 * DAY))
-    expect(mail.map((m) => m.subject)).toEqual(['Your blueyvatar Pro subscription was canceled'])
+    expect(mail.map((m) => m.subject)).toEqual(['Your blueyvatar Plus subscription was canceled'])
   })
   it('never fails the webhook when sending fails', async () => {
     const store = memoryBillingStore()
@@ -335,11 +335,11 @@ describe('checkout and portal', () => {
       const l = await tx.ensureLicense(DID)
       licenseId = l.licenseId
       await tx.linkCustomer(DID, l.licenseId, 'cus_1')
-      await tx.putSubscription({ id: 'sub_1', customerId: 'cus_1', did: DID, licenseId: l.licenseId, priceId: 'price_pro', tier: 'pro', status: 'active', currentPeriodEnd: null, cancelAtPeriodEnd: false, pastDueSince: null, lastEventAt: new Date(T0) })
+      await tx.putSubscription({ id: 'sub_1', customerId: 'cus_1', did: DID, licenseId: l.licenseId, priceId: 'price_pro', tier: 'plus', status: 'active', currentPeriodEnd: null, cancelAtPeriodEnd: false, pastDueSince: null, lastEventAt: new Date(T0) })
     })
     expect(await createPortalUrl(ctx, DID)).toEqual({ ok: true, url: 'https://billing.stripe.test/p' })
     expect(portal.mock.calls[0]![0]).toEqual({ customer: 'cus_1', return_url: 'https://blueyvatar.com/account/billing' })
-    expect((await createCheckoutUrl(ctx, DID, licenseId, 'pro')).ok).toBe(false)
+    expect((await createCheckoutUrl(ctx, DID, licenseId, 'plus')).ok).toBe(false)
     expect(create).toHaveBeenCalledTimes(1)
     // Developer subscriptions are per license, so another license (an organization's) may subscribe.
     expect((await createCheckoutUrl(ctx, DID, 'lic_org', 'business')).ok).toBe(true)
@@ -351,49 +351,55 @@ describe('Plus', () => {
   const plusItems = { data: [{ price: { id: 'price_plus' }, current_period_end: sec(T0 + 30 * DAY) }] }
   const plusSub = (o: Record<string, unknown> = {}) => subObj({ id: 'sub_plus', items: plusItems, ...o })
 
-  it('is priced at $9.99 per month', () => {
+  it('is priced at $9 per month, is the highlighted plan, and Pro is gone', () => {
     const p = PRICING.find((t) => t.id === 'plus')!
-    expect(p).toMatchObject({ amount: 9.99, per: 'mo' })
-    expect(formatPrice(p.amount)).toBe('$9.99')
+    expect(p).toMatchObject({ amount: 9, per: 'mo', highlighted: true })
+    expect(PRICING.map((t) => t.id)).toEqual(['free', 'plus', 'business'])
+    expect(PRICING.filter((t) => t.highlighted)).toHaveLength(1)
+    expect(formatPrice(9.99)).toBe('$9.99')
     expect(formatPrice(9)).toBe('$9')
     expect(formatPrice(0)).toBe('$0')
   })
-  it('config: STRIPE_PRICE_PLUS is optional and maps to the plus plan', () => {
+  it('config: price lists map retired prices to Plus, and only the first id is sold', () => {
     const noPlus = { ...env, STRIPE_PRICE_PLUS: undefined }
     expect(tierForPrice('price_plus', env)).toBe('plus')
+    expect(tierForPrice('price_pro', env)).toBe('plus')
+    expect(tierForPrice('price_biz', env)).toBe('business')
+    expect(priceFor('plus', env)).toBe('price_plus')
     expect(tierForPrice('price_plus', noPlus)).toBeNull()
-    expect(missingForCheckout(noPlus)).toEqual([])
+    expect(missingForCheckout(noPlus)).toEqual(['STRIPE_PRICE_PLUS'])
     expect(missingForCheckout(noPlus, 'plus')).toEqual(['STRIPE_PRICE_PLUS'])
-    expect(billingEnabled(noPlus)).toBe(true)
-    expect(plusEnabled(env)).toBe(true)
-    expect(plusEnabled(noPlus)).toBe(false)
-    expect(plusEnabled({})).toBe(false)
+    expect(billingEnabled(noPlus)).toBe(false)
+    expect(planEnabled('plus', env)).toBe(true)
+    expect(planEnabled('plus', noPlus)).toBe(false)
+    expect(planEnabled('business', noPlus)).toBe(true)
+    expect(planEnabled('plus', {})).toBe(false)
     expect(missingForWebhook({ STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_PRICE_PLUS: 'price_plus' })).toEqual([])
   })
-  it('an active Plus subscription grants Plus and leaves the developer license alone', async () => {
+  it('an active Plus subscription grants the Plus plan and the Plus license tier', async () => {
     const { send, store } = setup()
     expect((await send(ev('customer.subscription.created', plusSub()))).body.result).toBe('subscription active, tier plus')
     expect(await store.hasPlus(DID, new Date(T0))).toBe(true)
-    expect(store.licenseOf(DID)).toMatchObject({ tier: 'free', status: 'active', graceEndsAt: null })
+    expect(store.licenseOf(DID)).toMatchObject({ tier: 'plus', status: 'active', graceEndsAt: null })
+    expect((store.licenseOf(DID)!.entitlements as { keyedMonthly: number }).keyedMonthly).toBe(50_000)
     expect(await resolvePlan(DID, store, new Date(T0))).toBe('plus')
-    expect((await store.subscriptionFor(DID, 'plus'))?.id).toBe('sub_plus')
-    expect(await store.subscriptionFor(DID)).toBeNull()
+    expect((await store.subscriptionFor(DID))?.id).toBe('sub_plus')
   })
   it('a trialing Plus subscription grants Plus', async () => {
     const { send, store } = setup()
     await send(ev('customer.subscription.created', plusSub({ status: 'trialing' })))
     expect(await store.hasPlus(DID, new Date(T0))).toBe(true)
   })
-  it('Plus and Pro coexist: each changes only its own thing', async () => {
+  it('a legacy Pro subscription and a Plus subscription on one license both resolve to Plus', async () => {
     const { send, store } = setup()
     await send(ev('customer.subscription.created', subObj(), T0))
     await send(ev('customer.subscription.created', plusSub(), T0 + 1000))
-    expect(store.licenseOf(DID)?.tier).toBe('pro')
+    expect(store.licenseOf(DID)?.tier).toBe('plus')
     expect(await store.hasPlus(DID, new Date(T0))).toBe(true)
     await send(ev('customer.subscription.deleted', plusSub({ status: 'canceled' }), T0 + 2000))
-    expect(store.licenseOf(DID)?.tier).toBe('pro')
-    expect(await store.hasPlus(DID, new Date(T0))).toBe(false)
-    expect((await store.subscriptionFor(DID))?.tier).toBe('pro')
+    expect(store.licenseOf(DID)?.tier).toBe('plus')
+    expect(await store.hasPlus(DID, new Date(T0))).toBe(true)
+    expect((await store.subscriptionFor(DID))?.tier).toBe('plus')
   })
   it.each(['unpaid', 'canceled', 'incomplete_expired', 'paused'])('status %s ends Plus', async (status) => {
     const { send, store } = setup()
@@ -435,21 +441,18 @@ describe('Plus', () => {
       else process.env.PLUS_DIDS = prev
     }
   })
-  it('Checkout sells Plus with the Plus price, alongside an existing developer subscription, but not twice', async () => {
+  it('Checkout sells Plus with the Plus price, once per license', async () => {
     const store = memoryBillingStore()
     const create = vi.fn(async (_params: unknown) => ({ url: 'https://checkout.stripe.test/plus' }))
     const ctx = { store, client: { checkout: { sessions: { create } }, billingPortal: { sessions: { create: vi.fn() } } } as never, env, baseUrl: 'https://blueyvatar.com' }
-    await store.process('e1', 'x', async (tx) => {
-      const l = await tx.ensureLicense(DID)
-      await tx.putSubscription({ id: 'sub_1', customerId: 'cus_1', did: DID, licenseId: l.licenseId, priceId: 'price_pro', tier: 'pro', status: 'active', currentPeriodEnd: null, cancelAtPeriodEnd: false, pastDueSince: null, lastEventAt: new Date(T0) })
-    })
-    expect(await createCheckoutUrl(ctx, DID, 'lic_1', 'plus')).toEqual({ ok: true, url: 'https://checkout.stripe.test/plus' })
+    let licenseId = ''
+    await store.process('e1', 'x', async (tx) => { licenseId = (await tx.ensureLicense(DID)).licenseId })
+    expect(await createCheckoutUrl(ctx, DID, licenseId, 'plus')).toEqual({ ok: true, url: 'https://checkout.stripe.test/plus' })
     expect(create.mock.calls[0]![0]).toMatchObject({ line_items: [{ price: 'price_plus', quantity: 1 }], automatic_tax: { enabled: true }, subscription_data: { metadata: { did: DID } } })
     await store.process('e2', 'x', async (tx) => {
-      const l = await tx.ensureLicense(DID)
-      await tx.putSubscription({ id: 'sub_plus', customerId: 'cus_1', did: DID, licenseId: l.licenseId, priceId: 'price_plus', tier: 'plus', status: 'active', currentPeriodEnd: null, cancelAtPeriodEnd: false, pastDueSince: null, lastEventAt: new Date(T0) })
+      await tx.putSubscription({ id: 'sub_plus', customerId: 'cus_1', did: DID, licenseId, priceId: 'price_plus', tier: 'plus', status: 'active', currentPeriodEnd: null, cancelAtPeriodEnd: false, pastDueSince: null, lastEventAt: new Date(T0) })
     })
-    expect((await createCheckoutUrl(ctx, DID, 'lic_1', 'plus')).ok).toBe(false)
+    expect((await createCheckoutUrl(ctx, DID, licenseId, 'plus')).ok).toBe(false)
     expect(create).toHaveBeenCalledTimes(1)
   })
   it('Checkout for Plus reports the missing price when STRIPE_PRICE_PLUS is unset', async () => {
@@ -492,12 +495,12 @@ describe.skipIf(!url)('postgres billing store', () => {
     expect(results.filter((r) => r.body.result?.startsWith('duplicate')).length).toBe(2)
     const lic = await pool.query('SELECT tier, status, grace_ends_at, term FROM licenses WHERE owner = $1', [DID])
     expect(lic.rows).toHaveLength(1)
-    expect(lic.rows[0]).toMatchObject({ tier: 'pro', status: 'active', grace_ends_at: null, term: 'monthly' })
+    expect(lic.rows[0]).toMatchObject({ tier: 'plus', status: 'active', grace_ends_at: null, term: 'monthly' })
     expect((await pool.query('SELECT count(*)::int AS c FROM stripe_events')).rows[0].c).toBe(1)
 
     await send(ev('invoice.payment_failed', { subscription: 'sub_1' }, T0 + DAY), T0 + DAY)
     const past = (await pool.query('SELECT tier, status, grace_ends_at FROM licenses WHERE owner = $1', [DID])).rows[0]
-    expect(past).toMatchObject({ tier: 'pro', status: 'past_due' })
+    expect(past).toMatchObject({ tier: 'plus', status: 'past_due' })
     expect(new Date(past.grace_ends_at).getTime()).toBe(T0 + 8 * DAY)
     expect((await store.subscriptionFor(DID))?.status).toBe('past_due')
 

@@ -32,7 +32,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `invalid_key` | 401 | Unknown API key, or a secret key sent outside the `x-api-key` header. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |
 | `origin_not_allowed` | 403 | A publishable key was used from an origin or referer not on its domain list, or with none. |
-| `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise. |
+| `tier_required` | 403 | The route needs a higher tier. `/qr` requires Business or Enterprise, and cross-origin `/profile` (hovercards) requires Plus or higher. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
 | `secret_key_required` | 403 | `GET /usage` was called with a publishable key. Use a secret key in the `x-api-key` header. See [usage-v1.md](usage-v1.md). |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |
@@ -74,13 +74,13 @@ Sent on successful responses and on `429` responses, when the caller has a count
 | `x-rate-limit-remaining` | Requests left. Never below 0. |
 | `x-rate-limit-reset` | Unix time in seconds when the window resets. |
 
-Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. Pro and Business have monthly included volume of 50,000 and 1,000,000 (30-day window), with metered overage, so they are not blocked at the limit. Enterprise has no window and the three headers are omitted. A `429` also carries `retry-after`, the whole seconds (at least 1) until `x-rate-limit-reset`.
+Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. Plus and Business have monthly included volume of 50,000 and 1,000,000 (30-day window), with metered overage, so they are not blocked at the limit. Enterprise has no window and the three headers are omitted. A `429` also carries `retry-after`, the whole seconds (at least 1) until `x-rate-limit-reset`.
 
 ## Other response headers
 
 | Header | When | Value |
 | --- | --- | --- |
-| `x-tier` | Successful responses | `free`, `pro`, `business`, or `enterprise`. |
+| `x-tier` | Successful responses | `free`, `plus`, `business`, or `enterprise`. |
 | `x-usage-cost` | Successful keyed requests | `1`, the metered units for the request. Absent for anonymous requests. |
 | `x-adjusted-params` | A tier clamped or ignored a parameter | Comma-separated names, for example `s,fmt,ttl`. Possible names: `s`, `d`, `fmt`, `q`, `ttl`. On `/qr`, only `s` is reported. |
 | `retry-after` | `429` responses with a counted window | Seconds to wait before retrying. |

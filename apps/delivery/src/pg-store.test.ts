@@ -175,7 +175,7 @@ describe.skipIf(!url)('postgres stores', () => {
       [hashApiKey(raw)],
     )
     const found = await licenses.findKey(raw)
-    expect(found?.license).toEqual({ licenseId: 'lic1', owner: DID, tier: 'pro', status: 'active' })
+    expect(found?.license).toEqual({ licenseId: 'lic1', owner: DID, tier: 'plus', status: 'active' })
     expect(found?.key).toEqual({ key: raw, kind: 'publishable', licenseId: 'lic1', domains: ['*.example.com'] })
     expect(await licenses.findKey('pk_other')).toBeNull()
     await pool.query(`UPDATE api_keys SET revoked_at = now()`)
