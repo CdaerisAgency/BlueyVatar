@@ -4,7 +4,6 @@
  * Prices are not here. They come from ./pricing.ts.
  */
 export const COPY = {
-  brand: 'blueyvatar',
   nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in' },
   hero: {
     eyebrow: 'One avatar. Every app.',
