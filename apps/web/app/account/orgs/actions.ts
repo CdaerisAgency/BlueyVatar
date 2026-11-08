@@ -7,9 +7,10 @@ import { log } from '../../../lib/obs'
 import { limited } from '../../../lib/rate-guard'
 import { getPool } from '../../../lib/store'
 import { canManageMembership, isRole } from '../../../lib/orgs/roles'
-import { addMember, createOrganization, memberRole, removeMember, setRole, type OrgResult } from '../../../lib/orgs/store'
+import { addMember, cleanName, createOrganization, memberRole, removeMember, setRole, type OrgResult } from '../../../lib/orgs/store'
+import { runAddMember, runCreateOrg } from '../../../lib/orgs/forms'
+import type { AddMemberState, CreateOrgState } from '../../../lib/orgs/form-limits'
 
-const listBack = (error: string): never => redirect(`/account/orgs?error=${encodeURIComponent(error)}`)
 const orgBack = (id: string, key: 'error' | 'done', msg: string): never => redirect(`/account/orgs/${encodeURIComponent(id)}?${key}=${encodeURIComponent(msg)}`)
 
 async function ctx() {
@@ -18,16 +19,20 @@ async function ctx() {
   return did
 }
 
-export async function createOrg(form: FormData): Promise<void> {
-  const did = await ctx()
-  const wait = await limited(['org.did', 'org.ip'], did)
-  if (wait) return listBack(wait)
+/** Failures return to the form so the typed name stays. */
+export async function createOrg(_prev: CreateOrgState, form: FormData): Promise<CreateOrgState> {
   const pool = getPool()
-  if (!pool) return listBack('Organizations need the database, which is not configured here.')
-  const r = await createOrganization(pool, did, String(form.get('name') ?? ''))
-  if (!r.ok) return listBack(r.error)
-  log.info('organization created')
-  return redirect(`/account/orgs/${r.orgId}`)
+  const r = await runCreateOrg(await currentDid(), form, {
+    limited: (did) => limited(['org.did', 'org.ip'], did),
+    hasDb: pool !== null,
+    validName: cleanName,
+    create: (did, name) => createOrganization(pool!, did, name),
+  })
+  if (r.orgId) {
+    log.info('organization created')
+    return redirect(`/account/orgs/${r.orgId}`)
+  }
+  return r
 }
 
 /** Runs an owner-only membership change. `member` is the target DID. Leaving is allowed for any member. */
@@ -49,10 +54,21 @@ async function change(form: FormData, run: (orgId: string, actor: string, target
   return orgBack(orgId, 'done', ok)
 }
 
-/** Adds a member by atproto DID. There is no email invite, so nothing needs acceptance and no address is stored. */
-export async function addOrgMember(form: FormData): Promise<void> {
-  const role = String(form.get('role') ?? 'member')
-  return change(form, (o, a, t) => addMember(getPool()!, o, a, t, isRole(role) ? role : 'member'), 'Member added.')
+/** Adds a member by atproto DID. There is no email invite, so nothing needs acceptance and no address is stored. Failures return to the form so the typed values stay. */
+export async function addOrgMember(_prev: AddMemberState, form: FormData): Promise<AddMemberState> {
+  const pool = getPool()
+  const r = await runAddMember(await currentDid(), form, {
+    limited: (did) => limited(['org.did', 'org.ip'], did),
+    hasDb: pool !== null,
+    roleOf: (orgId, did) => memberRole(pool!, orgId, did),
+    canManage: canManageMembership,
+    add: (orgId, actor, target, role) => addMember(pool!, orgId, actor, target, role),
+  })
+  if (r.done) {
+    revalidatePath(`/account/orgs/${String(form.get('org') ?? '')}`)
+    log.info('organization membership changed')
+  }
+  return r
 }
 
 export async function changeOrgRole(form: FormData): Promise<void> {

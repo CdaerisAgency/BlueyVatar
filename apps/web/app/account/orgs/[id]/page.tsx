@@ -5,7 +5,8 @@ import { canManageMembership } from '../../../../lib/orgs/roles'
 import { getOrganization, listAudit, listMembers, memberRole, orgLicense } from '../../../../lib/orgs/store'
 import { getPool } from '../../../../lib/store'
 import AccountNav from '../../AccountNav'
-import { addOrgMember, changeOrgRole, removeOrgMember } from '../actions'
+import { changeOrgRole, removeOrgMember } from '../actions'
+import { AddMemberForm } from './AddMemberForm'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Organization' }
@@ -72,20 +73,7 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
         <>
           <h2>Add a member</h2>
           <p>Enter the person&apos;s atproto DID. They are added right away and can sign in with that account. There are no email invites.</p>
-          <form action={addOrgMember}>
-            <input type="hidden" name="org" value={id} />
-            <label>
-              DID <input name="member" required placeholder="did:plc:..." size={40} />
-            </label>{' '}
-            <label>
-              Role{' '}
-              <select name="role" defaultValue="member">
-                <option value="member">member</option>
-                <option value="owner">owner</option>
-              </select>
-            </label>{' '}
-            <button type="submit">Add member</button>
-          </form>
+          <AddMemberForm orgId={id} />
 
           <h2>Activity</h2>
           {audit.length === 0 ? <p>No activity yet.</p> : (

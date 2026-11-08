@@ -4,7 +4,7 @@ import { requireDid } from '../../../lib/auth'
 import { listOrganizations } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
 import AccountNav from '../AccountNav'
-import { createOrg } from './actions'
+import { CreateOrgForm } from './CreateOrgForm'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Organizations' }
@@ -34,12 +34,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
       )}
       <h2>Create an organization</h2>
       <p>You become its first owner and its billing owner. The Business tier ($49 per month, 25 keys) is for organizations.</p>
-      <form action={createOrg}>
-        <label>
-          Name <input name="name" required maxLength={80} />
-        </label>{' '}
-        <button type="submit">Create organization</button>
-      </form>
+      <CreateOrgForm />
     </PageMain>
   )
 }

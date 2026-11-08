@@ -1,5 +1,4 @@
 import { PageMain } from '../../../../components/Page'
-import { Button } from '../../../../components/Button'
 import { requireDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
 import { sourceLabel } from '../../../../lib/import'
@@ -8,8 +7,7 @@ import { canAddImage, limitMessage } from '../../../../lib/records'
 import { resolvePlan } from '../../../../lib/plan'
 import { limited } from '../../../../lib/rate-guard'
 import AccountNav from '../../AccountNav'
-import RatingFields from '../RatingFields'
-import { confirmImport } from './actions'
+import { ImportForm } from './ImportForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,23 +37,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
       {error && <p role="alert">{error}</p>}
       {problem && <p role="alert">{problem}</p>}
       {preview && (
-        <form action={confirmImport}>
-          <input type="hidden" name="source" value={source} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview.uri} alt="Preview of the image to import" width={160} height={160} className="object-cover" />
-          <p>
-            This image comes from {preview.label}. Confirm its rating before it is saved to your repository, where it will be public.
-            {preview.suggested === null ? ' We cannot see how the image was rated, so choose a rating.' : ''}
-          </p>
-          <RatingFields defaultRating={preview.suggested ?? ''} needsChoice={preview.suggested === null} />
-          <label>
-            Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
-          </label>
-          <label>
-            <input name="isDefault" type="checkbox" /> Use as my default image
-          </label>
-          <Button type="submit" variant="primary">Import</Button>
-        </form>
+        <ImportForm source={source} previewUri={preview.uri} label={preview.label} suggested={preview.suggested} />
       )}
       <p>
         <a href="/account/avatars">Back to avatars</a>

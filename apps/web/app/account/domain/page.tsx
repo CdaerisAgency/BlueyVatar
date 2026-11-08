@@ -6,7 +6,8 @@ import { getDomainStore } from '../../../lib/domain-store'
 import { resolvePlan } from '../../../lib/plan'
 import { limited } from '../../../lib/rate-guard'
 import AccountNav from '../AccountNav'
-import { addDomain, removeDomain } from './actions'
+import { removeDomain } from './actions'
+import { DomainForm } from './DomainForm'
 import { PollRefresh } from './PollRefresh'
 
 export const dynamic = 'force-dynamic'
@@ -115,13 +116,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
       {cfg && target && !row && plus && (
         <>
         <p>You have no custom domain yet. Enter a subdomain you control, then add the DNS records we show you.</p>
-        <form action={addDomain}>
-          <label>
-            Subdomain you own{' '}
-            <input name="hostname" placeholder="me.example.com" required autoComplete="off" spellCheck={false} />
-          </label>
-          <Button type="submit" variant="primary">Add domain</Button>
-        </form>
+        <DomainForm />
         </>
       )}
 

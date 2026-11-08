@@ -1,30 +1,16 @@
 import { createHash } from 'node:crypto'
 import type pg from 'pg'
 
-export const REASONS = ['child_safety', 'illegal', 'copyright', 'explicit', 'impersonation', 'harassment', 'private_info', 'spam', 'other'] as const
-export type Reason = (typeof REASONS)[number]
+export { REASONS, REASON_LABELS, type Reason }
 export type Source = 'profile' | 'avatar'
-
-export const REASON_LABELS: Record<Reason, string> = {
-  child_safety: 'Child safety concern',
-  illegal: 'Illegal content',
-  copyright: 'Copyright or trademark infringement',
-  explicit: 'Explicit content rated too low',
-  impersonation: 'Impersonation',
-  harassment: 'Threats or harassment',
-  private_info: 'Private information',
-  spam: 'Spam or scams',
-  other: 'Something else',
-}
 
 /** Submissions allowed per IP in the window. */
 export const RATE_LIMIT = 5
 /** Submissions allowed per signed-in account in the window, in addition to the per-IP limit. */
 export const RATE_LIMIT_DID = 5
 export const RATE_WINDOW_MS = 60 * 60 * 1000
-export const MIN_DETAILS = 10
-export const MAX_DETAILS = 2000
-export const MAX_CONTACT = 254
+import { MAX_CONTACT, MAX_DETAILS, MIN_DETAILS, REASONS, REASON_LABELS, type Reason } from './report-limits'
+export { MAX_CONTACT, MAX_DETAILS, MIN_DETAILS }
 
 export type ReportField = 'did' | 'reason' | 'details' | 'contact'
 export type ReportInput = { did: string; reporterDid: string; source: Source; reason: Reason; details: string; contact: string }
