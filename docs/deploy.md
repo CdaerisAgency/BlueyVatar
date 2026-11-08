@@ -78,11 +78,38 @@ fly deploy --config fly/indexer.toml --app blueyvatar-indexer-staging --dockerfi
   --env TAP_URL=http://blueyvatar-tap-staging.internal:2480
 ```
 
-The indexer needs the `--env` override because `fly/indexer.toml` points at the production Tap. The CI workflow deploys only the production apps.
+The indexer needs the `--env` override because `fly/indexer.toml` points at the production Tap. The CI workflow deploys these staging apps too (see CI deploys). Tap staging is deployed by hand.
 
 ## CI deploys
 
-`.github/workflows/deploy.yml` runs on push to `main` and on manual dispatch, but only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps. It installs flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>) and deploys delivery, then web, then indexer, using `FLY_API_TOKEN`. The job runs only on the owner's runner, named by the repository variable `DEPLOY_RUNNER`, and has no GitHub-hosted fallback because it holds `FLY_API_TOKEN`. It also runs only for `refs/heads/main` and uses `environment: production`, which GitHub creates on first use with no reviewers. CI (`ci.yml`), the npm publish and Live Tap workflows run on GitHub-hosted `ubuntu-latest`; the old `CI_RUNNER` variable is retired. If `DEPLOY_RUNNER` is missing, the job fails instead of running elsewhere. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
+`.github/workflows/deploy.yml` deploys automatically on every push to `main`: staging first, a smoke test against staging, then production, then a smoke test against production. Production starts only if the staging deploy and the staging smoke test both succeeded (`deploy-production` has `needs: deploy-staging`).
+
+**What turns it on.** All three must be in place, or nothing deploys:
+
+- The repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps.
+- The secret `FLY_API_TOKEN` exists in Settings > Secrets and variables > Actions > Secrets. It must be able to deploy all six apps (staging and production). **Unconfirmed:** whether one org-scoped token covers both.
+- The repository variable `DEPLOY_RUNNER` names the owner's runner. There is no GitHub-hosted fallback because the jobs hold `FLY_API_TOKEN`, so a missing value fails the job instead of running elsewhere.
+
+Optional: `SMOKE_HANDLE` and `SMOKE_OPTED_OUT_HASH` (variables) enable the extra smoke checks, and the secret `SMOKE_ORIGIN_SECRET` is sent on staging delivery checks because staging has no Cloudflare in front (see `tools/smoke/smoke.ts`).
+
+**Jobs.** `deploy-staging` (environment `staging`) deploys delivery, web, then indexer to the `blueyvatar-*-staging` apps with the same commands as `localdeploy.bat`, including `--env TAP_URL=http://blueyvatar-tap-staging.internal:2480` for the indexer, then runs `tools/smoke/smoke.ts --env staging`. `deploy-production` (environment `production`) deploys the production apps in the same order and runs `--env production`. Delivery goes first because its release command runs the migrations, so a migration reaches staging before production. Staging smoke targets are `https://blueyvatar-web-staging.fly.dev` and `https://blueyvatar-delivery-staging.fly.dev` (the smoke script defaults). Each smoke test retries up to three times, 30 seconds apart.
+
+**Manual re-runs.** Run the workflow from the Actions tab (workflow dispatch) and pick `target`: `both` (the default) or `staging`. `staging` stops after the staging smoke test. Both choices still need `FLY_DEPLOY_ENABLED` and the `main` branch.
+
+**Other rules.** The jobs install flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>), run only for `refs/heads/main`, and GitHub creates the `staging` and `production` environments on first use with no reviewers. CI (`ci.yml`), the npm publish and Live Tap workflows run on GitHub-hosted `ubuntu-latest`; the old `CI_RUNNER` variable is retired. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
+
+`localdeploy.bat` remains for emergencies, such as when Actions or the runner is down.
+
+### Roll back production
+
+The workflow does not roll back. If a production deploy or its smoke test fails, the workflow fails and the apps stay as they are. To go back, list releases with their images and deploy an earlier image for each affected app (no rebuild), as described in Fly's guide <https://docs.fly.io/blueprints/rollback-guide> and the `fly releases --image` reference <https://docs.fly.io/flyctl/cmd/fly_releases>:
+
+```sh
+fly releases --app blueyvatar-web --image
+fly deploy --app blueyvatar-web --image registry.fly.io/blueyvatar-web:deployment-XXXXXXXX
+```
+
+Repeat for `blueyvatar-delivery` and `blueyvatar-indexer` as needed. Rollbacks do not undo database migrations that delivery already applied, so check that the older image works with the current schema first. The image must still exist in the Fly registry. Also turn off `FLY_DEPLOY_ENABLED` (or fix `main`) so the next push does not redeploy the bad change.
 
 **Tap is deployed by hand.** Restarting Tap interrupts the firehose connection, and an image upgrade can force a re-backfill, so someone should watch each Tap deploy. It also changes rarely.
 

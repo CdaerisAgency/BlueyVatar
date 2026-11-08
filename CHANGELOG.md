@@ -4,6 +4,9 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 
 ## 2026-11-08
 
+### Changed
+- Every push to `main` now deploys automatically when `FLY_DEPLOY_ENABLED` is `true`: staging, a smoke test against staging, production, then a smoke test against production. Production is skipped if staging fails. A manual run can choose `staging` only. Tap is still deployed by hand, and `localdeploy.bat` stays for emergencies. Rollback steps are in `docs/deploy.md`.
+
 ### Added
 - Account menu: an Overview link above the groups, Organizations under Identity, Profile views under Profile, and Appeal under Settings (part of #243). The home page heading is now Overview and the appeal page heading is Appeal. Nested pages such as an organization's page keep the right item highlighted.
 - The account data export now includes your Bluesky avatar sync setting and the log of changes blueyvatar made to your profile avatar (part of #241). Only your own rows are listed, with no account ID or row numbers.
