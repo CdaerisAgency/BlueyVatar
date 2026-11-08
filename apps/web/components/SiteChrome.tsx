@@ -1,9 +1,11 @@
 import Link from 'next/link'
 import { COPY } from '../lib/copy'
-import { ButtonLink } from './Button'
+import FooterLinks from './FooterLinks'
+import NavAccount from './NavAccount'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
+/** Static markup. The account area is a client component that asks /api/viewer after load, so pages stay cacheable. */
 export function SiteNav() {
   const link = 'text-bv-black no-underline hover:text-bv-blue hover:underline'
   return (
@@ -36,9 +38,7 @@ export function SiteNav() {
           <Link href="/integrations" className={link}>
             {COPY.nav.integrations}
           </Link>
-          <ButtonLink href="/login" variant="primary">
-            {COPY.nav.signIn}
-          </ButtonLink>
+          <NavAccount />
         </nav>
       </div>
     </header>
@@ -50,13 +50,7 @@ export function SiteFooter() {
     <footer className="border-t-[1.5px] border-bv-line text-sm text-bv-ink-3">
       <div className={`${inner} flex flex-wrap justify-between gap-x-6 gap-y-3 py-7`}>
         <span>{COPY.footer.tagline}</span>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
-          {COPY.footer.links.map((l) => (
-            <Link key={l.href} href={l.href} className="text-bv-ink-3 no-underline hover:text-bv-blue hover:underline">
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        <FooterLinks />
       </div>
       <p className={`${inner} m-0 pb-7`}>
         {COPY.footer.climate.text}{' '}

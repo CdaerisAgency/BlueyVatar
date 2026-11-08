@@ -62,7 +62,7 @@ export const COPY = {
       { label: 'Changelog', href: '/changelog' },
       { label: 'Privacy', href: '/privacy' },
       { label: 'Accessibility', href: '/accessibility' },
-      { label: 'Sign in', href: '/login' },
+      { label: 'Sign in', href: '/login' }, // Hidden for signed-in visitors by SiteFooter.
     ],
   },
   login: {

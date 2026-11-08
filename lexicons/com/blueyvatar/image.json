@@ -15,7 +15,7 @@
           "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
           "license": {
             "type": "string",
-            "description": "User-declared usage license. Values are placeholders until legal review.",
+            "description": "Deprecated. No longer written or shown; readers ignore it. Older records may still carry a value, and nothing removes it from a repository.",
             "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"]
           },
           "crop": { "type": "ref", "ref": "#crop", "description": "Square region of the image to show. Absent means the center square." },

@@ -1,6 +1,6 @@
 import { COPY } from '../lib/copy'
 import { PRICING, formatPrice } from '../lib/pricing'
-import { ButtonLink } from './Button'
+import PricingButton from './PricingButton'
 import { SectionTitle } from './Type'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
@@ -33,9 +33,9 @@ export function PricingSection({ headingAs = 'h2' }: { headingAs?: 'h1' | 'h2' }
                 {t.per && <small className="font-sans text-lg font-normal text-bv-ink-3">{COPY.pricing.perMonth}</small>}
               </span>
               <p className="m-0">{COPY.pricing.tiers[t.id].body}</p>
-              <ButtonLink href="/login" variant={t.highlighted ? 'primary' : 'secondary'} className="mt-auto">
+              <PricingButton tier={t.id} highlighted={!!t.highlighted}>
                 {COPY.pricing.tiers[t.id].cta}
-              </ButtonLink>
+              </PricingButton>
             </li>
           ))}
         </ul>

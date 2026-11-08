@@ -39,7 +39,6 @@ export async function uploadImage(form: FormData): Promise<void> {
     alt: String(form.get('alt') ?? ''),
     rating: String(form.get('rating') ?? ''),
     rLabel: String(form.get('rLabel') ?? ''),
-    license: String(form.get('license') ?? ''),
     isDefault: form.get('isDefault') === 'on',
     cropX: String(form.get('cropX') ?? ''),
     cropY: String(form.get('cropY') ?? ''),

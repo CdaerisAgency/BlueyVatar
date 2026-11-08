@@ -1,16 +1,16 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { clearSessionCookie, currentDid, oauthClient } from '../../../lib/auth'
-import { confirmationMatches, deleteAccountData, DeletionBlocked } from '../../../lib/account-data'
-import { attestationWriter } from '../../../lib/attestation'
-import { stripeClient } from '../../../lib/billing/stripe'
-import { purgeImagePrefixes } from '../../../lib/cache-purge'
-import { cfSaasConfig, deleteHostname } from '../../../lib/cf-saas'
-import { limited } from '../../../lib/rate-guard'
-import { getPool } from '../../../lib/store'
+import { clearSessionCookie, currentDid, oauthClient } from '../../../../lib/auth'
+import { confirmationMatches, deleteAccountData, DeletionBlocked } from '../../../../lib/account-data'
+import { attestationWriter } from '../../../../lib/attestation'
+import { stripeClient } from '../../../../lib/billing/stripe'
+import { purgeImagePrefixes } from '../../../../lib/cache-purge'
+import { cfSaasConfig, deleteHostname } from '../../../../lib/cf-saas'
+import { limited } from '../../../../lib/rate-guard'
+import { getPool } from '../../../../lib/store'
 
-const back = (error: string): never => redirect(`/account/data?error=${encodeURIComponent(error)}`)
+const back = (error: string): never => redirect(`/account/settings/danger?error=${encodeURIComponent(error)}`)
 
 /** Deletes everything except billing records, signs the person out, and shows what was kept. */
 export async function deleteMyData(form: FormData): Promise<void> {

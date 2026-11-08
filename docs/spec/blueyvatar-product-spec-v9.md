@@ -17,7 +17,7 @@ Build instructions live in the repository README at the repo root, and this spec
 
 **Assumptions to confirm**
 
-1. "Licensing" covers two things: developer licenses (API keys with tier entitlements) and an optional usage license that a user can declare on each image.
+1. "Licensing" covers two things: developer licenses (API keys with tier entitlements) and, removed since this version, a usage license that a user could declare on each image (section 10.4).
 2. "Permissions" covers two things: user-set rules on who can fetch avatar and profile data, and the OAuth permissions an app requests from the user.
 3. Tier names (Free, Pro, Business, Enterprise) and all prices are placeholders. No published basis exists for pricing this product, so section 11 lists competitor reference points only.
 4. Version 1 targets web and API delivery. Mobile SDKs and WordPress plugins are listed as later phases.
@@ -122,7 +122,7 @@ The service defines three record types in the user's repository and keeps everyt
 
 | Record | NSID | Record key | Where it lives | Purpose |
 | --- | --- | --- | --- | --- |
-| Avatar image | `com.blueyvatar.image` | tid | User repo | One image blob with rating, alt text, license, and default flag |
+| Avatar image | `com.blueyvatar.image` | tid | User repo | One image blob with rating, alt text, and default flag |
 | Profile | `com.blueyvatar.profile` | literal:self | User repo | Extended fields and the chosen default avatar |
 | Link claim | `com.blueyvatar.claim` | tid | User repo | A claim of ownership of an outside account or URL |
 | Attestation | `com.blueyvatar.attestation` | tid | Service repo | The service's signed result for a claim, pointing at it by strong reference |
@@ -148,7 +148,7 @@ The service defines three record types in the user's repository and keeps everyt
           "image": { "type": "blob", "accept": ["image/png", "image/jpeg"], "maxSize": 5242880 },
           "alt": { "type": "string", "maxGraphemes": 300 },
           "labels": { "type": "union", "refs": ["com.atproto.label.defs#selfLabels"] },
-          "license": { "type": "string", "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"] },
+          "license": { "type": "string", "description": "Deprecated. No longer written or shown.", "knownValues": ["personal", "cc-by", "cc-by-nc", "all-rights-reserved"] },
           "crop": { "type": "ref", "ref": "#crop" },
           "isDefault": { "type": "boolean" },
           "purpose": { "type": "string", "knownValues": ["avatar", "gallery"], "maxLength": 32 },
@@ -185,7 +185,7 @@ Gallery rules follow the avatar rules. The gallery is a Plus user feature (secti
 - **Client resize.** Before upload, the web editor decodes the image, and if the long edge is above 4096 pixels or the file is above the byte cap, it draws the whole frame to a canvas at no more than 4096 pixels on the long side (aspect ratio kept, no crop) and re-encodes under the cap: a PNG stays PNG if it fits, otherwise JPEG at quality 0.92, 0.85, then 0.75, then smaller sizes in a few steps. An image within 4096 pixels and under the cap is uploaded untouched. This is best effort, so the result is not guaranteed. Because an untouched file is uploaded as is, its metadata, such as location, stays in the public blob. The editor says so next to the file input.
 - **Server fallback.** For uploads that skipped the browser step (API or direct uploads, the Gravatar and Libravatar imports, a browser that cannot decode the file), the web server downscales an image whose long edge is above 4096 pixels with sharp. It keeps the whole frame, applies the EXIF orientation (so a crop measured on the displayed image still lines up), and re-encodes under the byte cap. Concurrency goes through the same limiter as delivery resizes (issue #198, IMG_MAX_CONCURRENT, IMG_QUEUE_MAX, and IMG_QUEUE_WAIT_MS), with defaults of one at a time and a queue of four in the web process, and a busy answer asks the user to retry. Input is limited to 48,000,000 pixels with `failOn` set to `warning`. This resize runs inside the web process with no forked child, a trade-off that keeps the fallback small. The server still enforces the byte cap, the 80 pixel minimum, and the PNG and JPEG check.
 
-The blob size limit is the reference PDS default. It is higher than the Bluesky avatar limit, so a file above 1,000,000 bytes is accepted here but cannot be reused as a Bluesky avatar as it is. The license values are placeholders for the user-declared license in section 10.
+The blob size limit is the reference PDS default. It is higher than the Bluesky avatar limit, so a file above 1,000,000 bytes is accepted here but cannot be reused as a Bluesky avatar as it is. The `license` field on image records is deprecated (section 10.4).
 
 **Two constraints shape this model.**
 
@@ -347,14 +347,14 @@ Bluesky describes `nudity` as a warning label that [is not 18+ and defaults to i
 
 ## 10. Licensing and permissions
 
-Three separate controls cover this area: OAuth permissions a user grants the service, visibility rules a user sets for viewers, and licenses the service issues to developers. A fourth item, the usage license a user declares on each image, tells developers what they may do with it. This section is a product design. Legal questions go to a lawyer, who also needs to review the terms of service.
+Three separate controls cover this area: OAuth permissions a user grants the service, visibility rules a user sets for viewers, and licenses the service issues to developers. An image license field existed earlier and has been removed (section 10.4). This section is a product design. Legal questions go to a lawyer, who also needs to review the terms of service.
 
 | Who | Controls | Mechanism | Enforced by |
 | --- | --- | --- | --- |
 | User to service | What the service may read and write in the user's repo | atproto OAuth scopes | The user's PDS |
 | User to viewers | Who can fetch the avatar and profile through the service | Visibility rules | The service |
 | Developer to service | What a key may do and how much | License key with entitlements | The service |
-| User to developers | What a developer may do with an image | Declared image license | Terms of service |
+| User to developers | What a developer may do with an image | Terms of service (no per-image license field) | Terms of service |
 
 ### 10.1 User permissions to the service (OAuth)
 
@@ -405,12 +405,12 @@ Each license holds these fields:
 | `term`, `status` | Monthly or annual term; active, past due, suspended, canceled |
 | `usage` | Metered counters (section 12) |
 
-### 10.4 Image license declaration
+### 10.4 Image license declaration (removed)
 
-Each image record carries a `license` value the user picks. The values in section 5 are placeholders until the legal review. Two layers apply:
+Owner decision (issue #227): blueyvatar does not ask for, check, or display an image license. New image records carry no `license`. Records that already have one keep working, readers ignore the value, nothing is deleted from any repository, and the data export still lists the stored value. The lexicon marks the field deprecated, and dropping it from the schema is decided at publication (issue #54). Takedowns run through reports and the content policy (issue #66), and counsel confirms whether the terms need a line that users must have the right to the images they upload. Two layers still apply:
 
 - **License to the service.** By signing in, the user grants the service a limited right to cache, resize, convert, and deliver the image through its CDN. Terms of service must say so.
-- **License to developers.** A developer license allows showing the avatar next to the user's name in the developer's product. Other uses, such as advertising or resale, follow the user's declared license, and the profile JSON returns that field so integrators can check it.
+- **License to developers.** A developer license allows showing the avatar next to the user's name in the developer's product. Other uses, such as advertising or resale, are governed by the terms of service.
 
 ## 11. Service tiers
 

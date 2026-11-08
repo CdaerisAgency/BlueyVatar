@@ -38,7 +38,7 @@ export async function sendCode(
   await sender.send({
     to: email.trim(),
     subject: 'Your blueyvatar verification code',
-    text: `Your code is ${code}. It expires in 15 minutes.\n\nIf you did not ask to link this address on ${PUBLIC_URL}, ignore this message.`,
+    text: `Your code is ${code}. It expires in 15 minutes.\n\nYour email address is used to notify you of changes to your handle or avatar.\n\nIf you did not ask to link this address on ${PUBLIC_URL}, ignore this message.`,
   })
   // The encrypted address lives in the pending row for at most the life of this code. Confirming stores it as
   // the primary email for notices (when it becomes primary) and uses it to tell a previous owner of a move.
@@ -70,7 +70,7 @@ export async function confirmLink(
 export async function linkFromSession(session: OAuthSession): Promise<LinkOutcome> {
   const did = session.did
   const res = await session.fetchHandler('/xrpc/com.atproto.server.getSession')
-  if (!res.ok) return { kind: 'error', message: 'Your PDS did not return an email address.' }
+  if (!res.ok) return { kind: 'error', message: "Your Bluesky account's home server did not return an email address." }
   const body = (await res.json()) as { email?: string; emailConfirmed?: boolean }
   const email = body.email
   if (!email) return { kind: 'error', message: 'Your account has no email address, or the email permission was not granted.' }
