@@ -115,7 +115,7 @@
     gap: 10px;
   }
 
-  input:not([type='checkbox']):not([type='hidden']),
+  input:not([type='checkbox']):not([type='hidden']):not([type='color']),
   select,
   textarea {
     width: 100%;
@@ -127,6 +127,32 @@
     background: var(--color-bv-white);
     border: 1.5px solid var(--color-bv-black);
     border-radius: 12px;
+  }
+
+  input[type='color'] {
+    width: 56px;
+    height: 40px;
+    padding: 2px;
+    background: var(--color-bv-white);
+    border: 1.5px solid var(--color-bv-black);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+
+  input[type='color']:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .field-error {
+    font-weight: 400;
+    color: #b00020;
   }
 
   input[type='checkbox'] {

@@ -2,6 +2,7 @@
  * Pure validation and mapping for the record editor (spec sections 5, 9, 11.2).
  * Limits mirror lexicons/com/blueyvatar/*.json.
  */
+import { MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, type ProfileField, type ProfileErrors } from './profile-limits'
 import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE } from './upload-limits'
 import { RATINGS, isPlusDid, normalizeBackgroundColor, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
 
@@ -204,7 +205,7 @@ export function validateNewImage(input: NewImageInput): Check<NewImageFields> {
 
 // ---------- profile ----------
 
-export const MAX_INTERESTS = 20
+export { MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, type ProfileField, type ProfileErrors }
 
 export type ProfileInput = {
   jobTitle: string
@@ -256,7 +257,7 @@ export function parseInterests(raw: string): Check<string[]> {
   for (const part of raw.split(/[,\n]/)) {
     const t = part.trim()
     if (!t || seen.has(t.toLowerCase())) continue
-    const c = checkText('Each interest', t, 50, 500)
+    const c = checkText('Each interest', t, MAX_INTEREST_CHARS, 500)
     if (!c.ok) return c
     seen.add(t.toLowerCase())
     out.push(c.value)
@@ -265,9 +266,10 @@ export function parseInterests(raw: string): Check<string[]> {
   return ok(out)
 }
 
-/** Blank fields are omitted from the record. */
-export function validateProfile(input: ProfileInput): Check<ProfileFields> {
+/** Checks every field and reports all problems at once. Blank fields are omitted from the record. */
+export function validateProfileAll(input: ProfileInput): { ok: true; value: ProfileFields } | { ok: false; errors: ProfileErrors } {
   const out: ProfileFields = {}
+  const errors: ProfileErrors = {}
   const text: [keyof Pick<ProfileFields, 'jobTitle' | 'company' | 'location' | 'pronouns' | 'pronunciation'>, string, number, number][] = [
     ['jobTitle', 'Job title', 100, 1000],
     ['company', 'Company', 100, 1000],
@@ -277,23 +279,30 @@ export function validateProfile(input: ProfileInput): Check<ProfileFields> {
   ]
   for (const [key, label, g, b] of text) {
     const c = checkText(label, input[key], g, b)
-    if (!c.ok) return c
-    if (c.value) out[key] = c.value
+    if (!c.ok) errors[key] = c.error
+    else if (c.value) out[key] = c.value
   }
   const tz = input.timezone.trim()
   if (tz) {
-    if (!isValidTimezone(tz)) return fail('Enter an IANA time zone such as America/New_York.')
-    out.timezone = tz
+    if (!isValidTimezone(tz)) errors.timezone = 'Choose a time zone from the list, such as America/New_York.'
+    else out.timezone = tz
   }
   const interests = parseInterests(input.interests)
-  if (!interests.ok) return interests
-  if (interests.value.length) out.interests = interests.value
+  if (!interests.ok) errors.interests = interests.error
+  else if (interests.value.length) out.interests = interests.value
   const color = (input.backgroundColor ?? '').trim()
   if (color) {
     // Strict #rrggbb only. Names, short hex, and rgb() are refused.
     const normalized = normalizeBackgroundColor(color)
-    if (!normalized) return fail('Enter a background color as #rrggbb, such as #1f4e9b.')
-    out.backgroundColor = normalized
+    if (!normalized) errors.backgroundColor = 'Use a color like #3366cc.'
+    else out.backgroundColor = normalized
   }
-  return ok(out)
+  return Object.keys(errors).length ? { ok: false, errors } : { ok: true, value: out }
+}
+
+/** First problem only, for callers that show a single message. */
+export function validateProfile(input: ProfileInput): Check<ProfileFields> {
+  const r = validateProfileAll(input)
+  if (r.ok) return ok(r.value)
+  return fail(Object.values(r.errors)[0] as string)
 }
