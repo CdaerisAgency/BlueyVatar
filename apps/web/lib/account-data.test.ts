@@ -79,6 +79,8 @@ describe.skipIf(!url)('account data export and deletion', () => {
     await q("INSERT INTO subscriptions (stripe_subscription_id, stripe_customer_id, did, license_id, price_id, tier, status, last_event_at) VALUES ($1, $2, $3, $4, 'price', 'pro', 'active', now())", [`sub_${tag}`, `cus_${tag}`, did, `lic_${tag}`])
     await q("INSERT INTO stripe_events (event_id, type) VALUES ($1, 'x')", [`evt_${tag}`])
     const act = await pool.query("INSERT INTO admin_actions (actor, action, target_did, reason) VALUES ('did:plc:mod', 'takedown', $1, 'internal reason') RETURNING id", [did])
+    await q("INSERT INTO bsky_avatar_sync (did, auto_sync, previous_avatar, has_previous, last_source_cid, last_sent_cid, auto_count) VALUES ($1, false, $2, true, $3, $4, 2)", [did, JSON.stringify({ ref: { $link: `prev${tag}` } }), `src${tag}`, `sent${tag}`])
+    await q("INSERT INTO bsky_avatar_log (did, action, from_cid, to_cid, source_cid) VALUES ($1, 'set', $2, $3, $4), ($1, 'restore', $3, $2, NULL)", [did, `old${tag}`, `new${tag}`, `src${tag}`])
     await q("INSERT INTO appeals (did, action_id, statement, status, decided_by, decision_note, decided_at) VALUES ($1, $2, 'my statement', 'upheld', 'did:plc:mod2', 'internal note', now())", [did, act.rows[0].id])
   }
 
@@ -108,6 +110,14 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(text).not.toContain(HB)
     expect(text).not.toContain('spam')
     expect(text).not.toContain('secretblob')
+    expect(out.avatarSync.settings).toMatchObject({ auto_sync: false, has_previous: true, last_source_cid: 'srca', last_sent_cid: 'senta', auto_count: 2, previous_avatar: { ref: { $link: 'preva' } } })
+    expect(out.avatarSync.log).toEqual([
+      expect.objectContaining({ action: 'set', from_cid: 'olda', to_cid: 'newa', source_cid: 'srca' }),
+      expect.objectContaining({ action: 'restore', from_cid: 'newa', to_cid: 'olda', source_cid: null }),
+    ])
+    expect(JSON.stringify(out.avatarSync)).not.toContain(B)
+    expect(JSON.stringify(out.avatarSync)).not.toContain('srcb')
+    expect(JSON.stringify(out.avatarSync)).not.toContain('"did"')
     expect(out.appeals).toEqual([expect.objectContaining({ appealed_action: 'takedown', statement: 'my statement', status: 'upheld' })])
     expect(text).not.toContain('internal note')
     expect(text).not.toContain('internal reason')
@@ -134,7 +144,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     for (const [t, col] of [
       ['email_links', 'did'], ['email_codes', 'did'], ['notice_emails', 'did'], ['oauth_session', 'sub'], ['web_session', 'did'], ['session_floor', 'did'], ['profile_links', 'did'],
       ['visibility_rules', 'did'], ['verification_state', 'did'], ['custom_domains', 'did'], ['images', 'did'], ['profiles', 'did'],
-      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'], ['appeals', 'did'],
+      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'], ['appeals', 'did'], ['bsky_avatar_sync', 'did'], ['bsky_avatar_log', 'did'],
     ] as const) expect(await count(t, col, A), t).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM api_keys WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM usage_counters WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
@@ -148,7 +158,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(sub.deleted_at).toBeInstanceOf(Date)
     expect(await count('stripe_events', 'event_id', 'evt_a')).toBe(1)
 
-    for (const [t, col] of [['email_links', 'did'], ['images', 'did'], ['licenses', 'owner'], ['claims', 'did'], ['custom_domains', 'did'], ['visibility_rules', 'did'], ['appeals', 'did']] as const) expect(await count(t, col, B), t).toBeGreaterThan(0)
+    for (const [t, col] of [['email_links', 'did'], ['images', 'did'], ['licenses', 'owner'], ['claims', 'did'], ['custom_domains', 'did'], ['visibility_rules', 'did'], ['appeals', 'did'], ['bsky_avatar_sync', 'did'], ['bsky_avatar_log', 'did']] as const) expect(await count(t, col, B), t).toBeGreaterThan(0)
     expect((await pool.query('SELECT deleted_at FROM subscriptions WHERE did = $1', [B])).rows[0].deleted_at).toBeNull()
   })
 

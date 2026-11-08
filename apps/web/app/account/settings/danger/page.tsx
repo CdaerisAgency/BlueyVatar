@@ -30,7 +30,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
         <p>
           This is safe and changes nothing. You get one file with what blueyvatar stores about you: your linked emails (the primary
           address is masked), profile links, verified accounts, who can see your avatar, your license and API key details (never the
-          secret keys), your custom domain, daily profile view counts, any appeals you filed, and a summary of your subscriptions.
+          secret keys), your custom domain, daily profile view counts, any appeals you filed, your avatar sync setting and the log of changes blueyvatar made to your profile avatar, and a summary of your subscriptions.
         </p>
         <p>
           <a href="/account/data/export" download>Download my data</a>
@@ -48,7 +48,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
           <li>Your profile links, verified accounts, and visibility settings.</li>
           <li>Your license and API keys, which stop working at once. You leave any organization you belong to. An organization you created is deleted along with its keys, unless it still has other members. In that case, remove them first.</li>
           <li>Your custom domain, including its Cloudflare hostname.</li>
-          <li>Your daily profile view counts and any appeals you filed.</li>
+          <li>Your daily profile view counts, any appeals you filed, and your avatar sync setting and change log.</li>
           <li>Our copy of your avatars and profile, with cached versions cleared.</li>
           <li>Your sign-in sessions.</li>
         </ul>
