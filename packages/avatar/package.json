@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "description": "Avatar URL builder, email hashing, Gravatar migration helper, and React component for BlueyVatar.",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

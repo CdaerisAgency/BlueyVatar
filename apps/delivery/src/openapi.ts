@@ -82,13 +82,13 @@ export const openApiDocument = {
     '/u/{id}': { get: avatarOp('Avatar by handle or DID', 'Id') },
     '/profile/{id}': {
       get: {
-        summary: 'Profile JSON',
-        description: 'Cross-origin browser callers (hovercards) need a Plus, Business, or Enterprise key. Any origin may read the response, and the rate-limit and tier headers are exposed to scripts. Hidden profiles answer not_found, the same as unknown ones.',
+        summary: 'Profile JSON, or a JSON, Markdown, or vCard export',
+        description: 'Cross-origin browser callers (hovercards) need a Plus, Business, or Enterprise key. Any origin may read the response, and the rate-limit and tier headers are exposed to scripts. Hidden profiles answer not_found, the same as unknown ones. Add .json, .md, or .vcf to the id (or send format=json, md, or vcf) to download the public fields as a file with a Content-Disposition filename. The export routes share the caching, rate limit, rating, and hidden-profile rules of the profile JSON. A handle that itself ends in .md is read as that handle first; use format=md for the Markdown export of a handle that ends in .json, .md, or .vcf. Exports list only wallets the owner chose to show, marked not verified. Available on every plan.',
         tags: ['Profile'],
         security: [{}, { apiKeyHeader: [] }, { apiKeyQuery: [] }],
-        parameters: [ref('parameters/ProfileId')],
+        parameters: [ref('parameters/ProfileId'), q('Format')],
         responses: {
-          '200': { description: 'Profile document.', headers: { ...okHeaders, 'access-control-allow-origin': { schema: { type: 'string', const: '*' } } }, content: { 'application/json': { schema: ref('schemas/Profile') } } },
+          '200': { description: 'Profile document.', headers: { ...okHeaders, 'access-control-allow-origin': { schema: { type: 'string', const: '*' } } }, content: { 'application/json': { schema: ref('schemas/Profile') }, 'text/markdown': { schema: { type: 'string' } }, 'text/vcard': { schema: { type: 'string' } } } },
           '400': errors['400'], ...keyErrors, '404': errRef('not_found'),
         },
       },
@@ -96,13 +96,13 @@ export const openApiDocument = {
     '/qr/{file}': {
       get: {
         summary: 'Profile QR code',
-        description: 'Available on every plan. The file is {id}.svg or {id}.png. Default size is 256. With to=github the QR points at /go/{handle}/github.',
+        description: 'Available on every plan. The file is {id}.svg or {id}.png. Default size is 256, capped by the tier like avatars. With to=github the QR points at /go/{handle}/github. center=logo or center=avatar puts an image on a white plate in the middle and switches to error correction level H; the plate covers at most 15 percent of the symbol. The PNG edge is a whole number of pixels per module (at least 4), so it can be smaller than s; the x-qr-version, x-qr-modules, and x-qr-pixels headers report the result. With center=avatar the image follows the avatar rules (rating g, blocked images skipped, default avatar fallback).',
         tags: ['Profile'],
-        security: [{ apiKeyHeader: [] }, { apiKeyQuery: [] }],
-        parameters: [ref('parameters/QrFile'), q('s'), ref('parameters/To'), q('ttl')],
+        security: [{}, { apiKeyHeader: [] }, { apiKeyQuery: [] }],
+        parameters: [ref('parameters/QrFile'), q('s'), ref('parameters/To'), q('Center'), q('Quiet'), q('ttl')],
         responses: {
-          '200': { description: 'QR image.', headers: okHeaders, content: { 'image/svg+xml': { schema: { type: 'string' } }, 'image/png': { schema: { type: 'string', format: 'binary' } } } },
-          '400': errors['400'], ...keyErrors, '404': errRef('not_found'), '502': errRef('upstream_error'),
+          '200': { description: 'QR image.', headers: { ...okHeaders, 'x-qr-version': { schema: { type: 'integer' } }, 'x-qr-modules': { schema: { type: 'integer' } }, 'x-qr-pixels': { schema: { type: 'integer' } } }, content: { 'image/svg+xml': { schema: { type: 'string' } }, 'image/png': { schema: { type: 'string', format: 'binary' } } } },
+          '400': errRef('invalid_qr_option: center is not none, logo, or avatar, quiet is outside 4 to 16, or the text does not fit in a QR code. The other 400 codes are as for avatars.'), ...keyErrors, '404': errRef('not_found'), '502': errRef('upstream_error'),
         },
       },
     },
@@ -185,6 +185,9 @@ export const openApiDocument = {
       ttl: { name: 'ttl', in: 'query', description: 'Browser cache lifetime, 1h to 28d. Plus and higher only; other tiers get 24h.', schema: { type: 'string', pattern: '^[0-9]+[hd]$', default: '24h' } },
       json: { name: 'json', in: 'query', description: 'The exact value true returns JSON metadata instead of a redirect.', schema: { type: 'string', enum: ['true'] } },
       name: { name: 'name', in: 'query', description: 'With d=initials on /avatar/{hash}, the name to draw initials from.', schema: { type: 'string', maxLength: 100 } },
+      Format: { name: 'format', in: 'query', description: 'json, md, or vcf: the same file as the suffix. Any other value is ignored.', schema: { type: 'string', enum: ['json', 'md', 'vcf'] } },
+      Center: { name: 'center', in: 'query', description: 'Image in the middle of the code. Default none.', schema: { type: 'string', enum: ['none', 'logo', 'avatar'] } },
+      Quiet: { name: 'quiet', in: 'query', description: 'Quiet zone in modules, 4 to 16. Default 4.', schema: { type: 'integer', minimum: 4, maximum: 16 } },
       To: { name: 'to', in: 'query', description: 'Platform slug. The QR then points at /go/{handle}/{to}.', schema: { type: 'string', pattern: '^[a-z0-9-]+$' } },
     },
     headers: {

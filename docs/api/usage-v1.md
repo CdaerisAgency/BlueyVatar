@@ -37,7 +37,7 @@ x-api-key: sk_...
 
 | Field | Meaning |
 | --- | --- |
-| `tier` | `free`, `plus`, `business`, or `enterprise`. Keys on a license stored under the retired name `pro` report `plus`. |
+| `tier` | `free`, `plus`, `business`, or `enterprise`. A license that still holds the retired name `pro` reports `plus`. |
 | `period` | The current billing period: the UTC calendar month, first and last day. |
 | `included` | Included keyed volume. `volume` is `null` for Enterprise (contract). `per` is `month` for Plus and Business, `day` for Free, and `null` for Enterprise. |
 | `total` | Origin resolutions so far this period. This is the number that counts toward included volume. |

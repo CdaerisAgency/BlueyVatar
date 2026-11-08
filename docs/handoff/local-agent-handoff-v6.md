@@ -1,4 +1,4 @@
-# BlueyVatar handoff for the local agent (v5)
+# BlueyVatar handoff for the local agent (v6)
 
 Written November 4, 2026, from the cloud session that built phases 1 and 2. The step-by-step commands are in `docs/deploy.md`, and that runbook wins if anything here conflicts with it. This file explains where things stand, what you are expected to do, and the rules the owner has set.
 
@@ -13,7 +13,7 @@ BlueyVatar (blueyvatar.com) is a Gravatar-style avatar and profile service built
 ## 2. Owner's standing rules
 
 1. **PRs:** open every PR as ready for review (not draft). Once both CI jobs, `check` and `docker`, pass, merge it with a merge commit. You don't need to ask first. The owner gave this as a permanent order.
-2. **CI** runs on the owner's on-prem runners through the repository variable `CI_RUNNER`. Keep `runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}`. The pnpm cache was removed on purpose, so don't add it back.
+2. **CI** runs on GitHub-hosted runners (`runs-on: ubuntu-latest`) because the repository is public and a self-hosted runner on a public repository lets anyone who opens a pull request run code on that machine (<https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions>). The repository variable `CI_RUNNER` is retired. Only `deploy.yml` uses a self-hosted runner, named by the repository variable `DEPLOY_RUNNER` with no fallback. The pnpm cache was removed on purpose; leave it out unless the owner asks.
 3. **Writing:** use U.S. English. Never use em-dashes. Avoid "not X, but Y" phrasing.
 4. **Versioning:** put a version number on every new document and on each revision (v1, v2, and so on).
 5. **Sources:** take facts from vendor documentation. If nothing is published on a point, say so instead of guessing, and mark the item **unconfirmed** in the docs.
@@ -77,7 +77,7 @@ After each step, update the "Provisioned resources" section of `docs/deploy.md` 
 | 42 | Live Tap test against the real firehose |
 | 52, 53 | Staging and production deploy, origin lockdown verified |
 | 54 | Publish the lexicons (needs the domain live and name clearance confirmed; the owner says clearance is done) |
-| 55 | Tangled adapter (`org.tangled.actor.profile` enabled, `sh.tangled.actor.profile` enabled as a fallback; see `docs/research/tangled-collection-v1.md`) |
+| 55 | Tangled adapter (`org.tangled.actor.profile` enabled, `sh.tangled.actor.profile` enabled as a fallback; see `docs/research/tangled-collection-v2.md`) |
 
 These need the owner's decision and are not your work: issue 67 (pricing) and issues 60 and 66 (legal).
 

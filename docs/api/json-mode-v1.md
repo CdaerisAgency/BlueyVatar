@@ -51,3 +51,5 @@ This page describes v1, the only version today.
 The `/profile/{id}` document includes `backgroundColor`, the profile's page background as lowercase `#rrggbb`, or `null` when the owner has not set one or the stored value is not exactly that shape. It comes from the `backgroundColor` field of `com.blueyvatar.profile`. The profile page and hovercards choose dark or white text for a contrast ratio of at least 4.5 to 1 against it, and use the default palette when neither passes, so clients that draw their own card should apply the same rule.
 
 The `/profile/{id}` document includes `gallery`, an array of `{ "url": string, "caption": string or null }` with at most 12 entries. It is `[]` unless the profile owner is on the Plus plan. Each `url` is a signed `/img` path (512 pixel PNG) and follows the same visibility, rating, and blocklist rules as the avatar. Gallery images are never returned by the avatar routes.
+
+`/profile/{id}` can also return the public fields as a JSON, Markdown, or vCard file. See [exports-and-qr-v1.md](exports-and-qr-v1.md).
