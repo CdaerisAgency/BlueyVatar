@@ -1,19 +1,21 @@
 import { PageMain } from '../../../components/Page'
-import { Button } from '../../../components/Button'
+import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { requireDid } from '../../../lib/auth'
-import { RepoError, blobUrl, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
-import { LICENSES, canAddImage, imageLimit } from '../../../lib/records'
+import { RepoError, blobUrl, blueskyAvatarCid, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
+import { canAddImage, imageLimit, limitMessage } from '../../../lib/records'
 import { resolvePlan } from '../../../lib/plan'
 import { getStore } from '../../../lib/store'
+import { describeLinkedEmails, readPrimaryAddress } from '../../../lib/linked-emails'
 import AccountNav from '../AccountNav'
 import ImageFileInput from './ImageFileInput'
+import RatingFields from './RatingFields'
 import BskyAvatarPanel from './BskyAvatarPanel'
 import UseAsBskyAvatar from './UseAsBskyAvatar'
-import { currentBlueskyAvatar } from '../../../lib/bsky-profile'
 import { bskyBlockReason, hasBskyPermission, type SyncSession } from '../../../lib/bsky-sync'
 import { getSyncStore } from '../../../lib/bsky-sync-store'
 import { useBskyProfileScope } from '../../../lib/oauth'
+import LinkedEmail from '../LinkedEmail'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -24,19 +26,18 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   const plan = await resolvePlan(did)
   let images: StoredImage[] = []
   let pds = ''
+  let bskyCid: string | null = null
   let loadError: string | null = null
-  let bsky: { session: SyncSession; shownCid: string | null } | null = null
+  let bsky: { session: SyncSession } | null = null
   try {
     const session = await repoSession(did)
-    if (useBskyProfileScope() || (await hasBskyPermission(session))) {
-      const shown = await currentBlueskyAvatar(session)
-      bsky = { session, shownCid: shown.ok ? (shown.avatar?.ref.$link ?? null) : null }
-    }
-    ;[images, pds] = await Promise.all([listImages(session), pdsUrl(session)])
+    if (useBskyProfileScope() || (await hasBskyPermission(session))) bsky = { session }
+    ;[images, pds, bskyCid] = await Promise.all([listImages(session), pdsUrl(session), blueskyAvatarCid(session).catch(() => null)])
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
   }
   const links = await getStore().links.list(did).catch(() => [])
+  const emails = describeLinkedEmails(links, readPrimaryAddress(await getStore().links.noticeAddress(did).catch(() => undefined)))
   const canAdd = !loadError && canAddImage(images.length, plan)
 
   return (
@@ -47,23 +48,56 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
 
-      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} pds={pds} shownCid={bsky.shownCid} />}
+      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} />}
 
       <h2>
         Your images ({images.length} of {imageLimit(plan)})
       </h2>
-      {images.length === 0 && !loadError ? <p>You have no avatar yet. Upload an image below, or import one from Gravatar if you have an email linked, and choose its rating. The first image you add becomes your default.</p> : null}
+      {canAdd ? (
+        <p>
+          <ButtonLink href="#upload" variant="primary">Upload an image</ButtonLink>
+        </p>
+      ) : (
+        !loadError && (
+          <p>
+            <Button type="button" variant="primary" disabled>Upload an image</Button> {limitMessage(plan)}
+          </p>
+        )
+      )}
+      {images.length === 0 && !loadError ? <p>You have no avatar yet. The first image you add becomes your default.</p> : null}
+      {!loadError && (
+        <div className="flex items-start gap-3">
+          {bskyCid ? (
+            <>
+              {/* The blob is served by the user's home server, so next/image optimization does not apply. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={blobUrl(pds, did, bskyCid)} alt="Your Bluesky avatar" className="size-24 object-cover" referrerPolicy="no-referrer" />
+              <div>
+                <div>Your Bluesky avatar{images.length === 0 ? ' (currently shown)' : ''}</div>
+                {canAdd && (
+                  <p>
+                    <ButtonLink href="/account/avatars/import?source=bluesky">Use this as my blueyvatar avatar</ButtonLink>
+                  </p>
+                )}
+                <p>Bluesky accepts avatars up to 1,000,000 bytes, and blueyvatar accepts up to 5 MiB, so blueyvatar shrinks a large image when you send it to Bluesky.</p>
+              </div>
+            </>
+          ) : (
+            <p>You have no avatar on Bluesky.</p>
+          )}
+        </div>
+      )}
       <ul>
         {images.map((img) => {
           const isDefault = img.value.isDefault === true
           return (
             <li key={img.rkey} className="flex items-start gap-3">
-              {/* The blob is served by the user's PDS, so next/image optimization does not apply. */}
+              {/* The blob is served by the user's home server, so next/image optimization does not apply. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={blobUrl(pds, did, img.value.image.ref.$link)} alt={img.value.alt ?? ''} width={96} height={96} className="object-cover" referrerPolicy="no-referrer" />
               <div>
                 <div>
-                  {isDefault ? <strong>Default</strong> : null} Rating {ratingFromLabels(imageLabels(img)).toUpperCase()}, license {img.value.license ?? 'unset'}
+                  {isDefault ? <strong>Default</strong> : null} Rating {ratingFromLabels(imageLabels(img)).toUpperCase()}
                 </div>
                 {img.value.alt ? <div>{img.value.alt}</div> : null}
                 <div className="mt-1 flex gap-2">
@@ -88,14 +122,14 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       <h2>Import an image</h2>
       {canAdd ? (
         <>
-          <p>Copy an avatar you already use into your repository. You preview the image and confirm its rating and license before anything is saved. The image must be PNG or JPEG and at most 5 MB. Images above 4096 pixels on the long side are shrunk to fit.</p>
+          <p>Copy an avatar you already use into your repository. The image must be PNG or JPEG and at most 5 MB. Images above 4096 pixels on the long side are shrunk to fit.</p>
           <ul>
             <li>
               <a href="/account/avatars/import?source=bluesky">Import my Bluesky profile avatar</a>
             </li>
-            {links.map((l) => (
+            {links.map((l, i) => (
               <li key={l.emailHash}>
-                Linked email {l.emailHash.slice(0, 8)}: <a href={`/account/avatars/import?source=gravatar:${l.emailHash}`}>Gravatar</a>,{' '}
+                <LinkedEmail item={emails[i]!} />: <a href={`/account/avatars/import?source=gravatar:${l.emailHash}`}>Gravatar</a>,{' '}
                 <a href={`/account/avatars/import?source=libravatar:${l.emailHash}`}>Libravatar</a>
               </li>
             ))}
@@ -106,7 +140,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
         !loadError && <p>Importing needs a free image slot.</p>
       )}
 
-      <h2>Upload an image</h2>
+      <h2 id="upload">Upload an image</h2>
       <p>
         Everything you save here is written to your repository on your PDS, and all data in an atproto repository is public today. The visibility rules you set here only
         apply to what this service serves. An avatar blob stays readable from your PDS regardless of those rules, and copies that others already hold cannot be recalled. If
@@ -118,39 +152,14 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           <label>
             Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
           </label>
-          <label>
-            Rating{' '}
-            <select name="rating" defaultValue="g">
-              <option value="g">G: suitable for all audiences</option>
-              <option value="pg">PG: non-sexual nudity or mild content</option>
-              <option value="r">R: sexually suggestive or graphic media</option>
-              <option value="x">X: adult content</option>
-            </select>
-          </label>
-          <label>
-            If R, label as{' '}
-            <select name="rLabel" defaultValue="sexual">
-              <option value="sexual">Sexual</option>
-              <option value="graphic-media">Graphic media</option>
-            </select>
-          </label>
-          <label>
-            License{' '}
-            <select name="license" defaultValue="personal">
-              {LICENSES.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
+          <RatingFields />
           <label>
             <input name="isDefault" type="checkbox" /> Use as my default image
           </label>
           <Button type="submit" variant="primary">Upload</Button>
         </form>
       ) : (
-        !loadError && <p>You have reached the {imageLimit(plan)} image limit for the Free plan. Delete an image to add another.</p>
+        !loadError && <p>{limitMessage(plan)}</p>
       )}
     </PageMain>
   )

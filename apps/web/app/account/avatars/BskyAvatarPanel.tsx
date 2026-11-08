@@ -1,31 +1,21 @@
 import { Button } from '../../../components/Button'
-import { BSKY_MESSAGES } from '../../../lib/bsky-profile'
 import { FIRST_AUTO_NOTICE, hasBskyPermission, type SyncSession } from '../../../lib/bsky-sync'
 import type { SyncState } from '../../../lib/bsky-sync-store'
-import { blobUrl } from '../../../lib/repo'
 import { dismissBskyNotice, restoreBskyAvatar, saveBskyAutoSync } from './bsky-actions'
 
 /**
- * The Bluesky avatar section of the avatars page (issue #241): what Bluesky shows now, the switch, the undo, and
+ * The Bluesky avatar section of the avatars page (issue #241): the switch, the undo, and
  * the notice after the first automatic change. The page renders it only when the sign-in scope is switched on
  * (OAUTH_REQUEST_BSKY_PROFILE) or the session already holds the permission.
  */
-export default async function BskyAvatarPanel({ session, state, pds, shownCid }: { session: SyncSession; state: SyncState; pds: string; shownCid: string | null }) {
+export default async function BskyAvatarPanel({ session, state }: { session: SyncSession; state: SyncState }) {
   const granted = await hasBskyPermission(session)
   return (
     <section aria-labelledby="bsky-avatar-heading">
-      <h2 id="bsky-avatar-heading">Your Bluesky avatar</h2>
-      {shownCid ? (
-        <p className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={blobUrl(pds, session.did, shownCid)} alt="" width={64} height={64} className="object-cover" referrerPolicy="no-referrer" /> This is the picture Bluesky shows now.
-        </p>
-      ) : (
-        <p>Bluesky shows no picture of yours right now.</p>
-      )}
+      <h2 id="bsky-avatar-heading">Keep your Bluesky avatar in sync</h2>
       {!granted ? (
         <p role="status">
-          {BSKY_MESSAGES.no_permission} <a href="/login?next=/account/avatars">Sign in again</a> to allow it.
+          <a href="/login?next=/account/avatars">Sign in again to allow this.</a> blueyvatar needs your permission to change the picture on your Bluesky profile. It changes nothing else.
         </p>
       ) : (
         <>

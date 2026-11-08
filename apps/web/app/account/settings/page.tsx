@@ -3,7 +3,9 @@ import { Button } from '../../../components/Button'
 import { PageMain } from '../../../components/Page'
 import { currentSession, requireDid } from '../../../lib/auth'
 import { getStore } from '../../../lib/store'
-import { SETTINGS_GROUPS } from '../../../lib/settings-hub'
+import { viewerFor } from '../../../lib/viewer'
+import { displayName } from '../../../lib/viewer-core'
+import { DANGER_ZONE, SETTINGS_GROUPS } from '../../../lib/settings-hub'
 import AccountNav from '../AccountNav'
 import { signOutEverywhere, signOutSession } from './actions'
 
@@ -15,12 +17,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const did = await requireDid('/account/settings')
   const { error, done } = await searchParams
   const here = (await currentSession())?.sid ?? null
+  const viewer = await viewerFor(did)
   const sessions = await getStore().sessions.list(did)
   return (
     <PageMain>
       <AccountNav />
       <h1>Settings</h1>
-      <p>Signed in as {did}</p>
+      <p>Signed in as {displayName(viewer)}</p>
       {SETTINGS_GROUPS.map((g) => (
         <section key={g.title} aria-labelledby={`g-${g.title}`}>
           <h2 id={`g-${g.title}`}>{g.title}</h2>
@@ -39,7 +42,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {done && <p role="status">{done}</p>}
       <p>Browsers and devices signed in to this account. Sessions older than 30 days expire on their own.</p>
       {sessions.length === 0 ? (
-        <p>No tracked sessions yet. Sessions started before this list existed are not shown, but &quot;Sign out everywhere&quot; ends them too.</p>
+        <p>No tracked sessions yet. Older sign-ins may not be listed here. &quot;Sign out everywhere&quot; ends those too.</p>
       ) : (
         <ul>
           {sessions.map((s) => (
@@ -61,7 +64,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <form action={signOutEverywhere}>
         <Button type="submit">Sign out everywhere</Button>
       </form>
-      <p>This ends every session, including this one, and clears the sign-in we hold for your PDS. You will need to sign in again.</p>
+
+      <h2 id="account-id">Account ID</h2>
+      <p>
+        Some apps and support requests ask for this. <code>{did}</code>
+      </p>
+
+      <section aria-labelledby="danger" className="mt-10 rounded-bv-card border-2 border-red-700 p-5">
+        <h2 id="danger" className="mt-0">Danger zone</h2>
+        <p>
+          <Link href={DANGER_ZONE.href}>{DANGER_ZONE.label}</Link>: {DANGER_ZONE.description}
+        </p>
+      </section>
     </PageMain>
   )
 }

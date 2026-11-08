@@ -55,6 +55,7 @@ export async function handleRecord(evt: RecordEvt, db: IndexWrites): Promise<voi
         mimeType: blob.mimeType,
         rating: ratingFromLabels(selfLabelValues(getPath(evt.record, 'labels'))),
         isDefault: getPath(evt.record, 'isDefault') === true,
+        // Deprecated field: no longer written by blueyvatar. Old records keep their value so the data export stays complete.
         license: typeof evt.record.license === 'string' ? evt.record.license : null,
         purpose: purposeOf(evt.record.purpose),
         caption: typeof evt.record.caption === 'string' && evt.record.caption.trim() !== '' ? [...evt.record.caption].slice(0, GALLERY_CAPTION_MAX).join('') : null,

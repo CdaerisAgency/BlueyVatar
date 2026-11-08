@@ -1,4 +1,6 @@
 import { PageMain, TableBox } from '../../../components/Page'
+import { viewerFor } from '../../../lib/viewer'
+import { displayName } from '../../../lib/viewer-core'
 import { ENTITLEMENTS, historyDays, TIERS, type Tier } from '@blueyvatar/core'
 import Link from 'next/link'
 import { requireDid } from '../../../lib/auth'
@@ -53,7 +55,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
     <PageMain>
       <AccountNav />
       <h1>License and API keys</h1>
-      <p>Signed in as {did}</p>
+      <p>Signed in as {displayName(await viewerFor(did))}</p>
       {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
 
       <p>New to the API? Read the <Link href="/docs">API docs</Link> for parameters, error codes, rate-limit headers, and copy-paste examples, or fetch the <a href="https://img.blueyvatar.com/openapi.json">OpenAPI description</a>.</p>

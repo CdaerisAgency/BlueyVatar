@@ -101,18 +101,20 @@ describe('plan limits', () => {
 })
 
 describe('validateNewImage', () => {
-  const base = { alt: ' me ', rating: 'g', license: 'cc-by', isDefault: true }
+  const base = { alt: ' me ', rating: 'g', isDefault: true }
   it('builds fields', () => {
-    expect(validateNewImage(base)).toEqual({ ok: true, value: { alt: 'me', license: 'cc-by', isDefault: true } })
+    expect(validateNewImage(base)).toEqual({ ok: true, value: { alt: 'me', isDefault: true } })
+  })
+  it('ignores rLabel unless the rating is R', () => {
+    expect(validateNewImage({ ...base, rating: 'pg', rLabel: 'bogus' }).ok).toBe(true)
   })
   it('requires an R label choice', () => {
     expect(validateNewImage({ ...base, rating: 'r' }).ok).toBe(false)
     const r = validateNewImage({ ...base, rating: 'r', rLabel: 'graphic-media' })
     expect(r).toMatchObject({ ok: true, value: { labels: { values: [{ val: 'graphic-media' }] } } })
   })
-  it('rejects bad rating, license, and long alt', () => {
+  it('rejects bad rating and long alt', () => {
     expect(validateNewImage({ ...base, rating: 'z' }).ok).toBe(false)
-    expect(validateNewImage({ ...base, license: 'mit' }).ok).toBe(false)
     expect(validateNewImage({ ...base, alt: 'a'.repeat(301) }).ok).toBe(false)
     expect(validateNewImage({ ...base, alt: 'a'.repeat(300) }).ok).toBe(true)
   })
@@ -186,8 +188,8 @@ describe('crop fields', () => {
     [{ cropX: 'a', cropY: '0', cropSize: '5' }],
   ])('rejects %j', (input) => expect(parseCropFields(input)).toMatchObject({ ok: false, error: expect.stringContaining('crop') }))
   it('puts the crop in the new image fields only when given', () => {
-    const base = { alt: '', rating: 'g', license: 'personal', isDefault: false }
-    expect(validateNewImage(base)).toMatchObject({ ok: true, value: { license: 'personal' } })
+    const base = { alt: '', rating: 'g', isDefault: false }
+    expect((validateNewImage(base) as { value: object }).value).not.toHaveProperty('license')
     expect((validateNewImage(base) as { value: object }).value).not.toHaveProperty('crop')
     expect(validateNewImage({ ...base, cropX: '1000', cropY: '2000', cropSize: '6000' })).toMatchObject({ ok: true, value: { crop: { x: 1000, y: 2000, size: 6000 } } })
     expect(validateNewImage({ ...base, cropX: '1000' })).toMatchObject({ ok: false })

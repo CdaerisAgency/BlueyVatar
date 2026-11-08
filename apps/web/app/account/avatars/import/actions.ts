@@ -23,7 +23,6 @@ export async function confirmImport(form: FormData): Promise<void> {
     alt: String(form.get('alt') ?? ''),
     rating: String(form.get('rating') ?? ''),
     rLabel: String(form.get('rLabel') ?? ''),
-    license: String(form.get('license') ?? ''),
     isDefault: form.get('isDefault') === 'on',
   })
   if (!fields.ok) return redirect(`/account/avatars/import?source=${encodeURIComponent(source)}&error=${encodeURIComponent(fields.error)}`)

@@ -6,7 +6,6 @@ import { currentHref } from '../../lib/settings-hub'
 
 const LINKS = [
   ['/account', 'Account'],
-  ['/account/settings', 'Settings'],
   ['/account/avatars', 'Avatars'],
   ['/account/profile', 'Profile'],
   ['/account/keys', 'Keys'],
@@ -15,13 +14,19 @@ const LINKS = [
   ['/account/claims', 'Claims'],
   ['/account/visibility', 'Visibility'],
   ['/account/domain', 'Domain'],
-  ['/account/data', 'Your data'],
   ['/account/notifications', 'Notifications'],
 ] as const
 
 export default function AccountNav() {
-  const current = currentHref(usePathname() ?? '', LINKS.map(([h]) => h))
+  const path = usePathname() ?? ''
+  const current = currentHref(path, LINKS.map(([h]) => h))
   return (
+    <>
+    {path !== '/account' && path !== '/account/settings' && (
+      <p className="mb-3">
+        <Link href="/account/settings">Back to Settings</Link>
+      </p>
+    )}
     <nav aria-label="Account" className="mb-7 flex flex-wrap gap-2">
       {LINKS.map(([href, label]) => {
         const on = href === current
@@ -37,5 +42,6 @@ export default function AccountNav() {
         )
       })}
     </nav>
+    </>
   )
 }
