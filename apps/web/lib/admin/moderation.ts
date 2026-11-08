@@ -142,12 +142,12 @@ export async function dismissReport(pool: pg.Pool, actor: string, reportId: numb
 
 export type ReportRow = {
   id: number; target_did: string; source: string; reason: string; details: string | null; created_at: Date; status: string
-  actioned_by: string | null; action_reason: string | null; actioned_at: Date | null; target_report_count: number; has_contact: boolean
+  actioned_by: string | null; action_reason: string | null; actioned_at: Date | null; target_report_count: number; has_contact: boolean; reporter_did: string | null
 }
 
 const REPORT_COLS = `r.id::int AS id, r.target_did, r.source, r.reason, r.details, r.created_at, r.status, r.actioned_by, r.action_reason, r.actioned_at,
   (SELECT count(*)::int FROM reports x WHERE x.target_did = r.target_did) AS target_report_count,
-  (r.reporter_contact IS NOT NULL) AS has_contact`
+  (r.reporter_contact IS NOT NULL) AS has_contact, r.reporter_did`
 
 /** The reporter contact and IP hash are never selected: admins triage content, not reporters. */
 export async function listReports(pool: pg.Pool, status: 'open' | 'actioned' | 'dismissed' | 'all', limit = 100): Promise<ReportRow[]> {
