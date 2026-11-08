@@ -314,6 +314,11 @@ describe('checkout and portal', () => {
       success_url: 'https://blueyvatar.com/account/billing?checkout=success',
     })
     expect(p.customer).toBeUndefined()
+    const base = { did: DID, licenseId: 'l', price: 'p', customer: null, baseUrl: 'https://x.test' }
+    expect(checkoutParams({ ...base, env: {} })).not.toHaveProperty('allow_promotion_codes')
+    expect(checkoutParams({ ...base, env: { STRIPE_ALLOW_PROMO_CODES: 'false' } })).not.toHaveProperty('allow_promotion_codes')
+    expect(checkoutParams({ ...base, env: { STRIPE_ALLOW_PROMO_CODES: '1' } })).not.toHaveProperty('allow_promotion_codes')
+    expect(checkoutParams({ ...base, env: { STRIPE_ALLOW_PROMO_CODES: 'true' } })).toMatchObject({ allow_promotion_codes: true })
     expect(checkoutParams({ did: DID, licenseId: 'l', price: 'p', customer: 'cus_9', baseUrl: 'https://x.test' })).toMatchObject({ customer: 'cus_9', customer_update: { address: 'auto', name: 'auto' } })
   })
   it('creates a session for a new subscriber, reusing a known customer, and refuses a second subscription', async () => {
