@@ -60,6 +60,17 @@ describe('indexer handlers', () => {
     await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.profile', rkey: 'self', action: 'update', record }, db)
     expect(db.upsertProfile).toHaveBeenCalledWith('did:plc:a', record)
   })
+  it('passes languages, socialLinks, and wallets through unchanged', async () => {
+    const db = fakeDb()
+    const record = {
+      languages: [{ tag: 'en', primary: true }],
+      socialLinks: [{ url: 'https://a.test/' }],
+      wallets: [{ chain: 'Bitcoin', address: 'abc', visible: false }],
+      createdAt: '2026-11-03T00:00:00Z',
+    }
+    await handleRecord({ did: 'did:plc:a', collection: 'com.blueyvatar.profile', rkey: 'self', action: 'update', record }, db)
+    expect(db.upsertProfile).toHaveBeenCalledWith('did:plc:a', record)
+  })
   it('purges indexed images and the Bluesky avatar when the profile changes, so a label change takes effect', async () => {
     const db = fakeDb()
     await handleRecord({

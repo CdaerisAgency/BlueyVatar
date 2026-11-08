@@ -10,7 +10,7 @@ import { recordProfileView } from '../../../lib/profile-views'
 import { getPool } from '../../../lib/store'
 import { getDomainStore } from '../../../lib/domain-store'
 import { jsonLdString, personJsonLd, profileCanonical } from '../../../lib/seo'
-import { pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
+import { pageAtprotoApps, pageColors, pageAllLinks, pageGallery, pageInterests, pageLanguages, pageWallets, profileMetadata, type PublicProfile } from '../../../lib/profile-page'
 import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
@@ -50,7 +50,9 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
   // Aggregate daily counter only: no IP, user agent, or cookie is stored (issue #173).
   await recordProfileView(getPool(), p.did, await headers())
   const accounts = (p.verifiedAccounts ?? []).filter((a) => !a.hidden && /^https:\/\//.test(a.uri))
-  const links = pageLinks(p)
+  const links = pageAllLinks(p)
+  const languages = pageLanguages(p)
+  const wallets = pageWallets(p)
   const apps = pageAtprotoApps(p)
   const interests = pageInterests(p)
   const colors = pageColors(p)
@@ -72,14 +74,38 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
         {p.timezone && <p>Time zone: {p.timezone}</p>}
         {p.description && <p>{p.description}</p>}
         {interests.length > 0 && <p>Interests: {interests.join(', ')}</p>}
+        {languages.length > 0 && (
+          <p>
+            Languages:{' '}
+            {languages.map((l, i) => (
+              <span key={l.tag}>
+                {i > 0 && ', '}
+                <span lang={l.tag}>{l.name}</span>
+                {l.primary && ' (primary)'}
+              </span>
+            ))}
+          </p>
+        )}
         {links.length > 0 && (
           <ul aria-label="Links" className={list}>
             {links.map((l) => (
               <li key={l.url}>
-                <a href={l.url} rel="me nofollow noopener noreferrer">{l.label}</a>
+                <a href={l.url} rel={l.selfDeclared ? 'nofollow noopener noreferrer ugc' : 'me nofollow noopener noreferrer'}>{l.label}</a>
               </li>
             ))}
           </ul>
+        )}
+        {wallets.length > 0 && (
+          <section aria-labelledby="wallets-heading">
+            <h2 id="wallets-heading" className="mt-4 mb-1 text-base">Wallets (not verified)</h2>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {wallets.map((w) => (
+                <li key={`${w.chain}:${w.address}`}>
+                  {w.label ? `${w.label}, ` : ''}{w.chain}: <code className="break-all">{w.address}</code> <span>(not verified)</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         {accounts.length > 0 && (
           <ul aria-label="Verified accounts" className={list}>

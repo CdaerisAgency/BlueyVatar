@@ -1,5 +1,5 @@
 /** Pure helpers for /p/[handle]: link-preview metadata and the fields the page shows. */
-import { GALLERY_MAX, profileColors, sanitizeProfileLinks, type ProfileLink } from '@blueyvatar/core'
+import { GALLERY_MAX, cleanWallet, profileColors, sanitizeLanguages, sanitizeProfileLinks, sanitizeSocialLinks, type ProfileLink, type ProfileLanguage, type ProfileWallet } from '@blueyvatar/core'
 import { defaultOgImage } from './site'
 
 export interface PublicProfile {
@@ -15,6 +15,9 @@ export interface PublicProfile {
   pronouns: string | null
   timezone?: string | null
   interests?: unknown
+  languages?: unknown
+  socialLinks?: unknown
+  wallets?: unknown
   /** `#rrggbb` or null. Checked again by `pageColors` before it reaches a style attribute. */
   backgroundColor?: string | null
   gallery?: unknown
@@ -44,6 +47,59 @@ export const pageColors = (p: PublicProfile): { background: string; text: string
 
 /** Links come from the delivery JSON, but are checked again here so the page never renders a non-https href. */
 export const pageLinks = (p: PublicProfile): ProfileLink[] => sanitizeProfileLinks(p.links)
+
+export interface PageLink extends ProfileLink {
+  /** True for links the owner typed into com.blueyvatar.profile. They never carry rel=me. */
+  selfDeclared: boolean
+}
+
+/** Atproto links first, then the owner's social links, one entry per URL. Every URL is https. */
+export function pageAllLinks(p: PublicProfile): PageLink[] {
+  const seen = new Set<string>()
+  const out: PageLink[] = []
+  for (const [list, selfDeclared] of [[pageLinks(p), false], [sanitizeSocialLinks(p.socialLinks), true]] as const) {
+    for (const l of list) {
+      if (seen.has(l.url)) continue
+      seen.add(l.url)
+      out.push({ ...l, selfDeclared })
+    }
+  }
+  return out
+}
+
+export interface PageLanguage extends ProfileLanguage {
+  /** English name when the runtime knows the tag, else the tag. */
+  name: string
+}
+
+export function pageLanguages(p: PublicProfile): PageLanguage[] {
+  let names: Intl.DisplayNames | null = null
+  try {
+    names = new Intl.DisplayNames(['en'], { type: 'language' })
+  } catch {
+    names = null
+  }
+  return sanitizeLanguages(p.languages).map((l) => {
+    let name = l.tag
+    try {
+      name = names?.of(l.tag) ?? l.tag
+    } catch {
+      name = l.tag
+    }
+    return { ...l, name }
+  })
+}
+
+/** Wallets the delivery JSON lists are already opt-in; this checks the rules again. */
+export function pageWallets(p: PublicProfile): ProfileWallet[] {
+  if (!Array.isArray(p.wallets)) return []
+  const out: ProfileWallet[] = []
+  for (const w of (p.wallets as unknown[]).slice(0, 10)) {
+    const c = cleanWallet(w && typeof w === 'object' ? { ...(w as object), visible: true } : null)
+    if (c) out.push({ chain: c.chain, address: c.address, label: c.label, verified: false })
+  }
+  return out
+}
 
 export const pageInterests = (p: PublicProfile): string[] =>
   Array.isArray(p.interests) ? p.interests.filter((i): i is string => typeof i === 'string' && i.trim() !== '').slice(0, 20) : []

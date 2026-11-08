@@ -19,7 +19,7 @@ export default async function ProfilePage() {
   return (
     <PageMain>
       <h1>Profile</h1>
-      <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name, bio, and links stay in your atproto profile.</p>
+      <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name and bio stay in your atproto profile. Wallets stay hidden unless you choose to show them.</p>
       {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
       {loadError === null && (
         <ProfileForm
@@ -34,6 +34,9 @@ export default async function ProfilePage() {
             interests: (p.interests ?? []).join(', '),
             backgroundColor: color ?? '',
             clearBackgroundColor: !color,
+            languages: (p.languages ?? []).map((l) => ({ tag: l.tag, primary: l.primary === true })),
+            socialLinks: (p.socialLinks ?? []).map((l) => ({ label: l.label ?? '', url: l.url })),
+            wallets: (p.wallets ?? []).map((w) => ({ chain: w.chain, address: w.address, label: w.label ?? '', visible: w.visible === true })),
           }}
         />
       )}

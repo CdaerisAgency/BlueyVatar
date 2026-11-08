@@ -31,7 +31,7 @@ The redirect target encodes the format and quality, so each variant is its own i
 
 - `{ext}` is `png`, `jpeg`, or `webp`.
 - `-q{quality}` appears only for `jpeg` and `webp` at a non-default quality. The cached qualities are 60 and 85, so `q` snaps to the nearest of those. 85 has no suffix, for example `/80.webp` and `/80-q60.webp`.
-- `{size}` snaps up to the size ladder, as described in [json-mode-v1.md](json-mode-v1.md).
+- `{size}` snaps up to the size ladder, as described in [json-mode-v2.md](json-mode-v2.md).
 - The signature covers the file name, so a path for one variant cannot be edited into another. A request for a non-canonical name redirects to the canonical signed path.
 - `/img` responses are `Cache-Control: public, max-age=31536000, immutable`, keyed by blob CID.
 

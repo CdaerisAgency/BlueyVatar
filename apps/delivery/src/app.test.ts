@@ -304,6 +304,31 @@ describe('delivery API', () => {
     }
   })
 
+  it('returns languages, social links, and only the wallets the owner chose to show', async () => {
+    const { app, deps } = setup()
+    const empty = await (await app.request('/profile/alice.test')).json()
+    expect(empty).toMatchObject({ languages: [], socialLinks: [], wallets: [] })
+    const base = deps.resolver.getRecord
+    deps.resolver.getRecord = async (i, collection, rkey) =>
+      collection === 'com.blueyvatar.profile'
+        ? {
+            languages: [{ tag: 'pt-br', primary: true }, { tag: 'en' }, { tag: 'not a tag' }],
+            socialLinks: [{ label: 'Blog', url: 'https://blog.example/' }, { url: 'http://insecure.example/' }],
+            wallets: [
+              { chain: 'Bitcoin', address: 'bc1qshown', visible: true },
+              { chain: 'Ethereum', address: '0xhidden', visible: false },
+              { chain: 'Solana', address: 'defaultsHidden' },
+            ],
+          }
+        : base(i, collection, rkey)
+    const body = await (await app.request('/profile/alice.test')).json()
+    expect(body.languages).toEqual([{ tag: 'pt-BR', primary: true }, { tag: 'en', primary: false }])
+    expect(body.socialLinks).toEqual([{ label: 'Blog', url: 'https://blog.example/' }])
+    expect(body.wallets).toEqual([{ chain: 'Bitcoin', address: 'bc1qshown', label: null, verified: false }])
+    expect(JSON.stringify(body)).not.toContain('0xhidden')
+    expect(JSON.stringify(body)).not.toContain('defaultsHidden')
+  })
+
   it('lists detected atproto apps in the profile JSON', async () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()

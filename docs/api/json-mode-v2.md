@@ -50,4 +50,10 @@ This page describes v1, the only version today.
 
 The `/profile/{id}` document includes `backgroundColor`, the profile's page background as lowercase `#rrggbb`, or `null` when the owner has not set one or the stored value is not exactly that shape. It comes from the `backgroundColor` field of `com.blueyvatar.profile`. The profile page and hovercards choose dark or white text for a contrast ratio of at least 4.5 to 1 against it, and use the default palette when neither passes, so clients that draw their own card should apply the same rule.
 
+The document also includes three lists from `com.blueyvatar.profile`, always present and empty when unset:
+
+- `languages`: `{ tag, primary }` objects in the owner's order. `tag` is a BCP 47 language tag (RFC 5646, the same type as the atproto Lexicon `language` format). At most one entry has `primary: true`.
+- `socialLinks`: `{ label, url }` objects in the owner's order, https only, at most 10. `label` falls back to the host name. These are separate from `links`, which still comes from the atproto profile.
+- `wallets`: `{ chain, address, label, verified }` objects, only for wallets the owner chose to show. Wallets are hidden by default and hidden ones never appear in the JSON. `verified` is always `false`: addresses are self-declared and blueyvatar checks only length, whitespace, and control characters, not any chain's address format.
+
 The `/profile/{id}` document includes `gallery`, an array of `{ "url": string, "caption": string or null }` with at most 12 entries. It is `[]` unless the profile owner is on the Plus plan. Each `url` is a signed `/img` path (512 pixel PNG) and follows the same visibility, rating, and blocklist rules as the avatar. Gallery images are never returned by the avatar routes.
