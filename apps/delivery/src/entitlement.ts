@@ -1,6 +1,6 @@
 import { ANONYMOUS_DAILY_LIMIT, ENTITLEMENTS, type Tier } from '@blueyvatar/core'
 import type { ErrorCode } from './errors.js'
-import { hostAllowed, type LicenseStore, type RateLimiter, type RateWindow } from './licenses.js'
+import { hostAllowed, keyExpired, type LicenseStore, type RateLimiter, type RateWindow } from './licenses.js'
 
 export interface RequestInfo {
   headerKey: string | undefined
@@ -31,6 +31,7 @@ export async function checkEntitlement(
   info: RequestInfo,
   licenses: LicenseStore,
   limiter: RateLimiter,
+  now: Date = new Date(),
 ): Promise<EntitlementResult> {
   const raw = info.headerKey ?? info.tokenParam
   if (!raw) {
@@ -44,6 +45,9 @@ export async function checkEntitlement(
   const found = await licenses.findKey(raw)
   if (!found) return { ok: false, status: 401, code: 'invalid_key', message: 'Unknown API key' }
   const { key, license } = found
+  if (keyExpired(key.expiresAt, now)) {
+    return { ok: false, status: 401, code: 'key_expired', message: 'This API key has expired. Create a new key in your account.' }
+  }
   // Past due is served: the store already drops the tier to Free once the grace period ends.
   if (license.status !== 'active' && license.status !== 'past_due') {
     return { ok: false, status: 402, code: 'license_inactive', message: `License is ${license.status}` }
