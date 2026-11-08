@@ -3,7 +3,7 @@
 import { PAID_PLANS, type PaidPlan } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
-import { createCheckoutUrl, createPortalUrl, stripeClient, type UrlResult } from '../../../lib/billing/stripe'
+import { changePlan, createCheckoutUrl, createPortalUrl, setCancelAtPeriodEnd, stripeClient, type ActionResult, type UrlResult } from '../../../lib/billing/stripe'
 import { getBillingStore } from '../../../lib/billing/store'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { PUBLIC_URL } from '../../../lib/oauth'
@@ -47,6 +47,9 @@ export async function startCheckout(form: FormData): Promise<void> {
   }
   const license = await getDashboardStore().ensureLicense(did)
   if (tier !== 'plus' && license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
+  // Someone who already pays changes plan instead of buying a second subscription. The Billing page asks them to confirm first.
+  const store = getBillingStore()
+  if ((await store.subscriptionFor(did, 'developer', license.licenseId)) || (await store.subscriptionFor(did, 'plus'))) return redirect(`/account/billing?change=${tier}`)
   const r = await createCheckoutUrl(c, did, license.licenseId, tier as PaidPlan)
   return r.ok ? redirect(r.url) : back(r)
 }
@@ -63,4 +66,30 @@ export async function openPortal(form?: FormData): Promise<void> {
   }
   const r = await createPortalUrl(c, payer)
   return r.ok ? redirect(r.url) : back(r, org)
+}
+
+const done = (r: ActionResult): never => redirect(`/account/billing?${r.ok ? `done=${encodeURIComponent(r.message)}` : `error=${encodeURIComponent(r.error)}`}`)
+
+/** Switches the signed-in person's own subscription to Plus, Pro, or Business. Personal billing only. */
+export async function switchPlan(form: FormData): Promise<void> {
+  const tier = String(form.get('tier') ?? '')
+  if (!(PAID_PLANS as readonly string[]).includes(tier)) return back({ ok: false, error: 'Choose Plus, Pro, or Business.' })
+  const { did, c } = await ctx()
+  const license = await getDashboardStore().ensureLicense(did)
+  if (tier !== 'plus' && license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
+  return done(await changePlan(c, did, license.licenseId, tier as PaidPlan))
+}
+
+/** Ends the person's subscription at the close of the paid period. */
+export async function cancelSubscription(form: FormData): Promise<void> {
+  const { did, c } = await ctx()
+  const license = await getDashboardStore().ensureLicense(did)
+  return done(await setCancelAtPeriodEnd(c, did, license.licenseId, form.get('kind') === 'plus' ? 'plus' : 'developer', true))
+}
+
+/** Undoes a pending cancellation before the period ends. */
+export async function resumeSubscription(form: FormData): Promise<void> {
+  const { did, c } = await ctx()
+  const license = await getDashboardStore().ensureLicense(did)
+  return done(await setCancelAtPeriodEnd(c, did, license.licenseId, form.get('kind') === 'plus' ? 'plus' : 'developer', false))
 }

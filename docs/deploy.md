@@ -311,7 +311,7 @@ Stripe is the payment processor (issue #67). The web app sells Plus ($9.99 per m
 
 | Variable | Value |
 | --- | --- |
-| `STRIPE_SECRET_KEY` | Secret or restricted API key (`sk_...` or `rk_...`). A restricted key needs write on Checkout Sessions, Customer portal sessions, and Customers. |
+| `STRIPE_SECRET_KEY` | Secret or restricted API key (`sk_...` or `rk_...`). A restricted key needs write on Checkout Sessions, Customer portal sessions, Customers, and Subscriptions (plan switching and cancel use the Subscriptions API; confirm the exact permission names in test mode). |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret (`whsec_...`) of the webhook endpoint created in step 5. |
 | `STRIPE_PRICE_PRO` | Price id (`price_...`) of the Pro monthly price. |
 | `STRIPE_PRICE_BUSINESS` | Price id (`price_...`) of the Business monthly price. |
@@ -325,11 +325,34 @@ Keep them in Infisical and push them with `fly secrets set --app <web app>`. The
 1. **Products and prices.** Create three products, "blueyvatar Plus", "blueyvatar Pro", and "blueyvatar Business". Give each one recurring monthly price in USD: $9.99 for Plus, $9.00 for Pro, and $49.00 for Business, with tax behavior set to Exclusive (tax is added on top). Copy each price id into `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_PRO`, and `STRIPE_PRICE_BUSINESS`.
 2. **Stripe Tax.** Settings, Tax: set the business head office address, add the registrations where tax must be collected, and set the default product tax category to "Software as a service (SaaS)" or the category counsel confirms. Checkout sends `automatic_tax` and collects the billing address and optional tax ID, so tax is computed per customer.
 3. **Invoices.** Settings, Billing, Invoices: set the business name, address, support email, and invoice footer, and turn on customer emails for receipts and invoices. Stripe Billing creates an invoice for every subscription payment, with tax shown.
-4. **Customer Portal.** Settings, Billing, Customer portal: enable payment method updates, invoice history, and subscription cancellation (at period end). Enable "Customers can switch plans" and add the Pro and Business products so they can switch between each other. Do not group Plus with them, since Plus is a user plan and a person can hold Plus and a developer tier at the same time. Set the business information and the return link to `https://blueyvatar.com/account/billing`. Save the default configuration.
+4. **Customer Portal.** Settings, Billing, Customer portal: enable payment method updates, invoice history, and subscription cancellation (at period end). Plan switching and cancel/resume are also built into `/account/billing`, so the portal is mainly for the card and invoices. Leaving "Customers can switch plans" on for Pro and Business is harmless, since the webhook follows any price change; do not add Plus, since Plus is a user plan and a person can hold Plus and a developer tier at the same time. Set the business information and the return link to `https://blueyvatar.com/account/billing`. Save the default configuration.
 5. **Webhook endpoint.** Developers, Webhooks, Add endpoint with the URL `https://blueyvatar.com/api/stripe/webhook`. Subscribe it to exactly these events and no others: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. Copy the signing secret into `STRIPE_WEBHOOK_SECRET`. For local testing, run `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the secret it prints.
 6. **Payment retries.** Settings, Billing, Subscriptions and emails: use Smart Retries and email customers about failed payments. Set "If all retries for a payment fail" to cancel the subscription, and keep the retry window within the 7 day grace period below.
 7. **Migrations.** Migration 0015 (billing tables and `licenses.grace_ends_at`) and migration 0017 (allows `plus` in `subscriptions.tier`) run with the delivery release command, along with 0016 (`email_links.email_domain`). Deploy delivery first, then web.
 8. **Smoke test in test mode.** Subscribe with card 4242 4242 4242 4242, confirm the license shows Pro on `/account/keys`, cancel in the portal, and confirm it returns to Free. Repeat with the Plus price and confirm `/account/billing` shows Plan: Plus and the gallery section on `/account` unlocks. Use card 4000 0000 0000 0341 to see a failed renewal move the license to past due.
+
+### Plan changes in the app
+
+`/account/billing` lets a person with a paid plan switch between Plus, Pro, and Business, cancel, resume, and open the portal for the card and invoices. Switching calls `subscriptions.update` on the one subscription item (never adds a second item), so the renewal date does not change. Sources: https://docs.stripe.com/billing/subscriptions/upgrade-downgrade, https://docs.stripe.com/billing/subscriptions/prorations, https://docs.stripe.com/api/subscriptions/update, https://docs.stripe.com/billing/subscriptions/cancel.
+
+- **Higher price** (by the prices in `apps/web/lib/pricing.ts`, so Pro to Plus counts as higher): `proration_behavior: always_invoice`, which charges the difference now.
+- **Lower price:** `create_prorations`, which adds a credit to the next invoice. Stripe does not refund prorations automatically. Whether the credit shows tax is Unknown (the Stripe pages say only that tax on prorations is covered in the Stripe Tax variant of "Collect taxes for recurring payments"); check one downgrade invoice in test mode.
+- **Failed charge:** `payment_behavior: error_if_incomplete`, so a declined card returns an error and the plan is unchanged. This does not support cards that need 3D Secure; those people see the "not changed" message and can use Manage billing. Unknown: whether `pending_if_incomplete` supports these updates with Stripe Tax, so it is not used.
+- **Not allowed in the app:** switching while a payment is past due (Stripe may credit unpaid time), while the subscription is set to end (resume first), and for Enterprise licenses and organization licenses (organization billing stays in the portal).
+- **Cancel and resume:** `cancel_at_period_end` true or false. Resume works until the period ends; a subscription that has ended cannot be reactivated, so the person subscribes again.
+- **Database:** nothing changes until the webhook arrives. The same events as before carry the new price, `cancel_at_period_end`, and status, so no migration or new event is needed.
+
+### Stripe setup checklist
+
+Do these in test mode first, then live mode. Never commit keys, price ids, or promotion codes.
+
+1. Products and prices (USD, monthly, tax behavior Exclusive): "blueyvatar Plus" $9.99, "blueyvatar Pro" $9.00, "blueyvatar Business" $49.00.
+2. Environment variables on the web app (Infisical `prod`, `STAGING_` prefix for staging, then `fly secrets set`): `STRIPE_SECRET_KEY` (a restricted key also needs Subscriptions write), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_BUSINESS`, `STRIPE_PRICE_PLUS`. Optional: `STRIPE_ALLOW_PROMO_CODES=true` on staging only. `PUBLIC_URL=https://blueyvatar.com`.
+3. Webhook endpoint `https://blueyvatar.com/api/stripe/webhook` (and the staging URL with test mode) subscribed to exactly: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+4. Customer portal settings: payment method update on, invoice history on, cancel subscription on with "at end of billing period", return link `https://blueyvatar.com/account/billing`. Switch plan is optional (Pro and Business only, never Plus).
+5. Billing settings: Smart Retries on, customer emails for failed payments on, and when all retries fail, cancel the subscription, with the retry window inside 7 days.
+6. Stripe Tax, invoice branding, and the support email, as in the Dashboard steps above.
+7. Test in test mode: subscribe with Pro; switch to Business (card charged the difference); switch back (credit on the next invoice); cancel and confirm "Ends on" shows; resume; confirm card 4000 0000 0000 0341 on a switch shows the "not changed" message; confirm a failed renewal shows the grace notice.
 
 ### Testing with a free coupon
 
