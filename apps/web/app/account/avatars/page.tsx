@@ -10,6 +10,11 @@ import { describeLinkedEmails, readPrimaryAddress } from '../../../lib/linked-em
 import AccountNav from '../AccountNav'
 import ImageFileInput from './ImageFileInput'
 import RatingFields from './RatingFields'
+import BskyAvatarPanel from './BskyAvatarPanel'
+import UseAsBskyAvatar from './UseAsBskyAvatar'
+import { bskyBlockReason, hasBskyPermission, type SyncSession } from '../../../lib/bsky-sync'
+import { getSyncStore } from '../../../lib/bsky-sync-store'
+import { useBskyProfileScope } from '../../../lib/oauth'
 import LinkedEmail from '../LinkedEmail'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
@@ -23,8 +28,10 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   let pds = ''
   let bskyCid: string | null = null
   let loadError: string | null = null
+  let bsky: { session: SyncSession } | null = null
   try {
     const session = await repoSession(did)
+    if (useBskyProfileScope() || (await hasBskyPermission(session))) bsky = { session }
     ;[images, pds, bskyCid] = await Promise.all([listImages(session), pdsUrl(session), blueskyAvatarCid(session).catch(() => null)])
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
@@ -40,6 +47,8 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
+
+      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} />}
 
       <h2>
         Your images ({images.length} of {imageLimit(plan)})
@@ -70,7 +79,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                     <ButtonLink href="/account/avatars/import?source=bluesky">Use this as my blueyvatar avatar</ButtonLink>
                   </p>
                 )}
-                <p>Bluesky accepts avatars up to 1,000,000 bytes, and blueyvatar accepts up to 5 MiB, so a large image added here cannot be reused on Bluesky as it is.</p>
+                <p>Bluesky accepts avatars up to 1,000,000 bytes, and blueyvatar accepts up to 5 MiB, so blueyvatar shrinks a large image when you send it to Bluesky.</p>
               </div>
             </>
           ) : (
@@ -98,6 +107,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                       <Button type="submit">Set as default</Button>
                     </form>
                   )}
+                  {bsky && <UseAsBskyAvatar rkey={img.rkey} blockedReason={bskyBlockReason(img)} />}
                   <form action={removeImage}>
                     <input type="hidden" name="rkey" value={img.rkey} />
                     <Button type="submit">Delete</Button>

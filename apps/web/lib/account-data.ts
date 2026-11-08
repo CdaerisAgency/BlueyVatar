@@ -138,6 +138,8 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     await c.query('DELETE FROM custom_domains WHERE did = $1', [did])
     await c.query('DELETE FROM profile_view_counters WHERE did = $1', [did])
     await c.query('DELETE FROM appeals WHERE did = $1', [did])
+    await c.query('DELETE FROM bsky_avatar_sync WHERE did = $1', [did])
+    await c.query('DELETE FROM bsky_avatar_log WHERE did = $1', [did])
     const images = await c.query('DELETE FROM images WHERE did = $1', [did])
     await c.query('DELETE FROM profiles WHERE did = $1', [did])
     const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])

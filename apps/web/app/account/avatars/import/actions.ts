@@ -10,6 +10,8 @@ import { resolvePlan } from '../../../../lib/plan'
 import { reportError } from '../../../../lib/obs'
 import { limited } from '../../../../lib/rate-guard'
 import { screenUpload } from '../../../../lib/upload-screen'
+import { syncBlueskyAfterDefaultChange } from '../../../../lib/bsky-sync-server'
+import { syncsAfterImport } from '../../../../lib/bsky-sync'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -40,5 +42,7 @@ export async function confirmImport(form: FormData): Promise<void> {
     reportError('import failed', err)
     return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
   }
-  return back('done', 'Image imported.')
+  // An image imported from the Bluesky avatar is already what Bluesky shows, so nothing is written back.
+  const note = syncsAfterImport(source, fields.value.isDefault) ? await syncBlueskyAfterDefaultChange(did) : null
+  return back('done', note ? `Image imported. ${note}` : 'Image imported.')
 }

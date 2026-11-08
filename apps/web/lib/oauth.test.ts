@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PERMISSION_SET_NSID, clientMetadata, emailLinkScope, signInScope, usePermissionSet } from './oauth'
+import { PERMISSION_SET_NSID, clientMetadata, emailLinkScope, grantsBskyProfileUpdate, signInScope, useBskyProfileScope, usePermissionSet } from './oauth'
 
 describe('OAuth scope', () => {
   it('defaults to the three granular repo scopes', () => {
@@ -33,5 +33,26 @@ describe('OAuth scope', () => {
       if (saved === undefined) delete process.env.OAUTH_USE_PERMISSION_SET
       else process.env.OAUTH_USE_PERMISSION_SET = saved
     }
+  })
+})
+
+describe('Bluesky profile scope', () => {
+  it('is off by default and adds one update-only scope when on', () => {
+    for (const v of ['', 'false', '0', 'yes', undefined]) expect(useBskyProfileScope({ OAUTH_REQUEST_BSKY_PROFILE: v })).toBe(false)
+    for (const v of ['true', 'TRUE', '1', ' true ']) expect(useBskyProfileScope({ OAUTH_REQUEST_BSKY_PROFILE: v })).toBe(true)
+    expect(signInScope(false, false)).not.toContain('app.bsky')
+    expect(signInScope(false, true)).toBe('atproto repo:com.blueyvatar.image repo:com.blueyvatar.profile repo:com.blueyvatar.claim repo:app.bsky.actor.profile?action=update blob:image/*')
+    expect(signInScope(true, true)).toContain('repo:app.bsky.actor.profile?action=update')
+    expect(emailLinkScope(false, true)).toBe(`${signInScope(false, true)} account:email`)
+  })
+
+  it('reads a granted scope string', () => {
+    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile?action=update blob:image/*')).toBe(true)
+    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile')).toBe(true)
+    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile?action=create&action=update')).toBe(true)
+    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile?action=create')).toBe(false)
+    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profileX blob:image/*')).toBe(false)
+    expect(grantsBskyProfileUpdate('atproto repo:com.blueyvatar.image')).toBe(false)
+    expect(grantsBskyProfileUpdate(undefined)).toBe(false)
   })
 })

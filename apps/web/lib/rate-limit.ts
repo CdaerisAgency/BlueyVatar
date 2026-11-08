@@ -50,6 +50,7 @@ export const BUCKETS = {
   'appeal.ip': { limit: 20, windowSec: HOUR },
   'export.did': { limit: 5, windowSec: HOUR },
   'export.ip': { limit: 20, windowSec: HOUR },
+  'bskyAvatar.did': { limit: 10, windowSec: HOUR },
   'profileSave.did': { limit: 60, windowSec: HOUR },
   'deleteData.did': { limit: 5, windowSec: HOUR },
   'deleteData.ip': { limit: 20, windowSec: HOUR },

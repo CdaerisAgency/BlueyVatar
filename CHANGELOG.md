@@ -4,6 +4,9 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 
 ## 2026-11-08
 
+### Added
+- Change your Bluesky profile avatar from blueyvatar (#241). A "Use as my Bluesky avatar" button on each G or PG image, a switch to keep your Bluesky avatar the same as your default image (on by default once you allow it), and "Restore my previous Bluesky avatar". blueyvatar changes only the picture, keeps the rest of your profile exactly as it is, and never overwrites a change you made on Bluesky in the meantime. R and X images are never sent. The permission is requested at sign-in once the `OAUTH_REQUEST_BSKY_PROFILE` setting is on, which stays off until it is tested on staging. Until then, and for existing sessions, the page says "Sign in again to allow this".
+
 ### Changed
 - Reporting a profile or avatar now requires signing in with Bluesky, and the reason, details (at least 10 characters), and email are all required. Reports store the reporter's account, which is limited to 5 reports per hour in addition to the per-network limit and is shown to reviewers only. The content policy lists security@blueyvatar.com for legal or urgent notices from people who cannot sign in (#224).
 - The avatars page has an Upload an image button, shows your Bluesky avatar with a button to use it, shows linked emails (your primary in full, others masked), and hides "If R, label as" unless R is chosen. The limit message names the right plan (#227).
