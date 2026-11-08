@@ -76,10 +76,10 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                 <div>Your profile avatar{images.length === 0 ? ' (currently shown)' : ''}</div>
                 {canAdd && (
                   <p>
-                    <ButtonLink href="/account/avatars/import?source=bluesky">Use this as my blueyvatar avatar</ButtonLink>
+                    <ButtonLink href="/account/avatars/import?source=bluesky">Use this as my BlueyVatar avatar</ButtonLink>
                   </p>
                 )}
-                <p>Profile avatars accept up to 1,000,000 bytes, and blueyvatar accepts up to 5 MiB, so blueyvatar shrinks a large image when you send it to your profile.</p>
+                <p>Profile avatars accept up to 1,000,000 bytes, and BlueyVatar accepts up to 5 MiB, so BlueyVatar shrinks a large image when you send it to your profile.</p>
               </div>
             </>
           ) : (

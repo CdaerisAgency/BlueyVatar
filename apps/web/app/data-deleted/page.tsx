@@ -8,7 +8,7 @@ export const metadata = { title: 'Data deleted' }
 export default function DataDeletedPage() {
   return (
     <PageMain>
-      <h1>Your blueyvatar data is deleted</h1>
+      <h1>Your BlueyVatar data is deleted</h1>
       <p>You are signed out. Here is what we kept and why.</p>
       <ul>
         <li>Stripe billing records, for {BILLING_RETENTION_YEARS} years for tax and accounting, then they are deleted automatically.</li>

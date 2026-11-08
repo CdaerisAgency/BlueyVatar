@@ -28,7 +28,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
       <section aria-labelledby="download">
         <h2 id="download">Download a copy</h2>
         <p>
-          This is safe and changes nothing. You get one file with what blueyvatar stores about you: your linked emails (the primary
+          This is safe and changes nothing. You get one file with what BlueyVatar stores about you: your linked emails (the primary
           address is masked), profile links, verified accounts, who can see your avatar, your license and API key details (never the
           secret keys), your custom domain, daily profile view counts, any appeals you filed, and a summary of your subscriptions.
         </p>
@@ -38,9 +38,9 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
       </section>
 
       <section aria-labelledby="danger" className="mt-10 rounded-bv-card border-2 border-red-700 p-5">
-        <h2 id="danger" className="mt-0">Danger zone: delete my blueyvatar data</h2>
+        <h2 id="danger" className="mt-0">Danger zone: delete my BlueyVatar data</h2>
         <p>
-          <strong>This cannot be undone.</strong> It removes what blueyvatar stores about you and signs you out.
+          <strong>This cannot be undone.</strong> It removes what BlueyVatar stores about you and signs you out.
         </p>
         <p>What we delete:</p>
         <ul>
@@ -64,8 +64,8 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
         </ul>
         <p>
           Your avatars, profile, gallery, and verified accounts are saved on {homeServer}. A home server is the service
-          that stores your account and everything you post. They belong to you, and blueyvatar does not delete them. To
-          remove them, use an app that manages your repository or your home server&apos;s tools. Until you do, blueyvatar may show them again if you
+          that stores your account and everything you post. They belong to you, and BlueyVatar does not delete them. To
+          remove them, use an app that manages your repository or your home server&apos;s tools. Until you do, BlueyVatar may show them again if you
           sign in later.
         </p>
         <form action={deleteMyData}>
@@ -73,7 +73,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
             Type <code>{DELETE_CONFIRMATION}</code> to confirm{' '}
             <input name="confirm" required autoComplete="off" spellCheck={false} />
           </label>{' '}
-          <Button type="submit" variant="primary">Delete my blueyvatar data</Button>
+          <Button type="submit" variant="primary">Delete my BlueyVatar data</Button>
         </form>
       </section>
     </PageMain>

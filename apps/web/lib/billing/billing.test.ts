@@ -271,7 +271,7 @@ describe('billing notices', () => {
     await send(f) // Stripe redelivery
     await send(fail(T0 + 2 * DAY)) // a later retry of the same invoice
     expect(mail).toHaveLength(1)
-    expect(mail[0]).toMatchObject({ did: DID, kind: 'billing', subject: 'Your blueyvatar payment failed' })
+    expect(mail[0]).toMatchObject({ did: DID, kind: 'billing', subject: 'Your BlueyVatar payment failed' })
     expect(mail[0]!.text).toContain('2026-11-09')
     expect(mail[0]!.text).toContain(DID)
     expect(mail[0]!.text).toContain('https://blueyvatar.com/account/notifications')
@@ -285,7 +285,7 @@ describe('billing notices', () => {
     await send(end)
     await send(end)
     expect(mail).toHaveLength(1)
-    expect(mail[0]!.subject).toBe('Your blueyvatar Plus plan has ended')
+    expect(mail[0]!.subject).toBe('Your BlueyVatar Plus plan has ended')
   })
   it('mails cancellation once for an active subscription, and nothing for ordinary updates', async () => {
     const { mail, send } = withMail()
@@ -293,7 +293,7 @@ describe('billing notices', () => {
     await send(ev('customer.subscription.updated', subObj({ cancel_at_period_end: true }), T0 + DAY))
     expect(mail).toEqual([])
     await send(ev('customer.subscription.deleted', subObj({ status: 'canceled' }), T0 + 2 * DAY))
-    expect(mail.map((m) => m.subject)).toEqual(['Your blueyvatar Plus subscription was canceled'])
+    expect(mail.map((m) => m.subject)).toEqual(['Your BlueyVatar Plus subscription was canceled'])
   })
   it('never fails the webhook when sending fails', async () => {
     const store = memoryBillingStore()

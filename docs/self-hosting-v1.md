@@ -1,6 +1,6 @@
 # Self-hosting guide (v1)
 
-This guide covers running blueyvatar on your own infrastructure (issue #39, spec section 3 row 30). It collects what the repository already documents in [deploy.md](deploy.md), `.env.example`, and the `fly/` configs. The project has no license yet, so check the repository for a `LICENSE` file before you rely on the code for your own deployment. Anything the repo does not document is marked "not yet documented".
+This guide covers running BlueyVatar on your own infrastructure (issue #39, spec section 3 row 30). It collects what the repository already documents in [deploy.md](deploy.md), `.env.example`, and the `fly/` configs. The project has no license yet, so check the repository for a `LICENSE` file before you rely on the code for your own deployment. Anything the repo does not document is marked "not yet documented".
 
 Nothing here has been run as a self-hosted install by the maintainers. The Fly.io and Neon setup in [deploy.md](deploy.md) is the reference deployment.
 
@@ -108,7 +108,7 @@ services:
     image: postgres:16
     environment:
       POSTGRES_PASSWORD: change-me
-      POSTGRES_DB: blueyvatar
+      POSTGRES_DB: BlueyVatar
     volumes:
       - pgdata:/var/lib/postgresql/data
 

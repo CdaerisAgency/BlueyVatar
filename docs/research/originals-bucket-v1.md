@@ -4,7 +4,7 @@ Checked: November 6, 2026. Scope: issue #71, spec sections 4, 7, 13 (Cloudflare 
 
 ## Question
 
-Should blueyvatar keep original blobs in a bucket so that a slow or dead PDS does not break image delivery?
+Should BlueyVatar keep original blobs in a bucket so that a slow or dead PDS does not break image delivery?
 
 ## Recommendation
 

@@ -6,7 +6,7 @@ Checked: November 7, 2026. Scope: issue #65 (Q8, atproto spaces timing; spec sec
 
 1. **Keep the service-stored avatar option for v1.** Spaces are not launched, the design is a draft, and the alpha post says not to run production code against it. Decide whether to keep spec 10.2 option 1 as the only real access control until spaces ship. Recommendation: yes.
 2. **Treat spaces as a later phase, as the spec already says.** Re-check on a fixed date (suggested: December 15, 2026, after the "later this year" target) and again at any announcement of a launch.
-3. **Whether blueyvatar should be a space reader at all.** Reading a restricted avatar from a space needs a signed-in user to delegate access on every sync, because the service has no standing credential. This is a different trust model from today's. See "Can blueyvatar read space content". The owner should decide before any prototype starts.
+3. **Whether BlueyVatar should be a space reader at all.** Reading a restricted avatar from a space needs a signed-in user to delegate access on every sync, because the service has no standing credential. This is a different trust model from today's. See "Can BlueyVatar read space content". The owner should decide before any prototype starts.
 
 ## Status as of November 7, 2026
 
@@ -52,7 +52,7 @@ From proposal 0016 (draft, so names may change). Methods live under `com.atproto
 
 **OAuth scope.** The proposal defines a `space:` scope with parameters `authority`, `skey`, `collection`, `action` (`read`, `read_self`, `create`, `update`, `delete`) and `manage`. "Read access is all-or-nothing at the space boundary." The devex post gives one example, `space:com.example.notes`. A published scope catalog: no published answer.
 
-## Can blueyvatar read space content, and how authorization works
+## Can BlueyVatar read space content, and how authorization works
 
 **Short answer.** Yes in principle, but only through a path the space authority approves, and not with a standing service credential. The sources describe three ways in.
 
@@ -64,8 +64,8 @@ From proposal 0016 (draft, so names may change). Methods live under `com.atproto
 
 **What this means for a third party like blueyvatar.**
 - The service can read a space only while some user with read access is signed in and delegating, or the authority issues credentials to the service under its own policy. A standing "service account" read right: no published answer.
-- Per-viewer enforcement is the reader's job. blueyvatar would apply its own caller rules (license key, Origin) on top of the space-level gate, which the authority cannot see.
-- Revocation is by short expiry (credentials) plus optional `notifyCredentialRevoked`. Repo hosts keep each revocation at least 60 minutes. A leaked avatar image served by blueyvatar is not covered by any of this once it leaves the service.
+- Per-viewer enforcement is the reader's job. BlueyVatar would apply its own caller rules (license key, Origin) on top of the space-level gate, which the authority cannot see.
+- Revocation is by short expiry (credentials) plus optional `notifyCredentialRevoked`. Repo hosts keep each revocation at least 60 minutes. A leaked avatar image served by BlueyVatar is not covered by any of this once it leaves the service.
 - Authorship proof for space data is deliberately not durable (an HMAC from an ECDH shared secret instead of signatures), so a copy that escapes the boundary cannot be attributed.
 
 ## What would change in blueyvatar's restricted-avatar design
@@ -87,7 +87,7 @@ If spaces ship and a user stores the avatar in a space, the likely changes are b
 | Caching | A resized image served from `/img` is a copy outside the space. The existing per-caller, day-bucket scope still bounds a leak to the next day. A shorter scope for space-backed avatars is a choice, not a requirement from the sources | `sign.ts` |
 | Availability | If no eligible reader is signed in, the service cannot refresh the source image. Behavior to choose: serve the last cached copy until the scope expires, or return the default. The sources do not define it | Space sync post |
 | Indexing | Today the indexer follows the public firehose through Tap. Space records do not appear there. Indexing needs the spaces sync path. A launched Tap or Jetstream support for spaces: no published answer; the prototype is described on Nov 6 | Alpha post: "there is no concept of a relay" |
-| Copy to the user | The sign-up note in spec 10.2 changes for space-backed avatars: access control is real at the PDS, but blueyvatar still serves a derived copy to authorized callers, and spaces are not encrypted | Alpha post |
+| Copy to the user | The sign-up note in spec 10.2 changes for space-backed avatars: access control is real at the PDS, but BlueyVatar still serves a derived copy to authorized callers, and spaces are not encrypted | Alpha post |
 
 ## Prototype plan once stable
 
@@ -97,7 +97,7 @@ Start only after all of these hold: an announcement of a stable launch on atprot
 2. **Delegation flow.** Implement the delegation token to `getSpaceCredential` exchange from a test OAuth session. Record the real token lifetimes and the failure modes when the user signs out.
 3. **Upload path.** Learn how a client uploads a blob that a space record references, and which scope it needs. This is the largest open question today.
 4. **Delivery integration (behind a flag).** In `apps/delivery`, add a source resolver that returns bytes from a space for DIDs with a private avatar. Keep `visibilityAllows`, `restrictedScope`, and the gate unchanged. Add tests: the same-response rule still holds for a space-backed restricted hash, a revoked credential yields the default, and `/img` without a scope returns 403.
-5. **Indexer.** Prototype the spaces Jetstream or sync service example the Nov 6 post says is "coming soon". Decide whether blueyvatar follows spaces by user delegation only.
+5. **Indexer.** Prototype the spaces Jetstream or sync service example the Nov 6 post says is "coming soon". Decide whether BlueyVatar follows spaces by user delegation only.
 6. **Review.** Security review of storing delegation material, a decision on caching of derived copies, then an owner decision on rollout.
 
 No application code is changed by this PR.
@@ -108,7 +108,7 @@ Today: yes. Spaces are an alpha, not for production, and do not exist as a stabl
 
 After a stable launch: not decided by any published source, so the decision stays open. These facts bear on it, all from the sources above:
 - A space-backed avatar keeps portability, which the service-stored option loses.
-- The service still needs a delegating reader or an authority policy that admits it. A user who wants a private avatar in a space but does not run a signed-in session against blueyvatar would see the avatar go stale or fall back to the default.
+- The service still needs a delegating reader or an authority policy that admits it. A user who wants a private avatar in a space but does not run a signed-in session against BlueyVatar would see the avatar go stale or fall back to the default.
 - Blob upload, image tooling, and Tap or Jetstream support for spaces are not published as stable.
 - Spaces are unencrypted, as is the service's own storage, so neither option offers confidentiality from the operator.
 

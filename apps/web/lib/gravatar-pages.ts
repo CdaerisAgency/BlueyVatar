@@ -22,7 +22,7 @@ export interface Faq { q: string; a: string }
 export const FAQS: readonly Faq[] = [
   {
     q: 'Does my existing image URL keep working if I only change the host?',
-    a: 'For the common parameters, yes. Gravatar documents an avatar URL of the form gravatar.com/avatar/HASH with size, default, rating, and force-default parameters. blueyvatar accepts the same parameters on /avatar/{hash}. Sizes above your plan cap are clamped and reported in a response header.',
+    a: 'For the common parameters, yes. Gravatar documents an avatar URL of the form gravatar.com/avatar/HASH with size, default, rating, and force-default parameters. BlueyVatar accepts the same parameters on /avatar/{hash}. Sizes above your plan cap are clamped and reported in a response header.',
   },
   {
     q: 'Where is my avatar stored?',
@@ -33,7 +33,7 @@ export const FAQS: readonly Faq[] = [
     a: 'Sign in, link your email, then use the import page to fetch the image. You confirm its rating before it is saved to your repository, where it is public.',
   },
   {
-    q: 'Which email hash does blueyvatar accept?',
+    q: 'Which email hash does BlueyVatar accept?',
     a: 'A SHA-256 or MD5 hash. A raw email address is always rejected. Gravatar documents a SHA256 hash of the email address.',
   },
   {
@@ -42,15 +42,15 @@ export const FAQS: readonly Faq[] = [
   },
   {
     q: 'Do ratings map one to one?',
-    a: 'Not always. blueyvatar maps ratings from atproto self-labels, and its definitions differ from Gravatar documented definitions. Check the rating when you import an image.',
+    a: 'Not always. BlueyVatar maps ratings from atproto self-labels, and its definitions differ from Gravatar documented definitions. Check the rating when you import an image.',
   },
   {
     q: 'Can each email have its own image?',
-    a: 'No. blueyvatar keeps one avatar per account, shared by every linked email hash.',
+    a: 'No. BlueyVatar keeps one avatar per account, shared by every linked email hash.',
   },
   {
-    q: 'Is blueyvatar affiliated with Gravatar?',
-    a: 'No. Gravatar is a name that belongs to its owner. This page describes how blueyvatar works and links to Gravatar documentation for facts about Gravatar.',
+    q: 'Is BlueyVatar affiliated with Gravatar?',
+    a: 'No. Gravatar is a name that belongs to its owner. This page describes how BlueyVatar works and links to Gravatar documentation for facts about Gravatar.',
   },
 ]
 

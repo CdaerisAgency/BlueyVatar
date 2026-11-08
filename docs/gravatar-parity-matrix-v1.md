@@ -1,12 +1,12 @@
 # Gravatar and Libravatar parity matrix (v1)
 
-Research for issue #242. Gravatar and Libravatar rows come from published pages fetched November 8, 2026. blueyvatar rows come from the repository at commit `07ae608` (origin/main). "Unknown" means no published page or repo file I read confirms the answer. Nothing here is a build decision; scope decisions are step 2 of the issue.
+Research for issue #242. Gravatar and Libravatar rows come from published pages fetched November 8, 2026. BlueyVatar rows come from the repository at commit `07ae608` (origin/main). "Unknown" means no published page or repo file I read confirms the answer. Nothing here is a build decision; scope decisions are step 2 of the issue.
 
 Related earlier notes: `docs/research/gravatar-gaps-v1.md` (issue #62), `docs/research/qr-code-design-v1.md`, `docs/research/dns-delegation-v2.md`, `docs/api/gravatar-differences-v1.md`.
 
 ## 1. Avatar URL options
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Hash input | SHA256 of trimmed, lowercased email; MD5 not allowed for the v3 API ([REST docs](https://docs.gravatar.com/rest/api-data/)) | MD5 or SHA256 of lowercased email; OpenID URLs use SHA256 ([API](https://wiki.libravatar.org/api/)) | SHA-256 or MD5 hex hash; raw email rejected (`docs/api/gravatar-differences-v1.md`, `packages/core/src/hash.ts`). Also handle and DID routes (`apps/delivery/src/app.ts`: `/avatar/:hash`, `/u/:id`) |
 | Size | `s` or `size`, 1 to 2048, default 80 ([SDK images](https://docs.gravatar.com/sdk/images/)) | `s` or `size`, 1 to 512, default 80 ([API](https://wiki.libravatar.org/api/)) | Same params; cap 512 Free, 1024 Pro, 2048 Business and Enterprise (`packages/core/src/tiers.ts`) |
@@ -24,7 +24,7 @@ Related earlier notes: `docs/research/gravatar-gaps-v1.md` (issue #62), `docs/re
 
 Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://api.gravatar.com/v3/openapi), fields marked "(auth)" there are returned only to authenticated requests. Libravatar publishes no profile fields on its [home page](https://libravatar.org/) or [API page](https://wiki.libravatar.org/api/), so those cells read "None published".
 
-| Field | Gravatar | Libravatar | blueyvatar today |
+| Field | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Display name, bio | `display_name`, `description` | None published | From `app.bsky.actor.profile`; shown on `/p/{handle}` (`apps/web/app/p/[handle]/page.tsx`) |
 | Links | `links` (label, url), auth | None published | Read from `app.bsky.actor.profile#links` (max 10, https only); shown on the page; no editor on `/account/profile` (`packages/core/src/links.ts`, `apps/web/app/account/profile/page.tsx`) |
@@ -48,7 +48,7 @@ Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://a
 
 ## 3. Profile export formats
 
-| Format | Gravatar | Libravatar | blueyvatar today |
+| Format | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | JSON | `.json` suffix, PoCo format, JSONP `callback` ([JSON docs](https://docs.gravatar.com/profiles/json/)) | None published | `GET /profile/:id` returns JSON on delivery (`apps/delivery/src/app.ts`); no `.json` suffix route; no download button |
 | Markdown | `.md` suffix ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | None |
@@ -61,7 +61,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 ## 4. QR codes
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Profile QR | `https://gravatar.com/{hash}.qr` or `{username}.qr`; also `/qr-code/{sha256_hash}` in the API, PNG ([QR docs](https://docs.gravatar.com/sdk/qr-codes/), [OpenAPI](https://api.gravatar.com/v3/openapi)) | None published | `/qr/{id}.svg` and `.png` (`apps/delivery/src/app.ts`) |
 | Size | `s` or `size`, default 80 | n/a | `s`, default 256, tier clamped (`docs/api/gravatar-differences-v1.md`) |
@@ -73,7 +73,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 ## 5. Hovercards, embeds, widgets
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Hovercards | `gprofiles.js` plus `hovercard` class or `data-gravatar-hash` ([docs](https://docs.gravatar.com/hovercards/)) | None published | `@blueyvatar/hovercards`, served at `/embed/hovercard.js`; Business and Enterprise for cross-origin use (`packages/hovercards/README.md`). Package unpublished |
 | Profile card embed | oEmbed endpoint and `.card` iframe, 415 by 228 px ([profiles SDK](https://docs.gravatar.com/sdk/profiles/)) | None published | None found (no oEmbed or card route in `apps/`) |
@@ -83,7 +83,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 ## 6. API
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Profile API | REST v3, `GET /profiles/{id}`, OpenAPI published ([REST docs](https://docs.gravatar.com/rest/api-data/)) | None published | `GET /profile/:id`, OpenAPI at `/openapi.json` (`apps/delivery/src/app.ts`, `docs/api/README-v1.md`) |
 | Write API | `PATCH /me/profile`, avatar upload endpoints, OAuth ([OpenAPI](https://api.gravatar.com/v3/openapi)) | Unknown | Writes go to the person's atproto repo through atproto scopes (spec section 10.1); no write REST API |
@@ -93,7 +93,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 ## 7. Federation and lookup
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | DNS SRV discovery | None published | `_avatars._tcp` and `_avatars-sec._tcp`; fallback to `seccdn.libravatar.org` ([API](https://wiki.libravatar.org/api/)) | Design memo only; no code (`docs/research/dns-delegation-v2.md`) |
 | Self-hostable | Unknown | Yes, ivatar under AGPLv3 ([home](https://libravatar.org/)) | Yes, `docs/self-hosting-v1.md` |
@@ -103,7 +103,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 ## 8. Privacy and consent
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Default profile visibility | "All profile information is public" with per-section toggles under Design ([support](https://support.gravatar.com/your-profile/)) | Unknown; privacy policy is linked but not read ([home](https://libravatar.org/)) | Public unless visibility rules restrict it (`apps/web/app/account/visibility/page.tsx`) |
 | Hide a whole profile | `disabled` error code exists ([REST docs](https://docs.gravatar.com/rest/api-data/)); user flow Unknown | Unknown | `hiddenProfile` returns 404 (`apps/delivery/src/app.ts`) |
@@ -115,14 +115,14 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 ## 9. Pricing
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | End user | Free; paid details for end users Unknown | Free service; pricing not mentioned on the home page ([home](https://libravatar.org/)) | Free, Plus $9 per month (`apps/web/lib/pricing.ts`) |
 | Developer | Free tier with attribution; paid from $100 per month with SLA and support ([pricing](https://docs.gravatar.com/pricing)) | None published | Free, Plus $9 (includes 50,000 keyed requests a month), Business $49 per month, Enterprise by contract (`apps/web/lib/pricing.ts`, `packages/core/src/tiers.ts`) |
 
 ## 10. Other features found
 
-| Feature | Gravatar | Libravatar | blueyvatar today |
+| Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
 | Multiple avatars per account | Yes, one selected ([OpenAPI](https://api.gravatar.com/v3/openapi) `/me/avatars`) | Unknown | Free 3, Plus 20 (`docs/api/gravatar-differences-v1.md`) |
 | Per-email avatar | Each email can have its own image ([Gravatar FAQs](https://support.gravatar.com/basic/), as recorded in `docs/research/gravatar-gaps-v1.md`) | Unknown | One avatar per DID |
@@ -137,6 +137,6 @@ See the Unknown cells above. The main open items are:
 
 1. Gravatar: initials param on Libravatar, robohash set on Gravatar, file extension and output format on Libravatar, fallback chain, QR tier restriction, end-user paid plans, service license.
 2. Libravatar: all profile field, export, QR, hovercard, embed, rate limit, privacy and per-email questions.
-3. blueyvatar: verified service list, public org flag, per-section visibility, registration date.
+3. BlueyVatar: verified service list, public org flag, per-section visibility, registration date.
 4. Gravatar vCard field list (not published).
 5. Gravatar anonymous profile rate limit (not published).

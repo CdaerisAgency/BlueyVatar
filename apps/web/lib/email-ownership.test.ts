@@ -88,7 +88,7 @@ function suite(name: string, make: () => Promise<{ store: Store; age?: (ms: numb
       expect((await store.links.list(B)).map((l) => l.emailHash)).toContain(emailHash(email))
       expect(outbox.sent).toHaveLength(2)
       expect(outbox.sent[1]!.to).toBe(email)
-      expect(outbox.sent[1]!.subject).toMatch(/different blueyvatar account/)
+      expect(outbox.sent[1]!.subject).toMatch(/different BlueyVatar account/)
       expect(outbox.sent[1]!.text).toMatch(/add this address again/)
       // The pending row (and the raw address) is gone.
       expect(await store.codes.get(B)).toBeUndefined()

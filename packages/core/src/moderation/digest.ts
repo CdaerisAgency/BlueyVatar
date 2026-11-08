@@ -82,6 +82,6 @@ export function formatDigest(d: Digest, publicUrl: string): { subject: string; t
     '--', 'Counts only. This email never contains images or the content of reports.',
   )
   const flag = d.slaBreaches > 0 ? `, ${d.slaBreaches} past SLA` : ''
-  return { subject: `blueyvatar moderation digest: ${sum(d.newReports)} new reports, ${d.openCases} open${flag}`, text: lines.join('\n') }
+  return { subject: `BlueyVatar moderation digest: ${sum(d.newReports)} new reports, ${d.openCases} open${flag}`, text: lines.join('\n') }
 }
 

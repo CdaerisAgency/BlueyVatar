@@ -111,7 +111,7 @@ export default async function ProfilePage({ params, searchParams }: { params: Pr
           <ul aria-label="Verified accounts" className={list}>
             {accounts.map((a) => (
               <li key={a.uri}>
-                <a href={a.uri} rel="me noopener" title="Verified by blueyvatar">{PLATFORM_LABELS[a.platform] ?? a.platform} <span aria-label="verified">✓</span></a>
+                <a href={a.uri} rel="me noopener" title="Verified by BlueyVatar">{PLATFORM_LABELS[a.platform] ?? a.platform} <span aria-label="verified">✓</span></a>
               </li>
             ))}
           </ul>

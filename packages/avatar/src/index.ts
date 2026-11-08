@@ -152,8 +152,8 @@ export function fromGravatarUrl(url: string | URL, base: { baseUrl?: string; key
     else if (/^https:\/\//i.test(d)) {
       options.default = d
       notes.push('Custom default URLs need an HTTPS host on the service allowlist and a Plus key or higher. Otherwise the style default is used.')
-    } else if (d === 'color') notes.push('Dropped d=color: blueyvatar does not support it.')
-    else notes.push(`Dropped default "${d}": not a blueyvatar style or an HTTPS URL.`)
+    } else if (d === 'color') notes.push('Dropped d=color: BlueyVatar does not support it.')
+    else notes.push(`Dropped default "${d}": not a BlueyVatar style or an HTTPS URL.`)
   }
 
   const f = p.get('f') ?? p.get('forcedefault')
@@ -164,7 +164,7 @@ export function fromGravatarUrl(url: string | URL, base: { baseUrl?: string; key
     const rr = r.toLowerCase()
     if (RATINGS.includes(rr)) {
       options.rating = rr as Rating
-      notes.push('Ratings differ: Gravatar rates images by its own rules, while blueyvatar derives the rating from atproto self-labels. The same image can rate differently (docs/api/gravatar-differences-v1.md).')
+      notes.push('Ratings differ: Gravatar rates images by its own rules, while BlueyVatar derives the rating from atproto self-labels. The same image can rate differently (docs/api/gravatar-differences-v1.md).')
     } else notes.push(`Dropped rating "${r}": expected g, pg, r, or x.`)
   }
   return { options, notes }

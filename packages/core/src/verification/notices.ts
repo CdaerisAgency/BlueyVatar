@@ -63,32 +63,32 @@ export function usageNotice(i: UsageNoticeInput): Notice {
       : `Your account has used ${i.threshold} percent of the keyed requests included for the month starting ${i.period} ` +
         `(${n(i.used)} of ${n(i.included)}).\n\nSee ${base(i.publicUrl)}/account/billing for plan options.`
   return {
-    subject: `blueyvatar usage alert: ${i.threshold} percent of included requests`,
+    subject: `BlueyVatar usage alert: ${i.threshold} percent of included requests`,
     text: frame(i.did, i.publicUrl, body, 'usage'),
   }
 }
 
 export function paymentFailedNotice(i: { did: string; graceEnds: Date; publicUrl: string }): Notice {
   const body =
-    `Your last blueyvatar payment failed.\n\n` +
+    `Your last BlueyVatar payment failed.\n\n` +
     `Your paid limits continue until ${day(i.graceEnds)}. After that the account returns to Free limits. ` +
     `Your data, avatars, and profile are never deleted.\n\n` +
     `Update your payment method in the Stripe customer portal: ${base(i.publicUrl)}/account/billing (choose Manage billing).`
-  return { subject: 'Your blueyvatar payment failed', text: frame(i.did, i.publicUrl, body, 'billing') }
+  return { subject: 'Your BlueyVatar payment failed', text: frame(i.did, i.publicUrl, body, 'billing') }
 }
 
 export function graceExpiredNotice(i: { did: string; plan: string; publicUrl: string }): Notice {
   const body =
     `The grace period for your failed ${i.plan} payment has ended, so your account is back on Free limits.\n\n` +
     `Your data, avatars, and profile are untouched. To restore ${i.plan}, update your payment method or subscribe again at ${base(i.publicUrl)}/account/billing.`
-  return { subject: `Your blueyvatar ${i.plan} plan has ended`, text: frame(i.did, i.publicUrl, body, 'billing') }
+  return { subject: `Your BlueyVatar ${i.plan} plan has ended`, text: frame(i.did, i.publicUrl, body, 'billing') }
 }
 
 export function subscriptionCanceledNotice(i: { did: string; plan: string; publicUrl: string }): Notice {
   const body =
     `Your ${i.plan} subscription was canceled, so your account is back on Free limits.\n\n` +
     `Your data, avatars, and profile are untouched. You can subscribe again at ${base(i.publicUrl)}/account/billing.`
-  return { subject: `Your blueyvatar ${i.plan} subscription was canceled`, text: frame(i.did, i.publicUrl, body, 'billing') }
+  return { subject: `Your BlueyVatar ${i.plan} subscription was canceled`, text: frame(i.did, i.publicUrl, body, 'billing') }
 }
 
 export function keyRevokedNotice(i: { did: string; prefix: string; label?: string | null; publicUrl: string }): Notice {
@@ -96,7 +96,7 @@ export function keyRevokedNotice(i: { did: string; prefix: string; label?: strin
   const body =
     `The key ${name} was revoked and no longer works.\n\n` +
     `If you did not do this, sign in at ${base(i.publicUrl)}/account/keys, review your keys, and issue a new one.`
-  return { subject: i.label ? 'Your blueyvatar key "' + i.label + '" was revoked' : 'A blueyvatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: i.label ? 'Your BlueyVatar key "' + i.label + '" was revoked' : 'A BlueyVatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
 /**
@@ -109,10 +109,10 @@ export function reportOutcomeNotice(i: { reportId: number; outcome: 'actioned' |
       ? 'We reviewed your report and took action on the content you reported.'
       : 'We reviewed your report and did not take action on the content you reported.'
   const text =
-    `${line}\n\nThank you for helping keep blueyvatar safe. We do not share details of a decision.\n\n` +
+    `${line}\n\nThank you for helping keep BlueyVatar safe. We do not share details of a decision.\n\n` +
     `--\nReport number: ${i.reportId}\nThis is a one-time message about your report. We deleted your email address from our records after sending it. ` +
     `Our content policy: ${base(i.publicUrl)}/policy`
-  return { subject: `Update on your blueyvatar report #${i.reportId}`, text }
+  return { subject: `Update on your BlueyVatar report #${i.reportId}`, text }
 }
 
 const appealLink = (publicUrl: string, actionId: number) => `${base(publicUrl)}/account/appeal?action=${actionId}`
@@ -123,18 +123,18 @@ const appealLink = (publicUrl: string, actionId: number) => `${base(publicUrl)}/
  */
 export function takedownNotice(i: { did: string; actionId: number; publicUrl: string }): Notice {
   const body =
-    `We removed the images of your account from blueyvatar delivery after a review under our content policy: ${base(i.publicUrl)}/policy\n\n` +
+    `We removed the images of your account from BlueyVatar delivery after a review under our content policy: ${base(i.publicUrl)}/policy\n\n` +
     `Your repository is not changed. If you think this was a mistake, you can appeal once for this action, ` +
     `and a different reviewer will look at it: ${appealLink(i.publicUrl, i.actionId)}`
-  return { subject: 'Your blueyvatar images were removed', text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: 'Your BlueyVatar images were removed', text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
 export function suspensionNotice(i: { did: string; actionId: number; publicUrl: string }): Notice {
   const body =
-    `Your blueyvatar account was suspended after a review under our content policy: ${base(i.publicUrl)}/policy\n\n` +
+    `Your BlueyVatar account was suspended after a review under our content policy: ${base(i.publicUrl)}/policy\n\n` +
     `While it is suspended, your images are not served. Your repository is not changed. If you think this was a mistake, you can appeal once for this action, ` +
     `and a different reviewer will look at it: ${appealLink(i.publicUrl, i.actionId)}`
-  return { subject: 'Your blueyvatar account was suspended', text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: 'Your BlueyVatar account was suspended', text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
 /** Outcome of an appeal. Like the reporter notice, it never includes the admin's internal note. */
@@ -144,7 +144,7 @@ export function appealOutcomeNotice(i: { did: string; appealId: number; outcome:
       ? 'We reviewed your appeal and reversed the decision. Your images are served again after caches refresh.'
       : 'We reviewed your appeal and kept the decision. This was the one appeal available for this action.'
   const body = `${line}\n\nAppeal number: ${i.appealId}\nOur content policy: ${base(i.publicUrl)}/policy`
-  return { subject: `Update on your blueyvatar appeal #${i.appealId}`, text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: `Update on your BlueyVatar appeal #${i.appealId}`, text: frame(i.did, i.publicUrl, body, 'security') }
 }
 
 /**
@@ -170,27 +170,27 @@ const SOR_TAIL =
 
 export const SOR_TEMPLATES: Record<SorAction, { name: string; subject: string; body: string; needs: SorVar[] }> = {
   remove_image: {
-    name: 'sor-remove-image-v1', subject: 'Your blueyvatar images were removed',
-    body: 'What we did: we stopped serving {{scope}} from blueyvatar. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
+    name: 'sor-remove-image-v1', subject: 'Your BlueyVatar images were removed',
+    body: 'What we did: we stopped serving {{scope}} from BlueyVatar. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
     needs: ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
   },
   suspend: {
-    name: 'sor-suspend-v1', subject: 'Your blueyvatar account was suspended',
+    name: 'sor-suspend-v1', subject: 'Your BlueyVatar account was suspended',
     body: 'What we did: we suspended your account, so none of your images are served. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
     needs: ['duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
   },
   warn: {
-    name: 'sor-warn-v1', subject: 'A warning about your blueyvatar content',
+    name: 'sor-warn-v1', subject: 'A warning about your BlueyVatar content',
     body: 'What we did: we are warning you about {{scope}}. We did not restrict your account or remove anything. Duration: {{duration}}.' + SOR_TAIL,
     needs: ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
   },
   rating_change: {
-    name: 'sor-rating-change-v1', subject: 'The rating of your blueyvatar image was changed',
-    body: 'What we did: we changed the rating shown for {{scope}} in blueyvatar. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
+    name: 'sor-rating-change-v1', subject: 'The rating of your BlueyVatar image was changed',
+    body: 'What we did: we changed the rating shown for {{scope}} in BlueyVatar. Your repository is not changed. Duration: {{duration}}.' + SOR_TAIL,
     needs: ['scope', 'duration', 'facts', 'source', 'automated', 'policy', 'policy_url', 'explanation', 'appeal_link'],
   },
   reverse: {
-    name: 'sor-reverse-v1', subject: 'We reversed a blueyvatar moderation action',
+    name: 'sor-reverse-v1', subject: 'We reversed a BlueyVatar moderation action',
     body: 'What we did: we reversed an earlier action on your account ({{scope}}). It takes effect after caches refresh.\n\nWhy: {{facts}}\nPolicy reviewed: "{{policy}}" ({{policy_url}}).',
     needs: ['scope', 'facts', 'policy', 'policy_url'],
   },

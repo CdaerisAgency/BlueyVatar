@@ -1,4 +1,4 @@
-# Service status for blueyvatar (v1)
+# Service status for BlueyVatar (v1)
 
 Issue: CdaerisAgency/BlueyVatar#179. Status: decided by the owner (issue comment, 2026-11-07), partly built outside this repo, with two items left open at the end.
 
@@ -10,7 +10,7 @@ A status page that runs on the same Fly apps goes dark in the same outage, so wh
 
 ## Decision
 
-The owner ruled to monitor blueyvatar from the existing Cdaeris uptime dashboard (`CdaerisAgency/uptime`, Gatus on Fly, served at `uptime.cdaeris.com`) instead of building a separate status page. That repository already carries three blueyvatar rows, disabled until the first production deploy. So the choice among the options below is made, and nothing new is built or hosted for this issue.
+The owner ruled to monitor BlueyVatar from the existing Cdaeris uptime dashboard (`CdaerisAgency/uptime`, Gatus on Fly, served at `uptime.cdaeris.com`) instead of building a separate status page. That repository already carries three BlueyVatar rows, disabled until the first production deploy. So the choice among the options below is made, and nothing new is built or hosted for this issue.
 
 | Option | Verdict |
 | --- | --- |
@@ -21,7 +21,7 @@ The owner ruled to monitor blueyvatar from the existing Cdaeris uptime dashboard
 
 ### Where the probe runs
 
-Gatus runs on Fly, and so do all three blueyvatar apps. A Fly-wide outage would take the dashboard and the service down together. The uptime repository closes this for the dashboard itself: a Trigger.dev project (`monitoring/`, not on Fly, Vercel, or Neon) fetches `https://uptime.cdaeris.com/health` every five minutes and fails its run when the dashboard does not answer `200` with `{"status":"UP"}`. Its README records one manual step: the Trigger.dev alert (email) has to be created in that dashboard before a failed run reaches a person. That is an owner task in another repository and is not touched here.
+Gatus runs on Fly, and so do all three BlueyVatar apps. A Fly-wide outage would take the dashboard and the service down together. The uptime repository closes this for the dashboard itself: a Trigger.dev project (`monitoring/`, not on Fly, Vercel, or Neon) fetches `https://uptime.cdaeris.com/health` every five minutes and fails its run when the dashboard does not answer `200` with `{"status":"UP"}`. Its README records one manual step: the Trigger.dev alert (email) has to be created in that dashboard before a failed run reaches a person. That is an owner task in another repository and is not touched here.
 
 The probes go through the public hostnames (`blueyvatar.com`, `img.blueyvatar.com`), so Cloudflare, DNS, and TLS are part of what green means.
 
@@ -41,7 +41,7 @@ The three rows use the 4 hour interval the owner set on 2026-11-07. Both databas
 
 ## Data
 
-Gatus stores its own history and exposes it at `/api/v1/endpoints/statuses` on the dashboard. The row names there are `blueyvatar_web-api-health`, `blueyvatar_delivery-readyz`, and `blueyvatar_delivery-healthz`. No blueyvatar customer data and no secret is involved: the probes send no header, because delivery exempts `/healthz` and `/readyz` from the `ORIGIN_SECRET` lock. Nothing in this repository stores probe results.
+Gatus stores its own history and exposes it at `/api/v1/endpoints/statuses` on the dashboard. The row names there are `blueyvatar_web-api-health`, `blueyvatar_delivery-readyz`, and `blueyvatar_delivery-healthz`. No BlueyVatar customer data and no secret is involved: the probes send no header, because delivery exempts `/healthz` and `/readyz` from the `ORIGIN_SECRET` lock. Nothing in this repository stores probe results.
 
 ## Incident workflow
 
@@ -54,7 +54,7 @@ The dashboard is internal, so this is an owner workflow, not a public one.
 
 ## Open items for the owner
 
-1. Enable the rows at the first production deploy. In `CdaerisAgency/uptime`, set `enabled: true` on the three blueyvatar rows in `config.yaml` and redeploy that dashboard. This is a change in another repository, so it is not made here.
+1. Enable the rows at the first production deploy. In `CdaerisAgency/uptime`, set `enabled: true` on the three BlueyVatar rows in `config.yaml` and redeploy that dashboard. This is a change in another repository, so it is not made here.
 2. Create the Trigger.dev alert for the dashboard watchdog (Alerts, email), per that repository's README. Without it a dead dashboard is a red run nobody hears about.
-3. Decide whether paying developers get a public, read-only view. The dashboard is internal by the owner's ruling, because its other rows name Fly workers and Neon branches. As it stands, a Pro or Business developer has no way to check status themselves, and `/status` and a footer link do not exist. Possible shapes: a public Gatus instance with only the blueyvatar group, or a static page that mirrors only the three rows above. Either one is an infrastructure and hosting decision.
+3. Decide whether paying developers get a public, read-only view. The dashboard is internal by the owner's ruling, because its other rows name Fly workers and Neon branches. As it stands, a Pro or Business developer has no way to check status themselves, and `/status` and a footer link do not exist. Possible shapes: a public Gatus instance with only the BlueyVatar group, or a static page that mirrors only the three rows above. Either one is an infrastructure and hosting decision.
 4. Optionally add two rows once the app is deployed: `GET https://blueyvatar.com/login` returning 200 (the sign-in page renders), and a fixed demo profile such as `GET https://img.blueyvatar.com/profile/<demo handle>` returning 200 with the demo account created. Both would use the 4 hour interval.

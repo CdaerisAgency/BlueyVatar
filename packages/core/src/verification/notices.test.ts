@@ -11,12 +11,12 @@ const URL = 'https://blueyvatar.com'
 describe('keyRevokedNotice', () => {
   it('puts the key name in the subject and leads the body with it', () => {
     const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', label: 'My site', publicUrl: URL })
-    expect(n.subject).toBe('Your blueyvatar key "My site" was revoked')
+    expect(n.subject).toBe('Your BlueyVatar key "My site" was revoked')
     expect(n.text).toContain('The key My site (pk_abc123) was revoked')
   })
   it('falls back to the prefix when a key has no name', () => {
     const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', publicUrl: URL })
-    expect(n.subject).toBe('A blueyvatar key was revoked')
+    expect(n.subject).toBe('A BlueyVatar key was revoked')
     expect(n.text).toContain('The key pk_abc123 was revoked')
   })
 })

@@ -1,6 +1,6 @@
 # @blueyvatar/hovercards
 
-Hovercards for blueyvatar profiles. Hover or focus an element with `data-blueyvatar` and a small card shows the person's name, role, location, and verified accounts. If the person set a background color, the card uses it, with dark or white text chosen for a 4.5 to 1 contrast ratio (the default colors apply when neither passes). Accounts the person chose to hide are never shown.
+Hovercards for BlueyVatar profiles. Hover or focus an element with `data-blueyvatar` and a small card shows the person's name, role, location, and verified accounts. If the person set a background color, the card uses it, with dark or white text chosen for a 4.5 to 1 contrast ratio (the default colors apply when neither passes). Accounts the person chose to hide are never shown.
 
 Hovercards require a publishable key (`pk_...`) from a Plus, Business, or Enterprise license.
 

@@ -110,7 +110,7 @@ describe('resend sender', () => {
     await new ResendSender('re_key', DEFAULT_FROM, f).send({ to: 'a@b.co', subject: 's', text: 't' })
     expect(calls[0]?.url).toBe('https://api.resend.com/emails')
     expect((calls[0]?.init.headers as Record<string, string>).authorization).toBe('Bearer re_key')
-    expect(JSON.parse(String(calls[0]?.init.body)).from).toBe('blueyvatar <aifashiontribute@gmail.com>')
+    expect(JSON.parse(String(calls[0]?.init.body)).from).toBe('BlueyVatar <aifashiontribute@gmail.com>')
   })
   it('throws without leaking the address on failure', async () => {
     const f = (async () => new Response('bad a@b.co', { status: 422 })) as unknown as typeof fetch
