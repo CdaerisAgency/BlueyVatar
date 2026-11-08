@@ -22,6 +22,12 @@ Rules for AI agents and people working in this repository. `CLAUDE.md` points he
 5. **Merge when green.** When every check passes, squash merge, mark ready first if it is a draft. Resolve conflicts by merging main into the branch; never rewrite history on a shared branch.
 6. **Link the issue.** Use "Closes #N" only when the PR finishes the issue. Otherwise write "Part of #N".
 
+## Deploying
+- The full runbook is `docs/deploy.md`. Read it before any deploy-related work.
+- Agents never deploy, run `fly` commands, change Fly secrets, or run migrations against staging or production without the owner's approval for that specific action.
+- CI deploys are opt-in. `.github/workflows/deploy.yml` runs on push to `main` only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Merging a PR can trigger a deploy, and any migration in it, when that variable is on, so say so in the PR when it adds a migration.
+- Staging comes first. Test risky changes on staging with the owner before production.
+
 ## Files that many pull requests touch
 These cause most merge conflicts. Handle them carefully.
 - **`CHANGELOG.md`:** add one entry for user-visible changes, under the current date, in Added, Changed, or Fixed. On a conflict, keep both sides' entries.
