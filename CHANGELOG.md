@@ -33,6 +33,7 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 - BlueyVatar no longer asks for or stores an image license. Existing records keep working and nothing is deleted from your repository (#227).
 - The link email explains how your address is used, and the account page and privacy page say "your Bluesky account's home server" instead of "PDS" (#223).
 - The data export masks the domain of your primary email link, like the masked address in the same file (#223).
+- The deploy runbook's environment variable table lists `STRIPE_PRICE_PLUS` and `STRIPE_PRICE_BUSINESS` for Stripe billing, with `STRIPE_ALLOW_PROMO_CODES` as optional. It no longer lists `STRIPE_PRICE_PRO`, since Plus and Pro are one plan.
 
 ### Fixed
 - The avatar preview and URL on the account page now point at the image host. They used the website address, which answered "Page not found". With no avatar yet, the page shows a placeholder and a Change your avatar button (#223).
