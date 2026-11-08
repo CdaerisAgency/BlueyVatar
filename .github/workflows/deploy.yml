@@ -1,8 +1,6 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       target:
@@ -14,6 +12,7 @@ on:
 permissions:
   contents: read
 
+# Started only by hand (Actions tab > Deploy > Run workflow, or the Actions API). Runs from main only.
 # Never cancel a running deploy; later runs queue behind it.
 concurrency:
   group: deploy-${{ github.ref }}
@@ -72,7 +71,7 @@ jobs:
   deploy-production:
     needs: deploy-staging
     # Runs only after deploy-staging succeeded (deploy and smoke test). A manual run with target=staging stops before here.
-    if: vars.FLY_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_dispatch' || inputs.target == 'both')
+    if: vars.FLY_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' && inputs.target == 'both'
     runs-on: ${{ vars.DEPLOY_RUNNER }}
     # Add required reviewers in Settings > Environments > production if you want a manual gate (docs/deploy.md).
     environment: production

@@ -82,9 +82,11 @@ The indexer needs the `--env` override because `fly/indexer.toml` points at the 
 
 ## CI deploys
 
-`.github/workflows/deploy.yml` deploys automatically on every push to `main`: staging first, a smoke test against staging, then production, then a smoke test against production. Production starts only if the staging deploy and the staging smoke test both succeeded (`deploy-production` has `needs: deploy-staging`).
+`.github/workflows/deploy.yml` deploys only when someone starts it by hand (workflow dispatch): staging first, a smoke test against staging, then production, then a smoke test against production. Production starts only if the staging deploy and the staging smoke test both succeeded (`deploy-production` has `needs: deploy-staging`).
 
-**What turns it on.** All three must be in place, or nothing deploys:
+**How to start it.** Merging to `main` does not deploy. Open Actions > Deploy > Run workflow and pick the `main` branch, or ask the lead agent in chat to dispatch it through the GitHub Actions API. A dispatch from any other ref is skipped.
+
+**What allows it to run.** All three must be in place, or the run does nothing:
 
 - The repository variable `FLY_DEPLOY_ENABLED` is `true`. Set it after the first manual deploy has created the apps.
 - The secret `FLY_API_TOKEN` exists in Settings > Secrets and variables > Actions > Secrets. It must be able to deploy all six apps (staging and production). **Unconfirmed:** whether one org-scoped token covers both.
@@ -94,7 +96,7 @@ Optional: `SMOKE_HANDLE` and `SMOKE_OPTED_OUT_HASH` (variables) enable the extra
 
 **Jobs.** `deploy-staging` (environment `staging`) deploys delivery, web, then indexer to the `blueyvatar-*-staging` apps with the same commands as `localdeploy.bat`, including `--env TAP_URL=http://blueyvatar-tap-staging.internal:2480` for the indexer, then runs `tools/smoke/smoke.ts --env staging`. `deploy-production` (environment `production`) deploys the production apps in the same order and runs `--env production`. Delivery goes first because its release command runs the migrations, so a migration reaches staging before production. Staging smoke targets are `https://blueyvatar-web-staging.fly.dev` and `https://blueyvatar-delivery-staging.fly.dev` (the smoke script defaults). Each smoke test retries up to three times, 30 seconds apart.
 
-**Manual re-runs.** Run the workflow from the Actions tab (workflow dispatch) and pick `target`: `both` (the default) or `staging`. `staging` stops after the staging smoke test. Both choices still need `FLY_DEPLOY_ENABLED` and the `main` branch.
+**Choosing the target.** When you start the run, pick `target`: `both` (the default) or `staging`. `staging` stops after the staging smoke test. Both choices need `FLY_DEPLOY_ENABLED` and the `main` branch.
 
 **Other rules.** The jobs install flyctl with `superfly/flyctl-actions/setup-flyctl` (<https://github.com/superfly/flyctl-actions>), run only for `refs/heads/main`, and GitHub creates the `staging` and `production` environments on first use with no reviewers. CI (`ci.yml`), the npm publish and Live Tap workflows run on GitHub-hosted `ubuntu-latest`; the old `CI_RUNNER` variable is retired. Runs queue under `concurrency: deploy-<ref>` and never cancel each other. The flyctl version is `latest`; pin an exact release when you pick one.
 
@@ -109,7 +111,7 @@ fly releases --app blueyvatar-web --image
 fly deploy --app blueyvatar-web --image registry.fly.io/blueyvatar-web:deployment-XXXXXXXX
 ```
 
-Repeat for `blueyvatar-delivery` and `blueyvatar-indexer` as needed. Rollbacks do not undo database migrations that delivery already applied, so check that the older image works with the current schema first. The image must still exist in the Fly registry. Also turn off `FLY_DEPLOY_ENABLED` (or fix `main`) so the next push does not redeploy the bad change.
+Repeat for `blueyvatar-delivery` and `blueyvatar-indexer` as needed. Rollbacks do not undo database migrations that delivery already applied, so check that the older image works with the current schema first. The image must still exist in the Fly registry. Also turn off `FLY_DEPLOY_ENABLED` (or fix `main`) so nobody redeploys the bad change by mistake.
 
 **Tap is deployed by hand.** Restarting Tap interrupts the firehose connection, and an image upgrade can force a re-backfill, so someone should watch each Tap deploy. It also changes rarely.
 
