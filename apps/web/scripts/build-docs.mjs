@@ -10,7 +10,7 @@ const integrationsDir = `${root}docs/integrations/`
 const out = fileURLToPath(new URL('../lib/docs.generated.ts', import.meta.url))
 
 const INTEGRATIONS = ['html', 'wordpress', 'ghost', 'discourse']
-const ORDER = ['README', 'examples', 'hashing', 'json-mode', 'format-quality', 'cache-ttl', 'usage', 'gravatar-differences', 'errors']
+const ORDER = ['README', 'examples', 'hashing', 'json-mode', 'format-quality', 'cache-ttl', 'exports-and-qr', 'usage', 'gravatar-differences', 'errors']
 const slugOf = (file) => file.replace(/-v1\.md$/, '')
 const urlOf = (slug) => (slug === 'README' ? '/docs' : `/docs/${slug}`)
 

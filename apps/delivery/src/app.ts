@@ -1,4 +1,8 @@
-import { createLogger, Metrics, normalizeBackgroundColor } from '@blueyvatar/core'
+import { readFile } from 'node:fs/promises'
+import {
+  createLogger, Metrics, normalizeBackgroundColor, EXPORT_CONTENT_TYPES, EXPORT_FORMATS, QR_CENTER_OPTIONS, QrOptionError,
+  buildExport, exportFileName, qrLayout, qrSvgForLayout, toExportProfile, type CenterImage, type ExportFormat, type QrCenter, type QrLayout,
+} from '@blueyvatar/core'
 import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import {
@@ -33,6 +37,10 @@ export interface AppDeps {
   defaultUrlAllowlist: readonly string[]
   /** Origin of the profile pages the QR code points to. Defaults to https://blueyvatar.com. */
   profileBaseUrl?: string
+  /** Public origin of this service, used for absolute avatar URLs in exports. Defaults to the origin of the request. */
+  publicUrl?: string
+  /** Bytes of the blueyvatar logo (PNG or JPEG) for QR codes with center=logo. Defaults to apps/web/public/logo.jpg. */
+  qrLogo?: Uint8Array
   /** Read the client IP from CF-Connecting-IP. Only set when Cloudflare fronts the origin. */
   trustCloudflare: boolean
   remoteAddress?: (c: Context) => string | undefined
@@ -118,6 +126,22 @@ const QR_DEFAULT_SIZE = 256
 const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
 
 const PLATFORM_SLUG = /^[a-z0-9-]+$/
+
+/** Export suffixes on /profile/:id. */
+const EXPORT_SUFFIX = new RegExp(`\\.(${EXPORT_FORMATS.join('|')})$`, 'i')
+const isExportFormat = (v: string): v is ExportFormat => (EXPORT_FORMATS as readonly string[]).includes(v)
+
+/** The site's circle logo, read once. apps/web/public/logo.jpg sits two levels up from both src/ and dist/. */
+let logoFile: Promise<Uint8Array | null> | undefined
+function readLogoFile(): Promise<Uint8Array | null> {
+  logoFile ??= readFile(new URL('../../web/public/logo.jpg', import.meta.url)).then((b) => new Uint8Array(b), () => null)
+  return logoFile
+}
+
+function dataUri(bytes: Uint8Array, mime: 'image/png' | 'image/jpeg'): string {
+  return `data:${mime};base64,${Buffer.from(bytes).toString('base64')}`
+}
+const isPng = (b: Uint8Array) => b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47
 
 const IMG_FILE = /^(\d{1,4})(?:-q(\d{1,3}))?\.(png|jpeg|webp)$/
 
@@ -393,6 +417,14 @@ export function createApp(deps: AppDeps) {
     exposeHeaders: ['x-rate-limit-limit', 'x-rate-limit-remaining', 'x-rate-limit-reset', 'x-tier'],
   }))
 
+  async function findIdentity(id: NonNullable<ReturnType<typeof parseIdentifier>>): Promise<Identity | null> {
+    if (id.kind === 'hash') {
+      const did = await deps.index.didForEmailHash(id.value)
+      return did ? await deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
+    }
+    return deps.resolver.resolveIdentity(id)
+  }
+
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
@@ -401,15 +433,29 @@ export function createApp(deps: AppDeps) {
     if (isCrossOrigin(c) && !ENTITLEMENTS[e.tier].hovercards) {
       return fail(c, 403, 'tier_required', 'Hovercards require a Business or Enterprise key')
     }
-    const id = parseIdentifier(c.req.param('id'))
-    if (!id) return fail(c, 400, 'invalid_identifier', 'Expected a hash, handle, or DID')
-    let identity: Identity | null = null
-    if (id.kind === 'hash') {
-      const did = await deps.index.didForEmailHash(id.value)
-      identity = did ? await deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
-    } else {
-      identity = await deps.resolver.resolveIdentity(id)
+    // Exports use a suffix (/profile/alice.test.vcf) or ?format=vcf. A suffix is only an export when
+    // the rest parses as an identifier. ".md" is also a real top-level domain, so a handle that ends
+    // in .md keeps working: it is tried as a whole handle first, and only a miss becomes an export.
+    const raw = c.req.param('id')
+    const queryFormat = c.req.query('format')?.toLowerCase()
+    // An unknown ?format= value is ignored, as it was before exports existed.
+    let format: ExportFormat | null = queryFormat !== undefined && isExportFormat(queryFormat) ? queryFormat : null
+    let id = parseIdentifier(raw)
+    let identity: Identity | null | undefined
+    const suffix = format === null ? EXPORT_SUFFIX.exec(raw) : null
+    if (suffix) {
+      const bare = parseIdentifier(raw.slice(0, -suffix[0].length))
+      if (bare) {
+        const whole = suffix[1]!.toLowerCase() === 'md' && id ? await findIdentity(id) : null
+        if (whole) identity = whole
+        else {
+          id = bare
+          format = suffix[1]!.toLowerCase() as ExportFormat
+        }
+      }
     }
+    if (!id) return fail(c, 400, 'invalid_identifier', 'Expected a hash, handle, or DID')
+    if (identity === undefined) identity = await findIdentity(id)
     metrics.inc('delivery_resolutions_total', { route: 'profile', result: identity ? 'found' : 'miss' })
     if (e.licenseId) await deps.usage.add(e.licenseId, 'profile_json')
     if (!identity || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
@@ -442,7 +488,7 @@ export function createApp(deps: AppDeps) {
           .map((g) => ({ url: signedPath(c, e, vis, identity.did, g.cid, 512, 'png'), caption: g.caption }))
       : []
     c.header('cache-control', 'private, max-age=300')
-    return c.json({
+    const body = {
       did: identity.did,
       handle: identity.handle,
       displayName: bsky?.displayName ?? null,
@@ -464,17 +510,58 @@ export function createApp(deps: AppDeps) {
       verifiedAccounts: cap === null ? verified : verified.slice(0, cap),
       atprotoApps,
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
+    }
+    if (!format) return c.json(body)
+    // Exports carry the public fields of that same object: no DID, plan, email data, or hidden wallets.
+    const file = toExportProfile({
+      profile: body,
+      deliveryOrigin: (deps.publicUrl ?? new URL(c.req.url).origin).replace(/\/+$/, ''),
+      profileBaseUrl: (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, ''),
     })
+    c.header('content-type', EXPORT_CONTENT_TYPES[format])
+    c.header('content-disposition', `attachment; filename="${exportFileName(identity.handle, format)}"`)
+    c.header('x-content-type-options', 'nosniff')
+    return c.body(buildExport(format, file))
   })
 
-  // QR code for the profile URL. Business and Enterprise only (spec sections 8 and 11.1).
-  // The response needs a key check, so it is private to the browser, like the redirects.
+  async function logoImage(): Promise<CenterImage | null> {
+    const bytes = deps.qrLogo ?? (await readLogoFile())
+    if (!bytes) return null
+    return { dataUri: dataUri(bytes, isPng(bytes) ? 'image/png' : 'image/jpeg'), shape: 'round' }
+  }
+
+  /**
+   * The person's current avatar for the QR center. Same rules as the avatar routes: the default
+   * rating (g), the same block checks as /img, the record's crop, and the default avatar when
+   * there is no usable image. Bytes come from the person's own PDS through the resolver; no other
+   * URL is fetched.
+   */
+  async function avatarImage(identity: Identity, seed: string, px: number): Promise<CenterImage> {
+    const picked = pickCandidate(await deps.resolver.candidates(identity), 'g', false)
+    if (picked.kind === 'image') {
+      const cid = picked.candidate.blob.cid
+      if (!(await deps.index.isBlocked(identity.did, cid)) && !(await labelBlocksBlob(deps.index, identity.did, cid))) {
+        try {
+          const original = await deps.resolver.getBlob(identity, cid)
+          const crop = (await deps.index.imageCrop(identity.did, cid)) ?? undefined
+          const png = await deps.resize({ input: original, size: px, format: 'png', quality: CANONICAL_QUALITY, ...(crop ? { crop } : {}) })
+          return { dataUri: dataUri(png, 'image/png'), shape: 'circle' }
+        } catch (err) {
+          if (err instanceof ResizeBusyError) throw err
+          logger.warn('qr avatar fetch or resize failed', { did: identity.did, err })
+        }
+      }
+    }
+    const png = await deps.resize({ input: new TextEncoder().encode(defaultSvg('mp', seed, '')), size: px, format: 'png', quality: 85 })
+    return { dataUri: dataUri(png, 'image/png'), shape: 'circle' }
+  }
+
+  // QR code for the profile URL. Available on every plan (issue #242). The response depends on the
+  // caller's rate window, so it is private to the browser, like the redirects.
+  // Options: s (size), center=none|logo|avatar, quiet (quiet zone in modules), to (a verified platform).
   app.get('/qr/:file', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
-    if (!ENTITLEMENTS[e.tier].hovercards) {
-      return fail(c, 403, 'tier_required', 'QR codes require a Business or Enterprise key')
-    }
     const file = c.req.param('file')
     const dot = file.lastIndexOf('.')
     const ext = dot > 0 ? file.slice(dot + 1).toLowerCase() : ''
@@ -494,6 +581,10 @@ export function createApp(deps: AppDeps) {
     if (p.adjusted.includes('s')) c.header('x-adjusted-params', 's')
     const to = c.req.query('to')
     if (to !== undefined && !PLATFORM_SLUG.test(to)) return fail(c, 400, 'invalid_platform', 'to must be a platform name such as github')
+    const center = (c.req.query('center') ?? 'none').toLowerCase() as QrCenter
+    if (!(QR_CENTER_OPTIONS as readonly string[]).includes(center)) return fail(c, 400, 'invalid_qr_option', 'center must be none, logo, or avatar')
+    const quietRaw = c.req.query('quiet')
+    if (quietRaw !== undefined && !/^\d{1,2}$/.test(quietRaw)) return fail(c, 400, 'invalid_qr_option', 'quiet must be a whole number of modules')
 
     let identity: Identity | null
     if (id.kind === 'hash') {
@@ -512,15 +603,30 @@ export function createApp(deps: AppDeps) {
 
     const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
     const target = to ? `${base}/go/${encodeURIComponent(identity.handle)}/${to}` : `${base}/p/${identity.handle}`
-    const svg = qrSvg(target, p.size)
-    let body: Uint8Array | string = svg
-    if (ext === 'png') {
-      try {
-        body = await deps.resize({ input: new TextEncoder().encode(svg), size: p.size, format: 'png', quality: 85 })
-      } catch (err) {
-        if (err instanceof ResizeBusyError) return overloaded(c, err)
-        return fail(c, 502, 'upstream_error', 'Could not render the QR code')
+    let body: Uint8Array | string
+    try {
+      if (ext === 'svg' && center === 'none' && quietRaw === undefined) {
+        // The plain SVG keeps its original shape (level M, size as asked).
+        body = qrSvg(target, p.size)
+      } else {
+        let image: CenterImage | null = null
+        let layout: QrLayout = qrLayout(target, { size: p.size, quiet: quietRaw === undefined ? undefined : Number(quietRaw), center: center !== 'none' })
+        if (center !== 'none') {
+          const innerPx = Math.max(1, (layout.plate!.size - 2) * layout.modulePx)
+          image = center === 'logo' ? await logoImage() : await avatarImage(identity, id.value, innerPx)
+          // No usable logo: draw a plain code at level M instead of a blank plate.
+          if (!image) layout = qrLayout(target, { size: p.size, quiet: quietRaw === undefined ? undefined : Number(quietRaw), center: false })
+        }
+        const svg = qrSvgForLayout(target, layout, image ?? undefined)
+        c.header('x-qr-version', String(layout.version))
+        c.header('x-qr-modules', String(layout.modules))
+        c.header('x-qr-pixels', String(layout.pixels))
+        body = ext === 'svg' ? svg : await deps.resize({ input: new TextEncoder().encode(svg), size: layout.pixels, format: 'png', quality: 85 })
       }
+    } catch (err) {
+      if (err instanceof QrOptionError) return fail(c, 400, 'invalid_qr_option', err.message)
+      if (err instanceof ResizeBusyError) return overloaded(c, err)
+      return fail(c, 502, 'upstream_error', 'Could not render the QR code')
     }
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     c.header('content-type', ext === 'png' ? 'image/png' : 'image/svg+xml')
