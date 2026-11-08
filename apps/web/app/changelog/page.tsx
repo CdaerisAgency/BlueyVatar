@@ -6,7 +6,7 @@ import { pageMetadata } from '../../lib/site'
 export const dynamic = 'force-static'
 
 export const metadata = {
-  ...pageMetadata('/changelog', 'Changelog | blueyvatar', 'New features, changes, and fixes to blueyvatar, newest first.'),
+  ...pageMetadata('/changelog', 'Changelog | BlueyVatar', 'New features, changes, and fixes to BlueyVatar, newest first.'),
 }
 
 export default function ChangelogPage() {

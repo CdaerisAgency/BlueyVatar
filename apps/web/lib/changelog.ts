@@ -94,5 +94,5 @@ export function changelogFeed(entries: ChangelogEntry[], base: string): string {
       return `<entry><id>${xmlEscape(url)}</id><title>${xmlEscape(`Changes for ${e.date}`)}</title><link rel="alternate" type="text/html" href="${xmlEscape(url)}"/><updated>${stamp(e.date)}</updated><content type="html">${xmlEscape(entryHtml(e))}</content></entry>`
     })
     .join('')
-  return `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><id>${xmlEscape(page)}</id><title>blueyvatar changelog</title><link rel="self" type="application/atom+xml" href="${xmlEscape(absoluteUrl('/changelog/feed.xml', base))}"/><link rel="alternate" type="text/html" href="${xmlEscape(page)}"/><updated>${updated}</updated>${items}</feed>`
+  return `<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><id>${xmlEscape(page)}</id><title>BlueyVatar changelog</title><link rel="self" type="application/atom+xml" href="${xmlEscape(absoluteUrl('/changelog/feed.xml', base))}"/><link rel="alternate" type="text/html" href="${xmlEscape(page)}"/><updated>${updated}</updated>${items}</feed>`
 }

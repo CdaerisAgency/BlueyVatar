@@ -1,8 +1,8 @@
-# Gravatar behaviors the blueyvatar spec still lacks (v1)
+# Gravatar behaviors the BlueyVatar spec still lacks (v1)
 
 Research for issue #62. Sources are official Gravatar pages only, fetched November 7, 2026. Compared against `docs/spec/blueyvatar-product-spec-v12.md` (sections 5 to 11), `packages/core/src/params.ts`, and `apps/delivery/src/app.ts`. "Not published" means no official page I could reach states it.
 
-| Gravatar behavior | Source | blueyvatar today | Gap | Recommendation |
+| Gravatar behavior | Source | BlueyVatar today | Gap | Recommendation |
 | --- | --- | --- | --- | --- |
 | Upload formats: JPEG, PNG, HEIC | [Avatars support](https://support.gravatar.com/avatars/) | Blob accepts PNG and JPEG only (spec 5) | No HEIC. Note Gravatar's own docs disagree: the [llms-txt guide](https://docs.gravatar.com/guides/llms-txt/) lists JPG, PNG, GIF | Skip HEIC: atproto avatar blobs are PNG and JPEG, and one file must work in both places. Record the Gravatar doc conflict |
 | Upload size under 10MB | [Avatars support](https://support.gravatar.com/avatars/) | `maxSize` 1,000,000 bytes (spec 5), copied from Bluesky | 10x smaller. Users with large photos must downscale first | Adapt: keep 1MB in the record, add a client-side resize and recompress step in the upload flow |

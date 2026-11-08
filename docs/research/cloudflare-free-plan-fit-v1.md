@@ -4,7 +4,7 @@ Checked: November 6, 2026. Scope: issue #70, spec sections 13 (Cloudflare and im
 
 ## Question
 
-Is the Cloudflare Free plan acceptable once paying customers depend on blueyvatar, and if not, what should trigger a change?
+Is the Cloudflare Free plan acceptable once paying customers depend on BlueyVatar, and if not, what should trigger a change?
 
 ## Recommendation
 
@@ -35,7 +35,7 @@ Is the Cloudflare Free plan acceptable once paying customers depend on blueyvata
 
 Each row compares the Free value with Pro, from the pages named. "Use" is how `docs/deploy.md` and the spec use the feature.
 
-| Feature | Free | Pro | Use in blueyvatar | Source |
+| Feature | Free | Pro | Use in BlueyVatar | Source |
 | --- | --- | --- | --- | --- |
 | Cache Rules | 10 | 25 | None. Default cache rules cache `/img/*` by extension. The deploy says not to add Cache Everything | <https://developers.cloudflare.com/cache/how-to/cache-rules/> (updated August 14, 2026) |
 | Transform Rules | 10 active, no regex | 25 active, no regex | One request header rule for `x-origin-auth` | <https://developers.cloudflare.com/rules/transform/> (updated August 14, 2026) |

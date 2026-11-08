@@ -10,7 +10,7 @@ How BlueyVatar answers that request:
 
 - The path `/avatar/{hash}.png` works. The API strips a trailing `.png` and lowercases the hash.
 - `d=404` returns a 404 when there is no avatar, which Discourse treats as no Gravatar. The extra `reset_cache` parameter is not part of the API.
-- The hash is MD5. blueyvatar answers to MD5 only for emails verified after migration 0006, so a person must verify their email on blueyvatar first. See [hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients).
+- The hash is MD5. BlueyVatar answers to MD5 only for emails verified after migration 0006, so a person must verify their email on BlueyVatar first. See [hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients).
 - The request comes from your server, so a browser referrer policy does not apply. Discourse then stores the image as an upload.
 
 ## Set it
@@ -33,7 +33,7 @@ Two related hidden settings, `gravatar_name` and `gravatar_login_url`, exist in 
 
 ## Limits
 
-- A user whose email is not verified on blueyvatar keeps the Discourse letter avatar.
+- A user whose email is not verified on BlueyVatar keeps the Discourse letter avatar.
 - Discourse caches the downloaded image. Existing users get the new image when Discourse next refreshes it, not at once.
 - This was written from the Discourse source and has not been run against a live forum. Try it on a staging forum first.
 

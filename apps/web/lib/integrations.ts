@@ -20,7 +20,7 @@ export function signInEntries(env: Env = process.env): SignInEntry[] {
 const instagramSignIn = (env: Env): boolean => env.VERIFY_INSTAGRAM_ENABLED === 'true' && !!env.INSTAGRAM_APP_ID && !!env.INSTAGRAM_APP_SECRET
 
 export const PROOF_METHODS = [
-  { name: 'Website', how: 'Add a link to your blueyvatar profile on your page with rel="me". blueyvatar checks that the link is there.' },
+  { name: 'Website', how: 'Add a link to your BlueyVatar profile on your page with rel="me". BlueyVatar checks that the link is there.' },
   { name: 'Domain', how: 'Add a DNS TXT record that names your account. Only the person who controls the domain can add it.' },
   { name: 'Bluesky', how: 'Your own Bluesky account verifies at once. For a second account, put a proof line in its bio.' },
   { name: 'X and Instagram pages', how: 'Link back with rel="me" from the profile page. These platforms may hide bio links from crawlers, so a check can fail.' },

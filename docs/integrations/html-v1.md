@@ -6,7 +6,7 @@ Use this guide for a static page, a template, or any site you edit by hand. For 
 
 The API never accepts a raw email address, because a URL appears in server logs. Hash the address first: trim, lowercase, then SHA-256, written as 64 lowercase hex characters. See [hashing-v1.md](../api/hashing-v1.md) for JavaScript, Python, and shell versions.
 
-For a page that shows one fixed person, compute the hash once when you build the page and paste it in. The account page in blueyvatar shows the finished snippet for your own email.
+For a page that shows one fixed person, compute the hash once when you build the page and paste it in. The account page in BlueyVatar shows the finished snippet for your own email.
 
 ```sh
 printf '%s' 'ada@example.com' | tr '[:upper:]' '[:lower:]' | shasum -a 256 | cut -d' ' -f1

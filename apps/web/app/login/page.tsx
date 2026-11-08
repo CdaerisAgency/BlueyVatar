@@ -6,7 +6,7 @@ import { safeNext } from '../../lib/next-path'
 import { pageMetadata } from '../../lib/site'
 import { LoginForm } from './LoginForm'
 
-export const metadata = pageMetadata('/login', 'Sign in | blueyvatar', COPY.login.lead)
+export const metadata = pageMetadata('/login', 'Sign in | BlueyVatar', COPY.login.lead)
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
   if (await currentDid()) redirect('/account')

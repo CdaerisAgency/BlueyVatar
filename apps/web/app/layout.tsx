@@ -12,12 +12,12 @@ const description = 'Avatars and profiles that live in your atproto repository.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
-  title: 'blueyvatar',
+  title: 'BlueyVatar',
   description,
   // Public pages set their own canonical URL; this covers the rest, resolved against metadataBase.
   alternates: { canonical: './' },
-  openGraph: { title: 'blueyvatar', description, siteName: 'blueyvatar', type: 'website', images: [defaultOgImage()] },
-  twitter: { card: 'summary', title: 'blueyvatar', description, images: [defaultOgImage()] },
+  openGraph: { title: 'BlueyVatar', description, siteName: 'BlueyVatar', type: 'website', images: [defaultOgImage()] },
+  twitter: { card: 'summary', title: 'BlueyVatar', description, images: [defaultOgImage()] },
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

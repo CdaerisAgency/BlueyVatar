@@ -14,17 +14,17 @@ import { addClaim, deleteClaimAction, setHidden, verifyClaim } from './actions'
 export const dynamic = 'force-dynamic'
 
 const HELP: Record<string, string> = {
-  github: 'GitHub asks you to sign in once. blueyvatar reads only your username.',
-  mastodon: 'Your Mastodon instance asks you to sign in once. blueyvatar reads only your account address.',
-  website: 'You add a link back to your blueyvatar profile on that page. See the steps under the account once you add it.',
-  instagram: 'You add a link back to your blueyvatar profile in your Instagram profile. Instagram may hide links from checkers, so this can fail.',
+  github: 'GitHub asks you to sign in once. BlueyVatar reads only your username.',
+  mastodon: 'Your Mastodon instance asks you to sign in once. BlueyVatar reads only your account address.',
+  website: 'You add a link back to your BlueyVatar profile on that page. See the steps under the account once you add it.',
+  instagram: 'You add a link back to your BlueyVatar profile in your Instagram profile. Instagram may hide links from checkers, so this can fail.',
   domain: 'You add a TXT record to the domain. See the steps under the account once you add it. Domain changes can take a while to spread.',
-  bluesky: 'Your own Bluesky account is verified at once. For another account, you paste a line of text into that account\'s bio, and blueyvatar reads the public profile.',
-  threads: 'Threads asks you to sign in once. blueyvatar reads only your username.',
-  tiktok: 'TikTok asks you to sign in once. blueyvatar reads only your username.',
-  youtube: 'Google asks you to sign in once. blueyvatar reads only the ID of the channel you own. Use the channel ID address (youtube.com/channel/UC...), not an @handle.',
-  twitch: 'Twitch asks you to sign in once. blueyvatar reads only your username.',
-  x: 'You add a link back to your blueyvatar profile in your X profile. X may hide links from checkers, so this can fail.',
+  bluesky: 'Your own Bluesky account is verified at once. For another account, you paste a line of text into that account\'s bio, and BlueyVatar reads the public profile.',
+  threads: 'Threads asks you to sign in once. BlueyVatar reads only your username.',
+  tiktok: 'TikTok asks you to sign in once. BlueyVatar reads only your username.',
+  youtube: 'Google asks you to sign in once. BlueyVatar reads only the ID of the channel you own. Use the channel ID address (youtube.com/channel/UC...), not an @handle.',
+  twitch: 'Twitch asks you to sign in once. BlueyVatar reads only your username.',
+  x: 'You add a link back to your BlueyVatar profile in your X profile. X may hide links from checkers, so this can fail.',
 }
 
 const checkLabel = (platform: Parameters<typeof methodFor>[0], label: string): string => {
@@ -42,14 +42,14 @@ function NextStep({ platform, label, uri, did, link }: { platform: Platform; lab
         <p className="mb-1 font-semibold text-bv-black">Next step: link back to your profile</p>
         {link ? (
           <ol className="mb-2 list-decimal pl-6">
-            <li>Copy this link.<CopyField label={`Link back to your profile, for ${label}`} value={`<a rel="me" href="${link}">My blueyvatar profile</a>`} /></li>
+            <li>Copy this link.<CopyField label={`Link back to your profile, for ${label}`} value={`<a rel="me" href="${link}">My BlueyVatar profile</a>`} /></li>
             <li>{where}</li>
             <li>Come back here and press Check now.</li>
           </ol>
         ) : (
-          <p>Your account needs a valid handle before blueyvatar can build the link.</p>
+          <p>Your account needs a valid handle before BlueyVatar can build the link.</p>
         )}
-        <p className="mb-0">This lets blueyvatar see that the page and your profile belong to the same person.{platform === 'website' ? '' : ` ${label} may hide links from checkers, so the check can fail.`}</p>
+        <p className="mb-0">This lets BlueyVatar see that the page and your profile belong to the same person.{platform === 'website' ? '' : ` ${label} may hide links from checkers, so the check can fail.`}</p>
       </div>
     )
   }
@@ -79,7 +79,7 @@ function NextStep({ platform, label, uri, did, link }: { platform: Platform; lab
           </li>
           <li>Save it. Changes can take a while to appear. Then come back here and press Check now.</li>
         </ol>
-        <p className="mb-0">If you remove the record later, the badge goes away the next time blueyvatar re-checks.</p>
+        <p className="mb-0">If you remove the record later, the badge goes away the next time BlueyVatar re-checks.</p>
       </div>
     )
   }
@@ -116,13 +116,13 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
       <p>
-        A claim connects another account you own, such as GitHub, Mastodon, or your website, to your blueyvatar profile. blueyvatar checks each claim, and only checked claims appear on your profile.
+        A claim connects another account you own, such as GitHub, Mastodon, or your website, to your BlueyVatar profile. BlueyVatar checks each claim, and only checked claims appear on your profile.
       </p>
       <p>Accounts you hide stay verified but are left off your profile page and hover cards.</p>
       <details className="mb-5">
         <summary>What does &quot;link back to your profile&quot; mean?</summary>
         <p>
-          For some accounts, blueyvatar needs to see that the other page points back to your profile. You do that by adding a link to your blueyvatar profile on that page. In web page code the link carries a small tag, <code>rel=&quot;me&quot;</code>, which tells sites that the link goes to another page of yours. You only need to copy the link we give you.
+          For some accounts, BlueyVatar needs to see that the other page points back to your profile. You do that by adding a link to your BlueyVatar profile on that page. In web page code the link carries a small tag, <code>rel=&quot;me&quot;</code>, which tells sites that the link goes to another page of yours. You only need to copy the link we give you.
         </p>
       </details>
 

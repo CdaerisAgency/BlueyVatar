@@ -9,7 +9,7 @@ import { pageMetadata } from '../lib/site'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
-export const metadata = pageMetadata('/', 'blueyvatar | Avatars and profiles in your atproto repository', 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.')
+export const metadata = pageMetadata('/', 'BlueyVatar | Avatars and profiles in your atproto repository', 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.')
 
 export default async function Home() {
   const signedIn = Boolean(await currentDid())

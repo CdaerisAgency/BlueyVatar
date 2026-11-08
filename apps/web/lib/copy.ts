@@ -4,12 +4,11 @@
  * Prices are not here. They come from ./pricing.ts.
  */
 export const COPY = {
-  brand: 'blueyvatar',
   nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in' },
   hero: {
     eyebrow: 'One avatar. Every app.',
     title: 'Your face, carried by your own account.',
-    lead: 'blueyvatar stores your avatar and profile in your atproto repository, so any site that knows your email or handle can show the real you. Change it once and it changes everywhere.',
+    lead: 'BlueyVatar stores your avatar and profile in your atproto repository, so any site that knows your email or handle can show the real you. Change it once and it changes everywhere.',
     primary: 'Claim your avatar',
     secondary: 'Read the docs',
     note: 'Free for everyone. No password, no new account. Sign in with the atproto account you already have.',
@@ -18,9 +17,9 @@ export const COPY = {
   how: {
     title: 'You own it. We just deliver it.',
     steps: [
-      { title: 'Sign in with your account', body: 'Log in with your existing handle, on any atproto server. blueyvatar asks for permission to save its own records and to change the picture on your profile. It does not change anything else on your profile.' },
+      { title: 'Sign in with your account', body: 'Log in with your existing handle, on any atproto server. BlueyVatar asks for permission to save its own records and to change the picture on your profile. It does not change anything else on your profile.' },
       { title: 'Upload and rate', body: 'Add one avatar or several, pick a default, add alt text, and set a rating so sites can request only what fits their audience.' },
-      { title: 'Show up everywhere', body: 'Any site that supports blueyvatar can fetch your avatar by email hash or handle, resized and cached at the edge.' },
+      { title: 'Show up everywhere', body: 'Any site that supports BlueyVatar can fetch your avatar by email hash or handle, resized and cached at the edge.' },
     ],
   },
   dev: {
@@ -47,7 +46,7 @@ export const COPY = {
   },
   // Only destinations that exist today. Add Status and Terms here when those pages ship.
   footer: {
-    tagline: 'blueyvatar. Built on atproto.',
+    tagline: 'BlueyVatar. Built on atproto.',
     // Wording follows Stripe Climate guidance: state the share of revenue, make no carbon-neutral or donation claim.
     // Swap in the official badge image from the Stripe Dashboard (Climate page) once it is downloaded.
     climate: { text: 'We contribute 1% of revenue to carbon removal through', linkLabel: 'Stripe Climate', href: 'https://stripe.com/climate' },

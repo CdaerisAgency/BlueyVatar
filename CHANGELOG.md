@@ -1,6 +1,6 @@
 # Changelog
 
-New features, changes, and fixes to blueyvatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
+New features, changes, and fixes to BlueyVatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
 ## 2026-11-08
 
@@ -11,9 +11,10 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 - Languages, links, and wallets on your profile (part of #242). Add them on the Profile page with Add and Remove buttons and live character counts. Languages use language tags such as en or pt-BR and one can be marked primary. Links must start with https://. Wallets are hidden unless you check Show on my public profile, and shown wallets say "not verified". The profile JSON gains `languages`, `socialLinks`, and `wallets`.
 - Plan and billing: people with a paid plan can switch between Plus, Pro, and Business, cancel at the end of the period, and resume before it ends (#237). The page shows your plan, price, status, and renewal or end date in plain words, and the pricing page buttons send paid members to the same confirm step. Upgrades charge the difference now, and downgrades add a credit to the next invoice. Card and invoices stay under Manage billing. When billing is not set up, the page says so and gives support@blueyvatar.com.
 - API keys can expire (#236). When you create a key you choose 30 days, 90 days, 1 year (the default), or never. An expired key stops working at the API (error code `key_expired`) and shows as Expired on the API keys page. Existing keys never expire. A new key is shown once with a Copy button, key types are explained in plain words (Website key and Server key, both read only today), the tiers table is gone from the page, and a key with no name gets one such as "Unnamed key, created 2026-11-08". The revoked-key email now puts the key name in the subject.
-- Change your Bluesky profile avatar from blueyvatar (#241). A "Use as my Bluesky avatar" button on each G or PG image, a switch to keep your Bluesky avatar the same as your default image (on by default once you allow it), and "Restore my previous Bluesky avatar". blueyvatar changes only the picture, keeps the rest of your profile exactly as it is, and never overwrites a change you made on Bluesky in the meantime. R and X images are never sent. The permission is requested at sign-in once the `OAUTH_REQUEST_BSKY_PROFILE` setting is on, which stays off until it is tested on staging. Until then, and for existing sessions, the page says "Sign in again to allow this".
+- Change your Bluesky profile avatar from BlueyVatar (#241). A "Use as my Bluesky avatar" button on each G or PG image, a switch to keep your Bluesky avatar the same as your default image (on by default once you allow it), and "Restore my previous Bluesky avatar". BlueyVatar changes only the picture, keeps the rest of your profile exactly as it is, and never overwrites a change you made on Bluesky in the meantime. R and X images are never sent. The permission is requested at sign-in once the `OAUTH_REQUEST_BSKY_PROFILE` setting is on, which stays off until it is tested on staging. Until then, and for existing sessions, the page says "Sign in again to allow this".
 
 ### Changed
+- The logo in the site header now reads BlueyVa’tar, with an apostrophe between the a and the t. The name stays BlueyVatar everywhere else, including page titles, text, and screen readers.
 - Plus and Pro are now one plan. Plus costs $9 per month and includes 20 avatar images, a profile gallery, a custom profile domain, up to 20 verified accounts, 50,000 requests a month, hovercards, and priority cache warming. Business ($49 per month) includes everything in Plus plus 1 million requests a month, custom domains, and a support contact. QR codes are available on every plan. Pro is no longer sold; anyone who already had Pro keeps access as Plus. The pricing page and home page show Free, Plus, and Business, with Plus as the most popular plan, and plan switching on the Billing page offers Plus and Business.
 - Wording works for accounts hosted anywhere on atproto, not only Bluesky's servers (#246). The avatar sync says "Use as my avatar on <your server name>", messages name "your account's home server" and "your profile" without a brand, and sign-in, report, privacy, policy, and domain text no longer assume a Bluesky account. If your server has no profile record, the page says so plainly. The product spec is now v11.
 - Verified accounts page: starts with a plain definition of a claim, shows numbered next steps with Copy buttons under each account that still needs checking (link back to your profile, a line of text for a Bluesky bio, or a TXT record for a domain), and explains the rel="me" tag once in a short note. The button is now "Add account", and hide and show buttons say "your profile" instead of "hovercards" (#238).
@@ -23,7 +24,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 - Profile page: the time zone is a menu with a "Not set" option and a "Use my current time zone" button, interests show both limits with a live count, the background color picker is a normal swatch that shows the chosen color, and the extra paragraph under it is gone (#231). A failed save keeps everything you typed and lists every problem beside its field (#235).
 - Reporting a profile or avatar now requires signing in with Bluesky, and the reason, details (at least 10 characters), and email are all required. Reports store the reporter's account, which is limited to 5 reports per hour in addition to the per-network limit and is shown to reviewers only. The content policy lists security@blueyvatar.com for legal or urgent notices from people who cannot sign in (#224).
 - The avatars page has an Upload an image button, shows your Bluesky avatar with a button to use it, shows linked emails (your primary in full, others masked), and hides "If R, label as" unless R is chosen. The limit message names the right plan (#227).
-- blueyvatar no longer asks for or stores an image license. Existing records keep working and nothing is deleted from your repository (#227).
+- BlueyVatar no longer asks for or stores an image license. Existing records keep working and nothing is deleted from your repository (#227).
 - The link email explains how your address is used, and the account page and privacy page say "your Bluesky account's home server" instead of "PDS" (#223).
 - The data export masks the domain of your primary email link, like the masked address in the same file (#223).
 
@@ -105,7 +106,7 @@ New features, changes, and fixes to blueyvatar, newest first. Each entry is date
 ## 2026-11-03
 
 ### Added
-- First release of blueyvatar: the scaffold, spec v6, and the phase 1 build (#1).
+- First release of BlueyVatar: the scaffold, spec v6, and the phase 1 build (#1).
 - Image transforms, TTL, QR codes, hovercards, and avatar import (#73).
 - Locked-down origin, custom profile domains, and verified accounts (#74).
 

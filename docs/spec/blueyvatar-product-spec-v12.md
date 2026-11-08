@@ -1,10 +1,10 @@
-# blueyvatar - Product Spec v9
+# BlueyVatar - Product Spec v9
 
 Nov 3, 2026 by @Chris Duncan
 
 ## 1. Overview
 
-This spec defines blueyvatar (blueyvatar.com), a Gravatar-style avatar and profile service where avatars and profile data live in each user's atproto repository, and the service adds email lookup, fast delivery, and paid developer tiers on top.
+This spec defines BlueyVatar (blueyvatar.com), a Gravatar-style avatar and profile service where avatars and profile data live in each user's atproto repository, and the service adds email lookup, fast delivery, and paid developer tiers on top.
 
 Build instructions live in the repository README at the repo root, and this spec lives in `docs/spec/` in the same repository.
 
@@ -410,7 +410,7 @@ Each license holds these fields:
 
 ### 10.4 Image license declaration (removed)
 
-Owner decision (issue #227): blueyvatar does not ask for, check, or display an image license. New image records carry no `license`. Records that already have one keep working, readers ignore the value, nothing is deleted from any repository, and the data export still lists the stored value. The lexicon marks the field deprecated, and dropping it from the schema is decided at publication (issue #54). Takedowns run through reports and the content policy (issue #66), and counsel confirms whether the terms need a line that users must have the right to the images they upload. Two layers still apply:
+Owner decision (issue #227): BlueyVatar does not ask for, check, or display an image license. New image records carry no `license`. Records that already have one keep working, readers ignore the value, nothing is deleted from any repository, and the data export still lists the stored value. The lexicon marks the field deprecated, and dropping it from the schema is decided at publication (issue #54). Takedowns run through reports and the content policy (issue #66), and counsel confirms whether the terms need a line that users must have the right to the images they upload. Two layers still apply:
 
 - **License to the service.** By signing in, the user grants the service a limited right to cache, resize, convert, and deliver the image through its CDN. Terms of service must say so.
 - **License to developers.** A developer license allows showing the avatar next to the user's name in the developer's product. Other uses, such as advertising or resale, are governed by the terms of service.
@@ -527,7 +527,7 @@ Thirteen items in the table below need a decision or an answer before build, and
 | 6 | Hash lookups reveal whether an email has a linked account | Anyone can test a list of known addresses | Mitigate with rate limits and a user opt-out of email lookup |
 | 7 | Honor the `!no-unauthenticated` self-label? | It could serve as a privacy signal | Semantics confirmed: the atproto labels guide says it [makes the content inaccessible to logged-out users in applications which respect the label](https://atproto.com/guides/labels), lists it as a global value usable as a self-label, and leaves enforcement to applications. The [label spec](https://atproto.com/specs/label) does not mention it. Decision needed: avatar requests carry no viewer session, so honoring it would mean refusing delivery for that account (my inference) |
 | 8 | Atproto spaces timing | Real access control for avatars depends on it | [Alpha since August 20, 2026, not for production, launch targeted later this year](https://atproto.com/blog/atproto-spaces-alpha) |
-| 9 | Name clearance for blueyvatar and blueyvatar.com | Lexicon IDs are hard to change once other apps depend on them | Name chosen. Clear it and confirm the domain before publishing lexicons (see the note below this table). Also consider proposing the profile lexicon to community standards efforts, since the atp.pics author [wants one](https://graham.leaflet.pub/3mhr36lsmo222) |
+| 9 | Name clearance for BlueyVatar and blueyvatar.com | Lexicon IDs are hard to change once other apps depend on them | Name chosen. Clear it and confirm the domain before publishing lexicons (see the note below this table). Also consider proposing the profile lexicon to community standards efforts, since the atp.pics author [wants one](https://graham.leaflet.pub/3mhr36lsmo222) |
 | 10 | Legal review | Terms of service, privacy policy, image licenses, treatment of hashed emails | Needs a lawyer; I am not one |
 | 11 | Payment processor, taxes, invoicing, pricing | Section 12 depends on them | Decided (issue #67): Stripe, with Stripe Tax and Stripe invoices, and Pro $9 and Business $49 per month (section 12.1). Open: the past-due grace period (7 days proposed), a Plus price, and the overage rate, which needs the per-miss cost measured after deploy |
 | 12 | `/img` bypasses tier size caps | `/img` URLs carry no key and accept any size up to 2048 (section 7), so a Free caller can build a 2048 URL and skip the 512 cap in section 11 | Open risk. Mitigation ideas: sign image paths at the redirect route, or restrict `/img` to a fixed size ladder so tier caps map to a few cacheable sizes |

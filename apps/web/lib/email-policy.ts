@@ -33,9 +33,9 @@ export function linkErrorMessage(d: Extract<LinkDecision, { ok: false }>): strin
 }
 
 export const movedNotice = (publicUrl: string) => ({
-  subject: 'Your email was linked to a different blueyvatar account',
+  subject: 'Your email was linked to a different BlueyVatar account',
   text:
-    `This address was linked to a blueyvatar account. Someone just proved they control it with a one-time code, ` +
+    `This address was linked to a BlueyVatar account. Someone just proved they control it with a one-time code, ` +
     `so the link was moved to their account (the newest verification wins).\n\n` +
     `If that was you, nothing more is needed. If it was not, sign in at ${publicUrl}/account with your account and ` +
     `add this address again with a one-time code to move it back.`,

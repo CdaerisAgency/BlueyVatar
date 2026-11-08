@@ -85,7 +85,7 @@ export function emailNotice(sender: EmailSender, lookup: RecipientLookup, public
     }
     await sender.send({
       to,
-      subject: 'A verified account was removed from your blueyvatar profile',
+      subject: 'A verified account was removed from your BlueyVatar profile',
       text: `We could not re-verify ${c.claimUri} three times in a row, so its verified badge was removed.\n\nLast result: ${reason}\n\nFix the problem and run verification again at ${publicUrl.replace(/\/+$/, '')}/account/claims.`,
     })
   }

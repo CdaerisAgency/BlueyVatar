@@ -200,7 +200,7 @@ export const limitedMessage = (retryAfterSec: number): string => `Too many reque
 /** 429 for route handlers, with `Retry-After` in whole seconds and a short page for browsers. */
 export function limitedResponse(retryAfterSec: number): Response {
   const msg = limitedMessage(retryAfterSec)
-  return new Response(`<!doctype html><meta charset="utf-8"><title>Too many requests</title><p>${msg}</p><p><a href="/">Back to blueyvatar</a></p>`, {
+  return new Response(`<!doctype html><meta charset="utf-8"><title>Too many requests</title><p>${msg}</p><p><a href="/">Back to BlueyVatar</a></p>`, {
     status: 429,
     headers: { 'content-type': 'text/html; charset=utf-8', 'retry-after': String(retryAfterSec), 'cache-control': 'no-store' },
   })

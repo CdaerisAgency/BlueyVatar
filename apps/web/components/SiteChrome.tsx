@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { COPY } from '../lib/copy'
 import FooterLinks from './FooterLinks'
 import NavAccount from './NavAccount'
+import Wordmark from './Wordmark'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
@@ -20,7 +21,7 @@ export function SiteNav() {
         <Link href="/" className="flex items-center gap-3 font-display text-2xl font-semibold tracking-[-0.01em] text-bv-black no-underline hover:text-bv-black">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.jpg" alt="" width={44} height={44} className="size-11 rounded-full object-cover" />
-          <span>{COPY.brand}</span>
+          <Wordmark />
         </Link>
         <nav aria-label="Main" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] font-medium sm:gap-x-6">
           <Link href="/#how" className={link}>

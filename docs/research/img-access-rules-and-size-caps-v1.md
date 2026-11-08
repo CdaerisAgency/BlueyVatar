@@ -93,7 +93,7 @@ Why a token with an expiry alone is not enough on a public cache: the token woul
 2. For a DID with `keyedOnly` or a non-empty `domainAllowlist`, the redirect route (after `visibilityAllows`) adds an expiry to the signed path, for example 15 minutes, and `/img` serves it with `Cache-Control: private, max-age=<remaining lifetime>`.
 3. `/img` reads `visibility(did)` only on requests that reach the origin. Public DIDs are cached, so the extra lookup is a cache-miss cost. For restricted DIDs it runs every time, so rate limit it per IP.
 4. On any change to `visibility_rules`, purge `host/img/{did}/` by prefix. Free plan limits are 5 prefix purges per minute and 100 operations per request (<https://developers.cloudflare.com/cache/how-to/purge-cache/>, checked November 6, 2026). The web app does not call the purge API today, so it needs the Cloudflare token or an indexer endpoint.
-5. Settings UI text, close to the current sign-up wording: "These rules control what blueyvatar serves. Your avatar file stays public on your PDS, and anyone who already saved a URL or image keeps it."
+5. Settings UI text, close to the current sign-up wording: "These rules control what BlueyVatar serves. Your avatar file stays public on your PDS, and anyone who already saved a URL or image keeps it."
 
 ### What the owner must decide
 

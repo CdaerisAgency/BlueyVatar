@@ -11,8 +11,8 @@ describe('gravatar pages', () => {
     }
   })
   it('keeps titles under 60 characters', () => {
-    expect(pageMetadata('/x', 'A Gravatar alternative on atproto | blueyvatar', 'd').title.length).toBeLessThan(60)
-    expect('Migrate from Gravatar to blueyvatar'.length).toBeLessThan(60)
+    expect(pageMetadata('/x', 'A Gravatar alternative on atproto | BlueyVatar', 'd').title.length).toBeLessThan(60)
+    expect('Migrate from Gravatar to BlueyVatar'.length).toBeLessThan(60)
   })
   it('converts the example URL with the shared helper', () => {
     const m = exampleMigration()

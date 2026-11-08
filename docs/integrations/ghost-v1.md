@@ -39,7 +39,7 @@ In Ghost Admin, open Settings, Code Injection, and paste this into Site Footer. 
 Limits of this pattern:
 
 - The browser may request the Gravatar image before the script runs. It reduces Gravatar traffic but cannot stop the first request. If that matters, remove the Gravatar image in the theme instead.
-- Gravatar URLs carry an MD5 or SHA-256 hash. blueyvatar answers to a SHA-256 hash always, and to MD5 only for emails verified after migration 0006 ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)).
+- Gravatar URLs carry an MD5 or SHA-256 hash. BlueyVatar answers to a SHA-256 hash always, and to MD5 only for emails verified after migration 0006 ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)).
 - The script was written from the Ghost documentation and has not been run on a live Ghost site. Test it on a staging site first.
 
 Spec reference: section 9 (embed guidance).
