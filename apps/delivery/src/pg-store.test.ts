@@ -17,6 +17,7 @@ const migration16 = readFileSync(new URL('../../../db/migrations/0016_email_doma
 const migration17 = readFileSync(new URL('../../../db/migrations/0017_plus_subscriptions.sql', import.meta.url), 'utf8')
 const migration24 = readFileSync(new URL('../../../db/migrations/0024_usage_daily.sql', import.meta.url), 'utf8')
 const migration25 = readFileSync(new URL('../../../db/migrations/0025_profile_view_counters.sql', import.meta.url), 'utf8')
+const migration35 = readFileSync(new URL('../../../db/migrations/0035_api_key_expiry.sql', import.meta.url), 'utf8')
 const migration6 = readFileSync(new URL('../../../db/migrations/0006_email_md5.sql', import.meta.url), 'utf8')
 const schema =`t_delivery_${process.pid}_${Date.now()}`
 const DID = 'did:plc:alice'
@@ -43,6 +44,7 @@ describe.skipIf(!url)('postgres stores', () => {
     await pool.query(migration17)
     await pool.query(migration24)
     await pool.query(migration25)
+    await pool.query(migration35)
   }, 60_000)
 
   afterAll(async () => {
