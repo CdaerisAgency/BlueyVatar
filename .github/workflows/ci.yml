@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # Draft pull requests do not run CI. Marking one ready for review runs it once.
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -14,6 +16,7 @@ concurrency:
 
 jobs:
   check:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     services:
@@ -80,6 +83,7 @@ jobs:
 
   # PHP lint and unit test for the WordPress plugin in integrations/wordpress.
   wordpress-plugin:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
@@ -96,7 +100,7 @@ jobs:
 
   # Warns (never fails) when a pull request touches apps/ without a changelog line.
   changelog:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
@@ -112,6 +116,7 @@ jobs:
           fi
 
   docker:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -123,6 +128,7 @@ jobs:
   # Browser tests against `next start`, a stub delivery server, and the Postgres service below. No outside
   # services are called. Runs beside `check`, so it does not lengthen it.
   e2e:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     services:
