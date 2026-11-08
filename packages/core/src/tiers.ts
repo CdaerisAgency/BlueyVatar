@@ -19,11 +19,11 @@ export function normalizeTier(value: unknown): Tier {
 }
 
 /**
- * The value written to licenses.tier. The check constraint from migration 0001 still lists 'pro' and not 'plus', and
- * this change adds no migration, so the combined Plus plan is stored under its legacy name. Every read goes through
- * normalizeTier, so both spellings mean Plus.
+ * The value written to licenses.tier. Migration 0036 allows 'plus' and renamed old 'pro' rows, so every tier is stored
+ * under its own name. 'pro' is still allowed by the constraint and still read as Plus (normalizeTier) until a later cleanup.
  */
-export const storedLicenseTier = (tier: Tier): string => (tier === 'plus' ? 'pro' : tier)
+export const storedLicenseTier = (tier: Tier): string => tier
+
 export type OutputFormat = 'png' | 'jpeg' | 'webp'
 
 export interface Entitlements {
