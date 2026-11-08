@@ -29,7 +29,7 @@ Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://a
 | Display name, bio | `display_name`, `description` | None published | From `app.bsky.actor.profile`; shown on `/p/{handle}` (`apps/web/app/p/[handle]/page.tsx`) |
 | Links | `links` (label, url), auth | None published | Read from `app.bsky.actor.profile#links` (max 10, https only); shown on the page; no editor on `/account/profile` (`packages/core/src/links.ts`, `apps/web/app/account/profile/page.tsx`) |
 | Verified accounts | `verified_accounts`, capped at 4 unauthenticated | None published | Yes: attested claims, hide flag, Free JSON cap of 4 (`apps/delivery/src/app.ts`, `packages/core/src/tiers.ts`). Services supported: Unknown (not enumerated in files read) |
-| Wallet and crypto addresses | `payments.crypto_wallets` (label, address) and `payments.links`, auth | None published | None. Spec lists "Later" (`docs/spec/blueyvatar-product-spec-v12.md` line 306) |
+| Wallet and crypto addresses | `payments.crypto_wallets` (label, address) and `payments.links`, auth | None published | None. Spec lists "Later" (`docs/spec/blueyvatar-product-spec-v13.md` line 306) |
 | Languages | `languages` (code, name, is_primary, order), auth | None published | None. No field in `lexicons/com/blueyvatar/profile.json` |
 | Pronouns | `pronouns` | None published | Yes (`lexicons/com/blueyvatar/profile.json`) |
 | Pronunciation | `pronunciation` | None published | Yes |

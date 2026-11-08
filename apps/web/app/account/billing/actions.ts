@@ -3,7 +3,7 @@
 import { PAID_PLANS, type PaidPlan } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
 import { currentDid } from '../../../lib/auth'
-import { changePlan, createCheckoutUrl, createPortalUrl, setCancelAtPeriodEnd, stripeClient, type ActionResult, type UrlResult } from '../../../lib/billing/stripe'
+import { cancelScheduledChange, changePlan, createCheckoutUrl, createPortalUrl, setCancelAtPeriodEnd, stripeClient, type ActionResult, type UrlResult } from '../../../lib/billing/stripe'
 import { getBillingStore } from '../../../lib/billing/store'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { PUBLIC_URL } from '../../../lib/oauth'
@@ -78,6 +78,13 @@ export async function switchPlan(form: FormData): Promise<void> {
   const license = await getDashboardStore().ensureLicense(did)
   if (license.tier === 'enterprise') return back({ ok: false, error: 'Enterprise licenses are managed by contract. Contact us to change it.' })
   return done(await changePlan(c, did, license.licenseId, tier as PaidPlan))
+}
+
+/** Cancels a downgrade that is waiting for the period to end, so the person keeps their plan. Personal billing only. */
+export async function cancelPlanChange(): Promise<void> {
+  const { did, c } = await ctx()
+  const license = await getDashboardStore().ensureLicense(did)
+  return done(await cancelScheduledChange(c, did, license.licenseId))
 }
 
 /** Ends the person's subscription at the close of the paid period. */
