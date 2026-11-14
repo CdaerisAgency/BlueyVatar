@@ -157,7 +157,7 @@ describe('buildMarkdown', () => {
     expect(dests.sort()).toEqual(['https://a.test/x%29%28%3Cy%3E', 'https://g.test/'].sort())
     // No line starts as a heading, quote, or list unless we wrote it.
     for (const line of body.split('\n')) {
-      if (/^(#{1,6} |> )/.test(line)) expect(['# \\[click\\]', '## Details', '## Links', '## Verified accounts', '## Wallets (not verified)'].some((h) => line.startsWith(h) || line.startsWith('# '))).toBe(true)
+      if (/^(#{1,6} |> )/.test(line)) expect(['# \\[click\\]', '## Details', '## Links', '## Linked accounts', '## Wallets (not verified)'].some((h) => line.startsWith(h) || line.startsWith('# '))).toBe(true)
     }
     expect(body).not.toMatch(/^\s*(?:\d+\.|[-*+]) (?!Pronouns|Job title|Company|Location|Interests|\[|.*\(not verified\))/m)
     expect(md).not.toContain('<script>')

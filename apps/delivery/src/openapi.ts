@@ -109,7 +109,7 @@ export const openApiDocument = {
     '/go/{handle}/{platform}': {
       get: {
         summary: 'QR redirect to a verified platform',
-        description: 'Redirects (302) to the user\'s verified account on the platform, to bsky.app for bluesky, or to the profile page when the platform is missing, hidden, or not https.',
+        description: 'Redirects (302) to the user\'s linked account on the platform, to bsky.app for bluesky, or to the profile page when the platform is missing, hidden, or not https.',
         tags: ['Profile'],
         security: [{}, { apiKeyHeader: [] }, { apiKeyQuery: [] }],
         parameters: [ref('parameters/Handle'), ref('parameters/Platform')],

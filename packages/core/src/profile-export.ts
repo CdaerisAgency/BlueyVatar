@@ -215,7 +215,7 @@ export function buildMarkdown(p: ExportProfile): string {
   const uniq = links.filter((l) => (seen.has(l.url) ? false : (seen.add(l.url), true)))
   if (uniq.length) out.push('## Links', '', ...uniq.map((l) => `- [${mdLine(l.label)}](${mdDest(l.url)})`), '')
   if (p.verifiedAccounts.length) {
-    out.push('## Verified accounts', '', ...p.verifiedAccounts.map((a) => `- [${mdLine(a.platform)}](${mdDest(a.url)})`), '')
+    out.push('## Linked accounts', '', ...p.verifiedAccounts.map((a) => `- [${mdLine(a.platform)}](${mdDest(a.url)})`), '')
   }
   if (p.wallets.length) {
     out.push(
