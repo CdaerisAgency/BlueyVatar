@@ -106,7 +106,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {linked && <p>Linked {linked}. A hash of it is stored, and an encrypted copy of your primary email.</p>}
+      {linked && <p>Linked {linked}. A hash of it is stored, and an encrypted copy so it can be shown here.</p>}
       <h2>Linked emails ({links.length} of {MAX_LINKED_EMAILS})</h2>
       {links.length === 0 ? (
         <p>No email linked yet. <a href="#link-email">Link one below</a> so apps can find your avatar from your address.</p>
@@ -135,9 +135,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         link it again until then.
       </p>
       <p>
-        We keep a hash of each linked email. For your primary email we also keep the address itself, encrypted, so we can tell you
-        if a claim is removed or your email moves to another account. It is deleted when you unlink or replace it, or delete your
-        data.
+        We keep a hash of each linked email and the address itself, encrypted, so we can show it here and tell you if a claim is
+        removed or your email moves to another account. The address is deleted when you unlink it or delete your data. Emails you
+        linked before this change show as masked until you link them again.
       </p>
       <form action={linkEmail}>
         <Button type="submit" variant="primary">Use the email from my account</Button>
@@ -206,7 +206,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <h2>Your data</h2>
       <p>
         Go to <Link href="/account/settings/danger">Danger zone</Link> to download your data or delete it. Deleting removes what BlueyVatar holds about you, except
-        billing records, which we keep for 7 years. Records in your own atproto repository stay on your account's home server.
+        billing records, which we keep for 7 years. Records in your own atproto repository stay on your Bluesky account's home server. The home server is the service that stores your Bluesky account and everything you post.
       </p>
       <form action="/logout" method="post">
         <Button type="submit">Sign out</Button>

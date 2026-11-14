@@ -106,6 +106,37 @@ function suite(name: string, make: () => Promise<{ store: Store; age?: (ms: numb
       expect(JSON.stringify(row)).not.toMatch(/person|@/i)
     })
 
+    it('linked emails: every link keeps its address encrypted, which is replaced on re-verify, moved with the hash, and removed with the row', async () => {
+      const E1 = 'did:plc:enc1'
+      const E2 = 'did:plc:enc2'
+      const outbox = new Outbox()
+      // Two addresses by code: both are stored encrypted, not only the primary.
+      for (const addr of ['First@enc.test', 'Second@enc.test']) {
+        await sendCode(E1, addr, store, outbox)
+        await confirmLink(E1, (await store.codes.get(E1))!, store, outbox)
+      }
+      const rows = await store.links.list(E1)
+      expect(rows).toHaveLength(2)
+      expect(rows.every((r) => r.emailEnc?.startsWith('v1:'))).toBe(true)
+      expect(rows.map((r) => decryptJson<string>(r.emailEnc!)).sort()).toEqual(['First@enc.test', 'Second@enc.test'])
+      expect(JSON.stringify(rows)).not.toMatch(/First|Second/)
+      // A link made before the column existed reads as null, and linking again stores the address.
+      await store.links.link(h(701), E1.replace('enc1', 'enc3'), 'code')
+      expect((await store.links.list(E1.replace('enc1', 'enc3')))[0]!.emailEnc).toBeNull()
+      await store.links.link(h(701), E1.replace('enc1', 'enc3'), 'code', undefined, encryptJson('old@enc.test'))
+      expect(decryptJson<string>((await store.links.list(E1.replace('enc1', 'enc3')))[0]!.emailEnc!)).toBe('old@enc.test')
+      // A move gives the hash to the new owner with the new copy, and nothing stays with the old owner.
+      const moving = rows.find((r) => decryptJson<string>(r.emailEnc!) === 'Second@enc.test')!
+      await store.links.link(moving.emailHash, E2, 'code', undefined, encryptJson('Second@enc.test'))
+      expect((await store.links.list(E1)).map((r) => r.emailHash)).not.toContain(moving.emailHash)
+      expect(decryptJson<string>((await store.links.list(E2))[0]!.emailEnc!)).toBe('Second@enc.test')
+      // Unlinking and account deletion remove the stored address with the row.
+      await store.links.remove(E2, moving.emailHash)
+      expect(await store.links.list(E2)).toHaveLength(0)
+      await store.links.releaseAll(E1)
+      expect(await store.links.list(E1)).toHaveLength(0)
+    })
+
     it('domain: a direct link stores it, a re-verify without one keeps it, and a new one replaces it', async () => {
       const D2 = 'did:plc:domain2'
       await store.links.link(h(501), D2, 'trusted_pds', undefined, undefined, 'one.test')
@@ -280,7 +311,7 @@ if (url) {
     await admin.query(`CREATE SCHEMA ${schema}`)
     await admin.end()
     const pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs', '0037_linked_email_enc']) await pool.query(m(n))
     return {
       store: pgStore(pool),
       // Age every hold instead of waiting 30 days.
@@ -353,7 +384,7 @@ describe.skipIf(!url)('postgres: no plaintext address at rest', () => {
     await admin.query(`CREATE SCHEMA ${s3}`)
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${s3}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs']) await pool.query(m(n))
+    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs', '0037_linked_email_enc']) await pool.query(m(n))
   })
   afterAll(async () => {
     await pool.query(`DROP SCHEMA ${s3} CASCADE`)

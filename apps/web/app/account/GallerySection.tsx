@@ -32,7 +32,7 @@ export default async function GallerySection({ did, error, done }: { did: string
         Gallery ({images.length} of {GALLERY_MAX})
       </h2>
       <p>
-        Gallery images are saved to your repository on your PDS and are public there. They appear on your profile page and never become your avatar.
+        Gallery images are saved to your repository on your Bluesky account's home server and are public there. They appear on your profile page and never become your avatar.
       </p>
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}

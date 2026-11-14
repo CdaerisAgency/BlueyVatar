@@ -16,8 +16,8 @@ export default function DataDeletedPage() {
         <li>Moderation records, such as blocks on images and reports about your account.</li>
       </ul>
       <p>
-        Your avatars, profile, gallery, and claims in your own atproto repository are not ours to delete. They stay on your PDS until you
-        remove them there.
+        Your avatars, profile, gallery, and claims in your own atproto repository are not ours to delete. They stay on your Bluesky account's home server until you
+        remove them there. The home server is the service that stores your Bluesky account and everything you post.
       </p>
       <p>
         Questions? See the <Link href="/privacy">privacy page</Link>.

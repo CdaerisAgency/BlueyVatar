@@ -3,7 +3,7 @@ import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, blobUrl, blueskyAvatarCid, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
-import { canAddImage, imageLimit, limitMessage } from '../../../lib/records'
+import { canAddImage, imageLimit, limitMessage, uploadNotice } from '../../../lib/records'
 import { pdsHost } from '../../../lib/pds'
 import { serverLabel } from '../../../lib/home-server'
 import { resolvePlan } from '../../../lib/plan'
@@ -141,11 +141,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       )}
 
       <h2 id="upload">Upload an image</h2>
-      <p>
-        Everything you save here is written to your repository on your PDS, and all data in an atproto repository is public today. The visibility rules you set here only
-        apply to what this service serves. An avatar blob stays readable from your PDS regardless of those rules, and copies that others already hold cannot be recalled. If
-        you need real access control, this service cannot provide it for repository images.
-      </p>
+      <p>{uploadNotice(plan)}</p>
       {canAdd ? (
         <form action={uploadImage} encType="multipart/form-data">
           <ImageFileInput />

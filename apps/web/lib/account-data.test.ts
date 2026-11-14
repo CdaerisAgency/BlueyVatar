@@ -56,7 +56,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
 
   async function seed(did: string, hash: string, tag: string) {
     const q = (sql: string, p: unknown[]) => pool.query(sql, p)
-    await q("INSERT INTO email_links (email_hash, did, method, is_primary, email_domain) VALUES ($1, $2, 'code', true, 'example.com')", [hash, did])
+    await q("INSERT INTO email_links (email_hash, did, method, is_primary, email_domain, email_enc) VALUES ($1, $2, 'code', true, 'example.com', 'v1:linkblob')", [hash, did])
     await q('INSERT INTO email_codes (did, email_hash, code_hash, masked, expires_at) VALUES ($1, $2, $3, $4, now() + interval \'10 minutes\')', [did, hash.replace(/^./, 'd'), 'f'.repeat(64), 'a***@e***.com'])
     await q('INSERT INTO notice_emails (did, email_hash, email_enc) VALUES ($1, $2, $3)', [did, hash, 'v1:secretblob'])
     await q('INSERT INTO oauth_session (sub, value) VALUES ($1, $2)', [did, 'v'])
@@ -92,6 +92,8 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(out.did).toBe(A)
     expect(out.emails.primaryMasked).toBe('j***@e***.com')
     expect(out.emails.links).toHaveLength(1)
+    expect(out.emails.links[0]).toMatchObject({ address_stored: true, address_masked: 'j***@e***.com' })
+    expect(JSON.stringify(out)).not.toContain('linkblob')
     expect(out.emails.links[0]).toMatchObject({ email_hash: H1, method: 'code', is_primary: true, email_domain: 'e***.com' })
     expect(out.profileLinks).toHaveLength(1)
     expect(out.claims).toHaveLength(1)
