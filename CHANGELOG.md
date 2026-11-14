@@ -2,6 +2,11 @@
 
 New features, changes, and fixes to BlueyVatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-14
+
+### Changed
+- The API keys page is now about keys (#236). Its heading stays "API keys and license" until the menu label is renamed to "API keys". The License section, plan limits, usage history, last 30 days, and usage alert status moved to Plan and billing, for your account and for organizations. The page shows your handle, not your account ID, on Plan and billing too (part of #237). The revoked-key email names the key in the subject and first line (an unnamed key reads "Unnamed key, created 2026-11-08") and the "Account:" line shows your handle, falling back to the account ID.
+
 ## 2026-11-08
 
 ### Changed
