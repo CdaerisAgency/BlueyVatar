@@ -3,6 +3,7 @@ import pg from 'pg'
 import { scheduleBillingPurge } from './billing-retention.js'
 import { scheduleModerationDigest } from './moderation-digest.js'
 import { scheduleKeyExpiryReminders } from './key-expiry-reminder.js'
+import { scheduleEffectsSwitch } from './effects-switch.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
 import type { IndexWrites } from './handlers.js'
@@ -44,6 +45,8 @@ function writes(): IndexWrites {
     scheduleModerationDigest(pool)
     // One reminder email per expiring API key, 7 days before it expires (issue #236).
     scheduleKeyExpiryReminders(pool)
+    // Out-of-office switch-on and switch-off (issue #283). Asks the web app to do each step.
+    scheduleEffectsSwitch(pool)
     const warm = warmerFromEnv()
     const purge = purgerFromEnv()
     // Moderation labels (issue #207): one subscription per DID in LABELER_DIDS. Off when the list is empty.
