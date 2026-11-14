@@ -1,21 +1,21 @@
 import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
 import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
+import { redirect } from 'next/navigation'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, blobUrl, blueskyAvatarCid, imageLabels, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
 import { canAddImage, imageLimit, limitMessage, uploadNotice } from '../../../lib/records'
-import { pdsHost } from '../../../lib/pds'
-import { serverLabel } from '../../../lib/home-server'
 import { resolvePlan } from '../../../lib/plan'
 import { getStore } from '../../../lib/store'
 import { describeLinkedEmails, readPrimaryAddress } from '../../../lib/linked-emails'
 import ImageFileInput from './ImageFileInput'
 import RatingFields from './RatingFields'
-import BskyAvatarPanel from './BskyAvatarPanel'
-import UseAsBskyAvatar from './UseAsBskyAvatar'
-import { bskyBlockReason, hasBskyPermission, type SyncSession } from '../../../lib/bsky-sync'
-import { getSyncStore } from '../../../lib/bsky-sync-store'
-import { useBskyProfileScope } from '../../../lib/oauth'
+import UsePushAvatar from './UsePushAvatar'
+import PushNotices from '../../integrations/PushNotices'
+import { PUSH_APPS, type PushApp } from '../../../lib/push-apps'
+import { hasPushPermission, pushBlockReason } from '../../../lib/push-sync'
+import { getPushStore, type PushState } from '../../../lib/push-store'
+import { consentOpen } from '../../../lib/push-status'
 import LinkedEmail from '../LinkedEmail'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
@@ -23,20 +23,24 @@ export const dynamic = 'force-dynamic'
 
 export default async function AvatarsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
   const did = await requireDid('/account/avatars')
+  const store = getPushStore()
   const { error, done } = await searchParams
   const plan = await resolvePlan(did)
   let images: StoredImage[] = []
   let pds = ''
   let bskyCid: string | null = null
   let loadError: string | null = null
-  let bsky: { session: SyncSession } | null = null
+  let pushApps: { app: PushApp; state: PushState }[] = []
   try {
     const session = await repoSession(did)
-    if (useBskyProfileScope() || (await hasBskyPermission(session))) bsky = { session }
+    // Apps whose permission this session holds. The buttons below push to those, and nothing else changes here.
+    for (const app of PUSH_APPS) if (await hasPushPermission(session, app)) pushApps.push({ app, state: await store.get(did, app.id) })
     ;[images, pds, bskyCid] = await Promise.all([listImages(session), pdsUrl(session), blueskyAvatarCid(session).catch(() => null)])
   } catch (err) {
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
   }
+  // The permission screen for an app on the Integrations page returns here: send the user back to finish the last step there.
+  if (pushApps.some(({ state }) => !state.enabled && consentOpen(state))) redirect('/integrations')
   const links = await getStore().links.list(did).catch(() => [])
   const emails = describeLinkedEmails(links, readPrimaryAddress(await getStore().links.noticeAddress(did).catch(() => undefined)))
   const canAdd = !loadError && canAddImage(images.length, plan)
@@ -48,7 +52,10 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
 
-      {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} server={serverLabel(pdsHost(pds))} />}
+      <PushNotices items={pushApps} from="avatars" />
+      <p>
+        Choose which apps get your default image as their profile picture on the <a href="/integrations">Integrations page</a>.
+      </p>
 
       <Section title={`Your images (${images.length} of ${imageLimit(plan)})`}>
       {canAdd ? (
@@ -105,7 +112,9 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                       <Button type="submit">Set as default</Button>
                     </form>
                   )}
-                  {bsky && <UseAsBskyAvatar rkey={img.rkey} blockedReason={bskyBlockReason(img)} server={serverLabel(pdsHost(pds))} />}
+                  {pushApps.map(({ app }) => (
+                    <UsePushAvatar key={app.id} rkey={img.rkey} app={app} blockedReason={pushBlockReason(img)} />
+                  ))}
                   <form action={removeImage}>
                     <input type="hidden" name="rkey" value={img.rkey} />
                     <Button type="submit" variant="danger">Delete</Button>
