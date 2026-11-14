@@ -4,7 +4,12 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 
 ## 2026-11-14
 
+### Fixed
+- CI now installs pnpm into each job's own folder (`dest` on the pnpm setup action). The default folder in the runner user's home was shared by every runner on the machine, which still caused "pnpm: command not found" when jobs overlapped.
+- CI jobs sharing the self-hosted runner no longer collide. Each job has its own pnpm folder and store (fixes "pnpm: command not found"), the e2e and accessibility servers use free ports chosen at run time (fixes "port 3100 is already used"), and CI runs queue per ref instead of cancelling. Locally, `E2E_PORT` still defaults to 3100.
+
 ### Changed
+- The gallery upload form on the Account page now shows "If R, label as" only when the rating is R, like the avatars page (part of #227).
 - The API keys page is now about keys (#236). Its heading stays "API keys and license" until the menu label is renamed to "API keys". The License section, plan limits, usage history, last 30 days, and usage alert status moved to Plan and billing, for your account and for organizations. The page shows your handle, not your account ID, on Plan and billing too (part of #237). The revoked-key email names the key in the subject and first line (an unnamed key reads "Unnamed key, created 2026-11-08") and the "Account:" line shows your handle, falling back to the account ID.
 
 ## 2026-11-08
