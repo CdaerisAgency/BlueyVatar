@@ -10,9 +10,16 @@ on:
 permissions:
   contents: read
 
+# One queue per ref. Runs for the same ref wait their turn and a newer pending run replaces an older pending
+# one (GitHub keeps at most one running and one pending run per group). A single runner-wide group would
+# drop pending runs of other pull requests, so cross-PR safety comes from the per-job pnpm folders and the
+# free ports below instead.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+# Each job gets its own pnpm home and store so concurrent jobs on the shared self-hosted runner cannot
+# remove each other's pnpm binary or share a half-written store.
 
 jobs:
   check:
@@ -37,6 +44,14 @@ jobs:
 
       - name: Point tests at the service port
         run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
+
+      - name: Isolate pnpm per job
+        run: |
+          home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
+          mkdir -p "$home/store"
+          echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
+          echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
+          echo "$home" >> "$GITHUB_PATH"
 
       - uses: pnpm/action-setup@v4
         with:
@@ -77,6 +92,9 @@ jobs:
 
       - name: Install Chromium for accessibility checks
         run: pnpm --filter @blueyvatar/web exec playwright install --with-deps chromium
+
+      - name: Pick free ports
+        run: node .github/scripts/free-port.mjs A11Y_PORT A11Y_DELIVERY_PORT
 
       - name: Accessibility (axe-core and hovercard keyboard)
         run: pnpm --filter @blueyvatar/web a11y
@@ -150,6 +168,14 @@ jobs:
       - name: Point the app at the service port
         run: echo "E2E_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
+      - name: Isolate pnpm per job
+        run: |
+          home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
+          mkdir -p "$home/store"
+          echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
+          echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
+          echo "$home" >> "$GITHUB_PATH"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 10.28.0
@@ -183,6 +209,9 @@ jobs:
 
       - name: Install Chromium
         run: pnpm --filter @blueyvatar/web exec playwright install --with-deps chromium
+
+      - name: Pick free ports
+        run: node .github/scripts/free-port.mjs E2E_PORT E2E_STUB_PORT
 
       - name: E2E
         run: pnpm e2e
