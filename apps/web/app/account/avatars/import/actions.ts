@@ -11,8 +11,8 @@ import { resolvePlan } from '../../../../lib/plan'
 import { reportError } from '../../../../lib/obs'
 import { limited } from '../../../../lib/rate-guard'
 import { screenUpload } from '../../../../lib/upload-screen'
-import { syncBlueskyAfterDefaultChange } from '../../../../lib/bsky-sync-server'
-import { syncsAfterImport } from '../../../../lib/bsky-sync'
+import { pushAfterDefaultChange } from '../../../../lib/push-server'
+import { syncsAfterImport } from '../../../../lib/push-sync'
 
 const back = (key: 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -32,7 +32,7 @@ export async function confirmImport(_prev: ImportState, form: FormData): Promise
       if (!screened.ok) throw new RepoError(screened.error)
       await saveNewImage(session, ready.value.bytes, ready.value.mime, fields)
       // An image imported from the Bluesky avatar is already what Bluesky shows, so nothing is written back.
-      return { ok: true, note: syncsAfterImport(source, fields.isDefault) ? await syncBlueskyAfterDefaultChange(did) : null }
+      return { ok: true, note: syncsAfterImport(source, fields.isDefault) ? await pushAfterDefaultChange(did) : null }
     },
     report: (err) => reportError('import failed', err),
     messageFor: (err) => (err instanceof RepoError ? err.message : 'Something went wrong. Try again.'),

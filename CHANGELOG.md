@@ -4,11 +4,16 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 
 ## 2026-11-14
 
+### Added
+- Integrations page: choose per app whether BlueyVatar pushes your default image as that app's profile picture (part of #298). Bluesky and Tangled each have a box. Ticking one asks your Bluesky account's home server for the permission to change that one app's profile record, and nothing else; sign-in for everyone else is unchanged. If your account has no profile record for the app, BlueyVatar asks before creating one that holds only your picture. Images rated R or X are never sent. Unticking stops future pushes and leaves the record as it is. Adding an app is one entry in `lib/push-apps.ts` (see `docs/integrations-push-v1.md`). The page stays off until `OAUTH_PUSH_APPS` is set, which waits for a staging test (migration 0038).
+
 ### Fixed
+- The profile permission is now `repo:app.bsky.actor.profile?action=create&action=update` instead of `action=update` alone (#297). The reference server checks both actions on every profile write, so the narrower permission would have been refused. A permission with only one of the two is treated as not granted.
 - CI now installs pnpm into each job's own folder (`dest` on the pnpm setup action). The default folder in the runner user's home was shared by every runner on the machine, which still caused "pnpm: command not found" when jobs overlapped.
 - CI jobs sharing the self-hosted runner no longer collide. Each job has its own pnpm folder and store (fixes "pnpm: command not found"), the e2e and accessibility servers use free ports chosen at run time (fixes "port 3100 is already used"), and CI runs queue per ref instead of cancelling. Locally, `E2E_PORT` still defaults to 3100.
 
 ### Changed
+- The profile picture push replaces the sign-in permission and the automatic switch from #241 (part of #298). The permission is no longer requested at every sign-in, and nothing is pushed until you tick an app's box. The Avatars page keeps a "Push to <app>" button on each image for apps you allowed, and the undo. `OAUTH_REQUEST_BSKY_PROFILE` is replaced by `OAUTH_PUSH_APPS`.
 - Account pages share one page layout (part of #239). A new `PageHeader` component (heading, optional one-sentence intro, optional action buttons) opens every account page, and the type scale, intro size, and content widths are named in `app/tokens.css`. The API keys menu label and page heading are now "API keys" (the license moved to Plan and billing). A test fails when a menu label and its page heading differ, or when an account page has a bare heading instead of `PageHeader`. The standard is written down in `docs/page-standard-v1.md`.
 - Every notification email now shows your handle on the "Account:" line, falling back to the account ID (part of #239).
 - The profile menu in the header shows your own avatar, and keeps the letter when you have none (part of #239).

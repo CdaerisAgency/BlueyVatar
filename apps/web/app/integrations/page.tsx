@@ -1,21 +1,28 @@
 import { PageMain } from '../../components/Page'
 import { pageMetadata } from '../../lib/site'
 import { ATPROTO_APP_LIST, PROOF_METHODS, signInEntries } from '../../lib/integrations'
+import PushSection from './PushSection'
 
 export const metadata = pageMetadata(
   '/integrations',
   'Integrations',
-  'Accounts and apps BlueyVatar links to your profile: atproto apps, sign-in platforms, and proof checks.',
+  'Accounts and apps BlueyVatar links to your profile: choose which atproto apps get your profile picture, sign-in platforms, and proof checks.',
 )
 // Which sign-in platforms are on depends on runtime settings.
 export const dynamic = 'force-dynamic'
 
-export default function IntegrationsPage() {
+export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string; ask?: string }> }) {
+  const { error, done, ask } = await searchParams
   const signIn = signInEntries()
   return (
     <PageMain>
       <h1>Integrations</h1>
-      <p>Your profile can show the accounts you own elsewhere, each one checked before it appears. Beyond the guides above, there are three kinds.</p>
+      {error && <p role="alert">{error}</p>}
+      {done && <p role="status">{done}</p>}
+
+      <PushSection ask={ask} />
+
+      <p>Your profile can show the accounts you own elsewhere, each one checked before it appears. Below are guides for your own site, the atproto apps BlueyVatar recognizes, and the ways an account is checked.</p>
 
       <h2>Use BlueyVatar on your site</h2>
       <p>Guides for putting avatars on a site you run. Each uses the SHA-256 hash route, a default image with <code>d=</code>, and a no-referrer policy.</p>
