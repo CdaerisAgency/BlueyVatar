@@ -20,7 +20,7 @@ export const DEFAULT_NOTICE_PREFS: NoticePrefs = { usageAlerts: true, billingNot
 
 /** What the account page lists as always on. */
 export const SECURITY_NOTICES = [
-  'A verified account was removed from your profile after re-verification failed.',
+  'A linked account was removed from your profile after re-verification failed.',
   'Your email address was linked to a different account.',
   'One of your keys was revoked.',
   'Your images were removed, your account was suspended, or an appeal was decided.',
