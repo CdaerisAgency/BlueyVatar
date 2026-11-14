@@ -2,6 +2,11 @@
 
 New features, changes, and fixes to BlueyVatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-14
+
+### Changed
+- The gallery upload form on the Account page now shows "If R, label as" only when the rating is R, like the avatars page (part of #227).
+
 ## 2026-11-08
 
 ### Changed
