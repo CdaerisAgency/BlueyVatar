@@ -15,10 +15,10 @@ describe('GET /api/viewer', () => {
   })
   it('returns the handle and initial when signed in', async () => {
     cur.mockResolvedValue({ did: 'did:plc:x', handle: 'ann.bsky.social' })
-    expect(await (await GET()).json()).toEqual({ signedIn: true, name: 'ann.bsky.social', initial: 'A' })
+    expect(await (await GET()).json()).toEqual({ signedIn: true, name: 'ann.bsky.social', initial: 'A', avatarSrc: 'http://localhost:3001/u/did%3Aplc%3Ax?s=88&d=404' })
   })
   it('falls back to the DID and treats a lookup failure as signed out', async () => {
-    expect(viewerPayload({ did: 'did:plc:x', handle: null })).toEqual({ signedIn: true, name: 'did:plc:x', initial: '?' })
+    expect(viewerPayload({ did: 'did:plc:x', handle: null })).toEqual({ signedIn: true, name: 'did:plc:x', initial: '?', avatarSrc: null })
     cur.mockRejectedValue(new Error('x'))
     expect(await (await GET()).json()).toEqual({ signedIn: false })
   })

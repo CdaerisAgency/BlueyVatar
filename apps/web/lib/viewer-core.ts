@@ -31,9 +31,14 @@ export function makeTtlCache<V>(ttlMs: number, max = 500, now: () => number = Da
   }
 }
 
-export type ViewerPayload = { signedIn: false } | { signedIn: true; name: string; initial: string }
+/** The header avatar for a person: the delivery service's image for their DID, at menu size. `d=404` makes it answer 404 when they have no avatar, so the menu keeps the letter. Null without a delivery base. */
+export function avatarSrcFor(did: string, deliveryBase: string | null | undefined): string | null {
+  return deliveryBase ? `${deliveryBase.replace(/\/+$/, '')}/u/${encodeURIComponent(did)}?s=88&d=404` : null
+}
 
-/** What /api/viewer returns. Only what the header needs: no DID unless the handle is missing. */
-export function viewerPayload(v: { did: string; handle: string | null } | null): ViewerPayload {
-  return v ? { signedIn: true, name: displayName(v), initial: avatarInitial(v) } : { signedIn: false }
+export type ViewerPayload = { signedIn: false } | { signedIn: true; name: string; initial: string; avatarSrc: string | null }
+
+/** What /api/viewer returns. Only what the header needs: no DID unless the handle is missing. The avatar URL holds the DID, which is already public. */
+export function viewerPayload(v: { did: string; handle: string | null } | null, deliveryBase?: string | null): ViewerPayload {
+  return v ? { signedIn: true, name: displayName(v), initial: avatarInitial(v), avatarSrc: avatarSrcFor(v.did, deliveryBase) } : { signedIn: false }
 }

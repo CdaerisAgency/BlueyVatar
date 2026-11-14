@@ -14,6 +14,12 @@
   }
 }
 
+/* The intro under a page title (PageHeader). Size and line length come from the tokens. */
+@utility bv-intro {
+  max-width: var(--container-bv-intro);
+  font-size: var(--text-bv-intro);
+}
+
 /* Base element styles. Page-level layout lives in utilities and shared components. */
 @layer base {
   html {
@@ -48,6 +54,7 @@
 
   p {
     margin: 0 0 16px;
+    font-size: var(--text-bv-body);
     color: var(--color-bv-ink-2);
   }
 
@@ -69,7 +76,7 @@
   code,
   pre {
     font-family: var(--font-mono);
-    font-size: 0.9em;
+    font-size: var(--text-bv-code);
   }
 
   pre {

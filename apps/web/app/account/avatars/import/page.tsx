@@ -1,4 +1,4 @@
-import { PageMain } from '../../../../components/Page'
+import { PageHeader, PageMain } from '../../../../components/Page'
 import { requireDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
 import { sourceLabel } from '../../../../lib/import'
@@ -32,7 +32,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
 
   return (
     <PageMain>
-      <h1>Import an avatar</h1>
+      <PageHeader title="Import an avatar" />
       {error && <p role="alert">{error}</p>}
       {problem && <p role="alert">{problem}</p>}
       {preview && (

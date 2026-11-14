@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { PageHeader } from '../components/Page'
 import { ACCOUNT_HOME, ACCOUNT_NAV, allItems, currentItemHref, groupIdFor, nextIndex, openGroupIds, parseStoredOpen } from './account-nav'
 
 const accountDir = join(__dirname, '..', 'app', 'account')
@@ -10,7 +13,7 @@ describe('group membership', () => {
     expect(ACCOUNT_NAV.map((g) => [g.label, g.items.map((i) => i.label)])).toEqual([
       ['Profile', ['Profile', 'Profile views', 'Avatars', 'Visibility']],
       ['Identity', ['Organizations', 'Verified accounts', 'Verify', 'Custom profile domain']],
-      ['Developers', ['API keys and license']],
+      ['Developers', ['API keys']],
       ['Billing', ['Plan and billing']],
       ['Settings', ['Notifications', 'Sign-out options', 'Appeal', 'Danger zone']],
     ])
@@ -87,13 +90,37 @@ describe('arrow keys', () => {
   })
 })
 
+/** The visible title of a page: its PageHeader title, either a plain string or a template that starts with the label ("Plan and billing: {org}"). */
+function pageTitles(src: string): string[] {
+  return [...src.matchAll(/<PageHeader title=(?:"([^"]*)"|\{`([^`$]*?)(?::\s*)?(?:\$\{[^}]*\})?`\})/g)].map((m) => (m[1] ?? m[2])!.trim())
+}
+
 describe('label equals heading', () => {
   for (const item of allItems()) {
     it(`${item.href} heading is "${item.label}"`, () => {
       const src = readFileSync(join(accountDir, item.href.replace('/account', ''), 'page.tsx'), 'utf8')
-      const headings = [...src.matchAll(/<h1>([^<{]*?)(?::\s*)?(?:\{[^}]*\})?<\/h1>/g)].map((m) => m[1]!.trim())
+      const headings = pageTitles(src)
       expect(headings.length).toBeGreaterThan(0)
       for (const h of headings) expect(h).toBe(item.label)
     })
   }
+})
+
+describe('one page header', () => {
+  const pages = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? pages(join(dir, e.name)) : e.name === 'page.tsx' ? [join(dir, e.name)] : []))
+  for (const file of pages(accountDir)) {
+    it(`${file.slice(accountDir.length)} uses PageHeader and no bare h1`, () => {
+      const src = readFileSync(file, 'utf8')
+      expect(src).not.toMatch(/<h1[\s>]/)
+      if (src.includes('<PageMain')) expect(src).toContain('<PageHeader') // a page that only redirects has no header
+    })
+  }
+  it('PageHeader renders exactly one h1, with the intro and actions when given', () => {
+    const html = renderToStaticMarkup(createElement(PageHeader, { title: 'API keys', intro: 'Keys.', actions: createElement('a', null, 'Go') }))
+    expect(html.match(/<h1/g)).toHaveLength(1)
+    expect(html).toContain('<h1>API keys</h1>')
+    expect(html).toContain('Keys.')
+    expect(renderToStaticMarkup(createElement(PageHeader, { title: 'X' }))).toBe('<header><h1>X</h1></header>')
+  })
 })

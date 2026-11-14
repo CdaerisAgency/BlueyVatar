@@ -1,5 +1,5 @@
 import { COPY } from '../../../lib/copy'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
 import { ENTITLEMENTS } from '@blueyvatar/core'
@@ -23,7 +23,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   if (!isScope(scope)) {
     return (
       <PageMain>
-        <h1>API keys and license</h1>
+        <PageHeader title="API keys" />
         <p role="alert">{scope.error}</p>
       </PageMain>
     )
@@ -41,7 +41,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
 
   return (
     <PageMain>
-      <h1>API keys and license</h1>
+      <PageHeader title="API keys" />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
 

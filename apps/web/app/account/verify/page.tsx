@@ -1,4 +1,4 @@
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { redirect } from 'next/navigation'
 import { verifyCode } from '../../actions'
@@ -14,7 +14,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   const { error } = await searchParams
   return (
     <PageMain>
-      <h1>Verify</h1>
+      <PageHeader title="Verify" />
       <p>We sent a 6-digit code to {pending.masked}. It expires in 15 minutes.</p>
       {error && <p role="alert" id="verify-error">{error}</p>}
       <form action={verifyCode}>

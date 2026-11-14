@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, keyExpiringNotice, KEY_TYPE_LABELS, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, keyExpiringNotice, KEY_TYPE_LABELS, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice, withAccount,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -91,6 +91,19 @@ describe('Notifier', () => {
     const { sent, n } = setup(dir(on))
     expect(await n.send(DID, 'usage', msg)).toBe('sent')
     expect(sent[0]).toMatchObject({ to: 'a@example.com', subject: 's' })
+  })
+  it('shows the handle on the Account line, falling back to the DID', async () => {
+    const n = usageNotice({ did: DID, threshold: 80, used: 1, included: 2, period: '2026-11-01', publicUrl: URL })
+    const text = async (handle: string | null | 'throw') => {
+      const out: string[] = []
+      const d: NoticeDirectory = { ...dir(on), handle: async () => { if (handle === 'throw') throw new Error('x'); return handle } }
+      await new Notifier({ send: async (m) => void out.push(m.text) }, d).send(DID, 'usage', n)
+      return out[0]!
+    }
+    expect(await text('alice.bsky.social')).toContain('\nAccount: alice.bsky.social\n')
+    expect(await text(null)).toContain(`\nAccount: ${DID}\n`)
+    expect(await text('throw')).toContain(`\nAccount: ${DID}\n`)
+    expect(withAccount(reportOutcomeNotice({ reportId: 1, outcome: 'actioned', publicUrl: URL }), DID, 'a.b').text).not.toContain('Account:')
   })
   it('reports a missing address and a sender failure without throwing', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})

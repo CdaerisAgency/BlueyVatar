@@ -23,7 +23,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     title: 'Developer',
     links: [
-      { href: '/account/keys', label: 'API keys and license', description: 'Your license, API keys, and usage.' },
+      { href: '/account/keys', label: 'API keys', description: 'Create, rotate, and revoke your API keys.' },
       { href: '/account/domain', label: 'Custom profile domain', description: 'Serve your profile from your own subdomain (Plus).' },
     ],
   },

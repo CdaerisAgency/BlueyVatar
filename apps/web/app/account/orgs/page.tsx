@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { listOrganizations } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
@@ -16,7 +16,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const orgs = pool ? await listOrganizations(pool, did) : []
   return (
     <PageMain>
-      <h1>Organizations</h1>
+      <PageHeader title="Organizations" />
       <p>Signed in as {did}</p>
       {error && <p role="alert">{error}</p>}
       <p>An organization shares one license, with its API keys, among several people. Members are added by their atproto DID.</p>
@@ -25,7 +25,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
         <ul>
           {orgs.map((o) => (
             <li key={o.orgId}>
-              <Link href={`/account/orgs/${o.orgId}`}>{o.name}</Link> ({o.role}) - <Link href={`/account/keys?org=${o.orgId}`}>API keys and license</Link>
+              <Link href={`/account/orgs/${o.orgId}`}>{o.name}</Link> ({o.role}) - <Link href={`/account/keys?org=${o.orgId}`}>API keys</Link>
               {o.role === 'owner' && <> - <Link href={`/account/billing?org=${o.orgId}`}>Plan and billing</Link></>}
             </li>
           ))}

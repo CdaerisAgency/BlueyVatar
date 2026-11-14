@@ -1,5 +1,6 @@
 import { DEFAULT_NOTICE_PREFS, decryptJson, emailSender, Notifier, pgNoticeDirectory, type NoticeDirectory, type NoticePrefs } from '@blueyvatar/core/verification'
 import { getPool, getStore } from './store'
+import { resolveHandle } from './viewer'
 
 export interface PrefsDirectory extends NoticeDirectory {
   setPrefs(did: string, p: NoticePrefs): Promise<void>
@@ -32,5 +33,7 @@ export function getNoticeDirectory(): PrefsDirectory {
 }
 
 export function getNotifier(): Notifier {
-  return new Notifier(emailSender(), getNoticeDirectory())
+  const dir = getNoticeDirectory()
+  // The handle for the "Account:" line comes from the account's repo. A failed lookup shows the DID.
+  return new Notifier(emailSender(), { address: (d) => dir.address(d), prefs: (d) => dir.prefs(d), handle: resolveHandle })
 }

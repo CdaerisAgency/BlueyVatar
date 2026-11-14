@@ -1,6 +1,6 @@
 import { SECURITY_NOTICES } from '@blueyvatar/core/verification'
 import Link from 'next/link'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { getNoticeDirectory } from '../../../lib/notify'
 import { getStore } from '../../../lib/store'
@@ -13,7 +13,7 @@ export default async function NotificationsPage() {
   const [prefs, address] = await Promise.all([getNoticeDirectory().prefs(did), getStore().links.noticeAddress(did)])
   return (
     <PageMain>
-      <h1>Notifications</h1>
+      <PageHeader title="Notifications" />
       <p>Signed in as {did}</p>
       {!address && <p role="status">No primary email is on file, so no notices can be sent. Link an email on the <Link href="/account/verify">Verify</Link> page to receive them.</p>}
       <h2>Optional</h2>

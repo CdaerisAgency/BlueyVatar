@@ -29,7 +29,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
       { href: '/account/domain', label: 'Custom profile domain' },
     ],
   },
-  { id: 'developers', label: 'Developers', items: [{ href: '/account/keys', label: 'API keys and license' }] },
+  { id: 'developers', label: 'Developers', items: [{ href: '/account/keys', label: 'API keys' }] },
   { id: 'billing', label: 'Billing', items: [{ href: '/account/billing', label: 'Plan and billing' }] },
   {
     id: 'settings',
