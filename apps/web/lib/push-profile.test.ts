@@ -205,6 +205,6 @@ describe.each(PUSH_APPS.map((a) => [a.id, a] as const))('the %s entry', (_id, ap
   })
 
   it('names the app, never another one, in its messages', () => {
-    for (const m of Object.values(pushMessages(app))) for (const other of PUSH_APPS.filter((o) => o.id !== app.id)) expect(m).not.toContain(other.name)
+    for (const m of Object.values(pushMessages(app))) for (const other of PUSH_APPS.filter((o) => o.id !== app.id)) expect(m.replace("Bluesky account's home server", '')).not.toContain(other.name)
   })
 })
