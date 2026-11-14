@@ -1,6 +1,7 @@
 'use client'
 
 import { startCheckout } from '../app/account/billing/actions'
+import { pricingTarget } from '../lib/chrome'
 import { buttonClass, ButtonLink } from './Button'
 import { useViewer } from './useViewer'
 
@@ -11,8 +12,8 @@ import { useViewer } from './useViewer'
 export default function PricingButton({ tier, highlighted, children }: { tier: string; highlighted: boolean; children: string }) {
   const v = useViewer()
   const variant = highlighted ? 'primary' : 'secondary'
-  if (!v.signedIn) return <ButtonLink href="/login" variant={variant} className="mt-auto">{children}</ButtonLink>
-  if (tier === 'free') return <ButtonLink href="/account" variant={variant} className="mt-auto">{children}</ButtonLink>
+  const href = pricingTarget(tier, v.signedIn)
+  if (href) return <ButtonLink href={href} variant={variant} className="mt-auto">{children}</ButtonLink>
   return (
     <form action={startCheckout} className="mt-auto flex">
       <input type="hidden" name="tier" value={tier} />

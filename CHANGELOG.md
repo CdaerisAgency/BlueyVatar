@@ -2,6 +2,11 @@
 
 New features, changes, and fixes to BlueyVatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-14
+
+### Changed
+- Tests now cover the signed-in and signed-out header and footer links and the pricing buttons (part of #225).
+
 ## 2026-11-08
 
 ### Changed
