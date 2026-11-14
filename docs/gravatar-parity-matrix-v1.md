@@ -85,11 +85,11 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 | Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
-| Profile API | REST v3, `GET /profiles/{id}`, OpenAPI published ([REST docs](https://docs.gravatar.com/rest/api-data/)) | None published | `GET /profile/:id`, OpenAPI at `/openapi.json` (`apps/delivery/src/app.ts`, `docs/api/README-v1.md`) |
+| Profile API | REST v3, `GET /profiles/{id}`, OpenAPI published ([REST docs](https://docs.gravatar.com/rest/api-data/)) | None published | `GET /profile/:id`, OpenAPI at `/openapi.json` (`apps/delivery/src/app.ts`, `docs/api/README-v2.md`) |
 | Write API | `PATCH /me/profile`, avatar upload endpoints, OAuth ([OpenAPI](https://api.gravatar.com/v3/openapi)) | Unknown | Writes go to the person's atproto repo through atproto scopes (spec section 10.1); no write REST API |
 | Search by verified account | `/profiles/search/by-verified-account` ([OpenAPI](https://api.gravatar.com/v3/openapi)) | None published | None found |
 | Rate limits | 1,000 requests per hour per API key for Profiles; avatars not limited ([REST docs](https://docs.gravatar.com/rest/api-data/)) | Unknown | Anonymous 100 per day per IP; Free keyed 1,000 per day; paid monthly caps (`packages/core/src/tiers.ts`) |
-| Error format | `error` and `code` fields | Unknown | `errorBody` with code and message (`docs/api/errors-v1.md`) |
+| Error format | `error` and `code` fields | Unknown | `errorBody` with code and message (`docs/api/errors-v2.md`) |
 
 ## 7. Federation and lookup
 

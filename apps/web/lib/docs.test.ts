@@ -8,7 +8,7 @@ const ERR_CODES = ['invalid_identifier', 'invalid_ttl', 'rate_limited', 'upstrea
 
 describe('rendered docs', () => {
   it('has a page for every docs/api markdown file', () => {
-    const files = readdirSync(new URL('../../../docs/api/', import.meta.url)).filter((f) => f.endsWith('-v1.md'))
+    const files = readdirSync(new URL('../../../docs/api/', import.meta.url)).filter((f) => /-v\d+\.md$/.test(f))
     expect(docPages().filter((p) => p.group === 'api')).toHaveLength(files.length)
     expect(docPage('')?.title).toBe('API reference')
     for (const slug of ['errors', 'examples', 'hashing', 'json-mode', 'format-quality', 'cache-ttl', 'gravatar-differences']) {
@@ -17,7 +17,7 @@ describe('rendered docs', () => {
   })
 
   it('has a guide for every docs/integrations markdown file, with the required embed advice', () => {
-    const files = readdirSync(new URL('../../../docs/integrations/', import.meta.url)).filter((f) => f.endsWith('-v1.md'))
+    const files = readdirSync(new URL('../../../docs/integrations/', import.meta.url)).filter((f) => /-v\d+\.md$/.test(f))
     const guides = docPages().filter((p) => p.group === 'integrations')
     expect(guides.map((g) => g.slug).sort()).toEqual(['integrations-discourse', 'integrations-ghost', 'integrations-html', 'integrations-wordpress'])
     expect(guides).toHaveLength(files.length)
@@ -32,7 +32,7 @@ describe('rendered docs', () => {
   })
 
   it('rewrites cross-page .md links to /docs routes', () => {
-    for (const p of docPages()) expect(p.html, p.slug).not.toMatch(/href="[^"]*-v1\.md/)
+    for (const p of docPages()) expect(p.html, p.slug).not.toMatch(/href="[^"]*-v\d+\.md/)
     expect(docPage('')!.html).toContain('href="/docs/errors"')
   })
 

@@ -4,6 +4,9 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 
 ## 2026-11-14
 
+### Added
+- Expiry reminder emails (part of #236). A scheduled job in the indexer emails the key owner once, 7 days before a key that has an expiry date stops working. Each key gets one reminder, tracked in a new `api_keys.expiry_reminded_at` column (migration 0038). Forever keys, revoked keys, and keys already expired never get one.
+
 ### Fixed
 - CI now installs pnpm into each job's own folder (`dest` on the pnpm setup action). The default folder in the runner user's home was shared by every runner on the machine, which still caused "pnpm: command not found" when jobs overlapped.
 - CI jobs sharing the self-hosted runner no longer collide. Each job has its own pnpm folder and store (fixes "pnpm: command not found"), the e2e and accessibility servers use free ports chosen at run time (fixes "port 3100 is already used"), and CI runs queue per ref instead of cancelling. Locally, `E2E_PORT` still defaults to 3100.
@@ -12,6 +15,8 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 - Account pages are finished on one standard (part of #239). New shared parts: `Section` (heading, one-line description, content, danger tone), `Field` (label, hint, error, required marker), a red `danger` button variant used for delete, revoke, remove, and unlink, an empty-state block with a next action, and a back link on sub-pages (Import an avatar, an organization, its billing page, Danger zone, and a chosen appeal). Every account page now has one intro sentence under its title. The standard is now `docs/page-standard-v2.md`.
 - The Verified accounts page and menu entry are now "Linked accounts", and the landing page button "Claim your avatar" is now "Set up your avatar" (owner decisions on #239). "Custom profile domain" keeps its name.
 - Account pages share one page layout (part of #239). A new `PageHeader` component (heading, optional one-sentence intro, optional action buttons) opens every account page, and the type scale, intro size, and content widths are named in `app/tokens.css`. The API keys menu label and page heading are now "API keys" (the license moved to Plan and billing). A test fails when a menu label and its page heading differ, or when an account page has a bare heading instead of `PageHeader`. The standard is written down in `docs/page-standard-v2.md`.
+- The API docs `README`, `errors`, `examples`, and `usage` pages are now version 2 (`docs/api/*-v2.md`), after the revisions in #304. The usage page now says usage is shown on Plan and billing. Links, the docs site build, and the OpenAPI test follow the new names.
+- The home server wording is "your Bluesky account's home server" on first mention and "home server" after that, in the shared term and in the error messages from the repository code (part of #223).
 - Every notification email now shows your handle on the "Account:" line, falling back to the account ID (part of #239).
 - The profile menu in the header shows your own avatar, and keeps the letter when you have none (part of #239).
 - API key choices follow the owner's decisions on #236 (part of #236). When you create a key the lifetime choices are Forever (the default), 30 days, 90 days, and 1 year. Forever means the key has no expiry date and never stops working; existing keys are unchanged. Rotating a key keeps its lifetime. The two key types are now named "Website key (read only, safe to put in a web page)" and "Server key (read only, keeps usage and stays private)" on the keys page, in the API docs and OpenAPI description, and in the notices. A new expiry reminder email template exists for keys that expire; Forever keys never get one. The reminder is not sent yet.

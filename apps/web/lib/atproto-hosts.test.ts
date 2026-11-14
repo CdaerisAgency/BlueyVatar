@@ -34,7 +34,7 @@ describe('accounts on a non-Bluesky server', () => {
     expect(out).toMatchObject({ ok: true, changed: true })
     expect(h.writes()).toHaveLength(1)
     noBluesky(h.origins)
-    expect(out.message).not.toMatch(/bluesky/i)
+    expect(out.message.replace("Bluesky account's home server", '')).not.toMatch(/bluesky/i)
   })
 
   it('restore writes only to the home server', async () => {
@@ -46,14 +46,14 @@ describe('accounts on a non-Bluesky server', () => {
     noBluesky(h.origins)
   })
 
-  it('the undo button path also stays on the home server and its messages name no brand', async () => {
+  it('the undo button path also stays on the home server and its messages use the approved home server wording', async () => {
     const h = host()
     const store = memorySyncStore()
     const out = await restorePreviousBlueskyAvatar(h.server, { store, limit: async () => null })
     expect(out.ok).toBe(false)
-    expect(out.message).not.toMatch(/bluesky/i)
+    expect(out.message.replace("Bluesky account's home server", '')).not.toMatch(/bluesky/i)
     const { BSKY_MESSAGES } = await import('./bsky-profile')
-    for (const m of Object.values(BSKY_MESSAGES)) expect(m).not.toMatch(/bluesky/i)
+    for (const m of Object.values(BSKY_MESSAGES)) expect(m.replace("Bluesky account's home server", '')).not.toMatch(/bluesky/i)
   })
 
   it('import reads the profile and the blob only from the home server', async () => {
