@@ -8,6 +8,7 @@ import { getDashboardStore, type KeyRow } from '../../../lib/dashboard-store'
 import { getNotifier } from '../../../lib/notify'
 import { PUBLIC_URL } from '../../../lib/oauth'
 import { keyRevokedNotice } from '@blueyvatar/core/verification'
+import { viewerFor } from '../../../lib/viewer'
 import { limited } from '../../../lib/rate-guard'
 import { isScope, resolveScope } from '../../../lib/orgs/scope'
 import { asExpiryChoice, DEFAULT_EXPIRY, expiryFor } from '../../../lib/key-expiry'
@@ -97,7 +98,7 @@ export async function revokeKey(form: FormData): Promise<void> {
   // revokeKey is true only for the call that revoked it, so a repeated submit sends one notice.
   if ((await store.revokeKey(license.licenseId, hash)) && key) {
     await scope.audit(did, 'key_revoked', null, `${key.prefix} ${key.kind}`)
-    await getNotifier().send(license.owner, 'security', keyRevokedNotice({ did: license.owner, prefix: key.prefix, label: key.label, publicUrl: PUBLIC_URL }))
+    await getNotifier().send(license.owner, 'security', keyRevokedNotice({ did: license.owner, prefix: key.prefix, label: key.label, createdAt: key.createdAt, account: (await viewerFor(license.owner)).handle, publicUrl: PUBLIC_URL }))
   }
   revalidatePath('/account/keys')
 }
