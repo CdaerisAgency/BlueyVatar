@@ -458,7 +458,7 @@ Do these in test mode first, then live mode. Never commit keys, price ids, or pr
 - **Plus.** Plus is $9 per month, approved by the owner, and combines the old Plus and Pro plans. A DID has Plus while it holds a Plus subscription, or a Business subscription on its own license, that is `active`, `trialing`, or `past_due` inside the same 7 day grace period, or while it is listed in `PLUS_DIDS`. `PLUS_DIDS` stays as a manual grant for testing and gifts and needs no subscription. The web app and delivery both read the subscription, so the gallery, extra avatar slots, and custom domain follow a purchase within a webhook delivery. A license holds one subscription at a time.
 - **Overage.** Metered overage is not billed yet. It needs the per-miss cost measured after deploy, then a metered price and usage reporting.
 
-## Verified account providers
+## Linked account providers
 
 Issue #58. Research and per-platform status: `docs/research/verified-accounts-v1.md`. Set these on the **web** app only (the indexer's re-check needs no provider keys). Every provider is off until its flag is exactly `true` and both credentials are set, so a platform whose app review is not finished stays hidden on the claims page. The redirect (callback) URL to register with every provider is `https://<PUBLIC_URL host>/account/claims/callback`. Values live in Infisical and are pushed with `fly secrets set --app blueyvatar-web`; never commit them.
 
