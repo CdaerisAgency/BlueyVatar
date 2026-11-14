@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PERMISSION_SET_NSID, clientMetadata, emailLinkScope, grantsBskyProfileUpdate, signInScope, useBskyProfileScope, usePermissionSet } from './oauth'
+import { PERMISSION_SET_NSID, clientMetadata, consentScope, declaredScope, emailLinkScope, grantsProfileWrite, profileWriteScope, pushAppsEnabled, signInScope, usePermissionSet } from './oauth'
+import { PUSH_APPS } from './push-apps'
 
 describe('OAuth scope', () => {
   it('defaults to the three granular repo scopes', () => {
@@ -36,23 +37,50 @@ describe('OAuth scope', () => {
   })
 })
 
-describe('Bluesky profile scope', () => {
-  it('is off by default and adds one update-only scope when on', () => {
-    for (const v of ['', 'false', '0', 'yes', undefined]) expect(useBskyProfileScope({ OAUTH_REQUEST_BSKY_PROFILE: v })).toBe(false)
-    for (const v of ['true', 'TRUE', '1', ' true ']) expect(useBskyProfileScope({ OAUTH_REQUEST_BSKY_PROFILE: v })).toBe(true)
-    expect(signInScope(false, false)).not.toContain('app.bsky')
-    expect(signInScope(false, true)).toBe('atproto repo:com.blueyvatar.image repo:com.blueyvatar.profile repo:com.blueyvatar.claim repo:app.bsky.actor.profile?action=update blob:image/*')
-    expect(signInScope(true, true)).toContain('repo:app.bsky.actor.profile?action=update')
-    expect(emailLinkScope(false, true)).toBe(`${signInScope(false, true)} account:email`)
+describe('profile scope per app', () => {
+  it('asks for create and update on one collection (issue #297)', () => {
+    expect(profileWriteScope('app.bsky.actor.profile')).toBe('repo:app.bsky.actor.profile?action=create&action=update')
+    expect(profileWriteScope('org.tangled.actor.profile')).toBe('repo:org.tangled.actor.profile?action=create&action=update')
   })
 
-  it('reads a granted scope string', () => {
-    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile?action=update blob:image/*')).toBe(true)
-    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile')).toBe(true)
-    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile?action=create&action=update')).toBe(true)
-    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profile?action=create')).toBe(false)
-    expect(grantsBskyProfileUpdate('atproto repo:app.bsky.actor.profileX blob:image/*')).toBe(false)
-    expect(grantsBskyProfileUpdate('atproto repo:com.blueyvatar.image')).toBe(false)
-    expect(grantsBskyProfileUpdate(undefined)).toBe(false)
+  it('leaves the normal sign-in request without any app profile scope', () => {
+    for (const set of [false, true]) {
+      expect(signInScope(set)).not.toContain('app.bsky')
+      expect(signInScope(set)).not.toContain('tangled')
+      expect(emailLinkScope(set)).not.toContain('actor.profile')
+    }
+    expect(signInScope(false)).toBe('atproto repo:com.blueyvatar.image repo:com.blueyvatar.profile repo:com.blueyvatar.claim blob:image/*')
+  })
+
+  it('adds only the listed apps to a consent request, once each, after the sign-in scope', () => {
+    expect(consentScope(['app.bsky.actor.profile'], false)).toBe(`${signInScope(false)} repo:app.bsky.actor.profile?action=create&action=update`)
+    expect(consentScope(['app.bsky.actor.profile', 'org.tangled.actor.profile', 'app.bsky.actor.profile'], false)).toBe(
+      `${signInScope(false)} repo:app.bsky.actor.profile?action=create&action=update repo:org.tangled.actor.profile?action=create&action=update`,
+    )
+    expect(consentScope(['org.tangled.actor.profile'], false)).not.toContain('app.bsky')
+  })
+
+  it('is off by default and declares the registry scopes in the client metadata only when on', () => {
+    for (const v of ['', 'false', '0', 'yes', undefined]) expect(pushAppsEnabled({ OAUTH_PUSH_APPS: v })).toBe(false)
+    for (const v of ['true', 'TRUE', '1', ' true ']) expect(pushAppsEnabled({ OAUTH_PUSH_APPS: v })).toBe(true)
+    const collections = PUSH_APPS.map((a) => a.collection)
+    expect(declaredScope(collections, false, false)).toBe(emailLinkScope(false))
+    const on = declaredScope(collections, false, true).split(' ')
+    for (const c of collections) expect(on).toContain(profileWriteScope(c))
+    expect(on).toContain('account:email')
+  })
+
+  it('reads a granted scope string: both create and update are needed', () => {
+    const c = 'app.bsky.actor.profile'
+    expect(grantsProfileWrite(c, 'atproto repo:app.bsky.actor.profile?action=create&action=update blob:image/*')).toBe(true)
+    expect(grantsProfileWrite(c, 'atproto repo:app.bsky.actor.profile')).toBe(true)
+    expect(grantsProfileWrite(c, 'atproto repo:*')).toBe(true)
+    expect(grantsProfileWrite(c, 'atproto repo:app.bsky.actor.profile?action=update')).toBe(false)
+    expect(grantsProfileWrite(c, 'atproto repo:app.bsky.actor.profile?action=create')).toBe(false)
+    expect(grantsProfileWrite(c, 'atproto repo:app.bsky.actor.profile?action=delete')).toBe(false)
+    expect(grantsProfileWrite(c, 'atproto repo:app.bsky.actor.profileX blob:image/*')).toBe(false)
+    expect(grantsProfileWrite(c, 'atproto repo:com.blueyvatar.image')).toBe(false)
+    expect(grantsProfileWrite(c, undefined)).toBe(false)
+    expect(grantsProfileWrite('org.tangled.actor.profile', 'atproto repo:app.bsky.actor.profile?action=create&action=update')).toBe(false)
   })
 })
