@@ -53,7 +53,18 @@ if (!res.ok) {
 console.log(res.headers.get('x-rate-limit-remaining'), await res.json())
 ```
 
-In a browser, use a publishable key in the `token` query parameter and never ship a secret key.
+In a browser, use a website key in the `token` query parameter and never ship a server key.
+
+## Key types and lifetime
+
+| Key | Starts with | Sent in | What it is for |
+| --- | --- | --- | --- |
+| Website key (read only, safe to put in a web page) | `pk_` | `token` query parameter | Fetching avatars from a web page or app. On paid plans you can limit it to your own domains. |
+| Server key (read only, keeps usage and stays private) | `sk_` | `x-api-key` header | Fetching avatars and reading `GET /usage` from your own server. Never put it in a web page. |
+
+Both key types are read only. The API has no write routes yet.
+
+When you create a key you pick its lifetime: Forever, 30 days, 90 days, or 1 year. Forever is the default and the key never expires. Any other choice sets an expiration time, and after it passes the key is rejected with `401 key_expired`. Create a replacement on the API keys page before then. We email the account owner shortly before a key that expires stops working; a Forever key gets no such email.
 
 ## HTML
 
@@ -68,4 +79,4 @@ In a browser, use a publishable key in the `token` query parameter and never shi
 >
 ```
 
-Set `referrerpolicy="no-referrer"` on avatar images, so your page URL is not sent to the avatar host. The one exception is a publishable key with a domain list: an `<img>` request carries no `Origin` header, so the key check reads `Referer`. For that case use `referrerpolicy="origin"`, which sends only your site origin.
+Set `referrerpolicy="no-referrer"` on avatar images, so your page URL is not sent to the avatar host. The one exception is a website key with a domain list: an `<img>` request carries no `Origin` header, so the key check reads `Referer`. For that case use `referrerpolicy="origin"`, which sends only your site origin.

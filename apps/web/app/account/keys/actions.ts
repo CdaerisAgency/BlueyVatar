@@ -11,7 +11,7 @@ import { keyRevokedNotice } from '@blueyvatar/core/verification'
 import { viewerFor } from '../../../lib/viewer'
 import { limited } from '../../../lib/rate-guard'
 import { isScope, resolveScope } from '../../../lib/orgs/scope'
-import { asExpiryChoice, DEFAULT_EXPIRY, expiryFor } from '../../../lib/key-expiry'
+import { asExpiryChoice, DEFAULT_EXPIRY, expiryFor, lifetimeChoice } from '../../../lib/key-expiry'
 import { checkKeyLimit, cleanLabel, displayPrefix, generateKey, hashKey, parseDomainList, type KeyKind } from '../../../lib/keys'
 
 export interface KeyState {
@@ -20,7 +20,7 @@ export interface KeyState {
   /** The full key. Returned to the browser once and never stored. */
   key?: string
   keyKind?: KeyKind
-  /** ISO time the new key stops working. Absent for a key that never expires. */
+  /** ISO time the new key stops working. Absent for a Forever key. */
   expiresAt?: string
   /** What the person typed, so a failed submit keeps it. */
   values?: { label: string; expires: string; kind: string }
@@ -85,8 +85,8 @@ export async function rotateKey(_prev: KeyState, form: FormData): Promise<KeySta
   const hash = String(form.get('hash') ?? '')
   const old = (await store.listKeys(license.licenseId)).find((k) => k.hash === hash && !k.revokedAt)
   if (!old) return { error: 'That key is already revoked or does not exist.' }
-  // A rotated key that expired gets the default lifetime. A key that never expired keeps that.
-  return issue(orgOf(form), old.kind, old.label, old.domains, old.expiresAt ? expiryFor(DEFAULT_EXPIRY, new Date()) : null, hash)
+  // The replacement keeps the lifetime the old key was given: Forever stays Forever, 30 days, 90 days and 1 year start over.
+  return issue(orgOf(form), old.kind, old.label, old.domains, expiryFor(lifetimeChoice(old.createdAt, old.expiresAt), new Date()), hash)
 }
 
 export async function revokeKey(form: FormData): Promise<void> {
@@ -111,7 +111,7 @@ export async function saveDomains(_prev: KeyState, form: FormData): Promise<KeyS
   const parsed = parseDomainList(String(form.get('domains') ?? ''))
   if (!parsed.ok) return { error: parsed.errors.join(' ') }
   const ok = await store.setDomains(license.licenseId, String(form.get('hash') ?? ''), parsed.domains)
-  if (!ok) return { error: 'Only active publishable keys have a domain list.' }
+  if (!ok) return { error: 'Only active website keys have a domain list.' }
   await scope.audit(did, 'key_domains_changed', null, `${parsed.domains.length} domains`)
   revalidatePath('/account/keys')
   return { message: parsed.domains.length ? 'Domains saved.' : 'Domain list cleared. Any host may use this key.' }
