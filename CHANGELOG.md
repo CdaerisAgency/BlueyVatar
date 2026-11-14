@@ -9,6 +9,9 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 - CI jobs sharing the self-hosted runner no longer collide. Each job has its own pnpm folder and store (fixes "pnpm: command not found"), the e2e and accessibility servers use free ports chosen at run time (fixes "port 3100 is already used"), and CI runs queue per ref instead of cancelling. Locally, `E2E_PORT` still defaults to 3100.
 
 ### Changed
+- Every linked email is now stored encrypted, so the Account page shows each address in full under Linked emails (part of #223). Emails linked earlier show masked, with "address not stored, link it again to show it", until you link them again. The privacy page and the data export describe this (migration 0037).
+- "PDS" is now "home server" in user-facing text, with "your Bluesky account's home server" on first mention and a one-line explanation (part of #223). The Your data page shows both your handle and your account ID (part of #236).
+- The paragraph above "Upload an image" has the approved wording with your plan's image limit (part of #227).
 - The gallery upload form on the Account page now shows "If R, label as" only when the rating is R, like the avatars page (part of #227).
 - Tests now cover the signed-in and signed-out header and footer links and the pricing buttons (part of #225).
 - The API keys page is now about keys (#236). Its heading stays "API keys and license" until the menu label is renamed to "API keys". The License section, plan limits, usage history, last 30 days, and usage alert status moved to Plan and billing, for your account and for organizations. The page shows your handle, not your account ID, on Plan and billing too (part of #237). The revoked-key email names the key in the subject and first line (an unnamed key reads "Unnamed key, created 2026-11-08") and the "Account:" line shows your handle, falling back to the account ID.
