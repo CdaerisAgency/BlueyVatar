@@ -239,10 +239,43 @@ When a limit is hit, server actions show "Too many requests. Try again in N minu
 | `key.did`, `key.ip` (create and rotate) | DID, IP | 20, 60 | 1 hour |
 | `addEmail.did`, `addEmail.ip` (new codes) | DID, IP | 5, 20 | 1 hour |
 | `codeFail.did` (wrong codes across all codes, then lockout) | DID | 10 failures | 1 hour |
+| `bugReport.did`, `bugReport.ip` (bug report button) | DID, IP | 5, 20 | 1 hour |
 
 The per-code cap of 5 attempts and the 60 second resend gap still apply. Report submissions keep their own limit of 5 per IP per hour.
 
 Per-account caps, enforced on the server: images by plan (Free 3, Plus 20), gallery images (`GALLERY_MAX`), 10 linked emails, 10 profile links, claims (`MAX_CLAIMS`, checked against both the repo and the database), one custom domain, and active keys by tier. Uploads must carry exactly one file of at most 5 MiB (5,242,880 bytes, the reference PDS default), checked before the file is read, whatever the browser resized. An image above 4096 pixels on the long side is downscaled by the web server with sharp if the browser did not already do it (spec section 5). Server actions accept bodies up to 6 MB.
+## Bug reports
+
+The bug report button (issue 266) is a floating button on every page. A signed-in person describes the problem, optionally attaches a screenshot, and the web server files a GitHub issue. The browser never holds a token.
+
+### Owner step: create and store the token
+
+1. In GitHub, create a fine-grained personal access token. Resource owner: the organization that owns the repository. Repository access: only the repository that receives the issues. Repository permissions: **Issues: Read and write** (Metadata read-only is added automatically). Nothing else. Pick an expiry and note the renewal date.
+2. Store it in Infisical as `GITHUB_FEEDBACK_TOKEN` (staging: `STAGING_GITHUB_FEEDBACK_TOKEN`).
+3. Set it on the web app as a Fly secret, and optionally the repository: `fly secrets set GITHUB_FEEDBACK_TOKEN=<value> --app <web app>`. Do the staging app first and file a test issue before production. Use `GITHUB_FEEDBACK_REPO=owner/name` to point staging at a test repository. It defaults to `CdaerisAgency/BlueyVatar`.
+
+Agents do not create or set this token. Names only are in `.env.example`.
+
+### Behavior to know
+
+- **Variable unset:** the button is hidden on every page and `POST /api/bug-report` answers 503 "Bug reports are unavailable right now." Nothing else changes. The value is read at request time, so a Fly secret change takes effect on the next machine restart.
+- **Who can file:** signed-in accounts only (401 otherwise; signed-out visitors who open the button see a sign-in link). Limits are in the Web rate limits table: 5 per account and 20 per network per hour. A hidden field that people never see catches simple bots (the request looks successful and files nothing), the description is 10 to 2,000 characters with at most 3 links, and the request body is capped at 16 KB.
+- **The issue:** title `Bug report: <first line>`, the description, the page path (no query string or fragment), window size, browser string, and the build (`SENTRY_RELEASE`, else `FLY_IMAGE_REF`). `@names` and `#numbers` are defused so a report cannot ping people or link issues. The handle is named only if the person ticks the box (it falls back to the account ID, as in notification emails), and the contact email only if they type one; the dialog says both can be public. Labels are `bug` and `area:web`, which already exist. The route never creates labels and does no triage.
+- **Screenshots are not stored.** GitHub has no REST endpoint that uploads an image to an issue (Cadence reaches the same conclusion and keeps screenshots in its own database, linked from the issue behind a sign-in). BlueyVatar has no object storage or screenshot table, and adding one needs a migration and a private viewing route. Until the owner decides, the picture stays in the person's browser: it is re-drawn as a JPEG (this drops photo metadata), scaled to 1,600 pixels on the long side, held under 1 MB, and only PNG, JPEG, and WebP up to 10 MB are accepted. The issue says a screenshot exists, and after sending the dialog offers a download so the person can add it to the issue on GitHub.
+- **Privacy:** the repository will be public (issues 213 and 214), so every issue is public. The dialog warns about this and about personal information in screenshots. The privacy policy and the data export and deletion wording for filed issues are not updated yet; reports are not stored in the database, so there is nothing for the export to include.
+
+### What differs from Cadence
+
+| Cadence | BlueyVatar |
+| --- | --- |
+| Icon beside Help in the signed-in app header | Floating button on every page (the site has no signed-in app header) |
+| Screenshot saved in Cadence's database, linked from the issue | Not stored (see above) |
+| Up to 3 screenshots, drag and drop, paste | One screenshot: capture this tab (where the browser supports it) or attach a picture |
+| Token `FEEDBACK_GITHUB_TOKEN`, repository a constant | `GITHUB_FEEDBACK_TOKEN`, repository in `GITHUB_FEEDBACK_REPO` |
+| No limit beyond sign-in and body length | Per-account and per-network limits, hidden field, link cap |
+| Issue names the reporter and company | Handle only with consent; contact email only if typed |
+| Report kinds, help requests, Feedback board mirror | Bugs only; the feature only files issues |
+
 ## Email routing
 
 Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It receives and forwards only; it does not send mail.
@@ -449,7 +482,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `IMG_MAX_CONCURRENT`, `IMG_QUEUE_MAX`, `IMG_QUEUE_WAIT_MS`, `RATE_BATCH_MS`, `SENTRY_DSN`, `METRICS_TOKEN` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); moderation digest (optional `MODERATION_DIGEST_TO`, `MODERATION_DIGEST_HOUR_UTC`, `MODERATION_DIGEST_ALWAYS`, `MODERATION_SLA_HOURS`; `ADMIN_DIDS` as the default recipient source); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), optional `OAUTH_REQUEST_BSKY_PROFILE` (see Bluesky avatar permission), `TRUSTED_PDS_HOSTS`, `ADMIN_DIDS` and `ADMIN_TOTP_SECRET` (review portal; see Web admin page), optional `MODERATION_SLA_HOURS`, `MODERATION_POLICIES`, `MODERATION_CHILD_SAFETY_DIDS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_ALLOW_PROMO_CODES` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), optional `OAUTH_REQUEST_BSKY_PROFILE` (see Bluesky avatar permission), `TRUSTED_PDS_HOSTS`, `ADMIN_DIDS` and `ADMIN_TOTP_SECRET` (review portal; see Web admin page), optional `MODERATION_SLA_HOURS`, `MODERATION_POLICIES`, `MODERATION_CHILD_SAFETY_DIDS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_ALLOW_PROMO_CODES` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN`; bug report button: `GITHUB_FEEDBACK_TOKEN`, optional `GITHUB_FEEDBACK_REPO` (see Bug reports) |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `SENTRY_DSN` and `METRICS_TOKEN` are new secrets (see Observability). `SENTRY_DSN` can be the same project DSN on all three apps, since events are tagged with `app`. `METRICS_TOKEN` should differ per app. Staging uses `STAGING_SENTRY_DSN` and `STAGING_METRICS_TOKEN`, ideally pointing at a separate Sentry project or environment. Non-secret tuning values (`LOG_LEVEL`, `READY_TIMEOUT_MS`, `INDEXER_STALL_SECONDS`, `TAP_PROBE_INTERVAL_SECONDS`, `HEALTH_PORT`) are listed in `.env.example` and can go in `fly/*.toml` `[env]`.

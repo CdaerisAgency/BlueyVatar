@@ -54,6 +54,8 @@ export const BUCKETS = {
   'profileSave.did': { limit: 60, windowSec: HOUR },
   'deleteData.did': { limit: 5, windowSec: HOUR },
   'deleteData.ip': { limit: 20, windowSec: HOUR },
+  'bugReport.did': { limit: 5, windowSec: HOUR },
+  'bugReport.ip': { limit: 20, windowSec: HOUR },
 } as const satisfies Record<string, BucketConfig>
 
 export type BucketName = keyof typeof BUCKETS
