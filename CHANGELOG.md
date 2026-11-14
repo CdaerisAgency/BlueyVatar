@@ -10,6 +10,7 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 
 ### Changed
 - The gallery upload form on the Account page now shows "If R, label as" only when the rating is R, like the avatars page (part of #227).
+- Tests now cover the signed-in and signed-out header and footer links and the pricing buttons (part of #225).
 
 ## 2026-11-08
 
