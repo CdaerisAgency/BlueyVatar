@@ -48,13 +48,13 @@ describe('accounts on a non-Bluesky server', () => {
     noBluesky(h.origins)
   })
 
-  it('the undo button path also stays on the home server and its messages name no brand', async () => {
+  it('the undo button path also stays on the home server and its messages use the approved home server wording', async () => {
     const h = host()
     const store = memoryPushStore()
     const out = await restorePrevious(h.server, BSKY, { store, limit: async () => null })
     expect(out.ok).toBe(false)
-    // The app is named, because the record belongs to it. The account's server is never called Bluesky.
-    const neverHostBrand = (m: string) => expect(m).not.toMatch(/bluesky\.|bsky\.|on bluesky|bluesky server/i)
+    // The app is named, because the record belongs to it. The shared home server wording is the one allowed use of the brand for a server.
+    const neverHostBrand = (m: string) => expect(m.replace("Bluesky account's home server", '')).not.toMatch(/bluesky\.|bsky\.|on bluesky|bluesky server/i)
     neverHostBrand(out.message)
     for (const m of Object.values(pushMessages(BSKY))) neverHostBrand(m)
   })

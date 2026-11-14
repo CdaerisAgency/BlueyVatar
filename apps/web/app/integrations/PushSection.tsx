@@ -1,5 +1,6 @@
 import { Button } from '../../components/Button'
 import { currentDid } from '../../lib/auth'
+import { HOME_SERVER_TERM } from '../../lib/home-server'
 import { pdsHost } from '../../lib/pds'
 import { pushAppsEnabled } from '../../lib/oauth'
 import { PUSH_APPS, limitLabel, type PushApp } from '../../lib/push-apps'
@@ -23,7 +24,7 @@ export default async function PushSection({ ask }: { ask?: string }) {
     <section aria-labelledby="push-heading">
       <h2 id="push-heading">Send your picture to apps</h2>
       <p>
-        Pick the apps that should show your BlueyVatar default image as their profile picture. Each box is off until you tick it. Ticking one asks your Bluesky account&apos;s home server
+        Pick the apps that should show your BlueyVatar default image as their profile picture. Each box is off until you tick it. Ticking one asks {HOME_SERVER_TERM}
         for the permission to change that one app&apos;s profile record, and nothing else. The home server is the service that stores your account and everything you post. Images rated R or X are never sent.
       </p>
       {!did ? (

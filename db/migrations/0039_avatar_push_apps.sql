@@ -17,7 +17,7 @@ ALTER TABLE bsky_avatar_sync ADD COLUMN may_create boolean NOT NULL DEFAULT fals
 ALTER TABLE bsky_avatar_sync ADD COLUMN consent_started_at timestamptz;
 ALTER TABLE bsky_avatar_sync DROP CONSTRAINT bsky_avatar_sync_pkey;
 ALTER TABLE bsky_avatar_sync ADD PRIMARY KEY (did, app);
-COMMENT ON COLUMN bsky_avatar_sync.auto_sync IS 'Superseded by enabled (0038). No longer read.';
+COMMENT ON COLUMN bsky_avatar_sync.auto_sync IS 'Superseded by enabled (0039). No longer read.';
 
 ALTER TABLE bsky_avatar_log ADD COLUMN app text NOT NULL DEFAULT 'bluesky';
 

@@ -3,7 +3,7 @@ import type { BlobRef } from './repo'
 import { getPool } from './store'
 
 /**
- * Per-account, per-app state for the avatar push (migrations 0033 and 0038). The tables keep their original
+ * Per-account, per-app state for the avatar push (migrations 0033 and 0039). The tables keep their original
  * names (`bsky_avatar_sync`, `bsky_avatar_log`) so the account export and delete code keeps working. No row means
  * the defaults: the app is off, because nothing is pushed until the user ticks its box.
  */

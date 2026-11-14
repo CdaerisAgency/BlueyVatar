@@ -1,7 +1,7 @@
 /**
  * OpenAPI 3.1 description of the delivery API (issue #142). Served at /openapi.json.
  * The route and error-code tests in openapi.test.ts keep this file in step with app.ts,
- * errors.ts, and docs/api/errors-v1.md.
+ * errors.ts, and docs/api/errors-v2.md.
  */
 import { DEFAULT_STYLES } from '@blueyvatar/core'
 import { ERROR_CODES } from './errors.js'

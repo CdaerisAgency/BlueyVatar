@@ -58,4 +58,4 @@ A trailing `.png`, `.jpg`, `.jpeg`, or `.webp` on the hash is stripped and the h
 
 ## Errors
 
-Any value that is not 64 or 32 hex characters on `/avatar/{hash}` returns `400 invalid_identifier`. On `/profile/{id}`, an email address returns `400 invalid_identifier`. See [errors-v1.md](errors-v1.md).
+Any value that is not 64 or 32 hex characters on `/avatar/{hash}` returns `400 invalid_identifier`. On `/profile/{id}`, an email address returns `400 invalid_identifier`. See [errors-v2.md](errors-v2.md).

@@ -12,8 +12,8 @@ import { homeServerFor, homeServerHost, homeServerPhrase, serverLabel } from './
 
 describe('home server', () => {
   it('adds the host in parentheses when known', () => {
-    expect(homeServerPhrase('a.example.com')).toBe("your account's home server (a.example.com)")
-    expect(homeServerPhrase(null)).toBe("your account's home server")
+    expect(homeServerPhrase('a.example.com')).toBe("your Bluesky account's home server (a.example.com)")
+    expect(homeServerPhrase(null)).toBe("your Bluesky account's home server")
     expect(serverLabel('a.example.com')).toBe('a.example.com')
     expect(serverLabel(null)).toBe('my home server')
   })
@@ -24,6 +24,6 @@ describe('home server', () => {
   it('falls back without parentheses', async () => {
     expect(await homeServerHost('bad')).toBeNull()
     expect(await homeServerHost('junk')).toBeNull()
-    expect(await homeServerFor('bad')).toBe("your account's home server")
+    expect(await homeServerFor('bad')).toBe("your Bluesky account's home server")
   })
 })
