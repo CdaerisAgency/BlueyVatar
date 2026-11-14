@@ -19,7 +19,7 @@ export default async function StatsPage() {
 
   return (
     <PageMain>
-      <PageHeader title="Profile views" />
+      <PageHeader title="Profile views" intro="See how often people open your public profile each day (Plus)." />
       {!plus && (
         <Note>
           <p>

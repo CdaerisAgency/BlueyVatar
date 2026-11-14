@@ -12,7 +12,7 @@ describe('group membership', () => {
   it('matches the approved grouping', () => {
     expect(ACCOUNT_NAV.map((g) => [g.label, g.items.map((i) => i.label)])).toEqual([
       ['Profile', ['Profile', 'Profile views', 'Avatars', 'Visibility']],
-      ['Identity', ['Organizations', 'Verified accounts', 'Verify', 'Custom profile domain']],
+      ['Identity', ['Organizations', 'Linked accounts', 'Verify', 'Custom profile domain']],
       ['Developers', ['API keys']],
       ['Billing', ['Plan and billing']],
       ['Settings', ['Notifications', 'Sign-out options', 'Appeal', 'Danger zone']],
@@ -122,5 +122,24 @@ describe('one page header', () => {
     expect(html).toContain('<h1>API keys</h1>')
     expect(html).toContain('Keys.')
     expect(renderToStaticMarkup(createElement(PageHeader, { title: 'X' }))).toBe('<header><h1>X</h1></header>')
+  })
+})
+
+describe('page standard v2', () => {
+  const pages = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? pages(join(dir, e.name)) : e.name === 'page.tsx' ? [join(dir, e.name)] : []))
+  const withHeader = pages(accountDir).filter((f) => readFileSync(f, 'utf8').includes('<PageMain'))
+  for (const file of withHeader) {
+    const src = readFileSync(file, 'utf8')
+    it(`${file.slice(accountDir.length)} gives every PageHeader an intro and uses Section, not bare h2`, () => {
+      const headers = src.match(/<PageHeader\b[\s\S]*?\/>/g) ?? []
+      expect(headers.length).toBeGreaterThan(0)
+      for (const h of headers) expect(h).toMatch(/\sintro=/)
+      expect(src).not.toMatch(/<h2[\s>]/)
+      expect(src).not.toMatch(/<h3[\s>]/)
+    })
+  }
+  it('sub-pages link back to their parent', () => {
+    for (const f of ['avatars/import', 'orgs/[id]', 'settings/danger']) expect(readFileSync(join(accountDir, f, 'page.tsx'), 'utf8')).toContain('<BackLink')
   })
 })

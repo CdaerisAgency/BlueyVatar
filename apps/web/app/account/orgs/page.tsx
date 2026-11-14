@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PageHeader, PageMain } from '../../../components/Page'
+import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { listOrganizations } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
@@ -16,12 +16,11 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const orgs = pool ? await listOrganizations(pool, did) : []
   return (
     <PageMain>
-      <PageHeader title="Organizations" />
+      <PageHeader title="Organizations" intro="An organization shares one license, with its API keys, among several people." />
       <p>Signed in as {did}</p>
       {error && <p role="alert">{error}</p>}
-      <p>An organization shares one license, with its API keys, among several people. Members are added by their atproto DID.</p>
       {!pool && <p>Organizations need the database, which is not configured here.</p>}
-      {orgs.length === 0 ? <p>You are not in any organization yet.</p> : (
+      {orgs.length === 0 ? <EmptyState>You are not in any organization yet. Create one below.</EmptyState> : (
         <ul>
           {orgs.map((o) => (
             <li key={o.orgId}>
@@ -31,9 +30,9 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
           ))}
         </ul>
       )}
-      <h2>Create an organization</h2>
-      <p>You become its first owner and its billing owner. The Business tier ($49 per month, 25 keys) is for organizations.</p>
-      <CreateOrgForm />
+      <Section title="Create an organization" intro="You become its first owner and its billing owner. The Business tier ($49 per month, 25 keys) is for organizations. Members are added by their atproto DID.">
+        <CreateOrgForm />
+      </Section>
     </PageMain>
   )
 }

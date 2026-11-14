@@ -1,5 +1,5 @@
 import { ENTITLEMENTS, historyDays, type Tier } from '@blueyvatar/core'
-import { TableBox } from '../../../components/Page'
+import { Section, TableBox } from '../../../components/Page'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { alertState, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
 
@@ -22,7 +22,7 @@ export async function LicenseUsage({ license }: { license: { licenseId: string; 
   const state = alertState(license.tier, used)
   return (
     <>
-      <h2>License</h2>
+      <Section title="License">
       <ul>
         <li>Tier: {license.tier}</li>
         <li>Status: {license.status.replace('_', ' ')}</li>
@@ -38,10 +38,10 @@ export async function LicenseUsage({ license }: { license: { licenseId: string; 
         </li>
         {inc.per === 'day' && <li>Free limits are per day, so the monthly total above is for reference.</li>}
       </ul>
+      </Section>
 
       {periods.length > 0 && (
-        <>
-          <h2>Usage history</h2>
+        <Section title="Usage history">
           <TableBox label="Usage history">
             <table>
               <thead>
@@ -87,7 +87,7 @@ export async function LicenseUsage({ license }: { license: { licenseId: string; 
             </table>
           </TableBox>
           <p>The same numbers are available from code with <code>GET /usage</code> and a secret key. See the API docs.</p>
-        </>
+        </Section>
       )}
     </>
   )

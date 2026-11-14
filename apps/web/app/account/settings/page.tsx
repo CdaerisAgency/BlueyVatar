@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '../../../components/Button'
-import { PageHeader, PageMain } from '../../../components/Page'
+import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
 import { currentSession, requireDid } from '../../../lib/auth'
 import { getStore } from '../../../lib/store'
 import { viewerFor } from '../../../lib/viewer'
@@ -20,11 +20,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sessions = await getStore().sessions.list(did)
   return (
     <PageMain>
-      <PageHeader title="Sign-out options" />
+      <PageHeader title="Sign-out options" intro="See where you are signed in, and sign out of one device or all of them." />
       <p>Signed in as {displayName(viewer)}</p>
       {SETTINGS_GROUPS.map((g) => (
-        <section key={g.title} aria-labelledby={`g-${g.title}`}>
-          <h2 id={`g-${g.title}`}>{g.title}</h2>
+        <Section key={g.title} title={g.title} id={`g-${g.title}`}>
           <ul className="list-none p-0">
             {g.links.map((l) => (
               <li key={l.href}>
@@ -32,15 +31,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
               </li>
             ))}
           </ul>
-        </section>
+        </Section>
       ))}
 
-      <h2 id="sessions">Sessions</h2>
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
-      <p>Browsers and devices signed in to this account. Sessions older than 30 days expire on their own.</p>
+      <Section title="Sessions" id="sessions" intro="Browsers and devices signed in to this account. Sessions older than 30 days expire on their own.">
       {sessions.length === 0 ? (
-        <p>No tracked sessions yet. Older sign-ins may not be listed here. &quot;Sign out everywhere&quot; ends those too.</p>
+        <EmptyState>No tracked sessions yet. Older sign-ins may not be listed here. &quot;Sign out everywhere&quot; ends those too.</EmptyState>
       ) : (
         <ul>
           {sessions.map((s) => (
@@ -60,20 +58,21 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </ul>
       )}
       <form action={signOutEverywhere}>
-        <Button type="submit">Sign out everywhere</Button>
+        <Button type="submit" variant="danger">Sign out everywhere</Button>
       </form>
+      </Section>
 
-      <h2 id="account-id">Account ID</h2>
-      <p>
-        Some apps and support requests ask for this. <code>{did}</code>
-      </p>
+      <Section title="Account ID" id="account-id">
+        <p>
+          Some apps and support requests ask for this. <code>{did}</code>
+        </p>
+      </Section>
 
-      <section aria-labelledby="danger" className="mt-10 rounded-bv-card border-2 border-red-700 p-5">
-        <h2 id="danger" className="mt-0">Danger zone</h2>
+      <Section title="Danger zone" id="danger" tone="danger">
         <p>
           <Link href={DANGER_ZONE.href}>{DANGER_ZONE.label}</Link>: {DANGER_ZONE.description}
         </p>
-      </section>
+      </Section>
     </PageMain>
   )
 }

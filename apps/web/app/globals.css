@@ -20,6 +20,42 @@
   font-size: var(--text-bv-intro);
 }
 
+/* A Section component directly inside a card context: no top margin on its own title. */
+@utility bv-block {
+  & > h2 {
+    margin-top: 0;
+  }
+  & > form {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+}
+
+/* The empty-state block: dashed outline, one sentence, an optional action. */
+@utility bv-empty {
+  margin-bottom: 20px;
+  padding: 18px;
+  text-align: center;
+  border: 1.5px dashed var(--color-bv-ink-3);
+  border-radius: var(--radius-bv-card);
+
+  & > p {
+    margin-bottom: 12px;
+  }
+
+  & > :last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* The hint under a field label (Field). */
+@utility bv-hint {
+  font-size: var(--text-bv-small);
+  font-weight: 400;
+  color: var(--color-bv-ink-3);
+}
+
 /* Base element styles. Page-level layout lives in utilities and shared components. */
 @layer base {
   html {
@@ -159,7 +195,7 @@
 
   .field-error {
     font-weight: 400;
-    color: #b00020;
+    color: var(--color-bv-danger);
   }
 
   input[type='checkbox'] {
