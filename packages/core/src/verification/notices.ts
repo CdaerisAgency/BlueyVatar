@@ -108,6 +108,35 @@ export function keyRevokedNotice(i: {
   return { subject: `Your BlueyVatar key "${name}" was revoked`, text: frame(i.did, i.publicUrl, body, 'security', i.account || i.did) }
 }
 
+/** Plain names for the two key types, the same wording as the keys page and the API docs. */
+export const KEY_TYPE_LABELS = {
+  publishable: 'Website key (read only, safe to put in a web page)',
+  secret: 'Server key (read only, keeps usage and stays private)',
+} as const
+
+/**
+ * Heads-up that a key is about to stop working. Only keys that expire get this: a key made with the Forever
+ * lifetime has no expiry time, so `expiresAt` is required and there is no Forever variant.
+ */
+export function keyExpiringNotice(i: {
+  did: string
+  prefix: string
+  label?: string | null
+  kind: keyof typeof KEY_TYPE_LABELS
+  createdAt?: Date
+  expiresAt: Date
+  account?: string | null
+  publicUrl: string
+}): Notice {
+  const name = i.label?.trim() || (i.createdAt ? `Unnamed key, created ${day(i.createdAt)}` : 'Unnamed key')
+  const body =
+    `The key "${name}" (${i.prefix}) stops working on ${day(i.expiresAt)}.\n` +
+    `Type: ${KEY_TYPE_LABELS[i.kind]}\n\n` +
+    `Before then, sign in at ${base(i.publicUrl)}/account/keys, create a replacement key, and switch your site or server to it. ` +
+    `When you create the new key you can choose Forever, 30 days, 90 days, or 1 year.`
+  return { subject: `Your BlueyVatar key "${name}" expires on ${day(i.expiresAt)}`, text: frame(i.did, i.publicUrl, body, 'security', i.account || i.did) }
+}
+
 /**
  * One-line outcome for someone who filed a report and left an address (issue #145). The reporter has no
  * account, so there is no preferences link. The admin's internal reason is never included.

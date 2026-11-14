@@ -1,6 +1,6 @@
 # Usage API (v1)
 
-Version 1. `GET /usage` returns the metered usage of the license behind a secret key, so you can watch consumption from code. The dashboard at `/account/keys` shows the same numbers.
+Version 1. `GET /usage` returns the metered usage of the license behind a server key, so you can watch consumption from code. The dashboard at `/account/keys` shows the same numbers.
 
 ## Request
 
@@ -9,10 +9,10 @@ GET /usage
 x-api-key: sk_...
 ```
 
-- Secret keys only, sent in the `x-api-key` header. The `token` query parameter is not accepted.
-- A publishable key gets `403` with the error code `secret_key_required`. A missing or unknown key gets `401` (`invalid_key`). An inactive license gets `402` (`license_inactive`).
+- Server keys only, sent in the `x-api-key` header. The `token` query parameter is not accepted.
+- A website key gets `403` with the error code `secret_key_required`. A missing or unknown key gets `401` (`invalid_key`). An inactive license gets `402` (`license_inactive`).
 - The call counts toward your rate limit like any keyed request, and sends the usual `x-rate-limit-*` headers. It is not metered: it adds nothing to your usage and sends no `x-usage-cost` header.
-- Responses are `cache-control: private, no-store`. The route sends no CORS headers, because secret keys belong on servers.
+- Responses are `cache-control: private, no-store`. The route sends no CORS headers, because server keys belong on servers.
 
 ## Response
 

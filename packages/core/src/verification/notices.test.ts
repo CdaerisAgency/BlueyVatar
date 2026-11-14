@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, keyExpiringNotice, KEY_TYPE_LABELS, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -22,6 +22,22 @@ describe('keyRevokedNotice', () => {
   it('shows the handle on the Account line, and the DID when there is none', () => {
     expect(keyRevokedNotice({ did: DID, prefix: 'pk_a', label: 'x', account: 'alice.bsky.social', publicUrl: URL }).text).toContain('Account: alice.bsky.social')
     expect(keyRevokedNotice({ did: DID, prefix: 'pk_a', label: 'x', account: null, publicUrl: URL }).text).toContain(`Account: ${DID}`)
+  })
+})
+
+describe('keyExpiringNotice', () => {
+  const base = { did: DID, prefix: 'sk_abc123', label: 'Billing job', kind: 'secret' as const, expiresAt: new Date('2027-02-06T12:00:00Z'), publicUrl: URL }
+  it('names the key, its expiry date and its plain type label', () => {
+    const n = keyExpiringNotice(base)
+    expect(n.subject).toBe('Your BlueyVatar key "Billing job" expires on 2027-02-06')
+    expect(n.text).toContain('stops working on 2027-02-06')
+    expect(n.text).toContain('Type: Server key (read only, keeps usage and stays private)')
+    expect(n.text).toContain('https://blueyvatar.com/account/keys')
+  })
+  it('uses the website key label and lists Forever among the choices for the replacement', () => {
+    const n = keyExpiringNotice({ ...base, kind: 'publishable' })
+    expect(n.text).toContain(KEY_TYPE_LABELS.publishable)
+    expect(n.text).toContain('Forever, 30 days, 90 days, or 1 year')
   })
 })
 

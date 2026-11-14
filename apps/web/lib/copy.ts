@@ -71,6 +71,11 @@ export const COPY = {
     help: 'Example: username.bsky.social. If you use your own domain as a handle, enter it the same way, such as alice.example.com.',
     submit: 'Continue',
   },
+  keys: {
+    websiteKey: 'Website key (read only, safe to put in a web page)',
+    serverKey: 'Server key (read only, keeps usage and stays private)',
+    forever: 'Forever',
+  },
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const

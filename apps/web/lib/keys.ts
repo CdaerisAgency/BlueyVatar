@@ -39,9 +39,9 @@ export function checkKeyLimit(tier: Tier | string, kind: KeyKind, active: readon
   const current = active.filter((k) => k.hash !== replacing)
   const { maxKeys } = entitlementsFor(tier)
   if (tier === 'free') {
-    if (kind === 'secret') return { ok: false, error: 'The Free tier includes one publishable key. Secret keys need a paid tier.' }
+    if (kind === 'secret') return { ok: false, error: 'The Free tier includes one website key. Server keys need a paid tier.' }
     if (current.some((k) => k.kind === 'publishable')) {
-      return { ok: false, error: 'The Free tier includes one publishable key. Revoke it or rotate it instead.' }
+      return { ok: false, error: 'The Free tier includes one website key. Revoke it or rotate it instead.' }
     }
   }
   if (maxKeys !== null && current.length >= maxKeys) {

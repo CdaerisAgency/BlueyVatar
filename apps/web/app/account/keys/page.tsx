@@ -1,3 +1,4 @@
+import { COPY } from '../../../lib/copy'
 import { PageMain } from '../../../components/Page'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
@@ -53,8 +54,8 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
       <ul>
         {keys.map((k) => (
           <li key={k.hash} className="mb-4">
-            <code>{k.prefix}...</code> {k.kind === 'secret' ? 'Server key' : 'Website key'} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
-            {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : isExpired(k.expiresAt, now) ? ` (Expired ${k.expiresAt!.toISOString().slice(0, 10)})` : k.expiresAt ? `. Expires ${k.expiresAt.toISOString().slice(0, 10)}` : '. Never expires'}
+            <code>{k.prefix}...</code> {k.kind === 'secret' ? COPY.keys.serverKey : COPY.keys.websiteKey} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
+            {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : isExpired(k.expiresAt, now) ? ` (Expired ${k.expiresAt!.toISOString().slice(0, 10)})` : k.expiresAt ? `. Expires ${k.expiresAt.toISOString().slice(0, 10)}` : `. Lasts ${COPY.keys.forever}`}
             {k.kind === 'publishable' && !k.revokedAt && !isExpired(k.expiresAt, now) && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
             {!k.revokedAt && !isExpired(k.expiresAt, now) && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} orgId={orgId ?? ''} />}
           </li>

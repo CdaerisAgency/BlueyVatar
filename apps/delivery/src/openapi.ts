@@ -20,7 +20,7 @@ const avatarQuery = ['s', 'd', 'f', 'r', 'fmt', 'q', 'ttl', 'json'].map(q)
 
 const errors = {
   '400': errRef('Malformed identifier or parameter. Codes: invalid_identifier, invalid_size, invalid_default, default_url_not_allowed, invalid_rating, invalid_format, invalid_quality, invalid_ttl, invalid_platform.'),
-  '401': errRef('invalid_key or key_expired.'),
+  '401': errRef('invalid_key or key_expired (a key with a set lifetime past its expiration time; Forever keys never expire).'),
   '402': errRef('license_inactive'),
   '403': errRef('origin_not_allowed, tier_required, origin_forbidden, access_denied, or secret_key_required.'),
   '429': { description: 'rate_limited. Wait retry-after seconds.', headers: { ...rateHeaders, 'retry-after': hdr('RetryAfter') }, content: { 'application/json': { schema: ref('schemas/Error') } } },
@@ -53,7 +53,7 @@ export const openApiDocument = {
   tags: [
     { name: 'Avatars', description: 'Avatar delivery (spec section 7).' },
     { name: 'Profile', description: 'Profile JSON, QR codes, and platform redirects.' },
-    { name: 'Usage', description: 'Metered usage for secret keys.' },
+    { name: 'Usage', description: 'Metered usage for server keys.' },
     { name: 'Images', description: 'Signed, immutable image objects behind the redirects.' },
     { name: 'Service', description: 'Health and description.' },
   ],
@@ -64,15 +64,15 @@ export const openApiDocument = {
     '/openapi.json': { get: { summary: 'This document', tags: ['Service'], responses: { '200': { description: 'OpenAPI 3.1 JSON.', content: { 'application/json': { schema: { type: 'object' } } } } } } },
     '/usage': {
       get: {
-        summary: 'Usage for a secret key',
-        description: 'Metered usage of the license behind a secret key: current period, per-meter counts, and history by tier. Secret keys only, in the x-api-key header. Counts toward the rate limit but is not metered. Never cached, and sends no CORS headers.',
+        summary: 'Usage for a server key',
+        description: 'Metered usage of the license behind a server key: current period, per-meter counts, and history by tier. Server keys only, in the x-api-key header. Counts toward the rate limit but is not metered. Never cached, and sends no CORS headers.',
         tags: ['Usage'],
         security: [{ apiKeyHeader: [] }],
         responses: {
           '200': { description: 'Usage document.', headers: { ...rateHeaders, 'x-tier': hdr('Tier') }, content: { 'application/json': { schema: ref('schemas/Usage') } } },
           '401': errRef('invalid_key or key_expired, including a missing key or a key sent only as the token query parameter.'),
           '402': errors['402'],
-          '403': errRef('secret_key_required: a publishable key was used.'),
+          '403': errRef('secret_key_required: a website key was used.'),
           '429': errors['429'],
           '500': errors['500'],
         },
@@ -162,8 +162,8 @@ export const openApiDocument = {
   },
   components: {
     securitySchemes: {
-      apiKeyHeader: { type: 'apiKey', in: 'header', name: 'x-api-key', description: 'Publishable or secret key. Secret keys are accepted only here.' },
-      apiKeyQuery: { type: 'apiKey', in: 'query', name: 'token', description: 'Publishable key for browser use. Checked against the key\'s domain list using Origin or Referer.' },
+      apiKeyHeader: { type: 'apiKey', in: 'header', name: 'x-api-key', description: 'Website key (read only, safe to put in a web page) or server key (read only, keeps usage and stays private). Server keys (sk_) are accepted only here. A key made with the Forever lifetime never expires; any other key is rejected with key_expired after its expiration time.' },
+      apiKeyQuery: { type: 'apiKey', in: 'query', name: 'token', description: 'Website key (read only, safe to put in a web page; pk_) for browser use. Checked against the key\'s domain list using Origin or Referer.' },
     },
     parameters: {
       Hash: { name: 'hash', in: 'path', required: true, description: 'SHA-256 (64 hex) or MD5 (32 hex) of the trimmed, lowercased email. An optional .png, .jpg, .jpeg, or .webp suffix is ignored.', schema: { type: 'string', pattern: '^[0-9a-fA-F]{32}([0-9a-fA-F]{32})?(\\.(png|jpe?g|webp))?$' } },

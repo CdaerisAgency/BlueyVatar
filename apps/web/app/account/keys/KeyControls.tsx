@@ -3,13 +3,14 @@ import { Button } from '../../../components/Button'
 
 import { useActionState, useState } from 'react'
 import { DEFAULT_EXPIRY, EXPIRY_CHOICES, EXPIRY_LABELS } from '../../../lib/key-expiry'
+import { COPY } from '../../../lib/copy'
 import CopyField from '../CopyField'
 import { createKey, revokeKey, rotateKey, saveDomains, type KeyState } from './actions'
 
 const none: KeyState = {}
 
 function Result({ s }: { s: KeyState }) {
-  const label = s.keyKind === 'secret' ? 'Server key' : 'Website key'
+  const label = s.keyKind === 'secret' ? COPY.keys.serverKey : COPY.keys.websiteKey
   return (
     <>
       {s.error && <p role="alert">{s.error}</p>}
@@ -20,7 +21,7 @@ function Result({ s }: { s: KeyState }) {
             <strong>Copy this key now. It is shown once. We keep only a hash of it, so we cannot show it again.</strong> If you lose it, revoke it and create a new one.
           </p>
           <CopyField label={`${label} (new)`} value={s.key} />
-          <p>{s.expiresAt ? `This key stops working on ${s.expiresAt.slice(0, 10)}.` : 'This key does not expire.'}</p>
+          <p>{s.expiresAt ? `This key stops working on ${s.expiresAt.slice(0, 10)}.` : `This key lasts ${COPY.keys.forever}.`}</p>
         </div>
       )}
     </>
@@ -49,10 +50,10 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason, o
       <p>Both key types are read only today. The API has no way to change data yet.</p>
       <ul>
         <li>
-          <strong>Website key</strong> (starts with <code>pk_</code>): put it in a web page or app. It goes in the <code>token</code> parameter. Anyone who views the page can see it, so on paid plans you can limit it to your own domains.
+          <strong>{COPY.keys.websiteKey}</strong> (starts with <code>pk_</code>): put it in a web page or app. It goes in the <code>token</code> parameter. Anyone who views the page can see it, so on paid plans you can limit it to your own domains.
         </li>
         <li>
-          <strong>Server key</strong> (starts with <code>sk_</code>): keep it on your server and never put it in a web page. It goes in the <code>x-api-key</code> header and is the only key that can read your usage.
+          <strong>{COPY.keys.serverKey}</strong> (starts with <code>sk_</code>): keep it on your server and never put it in a web page. It goes in the <code>x-api-key</code> header and is the only key that can read your usage.
         </li>
       </ul>
       {disabledReason && <p>{disabledReason}</p>}
@@ -61,8 +62,8 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason, o
         <label>
           Type{' '}
           <select name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
-            {allowPublishable && <option value="publishable">Website key (read only, safe in a web page)</option>}
-            {allowSecret && <option value="secret">Server key (read only, keep private)</option>}
+            {allowPublishable && <option value="publishable">{COPY.keys.websiteKey}</option>}
+            {allowSecret && <option value="secret">{COPY.keys.serverKey}</option>}
           </select>
         </label>
         <label>
