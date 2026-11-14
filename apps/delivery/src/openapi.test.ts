@@ -54,8 +54,8 @@ describe('OpenAPI document', () => {
     expect([...doc].sort()).toEqual([...ERROR_CODES].sort())
   })
 
-  it('keeps docs/api/errors-v1.md in step with errors.ts', () => {
-    const md = readFileSync(new URL('../../../docs/api/errors-v1.md', import.meta.url), 'utf8')
+  it('keeps docs/api/errors-v2.md in step with errors.ts', () => {
+    const md = readFileSync(new URL('../../../docs/api/errors-v2.md', import.meta.url), 'utf8')
     const table = md.split('## Error codes')[1]!.split('\n## ')[0]!
     const codes = [...table.matchAll(/^\| `(\w+)` \|/gm)].map((m) => m[1]!)
     expect([...codes].sort()).toEqual([...ERROR_CODES].sort())

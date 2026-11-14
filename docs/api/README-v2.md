@@ -10,9 +10,9 @@ The delivery API serves avatars and profile JSON. The proposed delivery host is 
 | [cache-ttl-v1.md](cache-ttl-v1.md) | The `ttl` parameter, tier limits, and CDN interaction |
 | [gravatar-differences-v1.md](gravatar-differences-v1.md) | Where the API matches Gravatar and where it departs on purpose |
 | [exports-and-qr-v1.md](exports-and-qr-v1.md) | Profile downloads (JSON, Markdown, vCard) and QR codes with a logo or avatar in the center |
-| [usage-v1.md](usage-v1.md) | `GET /usage`: current period, per-meter counts, and history for a server key |
-| [examples-v1.md](examples-v1.md) | Copy-paste examples in curl, JavaScript, and an HTML `<img>` tag |
-| [errors-v1.md](errors-v1.md) | Error codes, rate limit headers, and other response headers |
+| [usage-v2.md](usage-v2.md) | `GET /usage`: current period, per-meter counts, and history for a server key |
+| [examples-v2.md](examples-v2.md) | Copy-paste examples in curl, JavaScript, and an HTML `<img>` tag |
+| [errors-v2.md](errors-v2.md) | Error codes, rate limit headers, and other response headers |
 
 ## Integration guides
 
