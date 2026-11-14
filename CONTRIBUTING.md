@@ -53,7 +53,9 @@ pnpm --filter @blueyvatar/web exec playwright install chromium   # once
 pnpm e2e
 ```
 
-Set `PW_CHROMIUM_PATH` to use a Chromium you already have instead of installing one. `E2E_DATABASE_URL` overrides `TEST_DATABASE_URL`, and `E2E_WEB_PORT` and `E2E_STUB_PORT` (default 3100 and 3101) move the servers when those ports are busy. The suite reuses a server that is already running on the web port outside CI. CI runs it as the `e2e` job.
+Set `PW_CHROMIUM_PATH` to use a Chromium you already have instead of installing one. `E2E_DATABASE_URL` overrides `TEST_DATABASE_URL`, and `E2E_PORT` (alias `E2E_WEB_PORT`) and `E2E_STUB_PORT` (default 3100 and 3101) move the servers when those ports are busy. The accessibility check likewise reads `A11Y_PORT` and `A11Y_DELIVERY_PORT` (default 3917 and 3918). The suite reuses a server that is already running on the web port outside CI. CI runs it as the `e2e` job.
+
+CI runs on one shared self-hosted runner, so jobs are isolated from each other. Each job sets its own `PNPM_HOME` and pnpm store under `$RUNNER_TEMP`, picks free ports at runtime with `.github/scripts/free-port.mjs` (e2e and accessibility servers), and uses the Postgres service's random host port. Runs queue per ref (`concurrency` group `ci-<workflow>-<ref>`, no cancel), so a newer pending run replaces an older pending one for the same ref but never another pull request's run.
 
 ## Smoke test
 
