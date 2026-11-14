@@ -3,7 +3,7 @@ import { Button } from '../../../../components/Button'
 import { BILLING_RETENTION_YEARS, DELETE_CONFIRMATION } from '../../../../lib/account-data'
 import { requireDid } from '../../../../lib/auth'
 import { HOLD_DAYS } from '../../../../lib/email-policy'
-import { homeServerFor } from '../../../../lib/home-server'
+import { homeServerHost } from '../../../../lib/home-server'
 import { viewerFor } from '../../../../lib/viewer'
 import { displayName } from '../../../../lib/viewer-core'
 import { deleteMyData } from './actions'
@@ -14,22 +14,22 @@ export const metadata = { title: 'Danger zone' }
 export default async function DangerZonePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const did = await requireDid('/account/settings/danger')
   const viewer = await viewerFor(did)
-  const homeServer = await homeServerFor(did)
+  const host = await homeServerHost(did)
+  const homeServer = `your Bluesky account's home server${host ? ` (${host})` : ''}`
   const { error } = await searchParams
   return (
     <PageMain>
       <h1>Danger zone</h1>
       <p>
         Signed in as {displayName(viewer)}
-        {viewer.handle && <small className="block text-bv-ink-3">Account ID: {did}</small>}
+        <small className="block text-bv-ink-3">Account ID: {did}</small>
       </p>
       {error && <p role="alert">{error}</p>}
 
       <section aria-labelledby="download">
         <h2 id="download">Download a copy</h2>
         <p>
-          This is safe and changes nothing. You get one file with what BlueyVatar stores about you: your linked emails (the primary
-          address is masked), profile links, verified accounts, who can see your avatar, your license and API key details (never the
+          This is safe and changes nothing. You get one file with what BlueyVatar stores about you: your linked emails (addresses are masked), profile links, verified accounts, who can see your avatar, your license and API key details (never the
           secret keys), your custom domain, daily profile view counts, any appeals you filed, your avatar sync setting and the log of changes blueyvatar made to your profile avatar, and a summary of your subscriptions.
         </p>
         <p>
@@ -63,8 +63,8 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
           <li>Moderation records, such as blocks on images and reports about your account.</li>
         </ul>
         <p>
-          Your avatars, profile, gallery, and verified accounts are saved on {homeServer}. A home server is the service
-          that stores your account and everything you post. They belong to you, and BlueyVatar does not delete them. To
+          Your avatars, profile, gallery, and verified accounts are saved on {homeServer}. The home server is the service
+          that stores your Bluesky account and everything you post. They belong to you, and BlueyVatar does not delete them. To
           remove them, use an app that manages your repository or your home server&apos;s tools. Until you do, BlueyVatar may show them again if you
           sign in later.
         </p>

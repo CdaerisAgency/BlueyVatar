@@ -6,8 +6,8 @@ import { randomBytes } from 'node:crypto'
 import { decryptJson, encryptJson } from './token-crypto'
 
 export type LinkMethod = 'trusted_pds' | 'code'
-/** `emailDomain` is the domain of the linked address (never the address), or null for links made before migration 0016. */
-export type LinkRow = { emailHash: string; method: LinkMethod; verifiedAt: Date; primary: boolean; emailDomain: string | null }
+/** `emailDomain` is the domain of the linked address, or null for links made before migration 0016. `emailEnc` is the address encrypted (`v1:` envelope), or null for links made before migration 0037. */
+export type LinkRow = { emailHash: string; method: LinkMethod; verifiedAt: Date; primary: boolean; emailDomain: string | null; emailEnc: string | null }
 
 /** One signed-in browser or device. `device` is a coarse hint such as "Firefox on Linux". */
 export type WebSession = { id: string; device: string; createdAt: Date; lastUsedAt: Date }
@@ -68,7 +68,7 @@ export interface Store {
 export function memoryStore(clock: () => number = Date.now): Store {
   const states = new Map<string, NodeSavedState>()
   const sessions = new Map<string, NodeSavedSession>()
-  type MemLink = { did: string; method: LinkMethod; verifiedAt: Date; emailMd5?: string; emailDomain?: string; primary: boolean }
+  type MemLink = { did: string; method: LinkMethod; verifiedAt: Date; emailMd5?: string; emailDomain?: string; emailEnc?: string; primary: boolean }
   const links = new Map<string, MemLink>()
   const holds = new Map<string, { did: string; releasedAt: number }>()
   const notice = new Map<string, { emailHash: string; enc: string }>()
@@ -133,7 +133,7 @@ export function memoryStore(clock: () => number = Date.now): Store {
     links: {
       async list(did) {
         return ownedBy(did)
-          .map(([emailHash, v]) => ({ emailHash, method: v.method, verifiedAt: v.verifiedAt, primary: v.primary, emailDomain: v.emailDomain ?? null }))
+          .map(([emailHash, v]) => ({ emailHash, method: v.method, verifiedAt: v.verifiedAt, primary: v.primary, emailDomain: v.emailDomain ?? null, emailEnc: v.emailEnc ?? null }))
           .sort((a, b) => Number(b.primary) - Number(a.primary) || a.verifiedAt.getTime() - b.verifiedAt.getTime())
       },
       async inspect(did, emailHash) {
@@ -145,14 +145,14 @@ export function memoryStore(clock: () => number = Date.now): Store {
         if (!d.ok) return d
         if (f.owner === 'self') {
           const cur = links.get(emailHash)!
-          links.set(emailHash, { ...cur, method, verifiedAt: new Date(clock()), emailMd5: emailMd5 ?? cur.emailMd5, emailDomain: emailDomain ?? cur.emailDomain })
+          links.set(emailHash, { ...cur, method, verifiedAt: new Date(clock()), emailMd5: emailMd5 ?? cur.emailMd5, emailDomain: emailDomain ?? cur.emailDomain, emailEnc: emailEnc ?? cur.emailEnc })
           reconcile(did, emailHash, emailEnc)
           return d
         }
         const prev = links.get(emailHash)
         links.delete(emailHash)
         if (prev) promote(prev.did)
-        links.set(emailHash, { did, method, verifiedAt: new Date(clock()), emailMd5, emailDomain, primary: f.count === 0 })
+        links.set(emailHash, { did, method, verifiedAt: new Date(clock()), emailMd5, emailDomain, emailEnc, primary: f.count === 0 })
         holds.delete(emailHash)
         if (prev) reconcile(prev.did)
         reconcile(did, emailHash, emailEnc)
@@ -358,10 +358,10 @@ export function pgStore(pool: pg.Pool): Store {
     links: {
       async list(did) {
         const r = await pool.query(
-          'SELECT email_hash, method, verified_at, is_primary, email_domain FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash',
+          'SELECT email_hash, method, verified_at, is_primary, email_domain, email_enc FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash',
           [did],
         )
-        return r.rows.map((x) => ({ emailHash: x.email_hash, method: x.method, verifiedAt: x.verified_at, primary: x.is_primary, emailDomain: x.email_domain ?? null }))
+        return r.rows.map((x) => ({ emailHash: x.email_hash, method: x.method, verifiedAt: x.verified_at, primary: x.is_primary, emailDomain: x.email_domain ?? null, emailEnc: x.email_enc ?? null }))
       },
       async inspect(did, emailHash) {
         return pgFacts(pool, did, emailHash)
@@ -378,8 +378,8 @@ export function pgStore(pool: pg.Pool): Store {
           if (!d.ok) return d
           if (f.owner === 'self') {
             await c.query(
-              `UPDATE email_links SET method = $2, verified_at = now(), email_md5 = coalesce($3, email_md5), email_domain = coalesce($4, email_domain) WHERE email_hash = $1`,
-              [emailHash, method, emailMd5 ?? null, emailDomain ?? null],
+              `UPDATE email_links SET method = $2, verified_at = now(), email_md5 = coalesce($3, email_md5), email_domain = coalesce($4, email_domain), email_enc = coalesce($5, email_enc) WHERE email_hash = $1`,
+              [emailHash, method, emailMd5 ?? null, emailDomain ?? null, emailEnc ?? null],
             )
             await reconcilePg(c, did, emailHash, emailEnc)
             return d
@@ -390,8 +390,8 @@ export function pgStore(pool: pg.Pool): Store {
             if (old.rows[0]) await reconcilePg(c, old.rows[0].did)
           }
           await c.query(
-            'INSERT INTO email_links (email_hash, did, method, email_md5, is_primary, email_domain) VALUES ($1, $2, $3, $4, $5, $6)',
-            [emailHash, did, method, emailMd5 ?? null, f.count === 0, emailDomain ?? null],
+            'INSERT INTO email_links (email_hash, did, method, email_md5, is_primary, email_domain, email_enc) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [emailHash, did, method, emailMd5 ?? null, f.count === 0, emailDomain ?? null, emailEnc ?? null],
           )
           await c.query('DELETE FROM email_holds WHERE email_hash = $1', [emailHash])
           await reconcilePg(c, did, emailHash, emailEnc)
