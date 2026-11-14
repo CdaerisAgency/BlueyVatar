@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  countLinks, feedbackConfig, isHoneypotFilled, issueBody, issueTitle, ISSUE_LABELS, MAX_DESCRIPTION, MAX_LINKS, neutralize,
+  countLinks, feedbackConfig, isHoneypotFilled, issueBody, issueTitle, ISSUE_LABELS, MAX_DESCRIPTION, MAX_LINKS, MAX_REQUEST_BYTES, neutralize,
   pagePath, parseBugReport, screenshotProblem, SCREENSHOT_MAX_INPUT_BYTES, sentSummary, type BugReportInput,
 } from './bug-report'
+import sharp from 'sharp'
+import { cleanScreenshot, decodeScreenshot } from './bug-report-screenshot'
 import { runBugReport, type RunDeps } from './bug-report-run'
 import { BUCKETS } from './rate-limit'
 
 const good = { description: 'The avatar upload button does nothing on my phone.', contact: '', includeHandle: false, page: '/account/avatars?code=secret#x', userAgent: 'UA/1', viewportWidth: 390, viewportHeight: 844, hasScreenshot: false }
-const input = (o: Partial<BugReportInput> = {}): BugReportInput => ({ description: 'It broke.', contact: '', includeHandle: false, page: '/pricing', userAgent: 'UA/1', viewport: '390x844', hasScreenshot: false, ...o })
+const input = (o: Partial<BugReportInput> = {}): BugReportInput => ({ description: 'It broke.', contact: '', includeHandle: false, page: '/pricing', userAgent: 'UA/1', viewport: '390x844', hasScreenshot: false, screenshot: '', ...o })
 
 describe('feedbackConfig', () => {
   it('is null without the token, so the button stays hidden', () => {
@@ -67,8 +69,12 @@ describe('issue text', () => {
     expect(neutralize('mail me at a@b.co')).toBe('mail me at a@b.co')
   })
   it('titles from the first line, trimmed', () => {
-    expect(issueTitle('Upload fails\nmore detail')).toBe('Bug report: Upload fails')
-    expect(issueTitle('y'.repeat(200)).length).toBeLessThanOrEqual(90)
+    expect(issueTitle('Upload fails\nmore detail')).toBe('Upload fails')
+    expect(issueTitle('y'.repeat(300)).length).toBe(200)
+  })
+  it('keeps links, issue numbers, and mentions out of the title (conventions, section 2)', () => {
+    expect(issueTitle('Avatar fails, see https://example.com/x?a=1 and #12 from @octocat')).toBe('Avatar fails, see and from octocat')
+    expect(issueTitle('  \n  ')).toBe('Bug report')
   })
   it('omits the handle and contact unless given', () => {
     const body = issueBody(input(), { handle: null, version: 'v1' })
@@ -82,11 +88,14 @@ describe('issue text', () => {
     expect(body).toContain('**alice.test**')
     expect(body).toContain('Contact: a@b.co')
   })
-  it('says a screenshot exists without embedding it', () => {
-    expect(issueBody(input({ hasScreenshot: true }), { handle: null, version: null })).toContain('not stored with this issue')
+  it('links the screenshot for admins without embedding it', () => {
+    const body = issueBody(input({ hasScreenshot: true }), { handle: null, version: null, screenshotUrl: 'https://x.test/admin/bug-reports/abc/screenshot' })
+    expect(body).toContain('Screenshots: 1. Visible to signed-in admins only: https://x.test/admin/bug-reports/abc/screenshot')
+    expect(body).not.toContain('![')
+    expect(issueBody(input({ hasScreenshot: true }), { handle: null, version: null })).toContain('Screenshots: 0')
   })
-  it('uses only labels that already exist in the repository', () => {
-    expect([...ISSUE_LABELS]).toEqual(['bug', 'area:web'])
+  it('carries only the conventions kind label, no status labels', () => {
+    expect([...ISSUE_LABELS]).toEqual(['bug'])
   })
   it('lists what is sent', () => {
     expect(sentSummary({ page: '/x', viewport: '1x1', hasContact: false, includeHandle: false })).toContain('No handle')
@@ -115,7 +124,7 @@ describe('runBugReport', () => {
   const ok = () => new Response(JSON.stringify({ number: 7, html_url: 'https://github.com/o/r/issues/7' }), { status: 201 })
   const deps = (o: Partial<RunDeps> = {}): RunDeps => ({
     did: 'did:plc:abc', config: { token: 'SECRET-TOKEN', repo: 'o/r' }, limited: async () => null, handleFor: async () => 'alice.test',
-    version: 'v1', fetchImpl: vi.fn(async () => ok()) as unknown as typeof fetch, report: vi.fn(), ...o,
+    version: 'v1', fetchImpl: vi.fn(async () => ok()) as unknown as typeof fetch, report: vi.fn(), screenshots: null, ...o,
   })
   const body = JSON.stringify(good)
 
@@ -138,7 +147,7 @@ describe('runBugReport', () => {
     expect(url).toBe('https://api.github.com/repos/o/r/issues')
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer SECRET-TOKEN')
     const sent = JSON.parse(String(init.body)) as { title: string; body: string; labels: string[] }
-    expect(sent.labels).toEqual(['bug', 'area:web'])
+    expect(sent.labels).toEqual(['bug'])
     expect(sent.body).not.toContain('SECRET-TOKEN')
     expect(sent.body).not.toContain('alice.test')
     expect(sent.body).not.toContain('did:plc')
@@ -169,7 +178,7 @@ describe('runBugReport', () => {
     const d = deps()
     expect((await runBugReport(JSON.stringify({ ...good, description: 'no' }), d)).status).toBe(400)
     expect((await runBugReport('{not json', d)).status).toBe(400)
-    expect((await runBugReport('x'.repeat(20_000), d)).status).toBe(413)
+    expect((await runBugReport('x'.repeat(MAX_REQUEST_BYTES + 1), d)).status).toBe(413)
     expect(d.fetchImpl).not.toHaveBeenCalled()
   })
   it('returns 502 and logs only the status when GitHub refuses', async () => {
@@ -185,5 +194,64 @@ describe('runBugReport', () => {
     const r = await runBugReport(body, d)
     expect(r.status).toBe(502)
     expect(((d.report as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Error).message).not.toContain('SECRET-TOKEN')
+  })
+})
+
+describe('screenshot cleaning', () => {
+  it('re-encodes to a JPEG without metadata and within the size cap', async () => {
+    const png = await sharp({ create: { width: 3000, height: 2000, channels: 3, background: '#336699' } }).withMetadata({ exif: { IFD0: { Copyright: 'someone' } } }).jpeg().toBuffer()
+    expect((await sharp(png).metadata()).exif).toBeDefined()
+    const out = await cleanScreenshot(png)
+    expect(out).not.toBeNull()
+    const meta = await sharp(out!).metadata()
+    expect(meta.format).toBe('jpeg')
+    expect(meta.exif).toBeUndefined()
+    expect(Math.max(meta.width!, meta.height!)).toBe(1600)
+    expect(out!.length).toBeLessThanOrEqual(1024 * 1024)
+  })
+  it('refuses bytes that are not a PNG, JPEG, or WebP picture', async () => {
+    expect(await cleanScreenshot(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'))).toBeNull()
+    expect(await cleanScreenshot(Buffer.from('%PDF-1.4'))).toBeNull()
+  })
+  it('decodes base64 and refuses junk or oversize input', () => {
+    expect(decodeScreenshot(Buffer.from('hello').toString('base64'), 100)?.toString()).toBe('hello')
+    expect(decodeScreenshot('data:image/png;base64,' + Buffer.from('hi').toString('base64'), 100)?.toString()).toBe('hi')
+    expect(decodeScreenshot('not base64!!', 100)).toBeNull()
+    expect(decodeScreenshot(Buffer.alloc(200).toString('base64'), 100)).toBeNull()
+    expect(decodeScreenshot('', 100)).toBeNull()
+  })
+})
+
+describe('runBugReport with a screenshot', () => {
+  const ok = () => new Response(JSON.stringify({ number: 9, html_url: 'https://github.com/o/r/issues/9' }), { status: 201 })
+  const store = () => ({ save: vi.fn(async () => 'SHOTID12345678901234567'), discard: vi.fn(async () => {}), attach: vi.fn(async () => {}), baseUrl: 'https://bv.test/' })
+  const mk = (screenshots: ReturnType<typeof store> | null, fetchImpl: typeof fetch): RunDeps => ({
+    did: 'did:plc:abc', config: { token: 'T', repo: 'o/r' }, limited: async () => null, handleFor: async () => null, version: null, fetchImpl, report: vi.fn(), screenshots,
+  })
+  const withShot = async () => JSON.stringify({ ...good, hasScreenshot: true, screenshot: (await sharp({ create: { width: 40, height: 30, channels: 3, background: '#fff' } }).png().toBuffer()).toString('base64') })
+
+  it('stores the cleaned picture, links it in the issue, and records the issue number', async () => {
+    const s = store()
+    const f = vi.fn(async () => ok()) as unknown as typeof fetch
+    expect((await runBugReport(await withShot(), mk(s, f))).status).toBe(200)
+    expect(s.save).toHaveBeenCalledOnce()
+    expect(((s.save.mock.calls[0] as unknown) as [string, Buffer])[1].subarray(0, 2).toString('hex')).toBe('ffd8')
+    const sent = JSON.parse(String((vi.mocked(f).mock.calls[0] as unknown as [string, RequestInit])[1].body)) as { body: string }
+    expect(sent.body).toContain('https://bv.test/admin/bug-reports/SHOTID12345678901234567/screenshot')
+    expect(s.attach).toHaveBeenCalledWith('SHOTID12345678901234567', 9)
+  })
+  it('refuses a screenshot that is not a picture, before filing anything', async () => {
+    const s = store()
+    const f = vi.fn(async () => ok()) as unknown as typeof fetch
+    const r = await runBugReport(JSON.stringify({ ...good, screenshot: Buffer.from('<svg/>').toString('base64') }), mk(s, f))
+    expect(r).toMatchObject({ status: 400, body: { field: 'screenshot' } })
+    expect(s.save).not.toHaveBeenCalled()
+    expect(f).not.toHaveBeenCalled()
+  })
+  it('deletes the stored picture when GitHub refuses the issue', async () => {
+    const s = store()
+    const f = vi.fn(async () => new Response('no', { status: 500 })) as unknown as typeof fetch
+    expect((await runBugReport(await withShot(), mk(s, f))).status).toBe(502)
+    expect(s.discard).toHaveBeenCalledWith('SHOTID12345678901234567')
   })
 })

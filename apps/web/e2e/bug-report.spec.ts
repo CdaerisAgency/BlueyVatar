@@ -70,7 +70,7 @@ test.describe('bug report button', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'PNG, JPEG, or WebP' })).toBeVisible()
   })
 
-  test('sends the report without the screenshot and shows the issue link', async ({ page }) => {
+  test('sends the report with the screenshot and shows the issue link', async ({ page }) => {
     await mockAvailability(page, { available: true, signedIn: true })
     let posted: Record<string, unknown> | null = null
     await page.route('**/api/bug-report', async (route) => {
@@ -85,7 +85,9 @@ test.describe('bug report button', () => {
     await page.getByRole('button', { name: 'Send report' }).click()
     await expect(page.getByRole('status')).toContainText('Your report was sent')
     expect(posted).toMatchObject({ includeHandle: false, hasScreenshot: true, page: '/pricing', website: '' })
-    expect(JSON.stringify(posted)).not.toContain('data:image')
+    const sentShot = (posted as { screenshot?: unknown } | null)?.screenshot
+    expect(typeof sentShot === 'string' && sentShot.length > 0).toBe(true)
+    expect(String(sentShot)).not.toContain('data:')
     await page.getByRole('button', { name: 'Done' }).click()
     await expect(page.getByRole('button', { name: 'Report a bug' })).toBeFocused()
   })

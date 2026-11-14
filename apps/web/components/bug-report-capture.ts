@@ -3,7 +3,7 @@ import { SCREENSHOT_MAX_BYTES, SCREENSHOT_MAX_EDGE, screenshotProblem } from '..
 /**
  * Turns a picture into a screenshot the report can keep: re-drawn on a canvas and saved as JPEG, which drops every
  * piece of metadata (camera, location, and so on), scaled to SCREENSHOT_MAX_EDGE, and held under SCREENSHOT_MAX_BYTES.
- * Same approach as Cadence's screenshot helper (getDisplayMedia plus a canvas), without a page-rendering library:
+ * The server cleans it again before storing it (lib/bug-report-screenshot.ts). Same approach as Cadence's screenshot helper (getDisplayMedia plus a canvas), without a page-rendering library:
  * no new dependency or license, and it captures what is on screen, not a re-render of the page.
  */
 
@@ -78,4 +78,14 @@ export async function captureTab(): Promise<Blob | null> {
   } finally {
     stream?.getTracks().forEach((t) => t.stop())
   }
+}
+
+/** The picture as base64 (no data URL prefix), for the JSON body of the report. */
+export function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload = () => resolve(String(r.result).replace(/^data:[^,]*,/, ''))
+    r.onerror = () => reject(new Error('The screenshot could not be read.'))
+    r.readAsDataURL(blob)
+  })
 }
