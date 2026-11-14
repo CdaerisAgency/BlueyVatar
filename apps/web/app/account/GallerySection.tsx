@@ -3,6 +3,7 @@ import { Button } from '../../components/Button'
 import { GALLERY_PLUS_MESSAGE, isPlus, listGallery } from '../../lib/gallery'
 import { RepoError, blobUrl, imageLabels, pdsUrl, repoSession, type StoredImage } from '../../lib/repo'
 import ImageFileInput from './avatars/ImageFileInput'
+import RatingFields from './avatars/RatingFields'
 import { moveGallery, removeGalleryImage, uploadGalleryImage } from './galleryActions'
 
 /** Account page Gallery section. Non-Plus users see one upsell line. */
@@ -82,22 +83,7 @@ export default async function GallerySection({ did, error, done }: { did: string
           <label>
             Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
           </label>
-          <label>
-            Rating{' '}
-            <select name="rating" defaultValue="g">
-              <option value="g">G: suitable for all audiences</option>
-              <option value="pg">PG: non-sexual nudity or mild content</option>
-              <option value="r">R: sexually suggestive or graphic media</option>
-              <option value="x">X: adult content</option>
-            </select>
-          </label>
-          <label>
-            If R, label as{' '}
-            <select name="rLabel" defaultValue="sexual">
-              <option value="sexual">Sexual</option>
-              <option value="graphic-media">Graphic media</option>
-            </select>
-          </label>
+          <RatingFields idPrefix="gallery" />
           <Button type="submit" variant="primary">Upload to gallery</Button>
         </form>
       ) : (
