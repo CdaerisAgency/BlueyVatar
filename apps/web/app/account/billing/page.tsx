@@ -11,6 +11,9 @@ import { PRICING, formatPrice } from '../../../lib/pricing'
 import { canManageBilling } from '../../../lib/orgs/roles'
 import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
+import { viewerFor } from '../../../lib/viewer'
+import { displayName } from '../../../lib/viewer-core'
+import { LicenseUsage } from './LicenseUsage'
 import { cancelPlanChange, cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +23,7 @@ const NOTICE: Record<string, string> = {
   canceled: 'Checkout was canceled. You were not charged.',
 }
 
-const UNAVAILABLE = 'Billing is not available yet on this deployment. To change your plan now, email support@blueyvatar.com.'
+const UNAVAILABLE = 'Billing is not available yet on this deployment, so plan changes are handled by hand. To change your plan now, email support@blueyvatar.com and include your handle.'
 const PLAN_NAME: Record<string, string> = { plus: 'Plus', business: 'Business' }
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string; done?: string; change?: string; org?: string }> }) {
@@ -47,7 +50,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <h1>Plan and billing</h1>
-      <p>Signed in as {did}</p>
+      <p>Signed in as {displayName(await viewerFor(did))}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.done && <p role="status">{q.done}</p>}
       {q.error && <p role="alert">{q.error}</p>}
@@ -150,6 +153,8 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           <button type="submit">Manage billing</button>
         </form>
       )}
+
+      <LicenseUsage license={license} />
     </PageMain>
   )
 }
@@ -209,10 +214,10 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   return (
     <PageMain>
       <h1>Plan and billing: {org.name}</h1>
-      <p>Signed in as {did}</p>
+      <p>Signed in as {displayName(await viewerFor(did))}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.error && <p role="alert">{q.error}</p>}
-      <p>Billing for this organization stays with its billing owner, {lic.billingDid}. Any owner can start or manage the subscription.</p>
+      <p>Billing for this organization stays with its billing owner, {displayName(await viewerFor(lic.billingDid))}. Any owner can start or manage the subscription.</p>
       <ul>
         <li>Developer tier: {license?.tier ?? 'free'}</li>
         {sub && <li>Subscription: {sub.status.replace('_', ' ')}{sub.currentPeriodEnd ? `, ${sub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateOf(sub.currentPeriodEnd)}` : ''}</li>}
@@ -232,6 +237,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
         </form>
       )}
       <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout.</p>
+      {license && <LicenseUsage license={license} />}
     </PageMain>
   )
 }

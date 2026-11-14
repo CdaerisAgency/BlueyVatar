@@ -12,12 +12,16 @@ describe('keyRevokedNotice', () => {
   it('puts the key name in the subject and leads the body with it', () => {
     const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', label: 'My site', publicUrl: URL })
     expect(n.subject).toBe('Your BlueyVatar key "My site" was revoked')
-    expect(n.text).toContain('The key My site (pk_abc123) was revoked')
+    expect(n.text).toContain('The key "My site" (pk_abc123) was revoked')
   })
-  it('falls back to the prefix when a key has no name', () => {
-    const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', publicUrl: URL })
-    expect(n.subject).toBe('A BlueyVatar key was revoked')
-    expect(n.text).toContain('The key pk_abc123 was revoked')
+  it('names an unnamed key by its creation date', () => {
+    const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', label: '', createdAt: new Date('2026-11-08T15:30:40Z'), publicUrl: URL })
+    expect(n.subject).toBe('Your BlueyVatar key "Unnamed key, created 2026-11-08" was revoked')
+    expect(n.text).toContain('The key "Unnamed key, created 2026-11-08" (pk_abc123)')
+  })
+  it('shows the handle on the Account line, and the DID when there is none', () => {
+    expect(keyRevokedNotice({ did: DID, prefix: 'pk_a', label: 'x', account: 'alice.bsky.social', publicUrl: URL }).text).toContain('Account: alice.bsky.social')
+    expect(keyRevokedNotice({ did: DID, prefix: 'pk_a', label: 'x', account: null, publicUrl: URL }).text).toContain(`Account: ${DID}`)
   })
 })
 
@@ -42,7 +46,7 @@ describe('templates', () => {
     expect(all[0]!.text).toContain('40,000 of 50,000')
     expect(all[1]!.subject).toContain('100 percent')
     expect(all[2]!.text).toContain('2026-11-08')
-    expect(all[3]!.text).toContain('site (bv_pub_ab12)')
+    expect(all[3]!.text).toContain('"site" (bv_pub_ab12)')
     expect(all[3]!.text).toContain('always sent')
   })
 })

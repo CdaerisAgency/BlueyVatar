@@ -35,12 +35,12 @@ const base = (publicUrl: string) => publicUrl.replace(/\/+$/, '')
 const day = (d: Date) => d.toISOString().slice(0, 10)
 
 /** Plain text only: no tracking pixels, no tracked links. Every message names the account and links the preferences page. */
-function frame(did: string, publicUrl: string, body: string, kind: NoticeKind): Notice['text'] {
+function frame(did: string, publicUrl: string, body: string, kind: NoticeKind, account: string = did): Notice['text'] {
   const why =
     kind === 'security'
       ? 'This is a security notice. It is always sent.'
       : 'You can turn this kind of message off at the link below.'
-  return `${body}\n\n--\nAccount: ${did}\n${why}\nNotification settings: ${base(publicUrl)}/account/notifications`
+  return `${body}\n\n--\nAccount: ${account}\n${why}\nNotification settings: ${base(publicUrl)}/account/notifications`
 }
 
 export interface UsageNoticeInput {
@@ -91,12 +91,21 @@ export function subscriptionCanceledNotice(i: { did: string; plan: string; publi
   return { subject: `Your BlueyVatar ${i.plan} subscription was canceled`, text: frame(i.did, i.publicUrl, body, 'billing') }
 }
 
-export function keyRevokedNotice(i: { did: string; prefix: string; label?: string | null; publicUrl: string }): Notice {
-  const name = i.label ? `${i.label} (${i.prefix})` : i.prefix
+export function keyRevokedNotice(i: {
+  did: string
+  prefix: string
+  label?: string | null
+  /** When the key was created. Used to name a key that has no label, such as "Unnamed key, created 2026-11-08". */
+  createdAt?: Date
+  /** What to show on the "Account:" line instead of the DID, usually the handle. Falls back to the DID. */
+  account?: string | null
+  publicUrl: string
+}): Notice {
+  const name = i.label?.trim() || (i.createdAt ? `Unnamed key, created ${day(i.createdAt)}` : 'Unnamed key')
   const body =
-    `The key ${name} was revoked and no longer works.\n\n` +
+    `The key "${name}" (${i.prefix}) was revoked and no longer works.\n\n` +
     `If you did not do this, sign in at ${base(i.publicUrl)}/account/keys, review your keys, and issue a new one.`
-  return { subject: i.label ? 'Your BlueyVatar key "' + i.label + '" was revoked' : 'A BlueyVatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: `Your BlueyVatar key "${name}" was revoked`, text: frame(i.did, i.publicUrl, body, 'security', i.account || i.did) }
 }
 
 /**
