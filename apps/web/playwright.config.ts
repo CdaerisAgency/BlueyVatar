@@ -6,7 +6,7 @@ import { defineConfig } from '@playwright/test'
  * delivery server that e2e/global-setup.ts starts. No Resend key and no PDS are configured, so nothing
  * leaves the machine. PW_CHROMIUM_PATH points at an installed Chromium when the bundled one is absent.
  */
-const WEB_PORT = Number(process.env.E2E_WEB_PORT ?? 3100)
+const WEB_PORT = Number(process.env.E2E_PORT ?? process.env.E2E_WEB_PORT ?? 3100)
 export const STUB_PORT = Number(process.env.E2E_STUB_PORT ?? 3101)
 const base = `http://localhost:${WEB_PORT}`
 const database = process.env.E2E_DATABASE_URL ?? process.env.TEST_DATABASE_URL

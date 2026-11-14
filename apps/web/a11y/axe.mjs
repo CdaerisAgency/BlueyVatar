@@ -5,7 +5,7 @@ import { chromium } from 'playwright'
 import { DID, sessionCookie, startDelivery, startWeb } from './server.mjs'
 
 const WEB_PORT = Number(process.env.A11Y_PORT ?? 3917)
-const DELIVERY_PORT = WEB_PORT + 1
+const DELIVERY_PORT = Number(process.env.A11Y_DELIVERY_PORT ?? WEB_PORT + 1)
 const base = `http://localhost:${WEB_PORT}`
 
 const PUBLIC = ['/', '/pricing', '/integrations', '/docs', '/login', '/login?error=Handle%20not%20found', '/p/alice.example.com', '/p/alice.example.com?report=invalid', '/policy', '/privacy', '/accessibility']
