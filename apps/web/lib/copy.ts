@@ -40,7 +40,7 @@ export const COPY = {
     perMonth: '/mo',
     tiers: {
       free: { body: '1,000 requests a day. Enough for a personal site or a side project.', cta: 'Get a key' },
-      plus: { body: 'Everything in Free, plus 20 avatar images, a profile gallery, a custom profile domain, up to 20 verified accounts, 50,000 requests a month, hovercards, and priority cache warming.', cta: 'Start Plus' },
+      plus: { body: 'Everything in Free, plus 20 avatar images, a profile gallery, a custom profile domain, up to 20 linked accounts, 50,000 requests a month, hovercards, and priority cache warming.', cta: 'Start Plus' },
       business: { body: 'Everything in Plus, plus 1 million requests a month, custom domains, and a support contact.', cta: 'Start Business' },
     },
   },
