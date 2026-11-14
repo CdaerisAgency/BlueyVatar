@@ -9,7 +9,7 @@ export const COPY = {
     eyebrow: 'One avatar. Every app.',
     title: 'Your face, carried by your own account.',
     lead: 'BlueyVatar stores your avatar and profile in your atproto repository, so any site that knows your email or handle can show the real you. Change it once and it changes everywhere.',
-    primary: 'Claim your avatar',
+    primary: 'Set up your avatar',
     secondary: 'Read the docs',
     note: 'Free for everyone. No password, no new account. Sign in with the atproto account you already have.',
     avatarAlt: 'Example avatar',

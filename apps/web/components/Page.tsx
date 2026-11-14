@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import type { HTMLAttributes, ReactNode } from 'react'
+import { ButtonLink } from './Button'
 
 /** Direct children that are forms, sections, or lists become white cards. */
 const autoCards = [
@@ -31,6 +33,46 @@ export function PageHeader({ title, intro, actions }: { title: string; intro?: R
       {intro && <p className="bv-intro">{intro}</p>}
       {actions && <div className="mb-5 flex flex-wrap gap-3">{actions}</div>}
     </header>
+  )
+}
+
+/** A link from a sub-page to its parent page, placed above the PageHeader. The label names the parent ("Back to avatars"). */
+export function BackLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <p className="mb-3 text-bv-small">
+      <Link href={href}>
+        <span aria-hidden="true">&larr; </span>
+        {children}
+      </Link>
+    </p>
+  )
+}
+
+const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+/**
+ * One block of a page: an h2, an optional one-line description, then the content. Directly inside PageMain it becomes a card.
+ * Use `tone="danger"` for destructive actions. Pass `id` when other links point at the section.
+ */
+export function Section({ title, intro, id, tone = 'default', children }: { title: ReactNode; intro?: ReactNode; id?: string; tone?: 'default' | 'danger'; children?: ReactNode }) {
+  const hid = `${id ?? (typeof title === 'string' ? slug(title) : 'section')}-title`
+  const cls = tone === 'danger' ? 'bv-block border-2! border-bv-danger!' : 'bv-block'
+  return (
+    <section id={id} aria-labelledby={hid} className={cls}>
+      <h2 id={hid}>{title}</h2>
+      {intro && <p>{intro}</p>}
+      {children}
+    </section>
+  )
+}
+
+/** What a list or table shows when it has no rows: one sentence that says what is missing, and the next action when there is one. */
+export function EmptyState({ children, action }: { children: ReactNode; action?: { href: string; label: string } }) {
+  return (
+    <div className="bv-empty">
+      <p>{children}</p>
+      {action && <ButtonLink href={action.href} variant="secondary">{action.label}</ButtonLink>}
+    </div>
   )
 }
 

@@ -1,4 +1,4 @@
-import { Note, PageHeader, PageMain, TableBox } from '../../../components/Page'
+import { EmptyState, Note, PageHeader, PageMain, Section, TableBox } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
 import { cfSaasConfig, fallbackOrigin, getHostname, type HostnameState } from '../../../lib/cf-saas'
@@ -38,8 +38,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
 
   return (
     <PageMain>
-      <PageHeader title="Custom profile domain" />
-      <p>Serve your profile from your own subdomain, such as me.example.com.</p>
+      <PageHeader title="Custom profile domain" intro="Serve your profile from your own subdomain, such as me.example.com." />
       {error && <p role="alert">{error}</p>}
 
       {!cfg || !target ? (
@@ -53,8 +52,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
       ) : null}
 
       {cfg && target && row && (
-        <section>
-          <h2>{row.hostname}</h2>
+        <Section title={row.hostname}>
           <p>
             Status:{' '}
             {row.status === 'active'
@@ -107,23 +105,24 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
           )}
           <PollRefresh active={row.status === 'pending'} />
           <form action={removeDomain}>
-            <Button type="submit">Remove domain</Button>
+            <Button type="submit" variant="danger">Remove domain</Button>
           </form>
-        </section>
+        </Section>
       )}
 
       {cfg && target && !row && plus && (
-        <>
-        <p>You have no custom domain yet. Enter a subdomain you control, then add the DNS records we show you.</p>
-        <DomainForm />
-        </>
+        <Section title="Add a domain">
+          <EmptyState>You have no custom domain yet. Enter a subdomain you control, then add the DNS records we show you.</EmptyState>
+          <DomainForm />
+        </Section>
       )}
 
-      <h2>Using a root domain</h2>
-      <p>
-        Root domains such as example.com cannot be served this way. Instead, set your account handle to your domain. Once your handle is the domain,
-        /p/{'{domain}'} on BlueyVatar shows your profile.
-      </p>
+      <Section title="Using a root domain">
+        <p>
+          Root domains such as example.com cannot be served this way. Instead, set your account handle to your domain. Once your handle is the domain,
+          /p/{'{domain}'} on BlueyVatar shows your profile.
+        </p>
+      </Section>
     </PageMain>
   )
 }

@@ -11,7 +11,7 @@ export default async function VisibilityPage() {
   const rules = await getDashboardStore().getRules(did)
   return (
     <PageMain>
-      <PageHeader title="Visibility" />
+      <PageHeader title="Visibility" intro="Choose who can fetch your avatar and profile, and whether apps can find you by email." />
       <p>Signed in as {did}</p>
       <p>Current setting: {isPublic(rules) ? 'Public. Anyone can fetch your avatar and profile.' : 'Restricted by the rules below.'}</p>
       <Note>

@@ -1,4 +1,4 @@
-import { PageHeader, PageMain } from '../../../components/Page'
+import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
 import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { requireDid } from '../../../lib/auth'
@@ -43,16 +43,14 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageMain>
-      <PageHeader title="Avatars" />
+      <PageHeader title="Avatars" intro="Upload, import, and choose the images apps show for you." />
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
 
       {bsky && <BskyAvatarPanel session={bsky.session} state={await getSyncStore().get(did)} server={serverLabel(pdsHost(pds))} />}
 
-      <h2>
-        Your images ({images.length} of {imageLimit(plan)})
-      </h2>
+      <Section title={`Your images (${images.length} of ${imageLimit(plan)})`}>
       {canAdd ? (
         <p>
           <ButtonLink href="#upload" variant="primary">Upload an image</ButtonLink>
@@ -64,7 +62,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           </p>
         )
       )}
-      {images.length === 0 && !loadError ? <p>You have no avatar yet. The first image you add becomes your default.</p> : null}
+      {images.length === 0 && !loadError ? <EmptyState action={canAdd ? { href: '#upload', label: 'Upload an image' } : undefined}>You have no avatar yet. The first image you add becomes your default.</EmptyState> : null}
       {!loadError && (
         <div className="flex items-start gap-3">
           {bskyCid ? (
@@ -110,7 +108,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
                   {bsky && <UseAsBskyAvatar rkey={img.rkey} blockedReason={bskyBlockReason(img)} server={serverLabel(pdsHost(pds))} />}
                   <form action={removeImage}>
                     <input type="hidden" name="rkey" value={img.rkey} />
-                    <Button type="submit">Delete</Button>
+                    <Button type="submit" variant="danger">Delete</Button>
                   </form>
                 </div>
               </div>
@@ -118,8 +116,9 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
           )
         })}
       </ul>
+      </Section>
 
-      <h2>Import an image</h2>
+      <Section title="Import an image">
       {canAdd ? (
         <>
           <p>Copy an avatar you already use into your repository. The image must be PNG or JPEG and at most 5 MB. Images above 4096 pixels on the long side are shrunk to fit.</p>
@@ -139,9 +138,9 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       ) : (
         !loadError && <p>Importing needs a free image slot.</p>
       )}
+      </Section>
 
-      <h2 id="upload">Upload an image</h2>
-      <p>{uploadNotice(plan)}</p>
+      <Section title="Upload an image" id="upload" intro={uploadNotice(plan)}>
       {canAdd ? (
         <form action={uploadImage} encType="multipart/form-data">
           <ImageFileInput />
@@ -157,6 +156,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
       ) : (
         !loadError && <p>{limitMessage(plan)}</p>
       )}
+      </Section>
     </PageMain>
   )
 }

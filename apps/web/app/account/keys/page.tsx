@@ -1,5 +1,5 @@
 import { COPY } from '../../../lib/copy'
-import { PageHeader, PageMain } from '../../../components/Page'
+import { PageHeader, PageMain, Section } from '../../../components/Page'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
 import { ENTITLEMENTS } from '@blueyvatar/core'
@@ -23,7 +23,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   if (!isScope(scope)) {
     return (
       <PageMain>
-        <PageHeader title="API keys" />
+        <PageHeader title="API keys" intro="Create, rotate, and revoke the keys apps use to call the BlueyVatar API." />
         <p role="alert">{scope.error}</p>
       </PageMain>
     )
@@ -41,7 +41,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
 
   return (
     <PageMain>
-      <PageHeader title="API keys" />
+      <PageHeader title="API keys" intro="Create, rotate, and revoke the keys apps use to call the BlueyVatar API." />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
 
@@ -49,7 +49,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
 
       <p>Your license, plan limits, and usage are on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Plan and billing</Link> page.</p>
 
-      <h2>Keys ({active.length}{ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)</h2>
+      <Section title={`Keys (${active.length}${ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)`}>
       {keys.length === 0 && <p>You have no keys yet. Create a website key below to use BlueyVatar from a web page or app. Server keys are for your own servers.</p>}
       <ul>
         {keys.map((k) => (
@@ -62,6 +62,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
         ))}
       </ul>
       <p>Only a SHA256 hash and a short prefix are stored, so a lost key cannot be shown again. Revoke it and create a new one, or rotate it.</p>
+      </Section>
 
       <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} orgId={orgId ?? ''} />
     </PageMain>

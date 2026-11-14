@@ -10,7 +10,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: '/account/avatars', label: 'Avatars', description: 'Upload, import, and choose your default avatar and its rating.' },
       { href: '/account/profile', label: 'Profile', description: 'Job title, location, pronouns, and other public details.' },
       { href: '/account/stats', label: 'Profile views', description: 'Daily profile views for the last 30 days (Plus).' },
-      { href: '/account/claims', label: 'Verified accounts', description: 'Verify accounts on other sites and see the atproto apps you use.' },
+      { href: '/account/claims', label: 'Linked accounts', description: 'Link accounts on other sites, verify them, and see the atproto apps you use.' },
     ],
   },
   {

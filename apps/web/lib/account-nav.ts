@@ -24,7 +24,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
     label: 'Identity',
     items: [
       { href: '/account/orgs', label: 'Organizations' },
-      { href: '/account/claims', label: 'Verified accounts' },
+      { href: '/account/claims', label: 'Linked accounts' },
       { href: '/account/verify', label: 'Verify' },
       { href: '/account/domain', label: 'Custom profile domain' },
     ],

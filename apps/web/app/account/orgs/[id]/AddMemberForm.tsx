@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '../../../../components/Button'
 import { useActionState, useRef } from 'react'
 import { FieldError, FormNotices, fieldProps, useFocusResult } from '../../../../components/FormNotices'
 import { ADD_MEMBER_FIELDS, type AddMemberState } from '../../../../lib/orgs/form-limits'
@@ -27,7 +28,7 @@ export function AddMemberForm({ orgId }: { orgId: string }) {
         </select>
         <FieldError prefix="member" name="role" error={e.role} />
       </label>{' '}
-      <button type="submit">Add member</button>
+      <Button type="submit" variant="primary">Add member</Button>
     </form>
   )
 }
