@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { currentDid } from '../../../lib/auth'
 import { feedbackConfig } from '../../../lib/bug-report'
 import { runBugReport } from '../../../lib/bug-report-run'
+import { attachIssue, deleteScreenshot, saveScreenshot } from '../../../lib/bug-report-screenshot'
 import { reportError } from '../../../lib/obs'
 import { limitedResult } from '../../../lib/rate-guard'
 import { siteUrl } from '../../../lib/site'
+import { getPool } from '../../../lib/store'
 import { resolveHandle } from '../../../lib/viewer'
 
 export const dynamic = 'force-dynamic'
@@ -24,6 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'The report was not understood.' }, { status: 400, headers: noStore })
   }
   const did = await currentDid().catch(() => null)
+  const pool = getPool()
   const out = await runBugReport(await req.text(), {
     did,
     config: feedbackConfig(),
@@ -34,6 +37,7 @@ export async function POST(req: Request) {
     handleFor: resolveHandle,
     version: process.env.SENTRY_RELEASE ?? process.env.FLY_IMAGE_REF ?? null,
     fetchImpl: fetch,
+    screenshots: pool ? { save: (d, img) => saveScreenshot(pool, d, img), discard: (id) => deleteScreenshot(pool, id), attach: (id, n) => attachIssue(pool, id, n), baseUrl: siteUrl() } : null,
     report: (err) => reportError('bug report failed', err),
   })
   const headers: Record<string, string> = { ...noStore }

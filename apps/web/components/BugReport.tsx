@@ -5,7 +5,7 @@ import {
   MAX_CONTACT, MAX_DESCRIPTION, MIN_DESCRIPTION, SCREENSHOT_TYPES, pagePath, sentSummary,
 } from '../lib/bug-report'
 import { buttonClass } from './Button'
-import { canCaptureScreen, captureTab, fileToScreenshot } from './bug-report-capture'
+import { blobToBase64, canCaptureScreen, captureTab, fileToScreenshot } from './bug-report-capture'
 
 type Availability = { available: boolean; signedIn: boolean }
 type Sent = { url: string; number: number }
@@ -154,7 +154,7 @@ export default function BugReport() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           description, contact, includeHandle, page: c.page, userAgent: c.userAgent, viewportWidth: c.width, viewportHeight: c.height,
-          hasScreenshot: shot !== null, website: website.current?.value ?? '',
+          hasScreenshot: shot !== null, screenshot: shot ? await blobToBase64(shot.blob) : '', website: website.current?.value ?? '',
         }),
       })
       const out = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; field?: string; number?: number; url?: string } | null
@@ -218,11 +218,7 @@ export default function BugReport() {
                 It is issue <a href={sent.url} className="text-bv-orange-deep underline" target="_blank" rel="noopener noreferrer">#{sent.number} on GitHub</a>, which may be public.
               </p>
             )}
-            {shot && (
-              <p className="mt-2">
-                Your screenshot was not sent. <a href={shot.url} download="screenshot.jpg" className="text-bv-orange-deep underline">Save it</a> and add it to the issue if you want us to see it.
-              </p>
-            )}
+            {shot && <p className="mt-2">Your screenshot was sent with the report. Only BlueyVatar admins can see it, and it is deleted after 90 days.</p>}
             <div className="mt-4 flex gap-3">
               <button type="button" onClick={discard} className={buttonClass('primary')}>Done</button>
             </div>
@@ -282,7 +278,7 @@ export default function BugReport() {
 
             <fieldset className="m-0 grid gap-2 border-0 p-0">
               <legend className="mb-1 p-0 font-semibold">Screenshot <span className="font-normal text-bv-ink-3">(optional)</span></legend>
-              <p className="m-0 text-[14px] text-bv-ink-3">A screenshot can show personal information such as your name, email, or other tabs. Check the preview. We strip photo metadata, shrink it, and keep it in your browser: it is not uploaded with the report.</p>
+              <p className="m-0 text-[14px] text-bv-ink-3">A screenshot can show personal information such as your name, email, or other tabs. Check the preview. We strip photo metadata and shrink it. It is sent with your report and kept for 90 days. Only BlueyVatar admins can see it, and it is not put on GitHub: the issue only links to it. It is deleted with your account.</p>
               {shot && (
                 <div className="flex items-start gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element -- a blob: URL has nothing for the image optimizer to fetch */}

@@ -1,6 +1,7 @@
 import { Tap } from '@atproto/tap'
 import pg from 'pg'
 import { scheduleBillingPurge } from './billing-retention.js'
+import { scheduleScreenshotPurge } from './bug-report-retention.js'
 import { scheduleModerationDigest } from './moderation-digest.js'
 import { scheduleKeyExpiryReminders } from './key-expiry-reminder.js'
 import { purgerFromEnv } from './cloudflare.js'
@@ -40,6 +41,8 @@ function writes(): IndexWrites {
     scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
     // Deletes Stripe billing rows 7 years after their owner deleted their data.
     scheduleBillingPurge(pool)
+    // Deletes bug report screenshots 90 days after they were filed (issue #266).
+    scheduleScreenshotPurge(pool)
     // Daily moderation digest email to the admin address (counts only). Off until an address or ADMIN_DIDS exists.
     scheduleModerationDigest(pool)
     // One reminder email per expiring API key, 7 days before it expires (issue #236).

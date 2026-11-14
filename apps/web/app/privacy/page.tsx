@@ -25,6 +25,8 @@ export default function PrivacyPage() {
       <p>We keep logs for 90 days or until the logs reach a size cap, whichever comes first, and then delete them. Where we keep a hashed IP address in our database (for abuse reports and rate limits), it is removed on the same schedule.</p>
       <h2>Profile view counts</h2>
       <p>We count how many times your public profile page is viewed, and how many keyed API calls fetch your profile, as one number per day for each. We do not store the visitor's IP address, user agent, or any cookie with these counts, and we skip known crawlers. Plus members can see their last 30 days at Profile views in their account. The counts follow the same retention as logs: 90 days or until the logs reach a size cap, whichever comes first. They are included in your data download and removed when you delete your data.</p>
+      <h2>Bug report screenshots</h2>
+      <p>When you send a bug report with a screenshot, we remove photo metadata, shrink the picture, and keep it in our database for 90 days. Only BlueyVatar admins, who sign in with a second step, can see it. It is not put on GitHub: the issue we file only holds a link that opens for admins. The rest of the report (your description, the page, your browser, and your handle or contact email if you chose to include them) is in a GitHub issue that may be public. Screenshots are deleted after 90 days, when you delete your data, and are included in your data download.</p>
       <h2>Contact</h2>
       <p>For privacy or security questions, write to security@blueyvatar.com.</p>
     </PageMain>

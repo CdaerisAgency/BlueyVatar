@@ -1,5 +1,6 @@
+import { cleanScreenshot, decodeScreenshot } from './bug-report-screenshot'
 import { limitedMessage } from './rate-limit'
-import { isHoneypotFilled, issueBody, issueTitle, ISSUE_LABELS, MAX_REQUEST_BYTES, parseBugReport, UNAVAILABLE_MESSAGE, type FeedbackConfig } from './bug-report'
+import { isHoneypotFilled, issueBody, issueTitle, ISSUE_LABELS, MAX_REQUEST_BYTES, parseBugReport, SCREENSHOT_MAX_INPUT_BYTES, UNAVAILABLE_MESSAGE, type FeedbackConfig } from './bug-report'
 
 /** Server side of the bug report button. Every outside effect is passed in so tests can mock GitHub and the limiter. */
 export type RunDeps = {
@@ -11,6 +12,8 @@ export type RunDeps = {
   handleFor: (did: string) => Promise<string | null>
   version: string | null
   fetchImpl: typeof fetch
+  /** Where screenshots are kept (Postgres) and the public address the admin link is built on. Null when there is no database: the report is filed without the picture. */
+  screenshots: { save: (did: string, image: Buffer) => Promise<string>; discard: (id: string) => Promise<void>; attach: (id: string, issueNumber: number) => Promise<void>; baseUrl: string } | null
   report: (err: unknown) => void
 }
 
@@ -36,6 +39,23 @@ export async function runBugReport(rawText: string, deps: RunDeps): Promise<RunR
   if (isHoneypotFilled(raw)) return { status: 200, body: { ok: true, number: 0, url: '' } }
   const parsed = parseBugReport(raw)
   if (!parsed.ok) return fail(400, parsed.error, parsed.field)
+  // The picture is checked and cleaned before anything is filed, so a bad one stops the report with a message the person can act on.
+  let shotId: string | null = null
+  if (parsed.value.screenshot && deps.screenshots) {
+    const decoded = decodeScreenshot(parsed.value.screenshot, SCREENSHOT_MAX_INPUT_BYTES)
+    const clean = decoded ? await cleanScreenshot(decoded) : null
+    if (!clean) return fail(400, 'That screenshot could not be read. Remove it or choose a PNG, JPEG, or WebP picture under 1 MB.', 'screenshot')
+    try {
+      shotId = await deps.screenshots.save(deps.did, clean)
+    } catch (err) {
+      deps.report(err)
+      return fail(502, 'The report could not be filed. Try again later.')
+    }
+  }
+  const screenshotUrl = shotId && deps.screenshots ? `${deps.screenshots.baseUrl.replace(/\/$/, '')}/admin/bug-reports/${shotId}/screenshot` : null
+  const drop = async () => {
+    if (shotId) await deps.screenshots?.discard(shotId).catch(() => {})
+  }
   const handle = parsed.value.includeHandle ? await deps.handleFor(deps.did).catch(() => null) : null
   try {
     const res = await deps.fetchImpl(`https://api.github.com/repos/${deps.config.repo}/issues`, {
@@ -47,18 +67,21 @@ export async function runBugReport(rawText: string, deps: RunDeps): Promise<RunR
         'content-type': 'application/json',
         'user-agent': 'blueyvatar-bug-report',
       },
-      body: JSON.stringify({ title: issueTitle(parsed.value.description), body: issueBody(parsed.value, { handle: handle ?? (parsed.value.includeHandle ? deps.did : null), version: deps.version }), labels: [...ISSUE_LABELS] }),
+      body: JSON.stringify({ title: issueTitle(parsed.value.description), body: issueBody(parsed.value, { handle: handle ?? (parsed.value.includeHandle ? deps.did : null), version: deps.version, screenshotUrl }), labels: [...ISSUE_LABELS] }),
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) {
       // Status only: the response body and the token never reach the logs.
       deps.report(new Error(`GitHub issue create failed: ${res.status}`))
+      await drop()
       return fail(502, 'The report could not be filed. Try again later.')
     }
     const issue = (await res.json()) as { number?: number; html_url?: string }
+    if (shotId && issue.number) await deps.screenshots?.attach(shotId, Number(issue.number)).catch(() => {})
     return { status: 200, body: { ok: true, number: Number(issue.number ?? 0), url: String(issue.html_url ?? '') } }
   } catch (err) {
     deps.report(new Error(`GitHub issue create failed: ${(err as Error).name}`))
+    await drop()
     return fail(502, 'The report could not be filed. Try again later.')
   }
 }
