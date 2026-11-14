@@ -1,6 +1,6 @@
 # Usage API (v1)
 
-Version 1. `GET /usage` returns the metered usage of the license behind a server key, so you can watch consumption from code. The dashboard at `/account/keys` shows the same numbers.
+Version 2. `GET /usage` returns the metered usage of the license behind a server key, so you can watch consumption from code. The same numbers are shown on Plan and billing, at `/account/billing`.
 
 ## Request
 

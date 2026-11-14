@@ -80,4 +80,4 @@ With `center=logo` or `center=avatar` the code uses error correction level H and
 
 `center=avatar` follows the avatar rules: rating `g`, the same blocked-image and label checks as `/img`, the image crop from the record, and the default avatar when there is no usable image. The bytes come from the owner's own server through the same resolver as the avatar routes, and no other URL is fetched.
 
-Errors: `400 invalid_qr_option` for a bad `center` or `quiet`, and the codes in [errors-v1.md](errors-v1.md) for the rest.
+Errors: `400 invalid_qr_option` for a bad `center` or `quiet`, and the codes in [errors-v2.md](errors-v2.md) for the rest.
