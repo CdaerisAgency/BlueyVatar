@@ -2,7 +2,7 @@ import { EmptyState, PageHeader, PageMain, Section } from '../../../components/P
 import CopyField from '../CopyField'
 import { Button } from '../../../components/Button'
 import { Field } from '../../../components/Field'
-import { fieldProps } from '../../../components/FormNotices'
+import { fieldProps } from '../../../lib/field-props'
 import { requireDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
 import { DNS_PROOF_LABEL, PLATFORMS, PLATFORM_LABELS, dnsProofName, isPlatform, profileLinkFor, proofToken, type Platform } from '../../../lib/claims'

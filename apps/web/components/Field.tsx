@@ -3,7 +3,7 @@ import { FieldError } from './FormNotices'
 
 /**
  * One form field: label, optional hint, the input, and an error message. Required fields show a star after the label.
- * Give the input `fieldProps(prefix, name, error, hint ? `${prefix}-${name}-hint` : undefined)` so the error and hint are read with it.
+ * Give the input `fieldProps(prefix, name, error, hint ? `${prefix}-${name}-hint` : undefined)` (from lib/field-props) so the error and hint are read with it.
  */
 export function Field({ prefix, name, label, hint, error, required = false, children }: {
   prefix: string

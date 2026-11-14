@@ -1,7 +1,7 @@
 import { PageHeader, PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { Field } from '../../../components/Field'
-import { fieldProps } from '../../../components/FormNotices'
+import { fieldProps } from '../../../lib/field-props'
 import { redirect } from 'next/navigation'
 import { verifyCode } from '../../actions'
 import { requireDid } from '../../../lib/auth'

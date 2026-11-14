@@ -13,7 +13,7 @@ Part of issue #239. Version 2 adds `Section`, `Field`, button variants, `EmptySt
 - When a list or table has no rows, show `EmptyState`: one sentence that says what is missing, and a next action when there is one (`action={{ href, label }}`).
 
 ## Forms and buttons
-- Use `Field` from `apps/web/components/Field.tsx` for a label, optional hint, the input, an error message, and the required marker. Give the input `fieldProps(prefix, name, error, hintId)` from `FormNotices` so the hint and error are read with it.
+- Use `Field` from `apps/web/components/Field.tsx` for a label, optional hint, the input, an error message, and the required marker. Give the input `fieldProps(prefix, name, error, hintId)` from `apps/web/lib/field-props.ts` (it also works in server pages) so the hint and error are read with it.
 - Use `Button` and `ButtonLink` from `apps/web/components/Button.tsx`. Do not write a bare `button` element.
   - `primary` (orange) is the one main action of a form or section.
   - `secondary` (outline) is any other action.
