@@ -1,4 +1,4 @@
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { MAX_STATEMENT, appealableActions } from '../../../lib/appeals'
 import { requireDid } from '../../../lib/auth'
@@ -18,7 +18,7 @@ export default async function AppealPage({ searchParams }: { searchParams: Promi
   const chosen = actions.find((a) => String(a.id) === sp.action)
   return (
     <PageMain>
-      <h1>Appeal</h1>
+      <PageHeader title="Appeal" />
       <p>Signed in as {did}</p>
       <p>You can appeal a takedown, a suspension, a warning, or a rating change on your account. Each action can be appealed once. See the <a href="/policy#appeals">content policy</a>.</p>
       {sp.error && <p role="alert">{sp.error}</p>}

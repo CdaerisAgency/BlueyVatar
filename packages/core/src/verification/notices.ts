@@ -34,13 +34,21 @@ export interface Notice {
 const base = (publicUrl: string) => publicUrl.replace(/\/+$/, '')
 const day = (d: Date) => d.toISOString().slice(0, 10)
 
+const accountLine = (account: string) => `Account: ${account}`
+
+/** Swaps the DID on the "Account:" line for a handle. Text without that exact line is returned unchanged. */
+export function withAccount(n: Notice, did: string, handle: string | null | undefined): Notice {
+  if (!handle || handle === did) return n
+  return { ...n, text: n.text.replace(`\n${accountLine(did)}\n`, `\n${accountLine(handle)}\n`) }
+}
+
 /** Plain text only: no tracking pixels, no tracked links. Every message names the account and links the preferences page. */
-function frame(did: string, publicUrl: string, body: string, kind: NoticeKind, account: string = did): Notice['text'] {
+function frame(did: string, publicUrl: string, body: string, kind: NoticeKind, account?: string | null): Notice['text'] {
   const why =
     kind === 'security'
       ? 'This is a security notice. It is always sent.'
       : 'You can turn this kind of message off at the link below.'
-  return `${body}\n\n--\nAccount: ${account}\n${why}\nNotification settings: ${base(publicUrl)}/account/notifications`
+  return `${body}\n\n--\n${accountLine(account || did)}\n${why}\nNotification settings: ${base(publicUrl)}/account/notifications`
 }
 
 export interface UsageNoticeInput {
@@ -272,6 +280,8 @@ export interface NoticeDirectory {
   /** The decrypted primary email, or null when none is on file. */
   address(did: string): Promise<string | null>
   prefs(did: string): Promise<NoticePrefs>
+  /** The account's handle for the "Account:" line, or null. Optional: without it the line shows the DID. */
+  handle?(did: string): Promise<string | null>
 }
 
 export type NoticeResult = 'sent' | 'off' | 'no_address' | 'failed'
@@ -294,7 +304,8 @@ export class Notifier {
         log.warn(`${kind} notice not sent: no address on file`, { did })
         return 'no_address'
       }
-      await this.sender.send({ to, ...n })
+      const handle = await this.dir.handle?.(did).catch(() => null)
+      await this.sender.send({ to, ...withAccount(n, did, handle) })
       return 'sent'
     } catch (err) {
       log.error(`${kind} notice failed`, { error: err instanceof Error ? err.message : 'unknown' })

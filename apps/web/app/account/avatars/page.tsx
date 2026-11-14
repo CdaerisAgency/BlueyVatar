@@ -1,4 +1,4 @@
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { requireDid } from '../../../lib/auth'
@@ -43,7 +43,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageMain>
-      <h1>Avatars</h1>
+      <PageHeader title="Avatars" />
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}

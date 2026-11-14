@@ -1,4 +1,4 @@
-import { PageMain } from '../../../../components/Page'
+import { PageHeader, PageMain } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { BILLING_RETENTION_YEARS, DELETE_CONFIRMATION } from '../../../../lib/account-data'
 import { requireDid } from '../../../../lib/auth'
@@ -19,7 +19,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
   const { error } = await searchParams
   return (
     <PageMain>
-      <h1>Danger zone</h1>
+      <PageHeader title="Danger zone" />
       <p>
         Signed in as {displayName(viewer)}
         <small className="block text-bv-ink-3">Account ID: {did}</small>

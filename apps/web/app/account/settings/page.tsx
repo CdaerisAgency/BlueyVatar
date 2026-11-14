@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '../../../components/Button'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { currentSession, requireDid } from '../../../lib/auth'
 import { getStore } from '../../../lib/store'
 import { viewerFor } from '../../../lib/viewer'
@@ -20,7 +20,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const sessions = await getStore().sessions.list(did)
   return (
     <PageMain>
-      <h1>Sign-out options</h1>
+      <PageHeader title="Sign-out options" />
       <p>Signed in as {displayName(viewer)}</p>
       {SETTINGS_GROUPS.map((g) => (
         <section key={g.title} aria-labelledby={`g-${g.title}`}>

@@ -27,6 +27,11 @@
   --container-bv-narrow: 540px; /* sign-in and profile pages that hold one short form */
   --text-bv-title: clamp(34px, 8vw, 48px); /* page title, the one h1 */
   --text-bv-section: clamp(26px, 6vw, 32px); /* section title, h2 */
+  --text-bv-intro: 18px; /* the one-sentence intro under a page title */
+  --text-bv-body: 16px; /* running text */
+  --text-bv-small: 14px; /* captions and table notes */
+  --text-bv-code: 0.9em; /* code and pre, relative to the text around it */
+  --container-bv-intro: 640px; /* line length of an intro */
   --spacing-bv-title: 16px; /* space under a title */
   --spacing-bv-section: 40px; /* space above a section title */
 }

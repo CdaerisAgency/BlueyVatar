@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PageMain } from '../../../../components/Page'
+import { PageHeader, PageMain } from '../../../../components/Page'
 import { requireDid } from '../../../../lib/auth'
 import { canManageMembership } from '../../../../lib/orgs/roles'
 import { getOrganization, listAudit, listMembers, memberRole, orgLicense } from '../../../../lib/orgs/store'
@@ -21,7 +21,7 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   if (!pool || !org || !role) {
     return (
       <PageMain>
-        <h1>Organization</h1>
+        <PageHeader title="Organization" />
         <p role="alert">You are not a member of that organization.</p>
       </PageMain>
     )
@@ -30,12 +30,12 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   const [members, lic, audit] = await Promise.all([listMembers(pool, id), orgLicense(pool, id), owner ? listAudit(pool, id) : Promise.resolve([])])
   return (
     <PageMain>
-      <h1>{org.name}</h1>
+      <PageHeader title={`${org.name}`} />
       <p>Signed in as {did}. Your role: {role}.</p>
       {q.error && <p role="alert">{q.error}</p>}
       {q.done && <p role="status">{q.done}</p>}
       <p>
-        <Link href={`/account/keys?org=${id}`}>API keys and license</Link>
+        <Link href={`/account/keys?org=${id}`}>API keys</Link>
         {owner && <> - <Link href={`/account/billing?org=${id}`}>Plan and billing</Link></>}
       </p>
       <p>Members manage keys. Only owners manage billing and membership. Billing stays with the billing owner{lic ? `, ${lic.billingDid}` : ''}.</p>

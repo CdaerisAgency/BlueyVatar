@@ -1,4 +1,4 @@
-import { PageMain } from '../../components/Page'
+import { PageHeader, PageMain } from '../../components/Page'
 import { Button, ButtonLink } from '../../components/Button'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
@@ -78,7 +78,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const url = primary ? ownerAvatarUrl(primary.emailHash) : null
   return (
     <PageMain>
-      <h1>Overview</h1>
+      <PageHeader title="Overview" />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {list && showChecklist(list.complete, prefs.showAgain) && (
         <section id="checklist" aria-labelledby="checklist-h">

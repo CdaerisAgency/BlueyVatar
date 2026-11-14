@@ -1,4 +1,4 @@
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import CopyField from '../CopyField'
 import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
@@ -111,7 +111,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
 
   return (
     <PageMain>
-      <h1>Verified accounts</h1>
+      <PageHeader title="Verified accounts" />
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}

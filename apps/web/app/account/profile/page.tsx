@@ -1,5 +1,5 @@
 import { normalizeBackgroundColor } from '@blueyvatar/core'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { ProfileForm } from './ProfileForm'
@@ -27,7 +27,7 @@ export default async function ProfilePage() {
   const color = normalizeBackgroundColor(p.backgroundColor)
   return (
     <PageMain>
-      <h1>Profile</h1>
+      <PageHeader title="Profile" />
       <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name and bio stay in your atproto profile. Wallets stay hidden unless you choose to show them.</p>
       {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
       {loadError === null && (

@@ -20,6 +20,20 @@ export function PageMain({ narrow = false, children }: { narrow?: boolean; child
   )
 }
 
+/**
+ * The top of every account page: the one h1, an optional one-sentence intro, and an optional row of actions.
+ * The title is the same words as the side menu label (account-nav.test.ts checks this). No other element is styled like a page title.
+ */
+export function PageHeader({ title, intro, actions }: { title: string; intro?: ReactNode; actions?: ReactNode }) {
+  return (
+    <header>
+      <h1>{title}</h1>
+      {intro && <p className="bv-intro">{intro}</p>}
+      {actions && <div className="mb-5 flex flex-wrap gap-3">{actions}</div>}
+    </header>
+  )
+}
+
 export function Card({ className = '', ...rest }: HTMLAttributes<HTMLDivElement>) {
   return <div className={`bv-card [&>:last-child]:mb-0 ${className}`} {...rest} />
 }

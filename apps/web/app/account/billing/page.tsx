@@ -1,5 +1,5 @@
 import { PAID_PLANS, PAST_DUE_GRACE_DAYS, effectiveTier, type PaidPlan } from '@blueyvatar/core'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { billingEnabled, planEnabled } from '../../../lib/billing/config'
 import { longDate, summarize } from '../../../lib/billing/summary'
@@ -49,7 +49,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageMain>
-      <h1>Plan and billing</h1>
+      <PageHeader title="Plan and billing" />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.done && <p role="status">{q.done}</p>}
@@ -194,7 +194,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   if (!pool || !org || !lic) {
     return (
       <PageMain>
-        <h1>Plan and billing</h1>
+        <PageHeader title="Plan and billing" />
         <p role="alert">You are not a member of that organization.</p>
       </PageMain>
     )
@@ -202,7 +202,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   if (!canManageBilling(role)) {
     return (
       <PageMain>
-        <h1>Plan and billing: {org.name}</h1>
+        <PageHeader title={`Plan and billing: ${org.name}`} />
         <p role="alert">Only organization owners can manage billing.</p>
       </PageMain>
     )
@@ -213,7 +213,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   const business = PRICING.find((p) => p.id === 'business')
   return (
     <PageMain>
-      <h1>Plan and billing: {org.name}</h1>
+      <PageHeader title={`Plan and billing: ${org.name}`} />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.error && <p role="alert">{q.error}</p>}
