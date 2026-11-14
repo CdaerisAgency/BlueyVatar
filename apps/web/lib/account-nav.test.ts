@@ -11,7 +11,7 @@ const accountDir = join(__dirname, '..', 'app', 'account')
 describe('group membership', () => {
   it('matches the approved grouping', () => {
     expect(ACCOUNT_NAV.map((g) => [g.label, g.items.map((i) => i.label)])).toEqual([
-      ['Profile', ['Profile', 'Profile views', 'Avatars', 'Visibility']],
+      ['Profile', ['Profile', 'Profile views', 'Avatars', 'Effects', 'Visibility']],
       ['Identity', ['Organizations', 'Linked accounts', 'Verify', 'Custom profile domain']],
       ['Developers', ['API keys']],
       ['Billing', ['Plan and billing']],

@@ -1,5 +1,6 @@
 'use client'
 import { Button } from '../../../components/Button'
+import { Section } from '../../../components/Page'
 
 import { useActionState, useState } from 'react'
 import { DEFAULT_EXPIRY, EXPIRY_CHOICES, EXPIRY_LABELS } from '../../../lib/key-expiry'
@@ -45,9 +46,7 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason, o
     if (state.key) setLabel('')
   }
   return (
-    <section>
-      <h2>Create a key</h2>
-      <p>Both key types are read only today. The API has no way to change data yet.</p>
+    <Section title="Create a key" intro="Both key types are read only today. The API has no way to change data yet.">
       <ul>
         <li>
           <strong>{COPY.keys.websiteKey}</strong> (starts with <code>pk_</code>): put it in a web page or app. It goes in the <code>token</code> parameter. Anyone who views the page can see it, so on paid plans you can limit it to your own domains.
@@ -84,7 +83,7 @@ export function CreateKeyForm({ allowSecret, allowPublishable, disabledReason, o
         </Button>
       </form>
       <Result s={state} />
-    </section>
+    </Section>
   )
 }
 
@@ -104,7 +103,7 @@ export function KeyActions({ hash, kind, domains, domainsEnabled, orgId = '' }: 
               <textarea name="domains" rows={3} cols={40} defaultValue={domains.join('\n')} />
             </label>
             <br />
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" variant="primary" disabled={saving}>
               Save domains
             </Button>
             <Result s={dom} />
@@ -114,15 +113,15 @@ export function KeyActions({ hash, kind, domains, domainsEnabled, orgId = '' }: 
         ))}
       <form action={rotate} className="inline">
         <input type="hidden" name="hash" value={hash} />
-            <input type="hidden" name="org" value={orgId} />
+        <input type="hidden" name="org" value={orgId} />
         <Button type="submit" disabled={rotating}>
-          Rotate
+          Rotate key
         </Button>
       </form>{' '}
       <form action={revokeKey} className="inline">
         <input type="hidden" name="hash" value={hash} />
-            <input type="hidden" name="org" value={orgId} />
-        <Button type="submit">Revoke</Button>
+        <input type="hidden" name="org" value={orgId} />
+        <Button type="submit" variant="danger">Revoke key</Button>
       </form>
       <Result s={rot} />
     </div>

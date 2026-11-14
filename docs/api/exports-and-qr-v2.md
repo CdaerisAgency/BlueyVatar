@@ -1,4 +1,4 @@
-# Profile exports and QR codes (v1)
+# Profile exports and QR codes (v2)
 
 Part of issue #242. Both features are available to every plan and every caller. They follow the same caching, rate limit, rating, and hidden-profile rules as the routes they extend.
 
@@ -18,7 +18,7 @@ The existing `/profile/{id}` URL is unchanged. A handle can end in `.md`, becaus
 
 ### What an export contains
 
-Display name, handle, profile page URL, description, avatar URL (a signed image URL, not image bytes), location, job title, company, pronouns, interests, languages, links (from your atproto profile and your own social links), verified accounts you have not hidden, and only the wallets you chose to show. Each wallet is marked not verified. Exports are built from the public profile JSON, so they never include hidden wallets, email links or hashes, your DID, your plan, or anything that only you can see.
+Display name, handle, profile page URL, description, avatar URL (a signed image URL, not image bytes), location, job title, company, pronouns, interests, languages, links (from your atproto profile and your own social links), linked accounts you have not hidden, and only the wallets you chose to show. Each wallet is marked not verified. Exports are built from the public profile JSON, so they never include hidden wallets, email links or hashes, your DID, your plan, or anything that only you can see.
 
 ### vCard properties
 
@@ -39,7 +39,7 @@ The file is vCard 4.0 ([RFC 6350](https://www.rfc-editor.org/rfc/rfc6350)) with 
 | `LANG` | Each language tag (RFC 5646). The primary language gets `PREF=1`. | RFC 6350 6.4.4, 5.3 |
 | `PHOTO` | The avatar URL. Image bytes are never embedded. | RFC 6350 6.2.4 |
 | `URL` | The profile page, then each link from your atproto profile. | RFC 6350 6.7.8 |
-| `SOCIALPROFILE` | Your own social links, and verified accounts with `SERVICE-TYPE` set to the platform name. | RFC 9554 3.5 and 4.9 |
+| `SOCIALPROFILE` | Your own social links, and linked accounts with `SERVICE-TYPE` set to the platform name. | RFC 9554 3.5 and 4.9 |
 | `X-BLUEYVATAR-WALLET` | Each shown wallet: the address is the value, with `X-CHAIN`, `X-LABEL`, and `X-VERIFIED=false` parameters. | RFC 6350 6.10 (extensions), 3.3 (`x-name`) |
 
 Rules the writer follows:
@@ -54,7 +54,7 @@ Wallets have no standard vCard property. The `X-BLUEYVATAR-WALLET` name is ours 
 
 ### Markdown
 
-A heading with the display name, the handle with links to the profile page and avatar, the description, then Details, Languages, Links, Verified accounts, and Wallets (not verified) lists. All user text is backslash-escaped (CommonMark 2.4), so it cannot make a link, image, heading, list, or HTML tag. Link addresses are https only, with parentheses and angle brackets percent-encoded.
+A heading with the display name, the handle with links to the profile page and avatar, the description, then Details, Languages, Links, Linked accounts, and Wallets (not verified) lists. All user text is backslash-escaped (CommonMark 2.4), so it cannot make a link, image, heading, list, or HTML tag. Link addresses are https only, with parentheses and angle brackets percent-encoded.
 
 ## QR codes
 
