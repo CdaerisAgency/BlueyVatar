@@ -4,6 +4,9 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 
 ## 2026-11-14
 
+### Added
+- A bug report button on every page (part of #266). Signed-in people describe the problem, optionally capture the page or attach a picture, and the server files a GitHub issue labeled `bug` and `area:web`. It is hidden until the owner sets `GITHUB_FEEDBACK_TOKEN` (see Bug reports in `docs/deploy.md`). Reports are limited to 5 per account and 20 per network per hour. Screenshots are shrunk and stripped of metadata in the browser and are not stored or uploaded yet.
+
 ### Fixed
 - CI now installs pnpm into each job's own folder (`dest` on the pnpm setup action). The default folder in the runner user's home was shared by every runner on the machine, which still caused "pnpm: command not found" when jobs overlapped.
 - CI jobs sharing the self-hosted runner no longer collide. Each job has its own pnpm folder and store (fixes "pnpm: command not found"), the e2e and accessibility servers use free ports chosen at run time (fixes "port 3100 is already used"), and CI runs queue per ref instead of cancelling. Locally, `E2E_PORT` still defaults to 3100.
