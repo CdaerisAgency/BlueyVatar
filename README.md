@@ -31,7 +31,7 @@ Requirements: Node 22 and pnpm 10.28.0 (`corepack enable` picks up the version f
 
 ```sh
 pnpm install
-cp .env.example .env            # optional for local runs
+cp .env.example .env            # optional for local runs (shared variables; app-specific ones are in apps/*/.env.example)
 pnpm lex:build                  # generate lexicon types into packages/core/src/lexicons
 pnpm --filter @blueyvatar/core build   # other packages import core from its dist output
 pnpm -r typecheck
@@ -73,7 +73,7 @@ pnpm lex:build                           # reads all of lexicons/, including ven
 
 ### Secrets
 
-Secrets (database credentials, the Tap admin password, the OAuth client signing key) live in Infisical. `.env.example` lists every variable the apps read. Never commit a filled-in `.env`.
+Secrets (database credentials, the Tap admin password, the OAuth client signing key) live in Infisical. `.env.example` lists the variables several apps share, and `apps/web/.env.example`, `apps/delivery/.env.example`, and `apps/indexer/.env.example` list the rest. Never commit a filled-in `.env`.
 
 ## Phase 1 TODO
 

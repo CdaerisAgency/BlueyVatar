@@ -87,7 +87,7 @@ jobs:
       - name: Unit test
         run: php integrations/wordpress/tests/test-url.php
 
-  # Warns (never fails) when a pull request touches apps/ without a changelog line.
+  # Warns (never fails) when a pull request touches apps/ without a changelog fragment.
   changelog:
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
@@ -100,8 +100,8 @@ jobs:
       - name: Check for a changelog change
         run: |
           changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if echo "$changed" | grep -q '^apps/' && ! echo "$changed" | grep -qx 'CHANGELOG.md'; then
-            echo "::warning file=CHANGELOG.md::This pull request changes apps/ but not CHANGELOG.md. If users or API developers will notice the change, add a line."
+          if echo "$changed" | grep -q '^apps/' && ! echo "$changed" | grep -qE '^(CHANGELOG\.md|changelog\.d/.+\.md)$'; then
+            echo "::warning file=changelog.d::This pull request changes apps/ but adds no changelog fragment. If users or API developers will notice the change, add changelog.d/YYYY-MM-DD-short-slug.md (see changelog.d/README.md)."
           fi
 
   docker:

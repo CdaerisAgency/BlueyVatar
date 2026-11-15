@@ -6,7 +6,7 @@ Requirements: Node 22 and pnpm 10.28.0 (`corepack enable` picks up the version f
 
 ```sh
 pnpm install
-cp .env.example .env            # optional for local runs
+cp .env.example .env            # optional for local runs (shared variables; app-specific ones are in apps/*/.env.example)
 pnpm lex:build                  # generate lexicon types
 pnpm --filter @blueyvatar/core build
 ```
@@ -28,7 +28,7 @@ See the README for the repository layout and how to run each service.
 
 ## Changelog
 
-Pull requests that change what users or API developers see add a line to `CHANGELOG.md`, under today's date and the right group (Added, Changed, or Fixed), in plain U.S. English. Add a new `## YYYY-MM-DD` heading when the date has no entry yet. The site renders the file at `/changelog` and in the Atom feed at `/changelog/feed.xml`. CI warns, but does not fail, when a pull request touches `apps/` without touching `CHANGELOG.md`.
+Pull requests that change what users or API developers see add one fragment file, `changelog.d/YYYY-MM-DD-short-slug.md`, using today's date and the headings Added, Changed, or Fixed, in plain U.S. English. Do not edit `CHANGELOG.md` directly, so pull requests never conflict on it; `changelog.d/README.md` has the format. The site merges the fragments into `CHANGELOG.md` for `/changelog` and the Atom feed at `/changelog/feed.xml`. `pnpm changelog:fold` folds them into the file for housekeeping. CI warns, but does not fail, when a pull request touches `apps/` without a fragment or a `CHANGELOG.md` change.
 
 ## Tests with a local Postgres
 

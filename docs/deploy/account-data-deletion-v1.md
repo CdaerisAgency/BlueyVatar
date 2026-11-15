@@ -1,0 +1,3 @@
+# Account data deletion and billing retention
+
+Signed-in users can download their data and delete it at `/account/data`. Deletion removes everything except Stripe billing rows (`billing_customers`, `subscriptions`), which are marked `deleted_at` and kept for 7 years for tax and accounting. It cancels active Stripe subscriptions first, so `STRIPE_SECRET_KEY` must be set on web for that step. The indexer runs a daily job (`apps/indexer/src/billing-retention.ts`) that deletes billing rows 7 years after `deleted_at`, and `stripe_events` rows 7 years after they were processed (they hold no DID). Email hashes stay as 30-day holds, as for any deleted account.
