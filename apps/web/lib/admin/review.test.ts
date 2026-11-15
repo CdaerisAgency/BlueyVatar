@@ -3,7 +3,11 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { attachSignal, moderationMetrics, slaHours, syncCases } from '@blueyvatar/core/moderation'
 import { appealableActions, submitAppeal } from '../appeals'
-import { allowedActions, caseDetail, claimCase, getCase, getWellness, listCases, logReveal, nextCase, performCaseAction, queueCounts, releaseCase, saveWellness, skipCase, type ActionInput } from './review'
+import { allowedActions, performCaseAction, type ActionInput } from './case-actions'
+import { caseDetail } from './case-detail'
+import { claimCase, nextCase, releaseCase, skipCase } from './review-locks'
+import { getCase, listCases, queueCounts } from './review-queue'
+import { getWellness, logReveal, saveWellness } from './wellness'
 
 const url = process.env.TEST_DATABASE_URL
 const schema = `t_review_${process.pid}_${Date.now()}`

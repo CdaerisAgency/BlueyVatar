@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { policyList, canViewChildSafety, QUEUES } from '@blueyvatar/core/moderation'
 import { Button } from '../../components/Button'
+import { PageMain } from '../../components/Page'
 import { adminLogout } from './actions'
 
 export const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : '')
@@ -19,6 +20,18 @@ export function AdminNav({ did }: { did?: string }) {
 
 export function Msg({ text }: { text?: string }) {
   return text ? <p role="status">{text}</p> : null
+}
+
+/** The shared admin page frame: nav, title, optional status message. */
+export function AdminPage({ did, title, msg, children }: { did?: string; title: string; msg?: string; children: ReactNode }) {
+  return (
+    <PageMain>
+      <AdminNav did={did} />
+      <h1>{title}</h1>
+      <Msg text={msg} />
+      {children}
+    </PageMain>
+  )
 }
 
 /** The configured policy list. Every action cites one. */

@@ -1,8 +1,7 @@
-import { PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { requireAdmin } from '../../../lib/admin/guard'
 import { isLive, listOffers, offerableEffects, type Offer } from '../../../lib/effects/grants'
-import { AdminNav, fmt, Msg } from '../AdminBits'
+import { AdminPage, fmt } from '../AdminBits'
 import { endOfferAction, saveOffer } from './actions'
 
 const day = (d: Date) => d.toISOString().slice(0, 10)
@@ -19,10 +18,7 @@ export default async function EffectOffersPage({ searchParams }: { searchParams:
   const now = new Date()
   const editing = offers.find((o) => String(o.id) === sp.edit && !o.endedAt && o.endsAt > now)
   return (
-    <PageMain>
-      <AdminNav did={did} />
-      <h1>Free effects</h1>
-      <Msg text={sp.msg} />
+    <AdminPage did={did} title="Free effects" msg={sp.msg}>
       <p>Make an effect free for a window. An avatar already made with it keeps working after the offer ends. Days are UTC and the last day is included.</p>
       <section aria-label={editing ? 'Change offer' : 'New offer'}>
         <h2>{editing ? `Change offer ${editing.id}` : 'New offer'}</h2>
@@ -74,6 +70,6 @@ export default async function EffectOffersPage({ searchParams }: { searchParams:
           </ul>
         )}
       </section>
-    </PageMain>
+    </AdminPage>
   )
 }

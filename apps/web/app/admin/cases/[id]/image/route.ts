@@ -1,6 +1,6 @@
 import { requireAdmin } from '../../../../../lib/admin/guard'
 import { fetchReviewBlob } from '../../../../../lib/admin/blob'
-import { getCase } from '../../../../../lib/admin/review'
+import { getCase } from '../../../../../lib/admin/review-queue'
 
 export const dynamic = 'force-dynamic'
 
