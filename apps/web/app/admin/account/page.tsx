@@ -1,10 +1,9 @@
 import { notFound } from 'next/navigation'
-import { PageMain } from '../../../components/Page'
 import { requireAdmin } from '../../../lib/admin/guard'
 import { accountSummary, DID_RE } from '../../../lib/admin/moderation'
 import { Button } from '../../../components/Button'
 import { openCaseAction } from '../actions'
-import { AdminNav, fmt, Msg } from '../AdminBits'
+import { AdminPage, fmt } from '../AdminBits'
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ did?: string; msg?: string }> }) {
   const { did: me, pool } = await requireAdmin()
@@ -12,10 +11,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   if (!did || !DID_RE.test(did)) return notFound()
   const s = await accountSummary(pool, did)
   return (
-    <PageMain>
-      <AdminNav did={me} />
-      <h1>Account</h1>
-      <Msg text={msg} />
+    <AdminPage did={me} title="Account" msg={msg}>
       <section>
         <p><code>{s.did}</code> {s.repo?.handle ? `(@${s.repo.handle})` : ''}</p>
         <p>Repo: {s.repo ? `${s.repo.active ? 'active' : 'inactive'}${s.repo.status ? `, ${s.repo.status}` : ''}` : 'not indexed'}.</p>
@@ -37,6 +33,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       {s.actions.length === 0 ? <p>No actions recorded.</p> : (
         <ul>{s.actions.map((a) => <li key={a.id}>{fmt(a.created_at)} {a.action} by {a.actor}: {a.reason}</li>)}</ul>
       )}
-    </PageMain>
+    </AdminPage>
   )
 }

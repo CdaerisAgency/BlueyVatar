@@ -1,15 +1,12 @@
-import { PageMain } from '../../../components/Page'
 import { requireAdmin } from '../../../lib/admin/guard'
 import { listActions } from '../../../lib/admin/moderation'
-import { AdminNav, fmt } from '../AdminBits'
+import { AdminPage, fmt } from '../AdminBits'
 
 export default async function AuditPage() {
   const { did, pool } = await requireAdmin()
   const rows = await listActions(pool, { limit: 200 })
   return (
-    <PageMain>
-      <AdminNav did={did} />
-      <h1>Audit log</h1>
+    <AdminPage did={did} title="Audit log">
       {rows.length === 0 ? <p>No actions yet.</p> : (
         <ul>
           {rows.map((a) => (
@@ -21,6 +18,6 @@ export default async function AuditPage() {
           ))}
         </ul>
       )}
-    </PageMain>
+    </AdminPage>
   )
 }

@@ -1,33 +1,26 @@
-import { EmptyState, PageHeader, PageMain, Section } from '../../components/Page'
-import { Button, ButtonLink } from '../../components/Button'
-import { Field } from '../../components/Field'
+import { Notices, PageHeader, PageMain } from '../../components/Page'
 import { cookies } from 'next/headers'
-import Link from 'next/link'
 import { qrSvg } from '@blueyvatar/core'
-import { addEmail, linkEmail, makePrimary, unlink } from '../actions'
 import { requireDid } from '../../lib/auth'
-import { imgSnippet, markdownSnippet } from '../../lib/avatar-snippets'
 import { ownerAvatarUrl } from '../../lib/avatar-preview'
 import { describeLinkedEmails, readPrimaryAddress } from '../../lib/linked-emails'
-import { COPY } from '../../lib/copy'
 import { getDashboardStore } from '../../lib/dashboard-store'
-import { CHECKLIST_COOKIE, checklist, parsePrefs, showChecklist } from '../../lib/onboarding'
+import { CHECKLIST_COOKIE, checklist, parsePrefs } from '../../lib/onboarding'
 import { getClaimStore } from '../../lib/claim-store'
 import { PLATFORM_LABELS } from '../../lib/claims'
 import { listClaims, repoHandle } from '../../lib/claims-repo'
-import { MAX_LINKED_EMAILS, HOLD_DAYS } from '../../lib/email-policy'
 import { PUBLIC_URL } from '../../lib/oauth'
 import { getProfile, listImages, repoSession, type ProfileRecord } from '../../lib/repo'
 import { getStore } from '../../lib/store'
-import { viewerFor } from '../../lib/viewer'
-import { displayName } from '../../lib/viewer-core'
-import CopyField from './CopyField'
+import { SignedInAs } from '../../components/SignedInAs'
+import { AvatarUrlSection } from './AvatarUrlSection'
+import { ChecklistSection } from './ChecklistSection'
+import { DataSection } from './DataSection'
+import { LinkEmailSection } from './LinkEmailSection'
+import { LinkedEmailsSection } from './LinkedEmailsSection'
 import GallerySection from './GallerySection'
-import LinkedEmail from './LinkedEmail'
 import { ShareSection } from './ShareSection'
-import { setChecklistShown } from './checklist/actions'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
   const did = await requireDid('/account')
@@ -82,107 +75,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <PageHeader title="Overview" intro="Your linked emails, your avatar link, and where to go next." />
-      <p>Signed in as {displayName(await viewerFor(did))}</p>
-      {list && showChecklist(list.complete, prefs.showAgain) && (
-        <Section title={`Get started (${list.done} of ${list.total} done)`} id="checklist" intro={list.complete ? 'Everything is set up.' : 'Work through these in any order.'}>
-          <ol>
-            {list.steps.map((st) => (
-              <li key={st.id}>
-                <span aria-hidden="true">{st.done ? '[x]' : '[ ]'}</span> <Link href={st.href}>{st.title}</Link>
-                <span className="sr-only">{st.done ? ' (done)' : ' (to do)'}</span>. {st.hint}
-              </li>
-            ))}
-          </ol>
-          {list.complete && (
-            <form action={setChecklistShown}>
-              <input type="hidden" name="show" value="0" />
-              <Button type="submit">Hide checklist</Button>
-            </form>
-          )}
-        </Section>
-      )}
-      {list && list.complete && !prefs.showAgain && (
-        <div>
-          Setup is complete. <form action={setChecklistShown} className="inline"><input type="hidden" name="show" value="1" /><button type="submit" className="cursor-pointer border-0 bg-transparent p-0 text-bv-blue underline">Show the checklist again</button></form>
-        </div>
-      )}
-      {error && <p role="alert">{error}</p>}
-      <Section
-        id="linked-emails"
-        title={<>{COPY.linkedEmails.title} <small className="text-base font-normal text-bv-ink-2">({links.length} of {MAX_LINKED_EMAILS})</small></>}
-        intro={COPY.linkedEmails.intro}
-      >
-      {links.length === 0 ? (
-        <EmptyState action={{ href: '#link-email', label: COPY.linkedEmails.emptyAction }}>{COPY.linkedEmails.empty}</EmptyState>
-      ) : (
-        <ul className="m-0 list-none space-y-4 p-0">
-          {links.map((l, i) => (
-            <li key={l.emailHash}>
-              <LinkedEmail item={emails[i]!}>
-                {!l.primary && (
-                  <form action={makePrimary} className="inline">
-                    <input type="hidden" name="hash" value={l.emailHash} />
-                    <Button type="submit">Make primary</Button>
-                  </form>
-                )}
-                <form action={unlink} className="inline">
-                  <input type="hidden" name="hash" value={l.emailHash} />
-                  <Button type="submit" variant="danger">Unlink</Button>
-                </form>
-              </LinkedEmail>
-            </li>
-          ))}
-        </ul>
-      )}
-      </Section>
-      <Section title="Link email" id="link-email" intro={`You can link up to ${MAX_LINKED_EMAILS} emails. An address you unlink is held for ${HOLD_DAYS} days: only this account can link it again until then.`}>
-      <p>We keep the address you link so we can show it here and tell you if a claim is removed or your email moves to another account. It is deleted when you unlink it or delete your data.</p>
-      <form action={linkEmail}>
-        <Button type="submit" variant="primary">Use the email from my account</Button>
-      </form>
-      <form action={addEmail}>
-        <Field prefix="email" name="email" label="Add another email by code" required>
-          <input id="email-email" name="email" type="email" required autoComplete="email" />
-        </Field>
-        <Button type="submit" variant="primary">Send code</Button>
-      </form>
-      </Section>
-      <Section title="Your avatar URL" id="preview">
-        {url ? (
-          <>
-            <p>This is how apps see the avatar for your primary email.</p>
-            <div className="flex items-center gap-3">
-              {avatarCount === 0 ? (
-                <span className="flex size-20 items-center justify-center rounded-full border border-solid border-bv-line text-sm" role="img" aria-label="No avatar yet">
-                  No avatar
-                </span>
-              ) : (
-                // Served by the delivery host, so next/image optimization does not apply. The square size comes from the class, not fixed attributes.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={url} alt="Your current avatar" className="size-20 rounded-full object-cover" referrerPolicy="no-referrer" />
-              )}
-              <ButtonLink href="/account/avatars" variant="primary">Change your avatar</ButtonLink>
-            </div>
-            {avatarCount === 0 && <p>You have not added an avatar here yet. Until you do, apps that ask for this link get the avatar on your profile if you have one, or a default avatar.</p>}
-            <CopyField label="URL" value={url} />
-            <CopyField label="HTML" value={imgSnippet(url)} />
-            <CopyField label="Markdown" value={markdownSnippet(url)} />
-          </>
-        ) : (
-          <p>Link an email above to get a preview and embed snippets.</p>
-        )}
-      </Section>
+      <SignedInAs did={did} />
+      {list && <ChecklistSection list={list} prefs={prefs} />}
+      <Notices error={error} />
+      <LinkedEmailsSection links={links} emails={emails} />
+      <LinkEmailSection />
+      <AvatarUrlSection url={url} avatarCount={avatarCount} />
       <GallerySection did={did} error={galleryError} done={galleryDone} />
       <ShareSection handle={handle} qrUrl={qrUrl} svg={svg} target={target} platforms={platforms} />
-      <Section title="Your data">
-      <p>
-        Go to <Link href="/account/settings/danger">Danger zone</Link> to download your data or delete it. Deleting removes what BlueyVatar holds about you, except
-        billing records, which we keep for 7 years. Records in your own atproto repository stay on your Bluesky account's home server. The home server is the service that stores your Bluesky account and everything you post.
-      </p>
-      <form action="/logout" method="post">
-        <Button type="submit">Sign out</Button>
-      </form>
-      </Section>
+      <DataSection />
     </PageMain>
   )
 }

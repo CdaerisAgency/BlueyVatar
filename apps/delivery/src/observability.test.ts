@@ -1,31 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { Metrics, createErrorTracker, createLogger } from '@blueyvatar/core'
 import { createApp, type AppDeps } from './app.js'
-import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
 import { resolverLog } from './obs.js'
-import { MemoryIndexStore } from './store.js'
-import { MemoryUsageMeter } from './usage.js'
+import { baseDeps } from './test/harness.js'
 
 function build(over: Partial<AppDeps> = {}) {
   const lines: Array<Record<string, unknown>> = []
   const metrics = new Metrics()
-  const deps: AppDeps = {
-    index: new MemoryIndexStore(),
-    resolver: {
-      resolveIdentity: async () => null, candidates: async () => [], galleryItems: async () => [],
-      getRecord: async () => null, getBlob: async () => new Uint8Array(),
-    },
-    licenses: new MemoryLicenseStore([]),
-    limiter: new MemoryRateLimiter(),
-    usage: new MemoryUsageMeter(),
-    resize: async () => new Uint8Array(),
-    defaultUrlAllowlist: [],
-    trustCloudflare: false,
-    imgSigningSecret: 's',
+  const deps: AppDeps = baseDeps({
     logger: createLogger({ app: 'delivery', write: (_l, s) => lines.push(JSON.parse(s)) }),
     metrics,
     ...over,
-  }
+  })
   return { app: createApp(deps), lines, metrics }
 }
 

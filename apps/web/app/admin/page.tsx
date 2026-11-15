@@ -1,10 +1,10 @@
 import { fmtHours, moderationMetrics, QUEUES, slaHours, syncCases, SEVERITIES, SEVERITY_LABELS, canViewChildSafety, WELLNESS_DEFAULTS } from '@blueyvatar/core/moderation'
-import { PageMain } from '../../components/Page'
 import { requireAdmin } from '../../lib/admin/guard'
-import { getWellness, queueCounts } from '../../lib/admin/review'
+import { queueCounts } from '../../lib/admin/review-queue'
+import { getWellness } from '../../lib/admin/wellness'
 import { Button } from '../../components/Button'
 import { saveWellnessAction } from './actions'
-import { AdminNav, Msg } from './AdminBits'
+import { AdminPage } from './AdminBits'
 
 const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : 'none yet')
 
@@ -15,10 +15,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
   const sla = slaHours()
   const [counts, m, well] = await Promise.all([queueCounts(pool), moderationMetrics(pool, sla), getWellness(pool, did)])
   return (
-    <PageMain>
-      <AdminNav did={did} />
-      <h1>Moderation</h1>
-      <Msg text={sp.msg} />
+    <AdminPage did={did} title="Moderation" msg={sp.msg}>
       <section aria-label="Queues">
         <h2>Queues</h2>
         <ul>
@@ -53,6 +50,6 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
           <Button type="submit">Save</Button>
         </form>
       </section>
-    </PageMain>
+    </AdminPage>
   )
 }

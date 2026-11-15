@@ -1,5 +1,6 @@
 import { ANONYMOUS_DAILY_LIMIT, entitlementsFor, normalizeTier, type Tier } from '@blueyvatar/core'
 import type { ErrorCode } from './errors.js'
+import { requestHost } from './http.js'
 import { hostAllowed, keyExpired, type LicenseStore, type RateLimiter, type RateWindow } from './licenses.js'
 
 export interface RequestInfo {
@@ -13,18 +14,6 @@ export interface RequestInfo {
 export type EntitlementResult =
   | { ok: true; tier: Tier; licenseId: string | null; /** Null for anonymous callers. */ keyKind: 'secret' | 'publishable' | null; window: RateWindow }
   | { ok: false; status: number; code: ErrorCode; message: string; window?: RateWindow }
-
-function requestHost(info: RequestInfo): string | null {
-  for (const v of [info.origin, info.referer]) {
-    if (!v) continue
-    try {
-      return new URL(v).hostname
-    } catch {
-      /* ignore malformed header */
-    }
-  }
-  return null
-}
 
 /** Steps 1 to 4 of the request pipeline in spec section 12. */
 export async function checkEntitlement(
