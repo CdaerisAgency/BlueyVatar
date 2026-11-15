@@ -1,4 +1,4 @@
-import { activeEntry, isValidTimeZone, localDate, nextChange, parseSchedule, type Schedule, type Weekday } from '@blueyvatar/core'
+import { activeEntry, holidayLookup, isValidTimeZone, localDate, nextChange, parseSchedule, type HolidayLookup, type OccurrenceSource, type Schedule, type Weekday } from '@blueyvatar/core'
 import type { StoredImage } from '../repo'
 import type { Plan } from '../records'
 import type { EffectsRow } from '../effects/store'
@@ -21,6 +21,15 @@ export interface ScheduleDeps {
   /** Pushes the new default to apps the user turned on. */
   push(): Promise<string | null>
   now(): Date
+  /** Holiday data for the account's country (issue #220). Left out, no holiday applies. */
+  holidays?: HolidayData
+}
+
+/** What the holiday feature needs from the holiday library, so tests can use a small fake. */
+export interface HolidayData {
+  hasCountry(country: string): boolean
+  hasRegion(country: string, region: string): boolean
+  occurrences(country: string, region: string): OccurrenceSource
 }
 
 const fail = (error: string): Result => ({ ok: false, error })
@@ -36,12 +45,12 @@ const isRender = (e: EffectsRow, rkey: string) => rkey === e.frameImageRkey || r
 
 const isDefault = (i: StoredImage) => i.value.isDefault === true
 
-async function originals(deps: ScheduleDeps): Promise<{ images: StoredImage[]; ok: Set<string> }> {
+export async function originals(deps: ScheduleDeps): Promise<{ images: StoredImage[]; ok: Set<string> }> {
   const [images, effects] = await Promise.all([deps.repo.list(), deps.effects()])
   return { images, ok: new Set(images.filter((i) => !isRender(effects, i.rkey)).map((i) => i.rkey)) }
 }
 
-async function requirePlus(deps: ScheduleDeps): Promise<Result | null> {
+export async function requirePlus(deps: ScheduleDeps): Promise<Result | null> {
   return (await deps.plan()) === 'plus' ? null : fail(PLUS_ONLY)
 }
 
@@ -109,14 +118,22 @@ export async function stripImage(store: ScheduleStore, did: string, rkey: string
   if (!row) return
   const dates = row.schedule.dates.filter((d) => d.image !== rkey)
   const weekly = row.schedule.weekly.filter((w) => w.image !== rkey)
-  const changed = dates.length !== row.schedule.dates.length || weekly.length !== row.schedule.weekly.length
+  const picks = row.holidays.picks.filter((p) => p.image !== rkey)
+  const changed = dates.length !== row.schedule.dates.length || weekly.length !== row.schedule.weekly.length || picks.length !== row.holidays.picks.length
   if (!changed && row.appliedImage !== rkey && row.appliedDefault !== rkey) return
-  await store.patch(did, { schedule: { dates, weekly }, nextChangeAt: now })
+  await store.patch(did, { schedule: { dates, weekly }, holidays: { ...row.holidays, picks }, nextChangeAt: now })
 }
 
 /** The next time the switch needs to look, or null when no change is coming. */
-function nextTime(row: ScheduleRow, schedule: Schedule, now: Date): Date | null {
-  return nextChange(schedule, row.timezone, now)
+function nextTime(row: ScheduleRow, schedule: Schedule, now: Date, holiday?: HolidayLookup): Date | null {
+  return nextChange(schedule, row.timezone, now, { holiday })
+}
+
+/** The holiday hook for a row, or undefined when it has no country, no picks, or no holiday data. */
+export function holidayHook(deps: Pick<ScheduleDeps, 'holidays'>, row: ScheduleRow): HolidayLookup | undefined {
+  const h = row.holidays
+  if (!deps.holidays || !h.country || h.picks.length === 0) return undefined
+  return holidayLookup(h, deps.holidays.occurrences(h.country, h.region))
 }
 
 type Outcome = 'applied' | 'restored' | 'waiting' | 'none' | 'failed'
@@ -186,9 +203,10 @@ export async function tickSchedule(deps: ScheduleDeps, did: string): Promise<Out
     const schedule = parseSchedule(row.schedule)
     const images = await deps.repo.list()
     const renders = new Set(images.filter((i) => isRender(effects, i.rkey)).map((i) => i.rkey))
-    const entry = plus ? activeEntry(schedule, row.timezone, now) : null
+    const holiday = plus ? holidayHook(deps, row) : undefined
+    const entry = plus ? activeEntry(schedule, row.timezone, now, { holiday }) : null
     const desired = entry && images.some((i) => i.rkey === entry.image && !renders.has(i.rkey)) ? entry.image : null
-    const next = plus ? nextTime(row, schedule, now) : null
+    const next = plus ? nextTime(row, schedule, now, holiday) : null
     if (desired === row.appliedImage) {
       await deps.store.patch(did, { nextChangeAt: next, ...(row.state === 'failed' ? { state: row.appliedImage ? 'applied' : 'idle', lastError: null } : {}) })
       return 'none'
