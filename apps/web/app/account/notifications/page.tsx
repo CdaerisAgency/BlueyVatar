@@ -6,7 +6,6 @@ import { getNoticeDirectory } from '../../../lib/notify'
 import { getStore } from '../../../lib/store'
 import { NotificationsForm } from './NotificationsForm'
 
-export const dynamic = 'force-dynamic'
 
 export default async function NotificationsPage() {
   const did = await requireDid('/account/notifications')

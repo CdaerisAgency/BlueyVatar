@@ -12,7 +12,6 @@ import { siteUrl } from '../../../lib/site'
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
 const PUBLIC_DELIVERY_URL = process.env.PUBLIC_DELIVERY_URL || DELIVERY_URL
 
-export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage() {
   const did = await requireDid('/account/profile')

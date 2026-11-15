@@ -1,4 +1,4 @@
-import { BackLink, PageHeader, PageMain } from '../../../../components/Page'
+import { BackLink, Notices, PageHeader, PageMain } from '../../../../components/Page'
 import { requireDid } from '../../../../lib/auth'
 import { loadImport, parseSourceParam } from '../../../../lib/import-load'
 import { sourceLabel } from '../../../../lib/import'
@@ -9,7 +9,6 @@ import { limited } from '../../../../lib/rate-guard'
 import { ImportForm } from './ImportForm'
 
 
-export const dynamic = 'force-dynamic'
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ source?: string; error?: string }> }) {
   const did = await requireDid('/account/avatars/import')
@@ -34,7 +33,7 @@ export default async function ImportPage({ searchParams }: { searchParams: Promi
     <PageMain>
       <BackLink href="/account/avatars">Back to avatars</BackLink>
       <PageHeader title="Import an avatar" intro="Check the image below, then copy it into your own repository." />
-      {error && <p role="alert">{error}</p>}
+      <Notices error={error} />
       {problem && <p role="alert">{problem}</p>}
       {preview && (
         <ImportForm source={source} previewUri={preview.uri} label={preview.label} suggested={preview.suggested} />

@@ -1,26 +1,10 @@
 'use server'
 
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../../lib/auth'
-import { reportError } from '../../../../lib/obs'
-import { RepoError } from '../../../../lib/repo'
+import { actionRunner } from '../../../../lib/action-run'
 import { removeDateEntry, saveTimezone, setDateEntry, setWeekly } from '../../../../lib/schedule/flow'
 import { liveScheduleDeps } from '../../../../lib/schedule/live'
-import type { Result } from '../../../../lib/effects/flow'
 
-const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars/schedule?${key}=${encodeURIComponent(value)}`)
-
-async function run(go: (did: string) => Promise<Result>): Promise<never> {
-  const did = (await currentDid()) ?? redirect('/login')
-  let r: Result
-  try {
-    r = await go(did)
-  } catch (err) {
-    reportError('schedule action failed', err)
-    return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.')
-  }
-  return r.ok ? back('done', r.message) : back('error', r.error)
-}
+const run = actionRunner('/account/avatars/schedule', 'schedule action failed')
 
 export async function saveScheduleTimezone(form: FormData): Promise<void> {
   await run(async (did) => saveTimezone(await liveScheduleDeps(did), did, String(form.get('timezone') ?? '')))

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BackLink, EmptyState, Note, PageHeader, PageMain, Section } from '../../../../components/Page'
+import { BackLink, EmptyState, Note, Notices, PageHeader, PageMain, Section } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { Field } from '../../../../components/Field'
 import { requireDid } from '../../../../lib/auth'
@@ -12,14 +12,10 @@ import { isValidTimeZone, localDate, windowOf, MAX_WINDOW_DAYS, resolveHoliday, 
 import { occurrenceSource } from '../../../../lib/holidays/data'
 import { removeHolidayPickAction, saveHolidayCountry, saveHolidayPick } from './actions'
 import { HolidayCredit } from './HolidayCredit'
+import { longDate } from '../../../../components/longDate'
 
-export const dynamic = 'force-dynamic'
 
 const imageName = (i: StoredImage | undefined) => (i ? i.value.alt || `Image from ${i.value.createdAt.slice(0, 10)}` : 'Image missing')
-
-function longDate(date: string, withYear = true): string {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: withYear ? 'long' : undefined, year: withYear ? 'numeric' : undefined, month: 'long', day: 'numeric' })
-}
 
 export default async function HolidaysPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string; popular?: string }> }) {
   const did = await requireDid('/account/avatars/holidays')
@@ -72,9 +68,7 @@ export default async function HolidaysPage({ searchParams }: { searchParams: Pro
     <PageMain>
       <BackLink href="/account/avatars/schedule">Back to the avatar calendar</BackLink>
       <PageHeader title="Holiday avatars" intro="Pick your country, then choose an image for each holiday you care about. It shows from a few days before the holiday until a few days after." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
       <Note>
         <p>
           Only holidays you pick are used, and your own default avatar shows on every other day. A day entry on the avatar calendar beats a holiday, and a holiday beats a weekly entry. If two holidays overlap, the holiday whose own days include today wins, then the closest one, then the one coming up over the one just past, then the one you picked first. A day starts at midnight in your own time zone, not the country&apos;s. Your picks are kept by BlueyVatar and are not public.
