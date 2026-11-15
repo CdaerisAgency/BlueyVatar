@@ -29,7 +29,7 @@
     "@atproto/lex": "0.4.4",
     "@types/node": "22.20.5",
     "typescript": "5.9.3",
-    "vitest": "3.2.7"
+    "vitest": "4.1.11"
   },
   "pnpm": {
     "overrides": {

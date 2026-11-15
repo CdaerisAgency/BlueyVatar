@@ -17,7 +17,7 @@ export default async function NotificationsPage() {
       <p>Signed in as {did}</p>
       {!address && <p role="status">No primary email is on file, so no notices can be sent. Link an email on the <Link href="/account/verify">Verify</Link> page to receive them.</p>}
       <Section title="Optional">
-        <NotificationsForm usageAlerts={prefs.usageAlerts} billingNotices={prefs.billingNotices} />
+        <NotificationsForm usageAlerts={prefs.usageAlerts} billingNotices={prefs.billingNotices} offerNotices={prefs.offerNotices !== false} />
       </Section>
       <Section title="Always sent" intro="Security notices cannot be turned off:">
         <ul>

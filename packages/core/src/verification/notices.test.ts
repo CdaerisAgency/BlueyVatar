@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, keyExpiringNotice, KEY_TYPE_LABELS, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice, withAccount,
+  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, keyExpiringNotice, KEY_TYPE_LABELS, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, effectOfferNotice, pgNoticeDirectory, usageNotice, withAccount,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -111,6 +111,17 @@ describe('Notifier', () => {
     expect(await setup(dir(on, null)).n.send(DID, 'billing', msg)).toBe('no_address')
     const bad = new Notifier({ send: async () => { throw new Error('boom') } }, dir(on))
     expect(await bad.send(DID, 'billing', msg)).toBe('failed')
+  })
+})
+
+describe('effectOfferNotice', () => {
+  it('names the effect and the last day, links preferences, and honors the offers opt-out', async () => {
+    const n = effectOfferNotice({ did: DID, name: 'Winter frame', endsAt: new Date('2026-12-26T00:00:00Z'), publicUrl: URL })
+    expect(n.subject).toContain('Winter frame')
+    expect(n.text).toContain('until 2026-12-25 (UTC)')
+    expect(n.text).toContain('/account/notifications')
+    expect(noticeAllowed({ usageAlerts: true, billingNotices: true, offerNotices: false }, 'offers')).toBe(false)
+    expect(noticeAllowed({ usageAlerts: false, billingNotices: false }, 'offers')).toBe(true)
   })
 })
 

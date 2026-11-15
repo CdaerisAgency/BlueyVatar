@@ -6,6 +6,7 @@ import { scheduleModerationDigest } from './moderation-digest.js'
 import { scheduleKeyExpiryReminders } from './key-expiry-reminder.js'
 import { scheduleEffectsSwitch } from './effects-switch.js'
 import { scheduleScheduleSwitch } from './schedule-switch.js'
+import { scheduleEffectOffers } from './effect-offers.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
 import type { IndexWrites } from './handlers.js'
@@ -53,6 +54,8 @@ function writes(): IndexWrites {
     scheduleEffectsSwitch(pool)
     // Avatar calendar (issue #219): same secret, asks the web app to change the default image when an entry starts or ends.
     scheduleScheduleSwitch(pool)
+    // One email when a free effect offer with notify on starts (issue #308).
+    scheduleEffectOffers(pool)
     const warm = warmerFromEnv()
     const purge = purgerFromEnv()
     // Moderation labels (issue #207): one subscription per DID in LABELER_DIDS. Off when the list is empty.
