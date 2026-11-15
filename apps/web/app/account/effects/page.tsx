@@ -6,6 +6,8 @@ import { RepoError, blobUrl, getProfile, listImages, pdsUrl, repoSession, type S
 import { resolvePlan } from '../../../lib/plan'
 import { canUse, FRAME_COLORS, FRAME_STYLES } from '../../../lib/effects/catalog'
 import { getEffectsStore } from '../../../lib/effects/store'
+import { FreeEffectsSection } from '../../../components/FreeEffectsSection'
+import { myOffers } from '../../../lib/effects/my-offers'
 import { cancelAway, deleteFrame, saveAway, saveFrame } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -37,7 +39,7 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
   const renders = new Set([row.frameImageRkey, row.awayImageRkey])
   const originals = images.filter((i) => !renders.has(i.rkey))
   const framed = images.find((i) => i.rkey === row.frameImageRkey)
-  const canFrame = canUse('frame:ring', plan)
+  const canFrame = canUse('frame:ring', plan, (await myOffers(did)).map((o) => o.effect))
   const awayOn = row.awayState === 'active'
   const defaultSource = row.frameSourceRkey ?? originals.find((i) => i.value.isDefault)?.rkey ?? originals[0]?.rkey
 
@@ -50,6 +52,8 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
       <Note>
         <p>Effects are drawn from your original image and saved to your Bluesky account like any upload, so they are public, count toward your image limit, and go through the same checks. Your original stays as it is.</p>
       </Note>
+
+      <FreeEffectsSection did={did} />
 
       <Section title="Out-of-office badge" intro="Free. Shows a small badge on your default image between two dates, then brings your previous default back.">
         <p>{STATE_TEXT[row.awayState]}</p>

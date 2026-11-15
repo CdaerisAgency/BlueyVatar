@@ -2,6 +2,11 @@
 
 New features, changes, and fixes to BlueyVatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-15
+
+### Added
+- Free effect offers (closes #308, part of #218, migration 0043). Admins have a new Free effects page: pick a paid effect, a name, a first and last day (UTC), and who gets it (everyone, one plan, or listed accounts by DID or handle). An offer can be changed or ended early; it then leaves the Effects page and avatars already made with the effect keep working. Each offer has a notify switch: on sends one email when it starts and shows a dismissible banner on account pages during the window; off adds it quietly. The email can be turned off on the Notifications page. Create, change, and end are in the audit log. Offer records for an account are in the data export and are deleted with the account. See `docs/effect-offers-v1.md`.
+
 ## 2026-11-14
 
 ### Added
