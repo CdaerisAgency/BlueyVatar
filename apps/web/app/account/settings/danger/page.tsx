@@ -31,7 +31,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
       <Section title="Download a copy" id="download">
         <p>
           This is safe and changes nothing. You get one file with what BlueyVatar stores about you: your linked emails (addresses are masked), profile links, linked accounts, who can see your avatar, your license and API key details (never the
-          secret keys), your custom domain, daily profile view counts, any appeals you filed, your avatar sync setting and the log of changes blueyvatar made to your profile avatar, your avatar frame and out-of-office settings, bug report screenshots you sent, and a summary of your subscriptions.
+          secret keys), your custom domain, daily profile view counts, any appeals you filed, your avatar sync setting and the log of changes blueyvatar made to your profile avatar, your avatar frame, out-of-office and calendar settings, bug report screenshots you sent, and a summary of your subscriptions.
         </p>
         <p>
           <a href="/account/data/export" download>Download my data</a>
@@ -48,7 +48,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
           <li>Your profile links, linked accounts, and visibility settings.</li>
           <li>Your license and API keys, which stop working at once. You leave any organization you belong to. An organization you created is deleted along with its keys, unless it still has other members. In that case, remove them first.</li>
           <li>Your custom domain, including its Cloudflare hostname.</li>
-          <li>Your daily profile view counts, any appeals you filed, your avatar sync setting and change log, your avatar frame and out-of-office settings, and bug report screenshots you sent.</li>
+          <li>Your daily profile view counts, any appeals you filed, your avatar sync setting and change log, your avatar frame, out-of-office and calendar settings, and bug report screenshots you sent.</li>
           <li>Our copy of your avatars and profile, with cached versions cleared.</li>
           <li>Your sign-in sessions.</li>
         </ul>

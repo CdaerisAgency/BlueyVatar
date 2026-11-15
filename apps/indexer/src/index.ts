@@ -5,6 +5,7 @@ import { scheduleScreenshotPurge } from './bug-report-retention.js'
 import { scheduleModerationDigest } from './moderation-digest.js'
 import { scheduleKeyExpiryReminders } from './key-expiry-reminder.js'
 import { scheduleEffectsSwitch } from './effects-switch.js'
+import { scheduleScheduleSwitch } from './schedule-switch.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
 import type { IndexWrites } from './handlers.js'
@@ -50,6 +51,8 @@ function writes(): IndexWrites {
     scheduleKeyExpiryReminders(pool)
     // Out-of-office switch-on and switch-off (issue #283). Asks the web app to do each step.
     scheduleEffectsSwitch(pool)
+    // Avatar calendar (issue #219): same secret, asks the web app to change the default image when an entry starts or ends.
+    scheduleScheduleSwitch(pool)
     const warm = warmerFromEnv()
     const purge = purgerFromEnv()
     // Moderation labels (issue #207): one subscription per DID in LABELER_DIDS. Off when the list is empty.
