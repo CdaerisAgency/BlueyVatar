@@ -76,6 +76,18 @@ export const COPY = {
     serverKey: 'Server key (read only, keeps usage and stays private)',
     forever: 'Forever',
   },
+  linkedEmails: {
+    title: 'Emails that show your avatar',
+    intro: 'Websites that use blueyvatar look up your avatar by email. Add every address you use.',
+    primary: 'Primary',
+    unsavedTitle: 'Linked email (address not saved yet)',
+    unsavedHelp: 'Link the same address again to see it here.',
+    linkAgain: 'Link again',
+    technical: 'Technical details',
+    technicalId: 'Technical ID',
+    empty: 'No email linked yet. Link one so websites can find your avatar from your address.',
+    emptyAction: 'Link an email',
+  },
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const
