@@ -19,5 +19,5 @@ Issue #308, part of #218. An admin can make a paid effect free for a window. Adm
 - **Privacy:** `effect_offer_users` rows are in the data export and are deleted with the account.
 
 ## Known gaps
-- Server-side enforcement: `lib/effects/flow.ts` (`applyFrame`) still checks `canUse(effect, plan)` without grants, so a granted account can open the form but a save is refused until that call passes `activeGrants(...)`. Lane S owns that file.
+- None known for grants. `lib/effects/flow.ts` (`applyFrame`) passes the account's grants to `canUse(effect, plan, grants)` through `FlowDeps.grants`, fed by `myOffers` in `lib/effects/live.ts`, so a granted account can save the offered effect and only that effect.
 - The email goes to accounts with a primary notice address only.
