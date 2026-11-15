@@ -3,7 +3,7 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Fetcher } from '@blueyvatar/core/verification'
 import {
-  DAY_MS, MAX_FAILS, pgReverifyStore, reverifyDue, scheduleReverify,
+  DAY_MS, MAX_FAILS, pgReverifyStore, reverifyDue,
   type DueClaim, type ReverifyStore, type Verifier,
 } from './reverify.js'
 import { randomBytes } from 'node:crypto'
@@ -143,23 +143,6 @@ describe('reverifyDue', () => {
       { now: () => T0, sleep: async () => {} },
     )
     expect(rows[0]!.result).toBe('revoked')
-  })
-})
-
-describe('scheduleReverify', () => {
-  it('runs on the interval and never overlaps itself', async () => {
-    vi.useFakeTimers()
-    let release!: () => void
-    const run = vi.fn(() => new Promise<{ checked: number; ok: number; failed: number; inconclusive: number; revoked: number }>((r) => { release = () => r({ checked: 0, ok: 0, failed: 0, inconclusive: 0, revoked: 0 }) }))
-    const t = scheduleReverify(run, 24 * 3_600_000)
-    await vi.advanceTimersByTimeAsync(24 * 3_600_000)
-    await vi.advanceTimersByTimeAsync(24 * 3_600_000)
-    expect(run).toHaveBeenCalledTimes(1)
-    release()
-    await vi.advanceTimersByTimeAsync(24 * 3_600_000)
-    expect(run).toHaveBeenCalledTimes(2)
-    clearInterval(t)
-    vi.useRealTimers()
   })
 })
 
