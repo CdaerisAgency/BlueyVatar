@@ -5,13 +5,12 @@ import { buildMarkdown, buildVcard, emailHash, qrLayout, toExportProfile, type C
 import { readFileSync } from 'node:fs'
 import { createApp, type AppDeps } from './app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from './licenses.js'
-import type { AvatarResolver, Identity } from './resolver.js'
+import type { AvatarResolver } from './resolver.js'
 import { MemoryIndexStore, PUBLIC_VISIBILITY } from './store.js'
 import { MemoryUsageMeter } from './usage.js'
+import { DID, ident, lic } from './test/harness.js'
 import type { Resizer } from './resize.js'
 
-const DID = 'did:plc:abc123'
-const ident: Identity = { did: DID, handle: 'alice.test', pds: 'https://pds.test' }
 const BASE = 'https://bv.test'
 const URL_OF_PROFILE = `${BASE}/p/alice.test`
 const biz = { 'x-api-key': 'sk_biz' }
@@ -50,7 +49,7 @@ function setup(opts: { candidates?: Candidate[]; own?: Record<string, unknown>; 
   const deps: AppDeps = {
     index, resolver, usage: new MemoryUsageMeter(),
     licenses: new MemoryLicenseStore([
-      { key: { key: 'sk_biz', kind: 'secret', licenseId: 'L3', domains: [] }, license: { licenseId: 'L3', owner: DID, tier: 'business', status: 'active' } },
+      lic('sk_biz', 'secret', 'L3', 'business'),
     ]),
     limiter: new MemoryRateLimiter(),
     resize: realResize,

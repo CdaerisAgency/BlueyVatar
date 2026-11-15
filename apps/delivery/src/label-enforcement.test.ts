@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
-import { AtprotoResolver, type Identity } from './resolver.js'
+import { AtprotoResolver } from './resolver.js'
 import { MemoryIndexStore } from './store.js'
 import { imageUri, labelBlocksBlob } from './label-block.js'
+import { ident } from './test/harness.js'
 
-const ident: Identity = { did: 'did:plc:abc123', handle: 'alice.test', pds: 'https://pds.test' }
 const img = (rkey: string, cid: string, extra = {}) => ({ rkey, cid, mimeType: 'image/png', rating: 'g' as const, isDefault: false, createdAt: '2026-11-01T00:00:00Z', ...extra })
 
 function setup() {
