@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import pg from 'pg'
@@ -48,5 +48,15 @@ describe.skipIf(!url)('migration runner', () => {
     const names = (await pool.query('SELECT name FROM schema_migrations WHERE name = ANY($1) ORDER BY applied_at, name', [['0001_a.sql', '0002_b.sql', '0003_bad.sql']])).rows.map((r) => r.name)
     expect(names).toEqual(['0001_a.sql', '0002_b.sql'])
     expect((await pool.query("SELECT to_regclass('t_c') AS t")).rows[0].t).toBeNull()
+  })
+})
+
+// No database needed. Two files sharing a number would apply in whatever order the sort gives them.
+describe('migration file names', () => {
+  it('are NNNN_name.sql with a unique number each', () => {
+    const names = readdirSync(repoMigrations).filter((f) => f.endsWith('.sql'))
+    for (const name of names) expect(name).toMatch(/^\d{4}_[a-z0-9_]+\.sql$/)
+    const prefixes = names.map((name) => name.slice(0, 4))
+    expect(prefixes.filter((p, i) => prefixes.indexOf(p) !== i)).toEqual([])
   })
 })
