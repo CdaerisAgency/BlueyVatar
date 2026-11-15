@@ -45,7 +45,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q('SELECT auto_sync, previous_avatar, has_previous, last_source_cid, last_sent_cid, auto_notice_pending, auto_count, updated_at FROM bsky_avatar_sync WHERE did = $1'),
     q('SELECT action, from_cid, to_cid, source_cid, created_at FROM bsky_avatar_log WHERE did = $1 ORDER BY id'),
     q("SELECT issue_number, created_at, encode(image, 'base64') AS image_base64 FROM bug_report_screenshots WHERE did = $1 ORDER BY created_at, id"),
-    q("SELECT frame_style, frame_color, to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone, away_prev_default_rkey FROM avatar_effects WHERE did = $1"),
+    q("SELECT frame_style, frame_color, filter_id, to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone, away_prev_default_rkey FROM avatar_effects WHERE did = $1"),
     q("SELECT o.name, o.effect, u.listed, u.emailed_at, u.dismissed_at FROM effect_offer_users u JOIN effect_offers o ON o.id = u.offer_id WHERE u.did = $1 ORDER BY o.id"),
   ])
   let primaryEmail: string | null = null

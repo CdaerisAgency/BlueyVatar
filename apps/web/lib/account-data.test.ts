@@ -124,7 +124,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(JSON.stringify(out.avatarSync)).not.toContain(B)
     expect(JSON.stringify(out.avatarSync)).not.toContain('srcb')
     expect(JSON.stringify(out.avatarSync)).not.toContain('"did"')
-    expect(out.effects).toEqual({ frame_style: 'double', frame_color: 'rose', away_start_on: '2026-11-20', away_end_on: '2026-11-27', away_timezone: 'Europe/Paris', away_prev_default_rkey: 'prev1' })
+    expect(out.effects).toEqual({ frame_style: 'double', frame_color: 'rose', filter_id: null, away_start_on: '2026-11-20', away_end_on: '2026-11-27', away_timezone: 'Europe/Paris', away_prev_default_rkey: 'prev1' })
     expect(out.effectOffers).toEqual([expect.objectContaining({ name: 'Offer a', effect: 'frame:ring', listed: true })])
     expect(text).not.toContain('Offer b')
     expect(text).not.toContain('frm1')
