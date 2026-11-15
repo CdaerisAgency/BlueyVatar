@@ -35,7 +35,7 @@ jobs:
       - name: Point the test at the service port
         run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
 

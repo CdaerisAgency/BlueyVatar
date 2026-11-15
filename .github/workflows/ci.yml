@@ -53,7 +53,7 @@ jobs:
           echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
           echo "$home" >> "$GITHUB_PATH"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
           # Install into the per-job folder. The default (~/setup-pnpm) is shared by
@@ -179,7 +179,7 @@ jobs:
           echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
           echo "$home" >> "$GITHUB_PATH"
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
           # Install into the per-job folder. The default (~/setup-pnpm) is shared by
