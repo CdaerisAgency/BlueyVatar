@@ -3,6 +3,10 @@ import pg from 'pg'
 import type { PendingCode } from './codes'
 import { decideLink, HOLD_DAYS, HOLD_MS, type LinkDecision, type LinkFacts } from './email-policy'
 import { randomBytes } from 'node:crypto'
+import { singleton } from './pool'
+
+// Kept so app/ and admin/ importers of getPool from './store' keep working.
+export { getPool } from './pool'
 import { inTx } from './tx'
 import { decryptJson, encryptJson } from './token-crypto'
 
@@ -462,18 +466,7 @@ export function pgStore(pool: pg.Pool): Store {
   }
 }
 
-const g = globalThis as { __bvStore?: Store; __bvPool?: pg.Pool }
-
-/** The shared Postgres pool, or null when DATABASE_URL is unset (in-memory dev mode). */
-export function getPool(): pg.Pool | null {
-  if (!process.env.DATABASE_URL) return null
-  g.__bvPool ??= new pg.Pool({ connectionString: process.env.DATABASE_URL, max: Number(process.env.PG_POOL_MAX) || 5 })
-  return g.__bvPool
-}
-
 /** Postgres when DATABASE_URL is set, otherwise in-memory (dev only, lost on restart). */
 export function getStore(): Store {
-  const pool = getPool()
-  g.__bvStore ??= pool ? pgStore(pool) : memoryStore()
-  return g.__bvStore
+  return singleton('__bvStore', pgStore, memoryStore)
 }

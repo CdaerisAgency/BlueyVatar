@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { currentDid } from '../auth'
 import { resolvePlan } from '../plan'
-import { getPool } from '../store'
+import { getPool } from '../pool'
 import { dismissOffer } from './grants'
 
 /** Hides the offer banner for the signed-in account. The offer itself stays available on the effects page. */

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('./store', () => ({ getPool: () => null }))
+vi.mock('./pool', () => ({ getPool: () => null }))
 
 import { trackAccountInTap } from './tap'
 

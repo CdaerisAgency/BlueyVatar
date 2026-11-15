@@ -1,5 +1,6 @@
 import { DEFAULT_NOTICE_PREFS, decryptJson, emailSender, Notifier, pgNoticeDirectory, type NoticeDirectory, type NoticePrefs } from '@blueyvatar/core/verification'
-import { getPool, getStore } from './store'
+import { singleton } from './pool'
+import { getStore } from './store'
 import { resolveHandle } from './viewer'
 
 export interface PrefsDirectory extends NoticeDirectory {
@@ -23,13 +24,9 @@ function memoryDirectory(): PrefsDirectory {
   }
 }
 
-const g = globalThis as { __bvNotices?: PrefsDirectory }
-
 /** Preferences and addresses: Postgres when DATABASE_URL is set, otherwise memory. */
 export function getNoticeDirectory(): PrefsDirectory {
-  const pool = getPool()
-  g.__bvNotices ??= pool ? pgNoticeDirectory(pool) : memoryDirectory()
-  return g.__bvNotices
+  return singleton('__bvNotices', pgNoticeDirectory, memoryDirectory)
 }
 
 export function getNotifier(): Notifier {

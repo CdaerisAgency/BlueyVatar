@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { ENTITLEMENTS, effectiveTier, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
 import type { KeyKind } from './keys'
-import { getPool } from './store'
+import { singleton } from './pool'
 import { inTx } from './tx'
 import { PUBLIC_RULES, type VisibilityRules } from './visibility'
 
@@ -245,10 +245,6 @@ function postgres(pool: pg.Pool): DashboardStore {
   }
 }
 
-const g = globalThis as { __bvDash?: DashboardStore }
-
 export function getDashboardStore(): DashboardStore {
-  const pool = getPool()
-  g.__bvDash ??= pool ? postgres(pool) : memory()
-  return g.__bvDash
+  return singleton('__bvDash', postgres, memory)
 }

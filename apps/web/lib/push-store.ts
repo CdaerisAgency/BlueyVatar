@@ -1,6 +1,6 @@
 import type pg from 'pg'
 import type { BlobRef } from './repo'
-import { getPool } from './store'
+import { singleton } from './pool'
 
 /**
  * Per-account, per-app state for the avatar push (migrations 0033 and 0039). The tables keep their original
@@ -178,10 +178,6 @@ export function pgPushStore(pool: Pick<pg.Pool, 'query'>): PushStore {
   }
 }
 
-type G = typeof globalThis & { __bvPushStore?: PushStore }
 export function getPushStore(): PushStore {
-  const g = globalThis as G
-  const pool = getPool()
-  g.__bvPushStore ??= pool ? pgPushStore(pool) : memoryPushStore()
-  return g.__bvPushStore
+  return singleton('__bvPushStore', pgPushStore, memoryPushStore)
 }

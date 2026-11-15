@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { ENTITLEMENTS, normalizePaidPlan, normalizeTier, plusEntitled, storedLicenseTier, type PaidPlan, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
-import { getPool } from '../store'
+import { singleton } from '../pool'
 import { inTx } from '../tx'
 
 export interface SubscriptionRow {
@@ -252,10 +252,6 @@ export function postgresBillingStore(pool: pg.Pool): BillingStore {
   }
 }
 
-const g = globalThis as { __bvBilling?: BillingStore }
-
 export function getBillingStore(): BillingStore {
-  const pool = getPool()
-  g.__bvBilling ??= pool ? postgresBillingStore(pool) : memoryBillingStore()
-  return g.__bvBilling
+  return singleton('__bvBilling', postgresBillingStore, memoryBillingStore)
 }

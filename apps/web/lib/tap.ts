@@ -1,4 +1,4 @@
-import { getPool } from './store'
+import { getPool } from './pool'
 import { log } from './obs'
 
 /**

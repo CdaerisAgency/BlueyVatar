@@ -1,6 +1,6 @@
 import type { ClaimRecord, OAuthProvider } from './claims'
 import type { MastodonApp } from './mastodon-oauth'
-import { getPool } from './store'
+import { singleton } from './pool'
 import { inTx } from './tx'
 
 export type AttestationRow = {
@@ -165,9 +165,6 @@ export function pgClaimStore(pool: import('pg').Pool): ClaimStore {
   }
 }
 
-const g = globalThis as { __bvClaimStore?: ClaimStore }
 export function getClaimStore(): ClaimStore {
-  const pool = getPool()
-  g.__bvClaimStore ??= pool ? pgClaimStore(pool) : memoryClaimStore()
-  return g.__bvClaimStore
+  return singleton('__bvClaimStore', pgClaimStore, memoryClaimStore)
 }
