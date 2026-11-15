@@ -1,5 +1,5 @@
 import { PageMain } from '../../components/Page'
-import { changelogAnchor, inlineParts, parseChangelog, readChangelogFile } from '../../lib/changelog'
+import { changelogAnchor, inlineParts, loadChangelog } from '../../lib/changelog'
 import { pageMetadata } from '../../lib/site'
 
 // Rendered from CHANGELOG.md when the app is built.
@@ -10,7 +10,7 @@ export const metadata = {
 }
 
 export default function ChangelogPage() {
-  const entries = parseChangelog(readChangelogFile())
+  const entries = loadChangelog()
   return (
     <PageMain>
       <h1>Changelog</h1>
