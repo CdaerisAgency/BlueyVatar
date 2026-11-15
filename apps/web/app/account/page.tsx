@@ -24,6 +24,7 @@ import { displayName } from '../../lib/viewer-core'
 import CopyField from './CopyField'
 import GallerySection from './GallerySection'
 import LinkedEmail from './LinkedEmail'
+import { ShareSection } from './ShareSection'
 import { setChecklistShown } from './checklist/actions'
 
 export const dynamic = 'force-dynamic'
