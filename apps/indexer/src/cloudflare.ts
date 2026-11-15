@@ -1,4 +1,4 @@
-import { ladderPaths } from '@blueyvatar/core'
+import { ladderPaths } from '@blueyvatar/core/sign'
 import { errors, log } from './obs.js'
 
 /**
