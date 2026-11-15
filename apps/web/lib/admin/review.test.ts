@@ -209,6 +209,44 @@ describe.skipIf(!url)('review portal', () => {
     expect((await act(id, 'reverse', { what: `rating:${img}`, facts: 'again' })).ok).toBe(false)
   })
 
+  it('suspend blocks images, and lifting it leaves takedown blocks in place', async () => {
+    const d = did()
+    const [a, b] = [cid(), cid()]
+    await image(d, a)
+    await image(d, b)
+    const id = (await sig(d, 'harassment')).caseId
+    await claimCase(pool, id, A, T0)
+    const r = await act(id, 'suspend', { policy: 'harassment' })
+    expect(r).toMatchObject({ ok: true, purge: { did: d } })
+    if (!r.ok) throw new Error('suspend')
+    expect(r.purge?.cids.sort()).toEqual([a, b].sort())
+    expect((await pool.query('SELECT cid, kind FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL ORDER BY cid', [d])).rows).toEqual([a, b].sort().map((cid) => ({ cid, kind: 'suspension' })))
+    // A takedown while suspended turns that block into a takedown block, so lifting the suspension leaves it.
+    await pool.query("UPDATE blocked_images SET kind = 'takedown' WHERE did = $1 AND cid = $2", [d, b])
+    await claimCase(pool, id, A, T0)
+    expect(await act(id, 'reverse', { what: 'suspension', facts: 'Cleared.' })).toMatchObject({ ok: true, purge: { did: d, cids: [a] } })
+    expect((await pool.query('SELECT cid FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL', [d])).rows).toEqual([{ cid: b }])
+    expect((await pool.query('SELECT 1 FROM account_suspensions WHERE did = $1 AND lifted_at IS NULL', [d])).rowCount).toBe(0)
+    await claimCase(pool, id, A, T0)
+    expect((await act(id, 'reverse', { what: 'suspension', facts: 'again' })).ok).toBe(false)
+  })
+
+  it('a later suspension does not downgrade a takedown block', async () => {
+    const d = did()
+    const [a, b] = [cid(), cid()]
+    await image(d, a)
+    await image(d, b)
+    const first = (await sig(d, 'illegal', { cid: b })).caseId
+    await claimCase(pool, first, A, T0)
+    expect(await act(first, 'remove_image', { scope: 'image' })).toMatchObject({ ok: true, resolved: true })
+    const second = (await sig(d, 'harassment')).caseId
+    expect(second).not.toBe(first)
+    await claimCase(pool, second, A, T0)
+    expect(await act(second, 'suspend', { policy: 'harassment' })).toMatchObject({ ok: true })
+    expect((await pool.query('SELECT cid, kind FROM blocked_images WHERE did = $1 AND unblocked_at IS NULL ORDER BY cid', [d])).rows)
+      .toEqual([{ cid: a, kind: 'suspension' }, { cid: b, kind: 'takedown' }].sort((x, y) => x.cid.localeCompare(y.cid)))
+  })
+
   it('suspends and lifts, and acknowledging dismisses linked reports', async () => {
     const d = did()
     const img = cid()
