@@ -40,7 +40,7 @@ describe('OpenAPI document', () => {
   })
 
   it('documents the avatar query parameters, auth, and rate-limit headers', () => {
-    const refs = (op: { parameters: readonly { $ref?: string; name?: string }[] }) => op.parameters.map((p) => p.$ref?.split('/').pop() ?? p.name)
+    const refs = (op: unknown) => (op as { parameters: readonly { $ref?: string; name?: string }[] }).parameters.map((p) => p.$ref?.split('/').pop() ?? p.name)
     for (const op of [openApiDocument.paths['/avatar/{hash}'].get, openApiDocument.paths['/u/{id}'].get]) {
       for (const name of ['s', 'd', 'f', 'r', 'fmt', 'q', 'ttl', 'json']) expect(refs(op)).toContain(name)
     }

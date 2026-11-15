@@ -34,7 +34,7 @@ describe('avatar parameters', () => {
       ['fmt=PNG', 'invalid_format'],
     ])('rejects %s with %s, keyed or anonymous', async (qs, code) => {
       const { app } = setup()
-      for (const headers of [{ 'x-api-key': 'sk_test' }, {}]) {
+      for (const headers of [{ 'x-api-key': 'sk_test' }, {}] as Record<string, string>[]) {
         const res = await app.request(`/u/alice.test?${qs}`, { headers })
         expect(res.status).toBe(400)
         expect((await res.json()).error.code).toBe(code)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import jsQR from 'jsqr'
+import jsQRImport from 'jsqr'
 import sharp from 'sharp'
 import { buildMarkdown, buildVcard, emailHash, qrLayout, toExportProfile, type Candidate } from '@blueyvatar/core'
 import { readFileSync } from 'node:fs'
@@ -150,6 +150,9 @@ describe('profile exports', () => {
     expect(res.status).toBe(403)
   })
 })
+
+// jsqr is CommonJS; under NodeNext its default import is typed as the module object. Type-only cast, same runtime value.
+const jsQR = jsQRImport as unknown as typeof import('jsqr').default
 
 async function decode(png: Uint8Array): Promise<string | null> {
   const { data, info } = await sharp(Buffer.from(png)).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
