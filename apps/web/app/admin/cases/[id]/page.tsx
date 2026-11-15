@@ -1,54 +1,19 @@
 import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
 import { canViewChildSafety, formatSla, SEVERITY_LABELS, slaHours, slaState, syncCases } from '@blueyvatar/core/moderation'
-import { SOR_TEMPLATES } from '@blueyvatar/core/verification'
-import { PageMain } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { REASON_LABELS, type Reason } from '../../../../lib/reports'
 import { requireAdmin } from '../../../../lib/admin/guard'
-import { ACTION_LABELS, allowedActions, caseDetail, claimCase, getWellness, type CaseAction, type CaseDetail } from '../../../../lib/admin/review'
-import { caseAction, releaseCaseAction, skipCaseAction } from '../../actions'
+import { ACTION_LABELS, allowedActions, type CaseAction } from '../../../../lib/admin/case-actions'
+import { caseDetail } from '../../../../lib/admin/case-detail'
+import { claimCase } from '../../../../lib/admin/review-locks'
+import { getWellness } from '../../../../lib/admin/wellness'
+import { releaseCaseAction, skipCaseAction } from '../../actions'
 import { GuardedImage } from '../../GuardedImage'
-import { AdminNav, fmt, Msg, PolicySelect } from '../../AdminBits'
+import { AdminPage, fmt } from '../../AdminBits'
+import { CaseForm, defaultFacts } from './CaseForm'
 
 const label = (k: string) => REASON_LABELS[k as Reason] ?? k
-
-function defaultFacts(d: CaseDetail): string {
-  const reports = d.signals.filter((s) => s.kind === 'report')
-  const auto = d.signals.filter((s) => s.kind === 'scanner' || s.kind === 'label')
-  const parts: string[] = []
-  if (reports.length) parts.push(`We received ${reports.length} report${reports.length === 1 ? '' : 's'} (${[...new Set(reports.map((r) => label(r.category)))].join(', ')}).`)
-  if (auto.length) parts.push(`An automated check flagged the content (${[...new Set(auto.map((s) => `${s.kind}: ${s.source ?? s.category}`))].join(', ')}).`)
-  return parts.join(' ')
-}
-
-function CaseForm({ id, action, title, children, notice }: { id: number; action: CaseAction; title: string; children?: ReactNode; notice?: { facts: string } }) {
-  const t = notice ? SOR_TEMPLATES[action as keyof typeof SOR_TEMPLATES] : null
-  return (
-    <form action={caseAction} aria-label={title}>
-      <h3>{title}</h3>
-      <input type="hidden" name="case" value={id} />
-      <input type="hidden" name="action" value={action} />
-      {children}
-      {notice && (
-        <>
-          <label>Facts for the account owner (what we saw, in plain words)
-            <textarea name="facts" required rows={3} maxLength={800} defaultValue={notice.facts} />
-          </label>
-          {action !== 'reverse' && (
-            <label>Why this breaks the policy, for the account owner
-              <textarea name="explanation" required rows={2} maxLength={600} />
-            </label>
-          )}
-          <details><summary>What the account owner receives</summary><pre className="whitespace-pre-wrap">{t?.body}</pre><p>The action is blocked if any field in this notice is empty.</p></details>
-        </>
-      )}
-      <label>Reason (internal, recorded in the audit log) <input name="reason" required maxLength={500} autoComplete="off" /></label>
-      <PolicySelect idSuffix={`${action}-${id}`} />
-      <Button type="submit">{title}</Button>
-    </form>
-  )
-}
 
 export default async function CasePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ msg?: string }> }) {
   const { did, pool } = await requireAdmin()
@@ -70,13 +35,56 @@ export default async function CasePage({ params, searchParams }: { params: Promi
   const has = (a: CaseAction) => allowed.includes(a)
   const cids = c.subject_cid ? [c.subject_cid] : d.images.slice(0, 3).map((i) => i.cid)
   const facts = defaultFacts(d)
+  const noticeFacts = { facts }
+  const forms: { action: CaseAction; title: string; notice?: { facts: string }; show?: boolean; body?: ReactNode }[] = [
+    { action: 'acknowledge', title: c.child_safety ? 'Close case after counsel guidance' : 'Acknowledge or dismiss' },
+    { action: 'divert', title: 'Divert (remove from serving)' },
+    {
+      action: 'remove_image', title: 'Remove image', notice: noticeFacts,
+      body: (
+        <fieldset><legend>Scope</legend>
+          {c.subject_cid && <label><input type="radio" name="scope" value="image" defaultChecked /> This image only</label>}
+          <label><input type="radio" name="scope" value="account" defaultChecked={!c.subject_cid} /> All images of the account</label>
+        </fieldset>
+      ),
+    },
+    {
+      action: 'rating_change', title: 'Apply rating change', notice: noticeFacts,
+      body: (
+        <>
+          <label>Image <select name="cid" defaultValue={c.subject_cid ?? ''}>{d.images.map((i) => <option key={i.cid} value={i.cid}>{i.cid.slice(0, 16)} (now {i.rating.toUpperCase()})</option>)}</select></label>
+          <label>New rating <select name="rating" defaultValue="r"><option value="g">G</option><option value="pg">PG</option><option value="r">R</option><option value="x">X</option></select></label>
+        </>
+      ),
+    },
+    { action: 'warn', title: 'Warn', notice: noticeFacts },
+    { action: 'suspend', title: 'Suspend account', notice: noticeFacts },
+    {
+      action: 'escalate', title: 'Escalate',
+      body: <label><input type="checkbox" name="childSafety" /> Send to the restricted child-safety queue. The image is taken out of serving at once and no one else sees it in this portal.</label>,
+    },
+    {
+      action: 'reverse', title: 'Reverse an action', notice: { facts: '' }, show: !!d.suspension || d.blocked.length > 0 || d.overrides.length > 0,
+      body: (
+        <label>What to reverse
+          <select name="what" required defaultValue="">
+            <option value="" disabled>Choose</option>
+            {d.suspension && <option value="suspension">Lift the suspension</option>}
+            {d.blocked.map((b) => <option key={b.cid} value={`block:${b.cid}`}>Unblock image {b.cid.slice(0, 16)}</option>)}
+            {d.overrides.map((o) => <option key={o.cid} value={`rating:${o.cid}`}>Restore rating of {o.cid.slice(0, 16)} to {o.prior_rating.toUpperCase()}</option>)}
+          </select>
+        </label>
+      ),
+    },
+    { action: 'uphold', title: 'Uphold decision' },
+    { action: 'overturn', title: 'Overturn decision' },
+    { action: 'tag', title: 'Tag', body: <label>Tag <input name="tag" required maxLength={31} pattern="[a-z0-9][a-z0-9\-]*" /></label> },
+    { action: 'comment', title: 'Comment' },
+  ]
   const byKind = (k: string) => d.signals.filter((x) => x.kind === k)
   const reportCats = Object.entries(byKind('report').reduce<Record<string, number>>((m, x) => ({ ...m, [x.category]: (m[x.category] ?? 0) + 1 }), {}))
   return (
-    <PageMain>
-      <AdminNav did={did} />
-      <h1>Case #{c.id}</h1>
-      <Msg text={msg} />
+    <AdminPage did={did} title={`Case #${c.id}`} msg={msg}>
       <section aria-label="Summary">
         <p>
           <strong>{SEVERITY_LABELS[c.severity]}</strong>, {c.status === 'appeal' ? 'appeal' : c.status}{c.child_safety ? ', child safety (restricted)' : ''}. Opened {fmt(c.opened_at)}.
@@ -141,45 +149,9 @@ export default async function CasePage({ params, searchParams }: { params: Promi
           <p>Every action needs a reason and a cited policy, and is written to the audit log.</p>
         </section>
       )}
-      {has('acknowledge') && <CaseForm id={c.id} action="acknowledge" title={c.child_safety ? 'Close case after counsel guidance' : 'Acknowledge or dismiss'} />}
-      {has('divert') && <CaseForm id={c.id} action="divert" title="Divert (remove from serving)" />}
-      {has('remove_image') && (
-        <CaseForm id={c.id} action="remove_image" title="Remove image" notice={{ facts }}>
-          <fieldset><legend>Scope</legend>
-            {c.subject_cid && <label><input type="radio" name="scope" value="image" defaultChecked /> This image only</label>}
-            <label><input type="radio" name="scope" value="account" defaultChecked={!c.subject_cid} /> All images of the account</label>
-          </fieldset>
-        </CaseForm>
-      )}
-      {has('rating_change') && (
-        <CaseForm id={c.id} action="rating_change" title="Apply rating change" notice={{ facts }}>
-          <label>Image <select name="cid" defaultValue={c.subject_cid ?? ''}>{d.images.map((i) => <option key={i.cid} value={i.cid}>{i.cid.slice(0, 16)} (now {i.rating.toUpperCase()})</option>)}</select></label>
-          <label>New rating <select name="rating" defaultValue="r"><option value="g">G</option><option value="pg">PG</option><option value="r">R</option><option value="x">X</option></select></label>
-        </CaseForm>
-      )}
-      {has('warn') && <CaseForm id={c.id} action="warn" title="Warn" notice={{ facts }} />}
-      {has('suspend') && <CaseForm id={c.id} action="suspend" title="Suspend account" notice={{ facts }} />}
-      {has('escalate') && (
-        <CaseForm id={c.id} action="escalate" title="Escalate">
-          <label><input type="checkbox" name="childSafety" /> Send to the restricted child-safety queue. The image is taken out of serving at once and no one else sees it in this portal.</label>
-        </CaseForm>
-      )}
-      {has('reverse') && (d.suspension || d.blocked.length > 0 || d.overrides.length > 0) && (
-        <CaseForm id={c.id} action="reverse" title="Reverse an action" notice={{ facts: '' }}>
-          <label>What to reverse
-            <select name="what" required defaultValue="">
-              <option value="" disabled>Choose</option>
-              {d.suspension && <option value="suspension">Lift the suspension</option>}
-              {d.blocked.map((b) => <option key={b.cid} value={`block:${b.cid}`}>Unblock image {b.cid.slice(0, 16)}</option>)}
-              {d.overrides.map((o) => <option key={o.cid} value={`rating:${o.cid}`}>Restore rating of {o.cid.slice(0, 16)} to {o.prior_rating.toUpperCase()}</option>)}
-            </select>
-          </label>
-        </CaseForm>
-      )}
-      {has('uphold') && <CaseForm id={c.id} action="uphold" title="Uphold decision" />}
-      {has('overturn') && <CaseForm id={c.id} action="overturn" title="Overturn decision" />}
-      {has('tag') && <CaseForm id={c.id} action="tag" title="Tag"><label>Tag <input name="tag" required maxLength={31} pattern="[a-z0-9][a-z0-9\-]*" /></label></CaseForm>}
-      {has('comment') && <CaseForm id={c.id} action="comment" title="Comment" />}
+      {forms.filter((f) => has(f.action) && (f.show ?? true)).map((f) => (
+        <CaseForm key={f.action} id={c.id} action={f.action} title={f.title} notice={f.notice}>{f.body}</CaseForm>
+      ))}
 
       <section aria-label="Case log">
         <h2>Case log</h2>
@@ -189,6 +161,6 @@ export default async function CasePage({ params, searchParams }: { params: Promi
           ))}</ul>
         )}
       </section>
-    </PageMain>
+    </AdminPage>
   )
 }

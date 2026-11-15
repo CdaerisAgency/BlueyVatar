@@ -1,12 +1,11 @@
 import { notFound } from 'next/navigation'
 import { canViewChildSafety, formatSla, QUEUES, SEVERITY_LABELS, slaHours, slaState, syncCases } from '@blueyvatar/core/moderation'
-import { PageMain } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { REASON_LABELS, type Reason } from '../../../../lib/reports'
 import { requireAdmin } from '../../../../lib/admin/guard'
-import { isQueue, listCases } from '../../../../lib/admin/review'
+import { isQueue, listCases } from '../../../../lib/admin/review-queue'
 import { nextCaseAction } from '../../actions'
-import { AdminNav, fmt, Msg } from '../../AdminBits'
+import { AdminPage, fmt } from '../../AdminBits'
 
 export default async function QueuePage({ params, searchParams }: { params: Promise<{ queue: string }>; searchParams: Promise<{ msg?: string }> }) {
   const { did, pool } = await requireAdmin()
@@ -21,10 +20,7 @@ export default async function QueuePage({ params, searchParams }: { params: Prom
   const now = new Date()
   const label = QUEUES.find((q) => q.name === queue)!.label
   return (
-    <PageMain>
-      <AdminNav did={did} />
-      <h1>{label}</h1>
-      <Msg text={msg} />
+    <AdminPage did={did} title={label} msg={msg}>
       {restricted && <p role="note">Restricted queue. Images are never shown here. Cases show metadata only.</p>}
       {queue !== 'resolved' && (
         <form action={nextCaseAction}>
@@ -52,6 +48,6 @@ export default async function QueuePage({ params, searchParams }: { params: Prom
           })}
         </ul>
       )}
-    </PageMain>
+    </AdminPage>
   )
 }

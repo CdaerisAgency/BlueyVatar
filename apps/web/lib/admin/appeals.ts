@@ -2,24 +2,6 @@ import type pg from 'pg'
 import { inTx, MAX_REASON, recordAction, type AuditMeta, type Result } from './moderation'
 import type { Purge } from './purge'
 
-export type AppealRow = {
-  id: number; did: string; action_id: number; statement: string; status: string; created_at: Date
-  decided_by: string | null; decision_note: string | null; decided_at: Date | null
-  action: string; action_by: string; action_reason: string | null; action_at: Date
-}
-
-export async function listAppeals(pool: Pick<pg.Pool, 'query'>, status: 'open' | 'decided' = 'open', limit = 100): Promise<AppealRow[]> {
-  const { rows } = await pool.query<AppealRow>(
-    `SELECT p.id::int AS id, p.did, p.action_id::int AS action_id, p.statement, p.status, p.created_at, p.decided_by, p.decision_note, p.decided_at,
-            a.action, a.actor AS action_by, a.reason AS action_reason, a.created_at AS action_at
-       FROM appeals p JOIN admin_actions a ON a.id = p.action_id
-      WHERE ($1 = 'open') = (p.status = 'open')
-      ORDER BY CASE WHEN p.status = 'open' THEN p.created_at END ASC, p.decided_at DESC LIMIT $2`,
-    [status, limit],
-  )
-  return rows
-}
-
 /**
  * Decides an open appeal. The decision is written to the audit log in the same transaction. Overturning also reverses the
  * original action: a takedown unblocks the images it blocked, a suspension is lifted. Someone other than the original
