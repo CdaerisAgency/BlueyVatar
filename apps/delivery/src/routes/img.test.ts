@@ -212,20 +212,16 @@ describe('/img and image serving', () => {
         expect(res.headers.get('cache-control')).toBe('public, max-age=31536000, immutable')
       })
 
-      it('rejects sizes outside 1 to 2048 with a stable code', async () => {
-        for (const f of ['0.png', '2049.png', '9999.png']) {
-          const res = await get(raw(f))
-          expect(res.status).toBe(404)
-          expect((await res.json()).error.code).toBe('invalid_size')
-        }
+      it.each(['0.png', '2049.png', '9999.png'])('rejects size file %s outside 1 to 2048 with a stable code', async (f) => {
+        const res = await get(raw(f))
+        expect(res.status).toBe(404)
+        expect((await res.json()).error.code).toBe('invalid_size')
       })
 
-      it('rejects qualities outside 1 to 100 with a stable code', async () => {
-        for (const f of ['80-q0.webp', '80-q101.webp']) {
-          const res = await get(raw(f))
-          expect(res.status).toBe(404)
-          expect((await res.json()).error.code).toBe('invalid_quality')
-        }
+      it.each(['80-q0.webp', '80-q101.webp'])('rejects quality file %s outside 1 to 100 with a stable code', async (f) => {
+        const res = await get(raw(f))
+        expect(res.status).toBe(404)
+        expect((await res.json()).error.code).toBe('invalid_quality')
       })
 
       it('emits avatar redirects that /img serves directly', async () => {

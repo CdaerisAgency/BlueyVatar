@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { emailHash, emailMd5 } from '@blueyvatar/core'
 import { PUBLIC_VISIBILITY } from '../store.js'
-import { CID, DID, img, raw, setup } from '../test/harness.js'
+import { CID, DID, img, setup } from '../test/harness.js'
 
 describe('avatar routes', () => {
   it('redirects an email hash to an immutable image path', async () => {
@@ -33,14 +33,15 @@ describe('avatar routes', () => {
     expect((await app.request(`/avatar/${emailMd5('alice@example.com').toUpperCase()}.png`)).status).toBe(302)
   })
 
-  it('rejects hashes that are neither 32 nor 64 hex characters', async () => {
-    const { app } = setup()
-    for (const bad of ['a'.repeat(31), 'a'.repeat(33), 'a'.repeat(40), 'a'.repeat(63), 'a'.repeat(65), 'z'.repeat(32), 'alice@example.com']) {
+  it.each(['a'.repeat(31), 'a'.repeat(33), 'a'.repeat(40), 'a'.repeat(63), 'a'.repeat(65), 'z'.repeat(32), 'alice@example.com'])(
+    'rejects %s as neither a 32 nor a 64 character hex hash',
+    async (bad) => {
+      const { app } = setup()
       const res = await app.request(`/avatar/${bad}`)
       expect(res.status).toBe(400)
       expect((await res.json()).error.code).toBe('invalid_identifier')
-    }
-  })
+    },
+  )
 
   it('answers unlinked and opted-out hashes identically, for MD5 as for SHA256', async () => {
     const { app, index } = setup()

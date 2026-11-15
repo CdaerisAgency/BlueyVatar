@@ -18,22 +18,26 @@ describe('avatar parameters', () => {
       expect((await app.request('/u/alice.test?fmt=png&q=40', { headers: h })).headers.get('location')).toMatch(/\/80\.png$/)
     })
 
-    it('rejects unknown formats and out-of-range quality', async () => {
+    it.each([
+      ['fmt=avif', 'invalid_format'],
+      ['fmt=webp&q=0', 'invalid_quality'],
+      ['fmt=webp&q=101', 'invalid_quality'],
+    ])('rejects %s with %s on a keyed request', async (qs, code) => {
       const { app } = setup()
-      const h = { 'x-api-key': 'sk_test' }
-      expect((await (await app.request('/u/alice.test?fmt=avif', { headers: h })).json()).error.code).toBe('invalid_format')
-      expect((await (await app.request('/u/alice.test?fmt=webp&q=0', { headers: h })).json()).error.code).toBe('invalid_quality')
-      expect((await (await app.request('/u/alice.test?fmt=webp&q=101', { headers: h })).json()).error.code).toBe('invalid_quality')
+      expect((await (await app.request(`/u/alice.test?${qs}`, { headers: { 'x-api-key': 'sk_test' } })).json()).error.code).toBe(code)
     })
 
-    it('rejects q=abc, fmt=gif, and uppercase fmt with stable codes', async () => {
+    it.each([
+      ['q=abc', 'invalid_quality'],
+      ['fmt=gif', 'invalid_format'],
+      ['fmt=WEBP', 'invalid_format'],
+      ['fmt=PNG', 'invalid_format'],
+    ])('rejects %s with %s, keyed or anonymous', async (qs, code) => {
       const { app } = setup()
-      for (const [qs, code] of [['q=abc', 'invalid_quality'], ['fmt=gif', 'invalid_format'], ['fmt=WEBP', 'invalid_format'], ['fmt=PNG', 'invalid_format']] as const) {
-        for (const headers of [{ 'x-api-key': 'sk_test' }, {}]) {
-          const res = await app.request(`/u/alice.test?${qs}`, { headers })
-          expect(res.status).toBe(400)
-          expect((await res.json()).error.code).toBe(code)
-        }
+      for (const headers of [{ 'x-api-key': 'sk_test' }, {}]) {
+        const res = await app.request(`/u/alice.test?${qs}`, { headers })
+        expect(res.status).toBe(400)
+        expect((await res.json()).error.code).toBe(code)
       }
     })
 
@@ -84,14 +88,11 @@ describe('avatar parameters', () => {
       expect(res.headers.get('x-adjusted-params')).toBeNull()
     })
 
-    it('rejects ttl outside the range or without a unit', async () => {
+    it.each(['30m', '29d', '0h', '3600', '1w'])('rejects ttl=%s as outside the range or without a unit', async (bad) => {
       const { app } = setup()
-      const h = { 'x-api-key': 'sk_test' }
-      for (const bad of ['30m', '29d', '0h', '3600', '1w']) {
-        const res = await app.request(`/u/alice.test?ttl=${bad}`, { headers: h })
-        expect(res.status).toBe(400)
-        expect((await res.json()).error.code).toBe('invalid_ttl')
-      }
+      const res = await app.request(`/u/alice.test?ttl=${bad}`, { headers: { 'x-api-key': 'sk_test' } })
+      expect(res.status).toBe(400)
+      expect((await res.json()).error.code).toBe('invalid_ttl')
     })
 
     it('applies the same ttl to JSON responses and the default redirect', async () => {

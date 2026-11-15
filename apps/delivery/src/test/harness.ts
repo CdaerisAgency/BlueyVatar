@@ -1,8 +1,8 @@
-import { GALLERY_MAX, emailHash, emailMd5, imagePath, restrictedScope, imageSig, qrSvg, type Candidate, type ImageFormat } from '@blueyvatar/core'
+import { emailHash, imagePath, imageSig, type Candidate, type ImageFormat } from '@blueyvatar/core'
 import { createApp, type AppDeps } from '../app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from '../licenses.js'
 import type { AvatarResolver, Identity } from '../resolver.js'
-import { MemoryIndexStore, PUBLIC_VISIBILITY } from '../store.js'
+import { MemoryIndexStore } from '../store.js'
 import { MemoryAlertLedger, UsageAlerts, type UsageAlert } from '../alerts.js'
 import { MemoryUsageMeter } from '../usage.js'
 

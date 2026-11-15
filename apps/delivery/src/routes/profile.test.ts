@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { GALLERY_MAX, imagePath, restrictedScope } from '@blueyvatar/core'
 import { createApp } from '../app.js'
 import { PUBLIC_VISIBILITY } from '../store.js'
-import { DID, SECRET, img, setup } from '../test/harness.js'
+import { DID, SECRET, setup } from '../test/harness.js'
 
 describe('/profile', () => {
   it('allows cross-origin reads of profile JSON', async () => {
