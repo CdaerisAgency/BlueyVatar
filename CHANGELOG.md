@@ -8,6 +8,10 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 - Free effect offers (closes #308, part of #218, migration 0043). Admins have a new Free effects page: pick a paid effect, a name, a first and last day (UTC), and who gets it (everyone, one plan, or listed accounts by DID or handle). An offer can be changed or ended early; it then leaves the Effects page and avatars already made with the effect keep working. Each offer has a notify switch: on sends one email when it starts and shows a dismissible banner on account pages during the window; off adds it quietly. The email can be turned off on the Notifications page. Create, change, and end are in the audit log. Offer records for an account are in the data export and are deleted with the account. See `docs/effect-offers-v1.md`.
 - More frames and image filters on the Effects page (part of #218, migration 0042). Plus accounts get three more rings (thick, dotted, inset) and five filters (black and white, sepia, warm, cool, high contrast). A look is one frame, one filter, or one of each, drawn from your original and saved as a new image like the other effects. The out-of-office badge stays free. The data export includes the filter. See `docs/effects-v2.md`.
 
+### Changed
+- Signing in now asks Tap to follow your account (`POST /repos/add`), so the indexer records it right away, even before you save a profile (closes #223). It is best effort with a 2 second limit and never blocks sign-in. It runs only when `TAP_URL` and `TAP_ADMIN_PASSWORD` are set on the web app.
+- Signed-in visitors on public pages (part of #225). The landing page button now asks `/api/viewer` in the browser instead of reading the cookie on the server, so `/` is a static page again and no signed-in copy can reach a signed-out visitor. Pages that read the session on the server (`/login`, `/account`, `/report`, `/integrations`, profile pages) now send `Cache-Control: private, no-store`. Assets and `/img` caching are unchanged. The `www` redirect and the `PUBLIC_URL` host check are still owner steps.
+
 ## 2026-11-14
 
 ### Added
