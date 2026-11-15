@@ -31,11 +31,11 @@ export interface ReverifyStore {
 
 export type Verifier = (claim: DueClaim) => Promise<VerifyOutcome>
 /** Deletes the attestation record from the service repo. Throws when it could not. */
-export type Remover = (attestationUri: string) => Promise<void>
+type Remover = (attestationUri: string) => Promise<void>
 /** Called once per revocation, after it succeeded. Failures are logged and never retried. */
 export type OnRevoked = (claim: DueClaim, reason: string) => Promise<void>
 
-export type ReverifyOptions = {
+type ReverifyOptions = {
   afterMs: number
   /** Skip claims checked more recently than this, so a short timer never double-counts a failure. */
   minGapMs: number
@@ -46,7 +46,7 @@ export type ReverifyOptions = {
 }
 
 export const DAY_MS = 86_400_000
-export const defaultOptions: ReverifyOptions = {
+const defaultOptions: ReverifyOptions = {
   afterMs: 30 * DAY_MS,
   minGapMs: 20 * 3_600_000,
   batchSize: 50,
@@ -55,8 +55,8 @@ export const defaultOptions: ReverifyOptions = {
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 }
 
-export type ReverifyDeps = { store: ReverifyStore; verify: Verifier; remove: Remover; onRevoked: OnRevoked }
-export type ReverifyResult = { checked: number; ok: number; failed: number; inconclusive: number; revoked: number }
+type ReverifyDeps = { store: ReverifyStore; verify: Verifier; remove: Remover; onRevoked: OnRevoked }
+type ReverifyResult = { checked: number; ok: number; failed: number; inconclusive: number; revoked: number }
 
 /** One pass over every due claim, in batches. A claim that throws is logged and left for the next pass. */
 export async function reverifyDue(deps: ReverifyDeps, opts: Partial<ReverifyOptions> = {}): Promise<ReverifyResult> {
@@ -146,21 +146,4 @@ export function pgReverifyStore(pool: Pool): ReverifyStore {
       await pool.query(`UPDATE attestations SET result = 'revoked' WHERE uri = $1`, [uri])
     },
   }
-}
-
-export type Timers = { setInterval: typeof setInterval }
-
-/** Runs a pass on an interval, never overlapping itself. Failures are logged and retried on the next tick. */
-export function scheduleReverify(run: () => Promise<ReverifyResult>, everyMs: number, timers: Timers = { setInterval }): NodeJS.Timeout {
-  let running = false
-  const timer = timers.setInterval(() => {
-    if (running) return
-    running = true
-    run()
-      .then((r) => r.checked > 0 && log.info('reverify pass', { ...r }))
-      .catch((err) => { log.error('reverify pass failed', { err }); errors.captureException(err, { tags: { task: 'reverify_pass' } }) })
-      .finally(() => { running = false })
-  }, everyMs)
-  timer.unref()
-  return timer
 }

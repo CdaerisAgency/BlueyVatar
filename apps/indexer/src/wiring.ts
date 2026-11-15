@@ -2,7 +2,7 @@ import { SimpleIndexer } from '@atproto/tap'
 import { handleRecord, type IndexWrites } from './handlers.js'
 
 /** Wraps one event handler (readiness bookkeeping, metrics, error reporting). It must rethrow failures so the event is not acked. */
-export type TrackEvent = (type: 'identity' | 'record', id: number, run: () => Promise<void>) => Promise<void>
+type TrackEvent = (type: 'identity' | 'record', id: number, run: () => Promise<void>) => Promise<void>
 
 const passthrough: TrackEvent = (_type, _id, run) => run()
 

@@ -98,7 +98,7 @@ export class PgLabelStore implements LabelStore {
   }
 }
 
-export interface RunOptions {
+interface RunOptions {
   /** Stops the loop when it returns true. Checked between frames and reconnects. */
   stopped?: () => boolean
   sleep?: (ms: number) => Promise<void>

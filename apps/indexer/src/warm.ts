@@ -16,7 +16,7 @@ import { log as logger } from './obs.js'
  * WARM_SIZES (comma list of ladder sizes), WARM_FORMATS (png, jpeg, webp),
  * WARM_CONCURRENCY (default 2), WARM_MAX_PER_MINUTE (default 120).
  */
-export interface WarmConfig {
+interface WarmConfig {
   sizes: readonly number[]
   formats: readonly ImageFormat[]
   concurrency: number
@@ -40,7 +40,7 @@ export function warmConfigFromEnv(env: Record<string, string | undefined> = proc
   }
 }
 
-export interface WarmerOptions {
+interface WarmerOptions {
   publicUrl: string
   /** Delivery's IMG_SIGNING_SECRET; /img serves only signed paths. */
   signingSecret: string
