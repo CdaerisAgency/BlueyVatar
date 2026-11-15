@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import AvatarRing from '../components/AvatarRing'
 import { ButtonLink } from '../components/Button'
+import HeroCta from '../components/HeroCta'
 import { Eyebrow, SectionTitle } from '../components/Type'
 import { PricingHashRedirect } from '../components/PricingHashRedirect'
-import { currentDid } from '../lib/auth'
 import { COPY } from '../lib/copy'
 import { pageMetadata } from '../lib/site'
 
@@ -11,8 +11,8 @@ const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
 export const metadata = pageMetadata('/', 'BlueyVatar | Avatars and profiles in your atproto repository', 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.')
 
-export default async function Home() {
-  const signedIn = Boolean(await currentDid())
+/** No cookie read here: the call to action asks /api/viewer after load, so this page is static and never carries a signed-in copy. */
+export default function Home() {
   return (
     <main id="main" tabIndex={-1} className="focus:outline-none">
       <PricingHashRedirect />
@@ -22,9 +22,7 @@ export default async function Home() {
           <h1 className="m-0 text-[clamp(38px,9vw,64px)]">{COPY.hero.title}</h1>
           <p className="m-0 max-w-[520px] text-lg sm:text-xl">{COPY.hero.lead}</p>
           <div className="flex flex-wrap gap-3.5">
-            <ButtonLink href={signedIn ? '/account' : '/login'} variant="primary" size="lg">
-              {COPY.hero.primary}
-            </ButtonLink>
+            <HeroCta>{COPY.hero.primary}</HeroCta>
             <ButtonLink href="/docs" size="lg">
               {COPY.hero.secondary}
             </ButtonLink>
