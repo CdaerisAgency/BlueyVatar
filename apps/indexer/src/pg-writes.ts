@@ -2,7 +2,7 @@ import pg from 'pg'
 import type { IndexWrites } from './handlers.js'
 import { errors, log } from './obs.js'
 
-export interface PgWritesOptions {
+interface PgWritesOptions {
   /**
    * Called after an avatar change. Image URLs are keyed by blob CID, so a new
    * avatar gets a new URL and the uncached redirect picks it up. This hook is
