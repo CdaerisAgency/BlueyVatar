@@ -30,7 +30,7 @@ export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
       </p>
       <p>
         <label>
-          <input type="checkbox" name="emailLookupOptOut" defaultChecked={rules.emailLookupOptOut} /> Opt out of email lookup: people cannot find my avatar by email hash.
+          <input type="checkbox" name="emailLookupOptOut" defaultChecked={rules.emailLookupOptOut} /> Opt out of email lookup: people cannot find my avatar by email address.
         </label>
       </p>
       <Button type="submit" variant="primary" disabled={pending}>Save</Button>
