@@ -1,4 +1,4 @@
-import { Notices, PageHeader, PageMain, Section } from '../../components/Page'
+import { Notices, PageHeader, PageMain } from '../../components/Page'
 import { cookies } from 'next/headers'
 import { qrSvg } from '@blueyvatar/core'
 import { requireDid } from '../../lib/auth'

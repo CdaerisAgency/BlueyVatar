@@ -1,5 +1,5 @@
 import { PAID_PLANS, PAST_DUE_GRACE_DAYS, effectiveTier, type PaidPlan } from '@blueyvatar/core'
-import { BackLink, PageHeader, PageMain, Section } from '../../../components/Page'
+import { PageHeader, PageMain, Section } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
 import { billingEnabled, planEnabled } from '../../../lib/billing/config'
@@ -9,23 +9,13 @@ import { getPendingChange, stripeClient } from '../../../lib/billing/stripe'
 import { getDashboardStore } from '../../../lib/dashboard-store'
 import { resolvePlan } from '../../../lib/plan'
 import { PRICING, formatPrice } from '../../../lib/pricing'
-import { canManageBilling } from '../../../lib/orgs/roles'
-import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
-import { getPool } from '../../../lib/store'
 import { SignedInAs } from '../../../components/SignedInAs'
-import { viewerFor } from '../../../lib/viewer'
-import { displayName } from '../../../lib/viewer-core'
 import { LicenseUsage } from './LicenseUsage'
-import { cancelPlanChange, cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
+import { OrgBilling } from './OrgBilling'
+import { PlanList } from './PlanList'
+import { NOTICE, PLAN_NAME, UNAVAILABLE } from './notices'
+import { cancelPlanChange, cancelSubscription, openPortal, resumeSubscription, switchPlan } from './actions'
 
-
-const NOTICE: Record<string, string> = {
-  success: 'Thanks. Your subscription is being set up. This page updates when Stripe confirms the payment, usually within a minute.',
-  canceled: 'Checkout was canceled. You were not charged.',
-}
-
-const UNAVAILABLE = 'Billing is not available yet on this deployment, so plan changes are handled by hand. To change your plan now, email support@blueyvatar.com and include your handle.'
-const PLAN_NAME: Record<string, string> = { plus: 'Plus', business: 'Business' }
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string; done?: string; change?: string; org?: string }> }) {
   const did = await requireDid('/account/billing')
@@ -87,33 +77,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       {target && held.has(target) && <p role="status">You are already on {PLAN_NAME[target]}.</p>}
       {target && !held.has(target) && canSwitchTo(target) && subs.length > 0 && <ConfirmSwitch target={target} subs={subs} endsOn={subs[0]!.currentPeriodEnd} />}
 
-      <Section title="Plans">
-      <ul>
-        {PRICING.map((p) => {
-          const id = p.id
-          const isCurrent = id === 'free' ? subs.length === 0 && !enterprise && plan !== 'plus' : held.has(id) || (id === 'plus' && plan === 'plus' && subs.length === 0)
-          return (
-            <li key={id}>
-              <strong>{p.name}</strong>: {p.amount === 0 ? '$0' : `${formatPrice(p.amount)} per ${p.per === 'mo' ? 'month' : p.per}`}
-              {isCurrent && ' (current)'}
-              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length === 0 && (
-                <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
-                  <input type="hidden" name="tier" value={id} />
-                  <Button type="submit" variant="primary">Subscribe to {p.name}</Button>
-                </form>
-              )}
-              {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && !pending && (
-                <a href={`/account/billing?change=${id}`} style={{ marginLeft: 12 }}>
-                  Switch to {p.name}
-                </a>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-      {subs.length > 0 && <p>To go back to Free, cancel your subscription below. You keep your paid plan until the end of the period you paid for.</p>}
-      <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout based on your billing address.</p>
-      </Section>
+      <PlanList subs={subs} plan={plan} enterprise={enterprise} held={held} pending={pending} />
       <Section title="How changes work">
       <ul>
         <li>Upgrades apply now, and you are charged the difference for the rest of the period.</li>
@@ -181,67 +145,5 @@ function ConfirmSwitch({ target, subs, endsOn }: { target: PaidPlan; subs: Array
         <a href="/account/billing">Keep my current plan</a>
       </form>
     </Section>
-  )
-}
-
-const dateOf = (d: Date) => d.toISOString().slice(0, 10)
-
-/** Billing for an organization license. Owners only; the Stripe customer is the billing owner's. */
-async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { checkout?: string; error?: string } }) {
-  const pool = getPool()
-  const role = pool ? await memberRole(pool, orgId, did) : null
-  const org = pool && role ? await getOrganization(pool, orgId) : null
-  const lic = pool && role ? await orgLicense(pool, orgId) : null
-  if (!pool || !org || !lic) {
-    return (
-      <PageMain>
-        <BackLink href="/account/orgs">Back to organizations</BackLink>
-        <PageHeader title="Plan and billing" intro="See the plan and billing for an organization." />
-        <p role="alert">You are not a member of that organization.</p>
-      </PageMain>
-    )
-  }
-  if (!canManageBilling(role)) {
-    return (
-      <PageMain>
-        <BackLink href={`/account/orgs/${orgId}`}>Back to {org.name}</BackLink>
-        <PageHeader title={`Plan and billing: ${org.name}`} intro="See the plan and billing for this organization." />
-        <p role="alert">Only organization owners can manage billing.</p>
-      </PageMain>
-    )
-  }
-  const license = await getDashboardStore().licenseById(lic.licenseId)
-  const sub = await getBillingStore().subscriptionFor(lic.billingDid, lic.licenseId)
-  const enabled = billingEnabled()
-  const business = PRICING.find((p) => p.id === 'business')
-  return (
-    <PageMain>
-      <BackLink href={`/account/orgs/${orgId}`}>Back to {org.name}</BackLink>
-      <PageHeader title={`Plan and billing: ${org.name}`} intro="Billing for this organization stays with its billing owner." />
-      <SignedInAs did={did} />
-      {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
-      {q.error && <p role="alert">{q.error}</p>}
-      <p>Billing for this organization stays with its billing owner, {displayName(await viewerFor(lic.billingDid))}. Any owner can start or manage the subscription.</p>
-      <ul>
-        <li>Developer tier: {license?.tier ?? 'free'}</li>
-        {sub && <li>Subscription: {sub.status.replace('_', ' ')}{sub.currentPeriodEnd ? `, ${sub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateOf(sub.currentPeriodEnd)}` : ''}</li>}
-      </ul>
-      {!enabled && <p>{UNAVAILABLE}</p>}
-      {enabled && !sub && business && (
-        <form action={startCheckout}>
-          <input type="hidden" name="tier" value="business" />
-          <input type="hidden" name="org" value={orgId} />
-          <Button type="submit" variant="primary">Subscribe to Business ({formatPrice(business.amount)} per month)</Button>
-        </form>
-      )}
-      {enabled && sub && (
-        <form action={openPortal}>
-          <input type="hidden" name="org" value={orgId} />
-          <Button type="submit">Manage billing</Button>
-        </form>
-      )}
-      <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout.</p>
-      {license && <LicenseUsage license={license} />}
-    </PageMain>
   )
 }
