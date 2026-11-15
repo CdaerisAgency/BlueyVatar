@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changelogFeed, inlineParts, parseChangelog, readChangelogFile } from './changelog'
+import { changelogFeed, inlineParts, mergeFragments, parseChangelog, readChangelogFile, readChangelogFragments } from './changelog'
 
 const md = `# Changelog
 
@@ -62,5 +62,28 @@ describe('changelogFeed', () => {
   })
   it('handles an empty changelog', () => {
     expect(changelogFeed([], 'https://blueyvatar.com')).toContain('<updated>1970-01-01T00:00:00Z</updated>')
+  })
+})
+
+describe('mergeFragments', () => {
+  const base = parseChangelog(md)
+  it('adds items to an existing date and group, and a new group when absent', () => {
+    const out = mergeFragments(base, [{ date: '2026-11-07', md: '### Added\n- Extra (#9).\n\n### Changed\n- Tweaked (#10).\n' }])
+    expect(out[0]!.groups.map((g) => [g.name, g.items.length])).toEqual([['Added', 3], ['Fixed', 1], ['Changed', 1]])
+    expect(out[0]!.groups[0]!.items.at(-1)).toBe('Extra (#9).')
+  })
+  it('creates a missing date in newest-first position', () => {
+    const out = mergeFragments(base, [{ date: '2026-11-05', md: '### Fixed\n- Mid (#5).' }, { date: '2026-11-09', md: '### Added\n- Top (#6).' }, { date: '2026-11-01', md: '### Fixed\n- Old (#7).' }])
+    expect(out.map((e) => e.date)).toEqual(['2026-11-09', '2026-11-07', '2026-11-05', '2026-11-03', '2026-11-01'])
+  })
+  it('does not change its input and ignores empty fragments', () => {
+    const before = JSON.stringify(base)
+    expect(mergeFragments(base, [{ date: '2026-11-07', md: '### Added\n- Z' }])).not.toBe(base)
+    expect(JSON.stringify(base)).toBe(before)
+    expect(mergeFragments(base, [{ date: '2026-12-01', md: 'no groups' }])).toEqual(base)
+  })
+  it('reads only dated fragment files, never README.md', () => {
+    const files = readChangelogFragments()
+    expect(files.every((f) => /^\d{4}-\d{2}-\d{2}$/.test(f.date))).toBe(true)
   })
 })

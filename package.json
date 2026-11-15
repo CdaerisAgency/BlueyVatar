@@ -10,6 +10,7 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "changelog:fold": "node tools/changelog/fold.mjs",
     "tap:live": "bash tools/tap-live.sh",
     "tap:live:local": "bash tools/tap-live-local.sh",
     "smoke": "node --experimental-strip-types tools/smoke/smoke.ts",
