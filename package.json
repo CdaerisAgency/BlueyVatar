@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "pnpm -r build",
+    "build:libs": "pnpm --filter @blueyvatar/core build && pnpm --filter @blueyvatar/hovercards build && pnpm --filter @blueyvatar/avatar build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "changelog:fold": "node tools/changelog/fold.mjs",

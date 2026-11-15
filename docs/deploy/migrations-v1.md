@@ -1,0 +1,13 @@
+# Migrations
+
+The runner in `tools/migrate` applies `db/migrations/*.sql` in filename order, one transaction per file, and records each file in `schema_migrations`. Rerunning applies nothing. The runner removes standalone `BEGIN;` and `COMMIT;` lines from each file because it supplies the transaction.
+
+- `fly/delivery.toml` sets `release_command = "node tools/migrate/dist/cli.js"`. Fly runs it in a temporary machine before the new version starts, and a failure aborts the deploy so the previous version keeps running. Deploy delivery first when a release adds a migration. The CI workflow does.
+- To run by hand: `DATABASE_URL_DIRECT=... pnpm db:migrate` from a checkout.
+- **Migration 0036 (license tier `plus`).** It replaces the `licenses_tier_check` constraint so `licenses.tier` allows `free`, `plus`, `pro`, `business`, and `enterprise`, then renames existing `pro` licenses to `plus`. It can run twice with no effect, and it changes no key or subscription. Order matters: the migration must run before web code writes `plus`. The deploy script deploys delivery first and delivery's release command runs migrations, so web only starts writing `plus` after the constraint allows it. `pro` stays allowed so web instances that are still on the old code during a rolling deploy can keep writing it. Until a later cleanup migration removes `pro` from the constraint, every SQL filter on a plan accepts both spellings (`tier IN ('plus', 'pro')` in `hasPlus` and `hasPlusSubscription`, which filter `subscriptions.tier`, and `normalizeTier` and `normalizePaidPlan` in code).
+- delivery deletes expired `rate_windows` rows hourly from a timer in the process.
+
+
+### Stored primary email (migration 0013)
+
+Until 0013 the database held only email hashes. Migration 0013 adds `notice_emails`: one row per account with the primary email encrypted at rest (AES-256-GCM, `v1:` envelope, key derived with HKDF from `TOKEN_ENCRYPTION_KEY`, the same path as OAuth tokens). It exists only to mail revocation notices (re-verification) and to tell a previous owner that an address moved to another account. Pending one-time codes carry the address in the same encrypted form for their 15 minute life, replacing the old plaintext `notify_to` column, which 0013 clears. The row is deleted when the primary changes, is unlinked, or is taken by another account, and when the indexer sees the account deleted. Existing accounts have no row until they verify or link their email again, so they get no notices before that. Rotating `TOKEN_ENCRYPTION_KEY` makes stored addresses unreadable: notices are skipped until users verify again. Set the same key on web and indexer, and never log addresses.
