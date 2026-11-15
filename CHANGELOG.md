@@ -9,6 +9,7 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 
 ### Changed
 - Signing in now asks Tap to follow your account (`POST /repos/add`), so the indexer records it right away, even before you save a profile (closes #223). It is best effort with a 2 second limit and never blocks sign-in. It runs only when `TAP_URL` and `TAP_ADMIN_PASSWORD` are set on the web app.
+- Signed-in visitors on public pages (part of #225). The landing page button now asks `/api/viewer` in the browser instead of reading the cookie on the server, so `/` is a static page again and no signed-in copy can reach a signed-out visitor. Pages that read the session on the server (`/login`, `/account`, `/report`, `/integrations`, profile pages) now send `Cache-Control: private, no-store`. Assets and `/img` caching are unchanged. The `www` redirect and the `PUBLIC_URL` host check are still owner steps.
 
 ## 2026-11-14
 
