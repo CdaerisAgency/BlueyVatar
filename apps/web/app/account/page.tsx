@@ -24,13 +24,14 @@ import { displayName } from '../../lib/viewer-core'
 import CopyField from './CopyField'
 import GallerySection from './GallerySection'
 import LinkedEmail from './LinkedEmail'
+import { ShareSection } from './ShareSection'
 import { setChecklistShown } from './checklist/actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; linked?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
   const did = await requireDid('/account')
-  const { error, linked, qr, galleryError, galleryDone } = await searchParams
+  const { error, qr, galleryError, galleryDone } = await searchParams
   const links = await getStore().links.list(did)
   const emails = describeLinkedEmails(links, readPrimaryAddress(await getStore().links.noticeAddress(did).catch(() => undefined)))
 
@@ -106,7 +107,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {linked && <p>Linked {linked}.</p>}
       <Section
         id="linked-emails"
         title={<>{COPY.linkedEmails.title} <small className="text-base font-normal text-bv-ink-2">({links.length} of {MAX_LINKED_EMAILS})</small></>}
@@ -150,7 +150,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <Section title="Your avatar URL" id="preview">
         {url ? (
           <>
-            <p>This is how apps see the avatar for your primary email. The link holds a hash of your address, not the address itself.</p>
+            <p>This is how apps see the avatar for your primary email.</p>
             <div className="flex items-center gap-3">
               {avatarCount === 0 ? (
                 <span className="flex size-20 items-center justify-center rounded-full border border-solid border-bv-line text-sm" role="img" aria-label="No avatar yet">
@@ -173,35 +173,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         )}
       </Section>
       <GallerySection did={did} error={galleryError} done={galleryDone} />
-      <Section title="QR code">
-      {svg && qrUrl ? (
-        <>
-          <form method="get">
-            <label>
-              Target{' '}
-              <select name="qr" defaultValue={target}>
-                <option value="">Profile page</option>
-                {[...platforms].map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </label>{' '}
-            <Button type="submit">Update</Button>
-          </form>
-          <p>
-            <img src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} alt={`QR code for ${qrUrl}`} width={256} height={256} />
-          </p>
-          <p>
-            <code>{qrUrl}</code>
-          </p>
-          <p>
-            <a href={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} download={`${handle}-qr.svg`}>Download SVG</a>
-          </p>
-        </>
-      ) : (
-        <p>Your QR code is unavailable until your handle can be loaded.</p>
-      )}
-      </Section>
+      <ShareSection handle={handle} qrUrl={qrUrl} svg={svg} target={target} platforms={platforms} />
       <Section title="Your data">
       <p>
         Go to <Link href="/account/settings/danger">Danger zone</Link> to download your data or delete it. Deleting removes what BlueyVatar holds about you, except

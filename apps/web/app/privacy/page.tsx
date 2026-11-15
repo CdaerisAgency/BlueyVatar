@@ -8,7 +8,7 @@ export default function PrivacyPage() {
       <h1>Privacy</h1>
       <p>BlueyVatar serves avatars and profiles that live in your own atproto repository. This page lists what we keep about you on our own servers.</p>
       <h2>Email addresses</h2>
-      <p>When you link an email address, we store a SHA256 hash and an MD5 hash of it so that sites can look up your avatar by hash. Each address you link also stays on file, encrypted, so we can show it to you in your account and send you account notices. We never store a plain copy of an address. In your account, you see each linked email in full, and the hash sits behind a Details link. Emails linked before we began storing them encrypted show masked until you link them again.</p>
+      <p>When you link an email address, we store a SHA256 hash and an MD5 hash of it so that sites can look up your avatar by hash. Each address you link also stays on file, encrypted, so we can show it to you in your account and send you account notices. We never store a plain copy of an address. In your account, you see each linked email in full. Emails linked before we began storing them encrypted show masked until you link them again.</p>
       <p>We also store the domain of each linked email address (the part after the @, for example example.com) next to its hash, and never the full address in the clear (the address is stored only encrypted). The domain lets us support domains that choose to serve their own avatars.</p>
       <p>Unlinking an address removes its hash, domain, and encrypted address. Deleting your data removes all of them. After an address is unlinked or your data is deleted, we keep its hash for 30 days so no other account can claim it right away.</p>
       <h2>Download or delete your data</h2>
