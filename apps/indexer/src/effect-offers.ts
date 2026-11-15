@@ -1,13 +1,15 @@
 import { effectOfferNotice, emailSender, Notifier, pgNoticeDirectory, type EmailSender } from '@blueyvatar/core/verification'
 import type pg from 'pg'
-import { errors, log } from './obs.js'
+import { job, type JobFactory } from './jobs/schedule.js'
+import { errors } from './obs.js'
+import { publicUrl } from './public-url.js'
 
 type Env = Record<string, string | undefined>
 
 /** At most this many emails per offer per run, so a large audience spreads over a few runs. */
-export const OFFER_BATCH = 100
+const OFFER_BATCH = 100
 
-export type OfferRun = { offers: number; sent: number; skipped: number; failed: number }
+type OfferRun = { offers: number; sent: number; skipped: number; failed: number }
 
 type Offer = { id: number; name: string; ends_at: Date; audience: 'everyone' | 'plan' | 'accounts'; plan_name: 'free' | 'plus' | null }
 
@@ -42,7 +44,7 @@ async function candidates(pool: pg.Pool, o: Offer, plusDids: string[]): Promise<
  */
 export async function runEffectOffers(pool: pg.Pool, sender: EmailSender, env: Env = process.env, now: Date = new Date()): Promise<OfferRun> {
   const out: OfferRun = { offers: 0, sent: 0, skipped: 0, failed: 0 }
-  const publicUrl = env.PUBLIC_URL ?? 'https://blueyvatar.com'
+  const siteUrl = publicUrl(env)
   const plusDids = (env.PLUS_DIDS ?? '').split(/[\s,]+/).filter(Boolean)
   const notifier = new Notifier(sender, pgNoticeDirectory(pool))
   const { rows: offers } = await pool.query<Offer>(
@@ -63,7 +65,7 @@ export async function runEffectOffers(pool: pg.Pool, sender: EmailSender, env: E
       [o.id, dids, now],
     )
     for (const { did } of claimed.rows) {
-      const res = await notifier.send(did, 'offers', effectOfferNotice({ did, name: o.name, endsAt: o.ends_at, publicUrl }))
+      const res = await notifier.send(did, 'offers', effectOfferNotice({ did, name: o.name, endsAt: o.ends_at, publicUrl: siteUrl }))
       if (res === 'sent') out.sent++
       else if (res === 'failed') {
         out.failed++
@@ -75,16 +77,7 @@ export async function runEffectOffers(pool: pg.Pool, sender: EmailSender, env: E
 }
 
 /** Checks every 5 minutes. Runs in the indexer because it is always on; the web app scales to zero. */
-export function scheduleEffectOffers(pool: pg.Pool, env: Env = process.env, sender: EmailSender = emailSender(env), everyMs = 5 * 60_000): NodeJS.Timeout {
-  const run = () =>
-    void runEffectOffers(pool, sender, env)
-      .then((r) => { if (r.sent || r.failed) log.info('effect offers', r) })
-      .catch((err) => {
-        log.error('effect offers failed', { err })
-        errors.captureException(err, { tags: { task: 'effect_offers' } })
-      })
-  run()
-  const timer = setInterval(run, everyMs)
-  timer.unref()
-  return timer
+export const effectOffersJob: JobFactory = (pool, env = process.env) => {
+  const sender = emailSender(env)
+  return job({ name: 'effect_offers', everyMs: 5 * 60_000, run: () => runEffectOffers(pool, sender, env), summarize: (r) => (r.sent || r.failed) && r })
 }

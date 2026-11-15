@@ -1,18 +1,18 @@
 import { Tap } from '@atproto/tap'
 import pg from 'pg'
-import { scheduleBillingPurge } from './billing-retention.js'
-import { scheduleScreenshotPurge } from './bug-report-retention.js'
-import { scheduleModerationDigest } from './moderation-digest.js'
-import { scheduleKeyExpiryReminders } from './key-expiry-reminder.js'
-import { scheduleEffectsSwitch } from './effects-switch.js'
-import { scheduleScheduleSwitch } from './schedule-switch.js'
-import { scheduleEffectOffers } from './effect-offers.js'
+import { billingPurgeJob } from './billing-retention.js'
+import { screenshotPurgeJob } from './bug-report-retention.js'
+import { moderationDigestJob } from './moderation-digest.js'
+import { keyExpiryReminderJob } from './key-expiry-reminder.js'
+import { effectsSwitch } from './effects-switch.js'
+import { scheduleSwitch } from './schedule-switch.js'
+import { effectOffersJob } from './effect-offers.js'
+import { startJobs, type JobFactory } from './jobs/schedule.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
 import type { IndexWrites } from './handlers.js'
 import { PgIndexWrites } from './pg-writes.js'
-import { pgReverifyStore, reverifyDue, scheduleReverify } from './reverify.js'
-import { reverifyFromEnv } from './reverify-wiring.js'
+import { reverifyJob } from './reverify-wiring.js'
 import { IndexerHealth, probeTap, startHealthServer } from './health.js'
 import { errors, log, metrics } from './obs.js'
 import { createIndexer } from './wiring.js'
@@ -28,6 +28,18 @@ import { wsLabelSource } from './label-stream.js'
 const tapUrl = process.env.TAP_URL ?? 'http://localhost:2480'
 const tap = new Tap(tapUrl, { adminPassword: process.env.TAP_ADMIN_PASSWORD })
 
+/** Scheduled jobs, started in this order when Postgres is on. A new job is one new file and one line here. */
+const jobs: JobFactory[] = [
+  reverifyJob,
+  billingPurgeJob,
+  screenshotPurgeJob,
+  moderationDigestJob,
+  keyExpiryReminderJob,
+  effectsSwitch.job,
+  scheduleSwitch.job,
+  effectOffersJob,
+]
+
 // Postgres when DATABASE_URL is set (schema in db/migrations); console logging for local dev.
 function writes(): IndexWrites {
   const url = process.env.DATABASE_URL
@@ -38,24 +50,7 @@ function writes(): IndexWrites {
       log.error('postgres pool error', { err })
       errors.captureException(err, { tags: { task: 'postgres_pool' } })
     })
-    // Re-check attested claims older than REVERIFY_AFTER_DAYS every REVERIFY_INTERVAL_HOURS.
-    const rv = reverifyFromEnv(pool)
-    const store = pgReverifyStore(pool)
-    scheduleReverify(() => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }), rv.everyMs)
-    // Deletes Stripe billing rows 7 years after their owner deleted their data.
-    scheduleBillingPurge(pool)
-    // Deletes bug report screenshots 90 days after they were filed (issue #266).
-    scheduleScreenshotPurge(pool)
-    // Daily moderation digest email to the admin address (counts only). Off until an address or ADMIN_DIDS exists.
-    scheduleModerationDigest(pool)
-    // One reminder email per expiring API key, 7 days before it expires (issue #236).
-    scheduleKeyExpiryReminders(pool)
-    // Out-of-office switch-on and switch-off (issue #283). Asks the web app to do each step.
-    scheduleEffectsSwitch(pool)
-    // Avatar calendar (issue #219): same secret, asks the web app to change the default image when an entry starts or ends.
-    scheduleScheduleSwitch(pool)
-    // One email when a free effect offer with notify on starts (issue #308).
-    scheduleEffectOffers(pool)
+    startJobs(pool, jobs)
     const warm = warmerFromEnv()
     const purge = purgerFromEnv()
     // Moderation labels (issue #207): one subscription per DID in LABELER_DIDS. Off when the list is empty.

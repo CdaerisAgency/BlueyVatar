@@ -97,3 +97,14 @@ export function TableBox({ label, children }: { label: string; children: ReactNo
     </div>
   )
 }
+
+/** The error, done and load-error lines under a page header. Each shows only when it has text. */
+export function Notices({ error, done, loadError }: { error?: string | null; done?: string | null; loadError?: string | null }) {
+  return (
+    <>
+      {error && <p role="alert">{error}</p>}
+      {done && <p role="status">{done}</p>}
+      {loadError && <p role="alert">{loadError}</p>}
+    </>
+  )
+}

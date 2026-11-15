@@ -1,6 +1,8 @@
 import { keyExpiringNotice, Notifier, pgNoticeDirectory, emailSender, type EmailSender } from '@blueyvatar/core/verification'
 import type pg from 'pg'
-import { errors, log } from './obs.js'
+import { job, type JobFactory } from './jobs/schedule.js'
+import { errors } from './obs.js'
+import { publicUrl } from './public-url.js'
 
 type Env = Record<string, string | undefined>
 
@@ -8,7 +10,7 @@ type Env = Record<string, string | undefined>
 export const KEY_REMINDER_DAYS = 7
 const DAY = 86_400_000
 
-export type ReminderRun = { sent: number; skipped: number; failed: number }
+type ReminderRun = { sent: number; skipped: number; failed: number }
 
 /**
  * Emails the key owner once, KEY_REMINDER_DAYS (7) before an expiring key stops working. A key is claimed by setting
@@ -17,7 +19,7 @@ export type ReminderRun = { sent: number; skipped: number; failed: number }
  */
 export async function runKeyExpiryReminders(pool: pg.Pool, sender: EmailSender, env: Env = process.env, now: Date = new Date()): Promise<ReminderRun> {
   const out: ReminderRun = { sent: 0, skipped: 0, failed: 0 }
-  const publicUrl = env.PUBLIC_URL ?? 'https://blueyvatar.com'
+  const siteUrl = publicUrl(env)
   const notifier = new Notifier(sender, pgNoticeDirectory(pool))
   const claimed = await pool.query(
     `UPDATE api_keys k SET expiry_reminded_at = $1
@@ -31,7 +33,7 @@ export async function runKeyExpiryReminders(pool: pg.Pool, sender: EmailSender, 
     const res = await notifier.send(
       r.owner as string,
       'security',
-      keyExpiringNotice({ did: r.owner, prefix: r.prefix, label: r.label, kind: r.kind, createdAt: r.created_at, expiresAt: r.expires_at, publicUrl }),
+      keyExpiringNotice({ did: r.owner, prefix: r.prefix, label: r.label, kind: r.kind, createdAt: r.created_at, expiresAt: r.expires_at, publicUrl: siteUrl }),
     )
     if (res === 'sent') out.sent++
     else if (res === 'failed') {
@@ -43,16 +45,10 @@ export async function runKeyExpiryReminders(pool: pg.Pool, sender: EmailSender, 
 }
 
 /** Checks hourly. Runs in the indexer because it is always on; the web and delivery apps scale to zero. */
-export function scheduleKeyExpiryReminders(pool: pg.Pool, env: Env = process.env, sender: EmailSender = emailSender(env), everyMs = 60 * 60_000): NodeJS.Timeout {
-  const run = () =>
-    void runKeyExpiryReminders(pool, sender, env)
-      .then((r) => { if (r.sent || r.failed) log.info('key expiry reminders', r) })
-      .catch((err) => {
-        log.error('key expiry reminders failed', { err })
-        errors.captureException(err, { tags: { task: 'key_expiry_reminder' } })
-      })
-  run()
-  const timer = setInterval(run, everyMs)
-  timer.unref()
-  return timer
+export const keyExpiryReminderJob: JobFactory = (pool, env = process.env) => {
+  const sender = emailSender(env)
+  return job({
+    name: 'key_expiry_reminder', label: 'key expiry reminders', everyMs: 60 * 60_000,
+    run: () => runKeyExpiryReminders(pool, sender, env), summarize: (r) => (r.sent || r.failed) && r,
+  })
 }

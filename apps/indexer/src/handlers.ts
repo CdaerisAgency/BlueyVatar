@@ -27,7 +27,7 @@ export interface IndexWrites {
   purgeImages(did: string, cids?: string[], opts?: { warm?: boolean }): Promise<void>
 }
 
-export interface RecordEvt {
+interface RecordEvt {
   did: string
   collection: string
   rkey: string

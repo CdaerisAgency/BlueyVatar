@@ -6,7 +6,6 @@ import { STATS_DAYS, statsForPlan } from '../../../lib/profile-views'
 import { limited } from '../../../lib/rate-guard'
 import { getPool } from '../../../lib/store'
 
-export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Profile views' }
 
 const n = (v: number) => v.toLocaleString('en-US')

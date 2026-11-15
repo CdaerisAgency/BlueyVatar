@@ -1,6 +1,6 @@
 import { GALLERY_CAPTION_MAX, GALLERY_MAX, ratingFromLabels } from '@blueyvatar/core'
 import { Button } from '../../components/Button'
-import { EmptyState, Section } from '../../components/Page'
+import { EmptyState, Notices, Section } from '../../components/Page'
 import { GALLERY_PLUS_MESSAGE, isPlus, listGallery } from '../../lib/gallery'
 import { RepoError, blobUrl, imageLabels, pdsUrl, repoSession, type StoredImage } from '../../lib/repo'
 import ImageFileInput from './avatars/ImageFileInput'
@@ -31,9 +31,7 @@ export default async function GallerySection({ did, error, done }: { did: string
       <p>
         Gallery images are saved to your repository on your Bluesky account's home server and are public there. They appear on your profile page and never become your avatar.
       </p>
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
       {images.length === 0 && !loadError ? <EmptyState>No gallery images yet. Upload one below.</EmptyState> : null}
       <ul>
         {images.map((img, i) => (
