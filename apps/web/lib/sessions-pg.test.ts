@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { pgStore, SESSION_TOUCH_MS } from './store'
+import { pgStore } from './store'
+import { SESSION_TOUCH_MS } from './web-sessions'
 
 const url = process.env.TEST_DATABASE_URL
 const schema = `t_sess_${process.pid}_${Date.now()}`
