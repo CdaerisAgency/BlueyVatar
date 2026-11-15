@@ -83,6 +83,8 @@ describe.skipIf(!url)('account data export and deletion', () => {
     await q("INSERT INTO bsky_avatar_sync (did, auto_sync, previous_avatar, has_previous, last_source_cid, last_sent_cid, auto_count) VALUES ($1, false, $2, true, $3, $4, 2)", [did, JSON.stringify({ ref: { $link: `prev${tag}` } }), `src${tag}`, `sent${tag}`])
     await q("INSERT INTO bsky_avatar_log (did, action, from_cid, to_cid, source_cid) VALUES ($1, 'set', $2, $3, $4), ($1, 'restore', $3, $2, NULL)", [did, `old${tag}`, `new${tag}`, `src${tag}`])
     await q("INSERT INTO avatar_effects (did, frame_style, frame_color, frame_source_rkey, frame_image_rkey, away_state, away_start_on, away_end_on, away_timezone, away_start_at, away_end_at, away_image_rkey, away_prev_default_rkey) VALUES ($1, 'double', 'rose', 'src1', 'frm1', 'active', '2026-11-20', '2026-11-27', 'Europe/Paris', '2026-11-19T23:00:00Z', '2026-11-27T23:00:00Z', 'away1', 'prev1')", [did])
+    await q("INSERT INTO effect_offers (id, effect, name, starts_at, ends_at, audience, created_by) VALUES ($1, 'frame:ring', $2, '2026-12-01', '2027-01-01', 'accounts', 'did:plc:admin') ON CONFLICT DO NOTHING", [tag === 'a' ? 9001 : 9002, `Offer ${tag}`])
+    await q("INSERT INTO effect_offer_users (offer_id, did, listed, dismissed_at) VALUES ($1, $2, true, now())", [tag === 'a' ? 9001 : 9002, did])
     await q("INSERT INTO appeals (did, action_id, statement, status, decided_by, decision_note, decided_at) VALUES ($1, $2, 'my statement', 'upheld', 'did:plc:mod2', 'internal note', now())", [did, act.rows[0].id])
   }
 
@@ -123,6 +125,8 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(JSON.stringify(out.avatarSync)).not.toContain('srcb')
     expect(JSON.stringify(out.avatarSync)).not.toContain('"did"')
     expect(out.effects).toEqual({ frame_style: 'double', frame_color: 'rose', filter_id: null, away_start_on: '2026-11-20', away_end_on: '2026-11-27', away_timezone: 'Europe/Paris', away_prev_default_rkey: 'prev1' })
+    expect(out.effectOffers).toEqual([expect.objectContaining({ name: 'Offer a', effect: 'frame:ring', listed: true })])
+    expect(text).not.toContain('Offer b')
     expect(text).not.toContain('frm1')
     expect(text).not.toContain('away1')
     expect(text).not.toContain('"src1"')
@@ -154,7 +158,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     for (const [t, col] of [
       ['email_links', 'did'], ['email_codes', 'did'], ['notice_emails', 'did'], ['oauth_session', 'sub'], ['web_session', 'did'], ['session_floor', 'did'], ['profile_links', 'did'],
       ['visibility_rules', 'did'], ['verification_state', 'did'], ['custom_domains', 'did'], ['images', 'did'], ['profiles', 'did'],
-      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'], ['appeals', 'did'], ['bsky_avatar_sync', 'did'], ['bsky_avatar_log', 'did'], ['bug_report_screenshots', 'did'], ['avatar_effects', 'did'],
+      ['claims', 'did'], ['attestations', 'claim_did'], ['licenses', 'owner'], ['profile_view_counters', 'did'], ['appeals', 'did'], ['bsky_avatar_sync', 'did'], ['bsky_avatar_log', 'did'], ['bug_report_screenshots', 'did'], ['avatar_effects', 'did'], ['effect_offer_users', 'did'],
     ] as const) expect(await count(t, col, A), t).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM api_keys WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
     expect((await pool.query("SELECT count(*)::int AS c FROM usage_counters WHERE license_id = 'lic_a'")).rows[0].c).toBe(0)
@@ -168,7 +172,7 @@ describe.skipIf(!url)('account data export and deletion', () => {
     expect(sub.deleted_at).toBeInstanceOf(Date)
     expect(await count('stripe_events', 'event_id', 'evt_a')).toBe(1)
 
-    for (const [t, col] of [['email_links', 'did'], ['images', 'did'], ['licenses', 'owner'], ['claims', 'did'], ['custom_domains', 'did'], ['visibility_rules', 'did'], ['appeals', 'did'], ['bsky_avatar_sync', 'did'], ['bsky_avatar_log', 'did'], ['bug_report_screenshots', 'did'], ['avatar_effects', 'did']] as const) expect(await count(t, col, B), t).toBeGreaterThan(0)
+    for (const [t, col] of [['email_links', 'did'], ['images', 'did'], ['licenses', 'owner'], ['claims', 'did'], ['custom_domains', 'did'], ['visibility_rules', 'did'], ['appeals', 'did'], ['bsky_avatar_sync', 'did'], ['bsky_avatar_log', 'did'], ['bug_report_screenshots', 'did'], ['avatar_effects', 'did'], ['effect_offer_users', 'did']] as const) expect(await count(t, col, B), t).toBeGreaterThan(0)
     expect((await pool.query('SELECT deleted_at FROM subscriptions WHERE did = $1', [B])).rows[0].deleted_at).toBeNull()
   })
 

@@ -3,7 +3,7 @@ import { useActionState } from 'react'
 import { Button } from '../../../components/Button'
 import { saveNotifications, type NotificationState } from './actions'
 
-export function NotificationsForm({ usageAlerts, billingNotices }: { usageAlerts: boolean; billingNotices: boolean }) {
+export function NotificationsForm({ usageAlerts, billingNotices, offerNotices }: { usageAlerts: boolean; billingNotices: boolean; offerNotices: boolean }) {
   const [state, action, pending] = useActionState(saveNotifications, {} as NotificationState)
   return (
     <form action={action}>
@@ -15,6 +15,11 @@ export function NotificationsForm({ usageAlerts, billingNotices }: { usageAlerts
       <p>
         <label>
           <input type="checkbox" name="billingNotices" defaultChecked={billingNotices} /> Billing notices: failed payments, the end of a grace period, and canceled subscriptions.
+        </label>
+      </p>
+      <p>
+        <label>
+          <input type="checkbox" name="offerNotices" defaultChecked={offerNotices} /> Free effect offers: one email when a limited-time free effect becomes available to you.
         </label>
       </p>
       <Button type="submit" variant="primary" disabled={pending}>Save</Button>

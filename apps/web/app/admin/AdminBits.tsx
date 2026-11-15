@@ -10,6 +10,7 @@ export function AdminNav({ did }: { did?: string }) {
     <nav aria-label="Admin" className="mb-4 flex flex-wrap items-center gap-4">
       <a href="/admin">Home</a>
       {QUEUES.filter((q) => q.name !== 'child_safety' || !did || canViewChildSafety(did)).map((q) => <a key={q.name} href={`/admin/queue/${q.name}`}>{q.label}</a>)}
+      <a href="/admin/effects">Free effects</a>
       <a href="/admin/audit">Audit log</a>
       <form action={adminLogout} className="ml-auto"><Button type="submit">End admin session</Button></form>
     </nav>
