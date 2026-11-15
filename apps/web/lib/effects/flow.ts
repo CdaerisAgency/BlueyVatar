@@ -1,6 +1,6 @@
 import type { StoredImage } from '../repo'
 import { canAddImage, limitMessage, type Check, type ImageMime, type Plan } from '../records'
-import { canUse, parseFrame, type Look } from './catalog'
+import { canUse, parseLook, isFilterId, parseFrame, type EffectId, type Look } from './catalog'
 import type { RenderInput } from './render'
 import type { EffectsRow, EffectsStore } from './store'
 import { validateAway } from './time'
@@ -25,6 +25,8 @@ export interface FlowDeps {
   store: EffectsStore
   repo: RepoPort
   plan(): Promise<Plan>
+  /** Effects granted to this account by live admin offers (#308). Missing means none. */
+  grants?(): Promise<EffectId[]>
   render(input: RenderInput): Promise<Check<{ bytes: Uint8Array; mime: 'image/png' }>>
   /** Same steps as an upload: validate and strip metadata, before screening. */
   prepare(bytes: Uint8Array): Promise<Check<{ bytes: Uint8Array; mime: ImageMime }>>
@@ -55,19 +57,26 @@ async function renderToRecord(deps: FlowDeps, base: StoredImage, source: StoredI
   return { ok: true, value: rkey }
 }
 
-function frameLook(row: EffectsRow): Look['frame'] | undefined {
+/** The saved frame and filter of a row, ignoring anything that is no longer in the catalog. */
+function savedLook(row: EffectsRow): Pick<Look, 'frame' | 'filter'> {
   const f = row.frameStyle && row.frameColor ? parseFrame(row.frameStyle, row.frameColor) : null
-  return f?.ok ? f.value : undefined
+  return { ...(f?.ok ? { frame: f.value } : {}), ...(isFilterId(row.filterId) ? { filter: row.filterId } : {}) }
 }
 
-/** Render a frame from an original image and make the render the default. Plus and above. */
-export async function applyFrame(deps: FlowDeps, did: string, input: { sourceRkey: string; style: string; color: string }): Promise<Result> {
-  const frame = parseFrame(input.style, input.color)
-  if (!frame.ok) return fail(frame.error)
+/**
+ * Render the look (a frame, a filter, or one of each) from an original image and make the render the default.
+ * Plus and above. Empty `style` means no frame and empty `filter` means no filter.
+ */
+export async function applyFrame(deps: FlowDeps, did: string, input: { sourceRkey: string; style: string; color: string; filter?: string }): Promise<Result> {
+  const parsed = parseLook(input.style, input.color, input.filter ?? '')
+  if (!parsed.ok) return fail(parsed.error)
+  const look = parsed.value
   const plan = await deps.plan()
-  if (!canUse(`frame:${frame.value.style}`, plan)) return fail('Frames are part of the Plus plan.')
+  const ids: EffectId[] = [...(look.frame ? [`frame:${look.frame.style}` as const] : []), ...(look.filter ? [`filter:${look.filter}` as const] : [])]
+  const grants = (await deps.grants?.()) ?? []
+  if (!ids.every((id) => canUse(id, plan, grants))) return fail('Frames and filters are part of the Plus plan.')
   const row = await deps.store.get(did)
-  if (row.awayState === 'active') return fail('Out-of-office is on. Turn it off before you change your frame.')
+  if (row.awayState === 'active') return fail('Out-of-office is on. Turn it off before you change your look.')
   const images = await deps.repo.list()
   const source = images.find((i) => i.rkey === input.sourceRkey)
   if (!source || isRender(row, source.rkey)) return fail('Choose one of your original images.')
@@ -77,7 +86,7 @@ export async function applyFrame(deps: FlowDeps, did: string, input: { sourceRke
   // Render and screen first, so a failure leaves the old frame as it was. The old record goes only after the new bytes are known good.
   const bytes = await deps.repo.blob(source)
   if (!bytes.ok) return fail(bytes.error)
-  const out = await deps.render({ bytes: bytes.value, crop: source.value.crop, look: { frame: frame.value } })
+  const out = await deps.render({ bytes: bytes.value, crop: source.value.crop, look })
   if (!out.ok) return fail(out.error)
   const prepared = await deps.prepare(out.value.bytes)
   if (!prepared.ok) return fail(prepared.error)
@@ -85,14 +94,14 @@ export async function applyFrame(deps: FlowDeps, did: string, input: { sourceRke
   if (!screened.ok) return fail(screened.error)
   if (old) await deps.repo.remove(old.rkey)
   const rkey = await deps.repo.add(prepared.value.bytes, prepared.value.mime, { alt: source.value.alt, labels: source.value.labels }, true)
-  await deps.store.patch(did, { frameStyle: frame.value.style, frameColor: frame.value.color, frameSourceRkey: source.rkey, frameImageRkey: rkey })
-  return done(withNote('Frame saved. The framed image is now your default.', await deps.push()))
+  await deps.store.patch(did, { frameStyle: look.frame?.style ?? null, frameColor: look.frame?.color ?? null, filterId: look.filter ?? null, frameSourceRkey: source.rkey, frameImageRkey: rkey })
+  return done(withNote('Look saved. The new image is now your default.', await deps.push()))
 }
 
 /** Delete the render. If it was the default, the original it came from becomes the default again. */
 export async function removeFrame(deps: FlowDeps, did: string): Promise<Result> {
   const row = await deps.store.get(did)
-  if (row.awayState === 'active') return fail('Out-of-office is on. Turn it off before you change your frame.')
+  if (row.awayState === 'active') return fail('Out-of-office is on. Turn it off before you change your look.')
   const images = await deps.repo.list()
   const render = row.frameImageRkey ? images.find((i) => i.rkey === row.frameImageRkey) : undefined
   const source = row.frameSourceRkey ? images.find((i) => i.rkey === row.frameSourceRkey) : undefined
@@ -102,8 +111,8 @@ export async function removeFrame(deps: FlowDeps, did: string): Promise<Result> 
     await deps.repo.remove(render.rkey)
     pushed = await deps.push()
   }
-  await deps.store.patch(did, { frameStyle: null, frameColor: null, frameSourceRkey: null, frameImageRkey: null })
-  return done(withNote('Frame removed.', pushed))
+  await deps.store.patch(did, { frameStyle: null, frameColor: null, filterId: null, frameSourceRkey: null, frameImageRkey: null })
+  return done(withNote('Look removed.', pushed))
 }
 
 /** Save an out-of-office window. It switches on by itself at the start. Free for everyone. */
@@ -126,12 +135,11 @@ async function switchOn(deps: FlowDeps, did: string, row: EffectsRow): Promise<R
   const current = images.find((i) => i.value.isDefault === true)
   if (!current) return fail('You have no default image to add the badge to.')
   if (!canAddImage(images.length, plan)) return fail(limitMessage(plan))
-  // A framed default is rebuilt from its original so the frame and the badge are drawn once each.
+  // A framed default is rebuilt from its original so the frame, the filter and the badge are drawn once each.
   const framed = current.rkey === row.frameImageRkey
   const frameSource = framed && row.frameSourceRkey ? images.find((i) => i.rkey === row.frameSourceRkey) : undefined
   const source = frameSource ?? current
-  const frame = frameSource ? frameLook(row) : undefined
-  const look: Look = { badge: 'away', ...(frame ? { frame } : {}) }
+  const look: Look = { badge: 'away', ...(frameSource ? savedLook(row) : {}) }
   const rkey = await renderToRecord(deps, current, source, look, true)
   if (!rkey.ok) return fail(rkey.error)
   await deps.store.patch(did, { awayState: 'active', awayImageRkey: rkey.value, awayPrevDefaultRkey: current.rkey, awayError: null, awayRetryAt: null })

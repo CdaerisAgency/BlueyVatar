@@ -4,8 +4,10 @@ import { Field } from '../../../components/Field'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, blobUrl, getProfile, listImages, pdsUrl, repoSession, type StoredImage } from '../../../lib/repo'
 import { resolvePlan } from '../../../lib/plan'
-import { canUse, FRAME_COLORS, FRAME_STYLES } from '../../../lib/effects/catalog'
+import { canUse, FILTERS, FRAME_COLORS, FRAME_STYLES } from '../../../lib/effects/catalog'
 import { getEffectsStore } from '../../../lib/effects/store'
+import { FreeEffectsSection } from '../../../components/FreeEffectsSection'
+import { myOffers } from '../../../lib/effects/my-offers'
 import { cancelAway, deleteFrame, saveAway, saveFrame } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -37,19 +39,23 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
   const renders = new Set([row.frameImageRkey, row.awayImageRkey])
   const originals = images.filter((i) => !renders.has(i.rkey))
   const framed = images.find((i) => i.rkey === row.frameImageRkey)
-  const canFrame = canUse('frame:ring', plan)
+  const grants = (await myOffers(did)).map((o) => o.effect)
+  // A granted effect opens the look form; the save step still checks each chosen effect against the grants.
+  const canFrame = canUse('frame:ring', plan) || grants.length > 0
   const awayOn = row.awayState === 'active'
   const defaultSource = row.frameSourceRkey ?? originals.find((i) => i.value.isDefault)?.rkey ?? originals[0]?.rkey
 
   return (
     <PageMain>
-      <PageHeader title="Effects" intro="Add a frame or an out-of-office badge to your avatar. Each look is saved as a new image." />
+      <PageHeader title="Effects" intro="Add a frame, a filter, or an out-of-office badge to your avatar. Each look is saved as a new image." />
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
       <Note>
         <p>Effects are drawn from your original image and saved to your Bluesky account like any upload, so they are public, count toward your image limit, and go through the same checks. Your original stays as it is.</p>
       </Note>
+
+      <FreeEffectsSection did={did} />
 
       <Section title="Out-of-office badge" intro="Free. Shows a small badge on your default image between two dates, then brings your previous default back.">
         <p>{STATE_TEXT[row.awayState]}</p>
@@ -72,11 +78,11 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
         )}
       </Section>
 
-      <Section title="Profile frame" intro="Plus plan. A ring around a round version of your picture.">
+      <Section title="Frame and filter" intro="Plus plan. A ring around a round version of your picture, a color filter, or one of each. You keep one look at a time.">
         {!canFrame ? (
-          <EmptyState action={{ href: '/account/billing', label: 'See the Plus plan' }}>Frames are part of the Plus plan.</EmptyState>
+          <EmptyState action={{ href: '/account/billing', label: 'See the Plus plan' }}>Frames and filters are part of the Plus plan.</EmptyState>
         ) : originals.length === 0 && !loadError ? (
-          <EmptyState action={{ href: '/account/avatars#upload', label: 'Upload an image' }}>Upload an image first, then frame it here.</EmptyState>
+          <EmptyState action={{ href: '/account/avatars#upload', label: 'Upload an image' }}>Upload an image first, then style it here.</EmptyState>
         ) : (
           !loadError && (
             <>
@@ -84,7 +90,7 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
                 <p>
                   {/* The blob is served by the user's home server, so next/image optimization does not apply. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={blobUrl(pds, did, framed.value.image.ref.$link)} alt="Your framed avatar" className="size-24 object-cover" referrerPolicy="no-referrer" />
+                  <img src={blobUrl(pds, did, framed.value.image.ref.$link)} alt="Your styled avatar" className="size-24 object-cover" referrerPolicy="no-referrer" />
                 </p>
               )}
               <form action={saveFrame}>
@@ -94,23 +100,31 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
                   </select>
                 </Field>
                 <fieldset>
-                  <legend>Style</legend>
+                  <legend>Frame style</legend>
+                  <label><input type="radio" name="style" value="" defaultChecked={!row.frameStyle && !!row.filterId} /> No frame</label>
                   {FRAME_STYLES.map((s) => (
-                    <label key={s.id}><input type="radio" name="style" value={s.id} defaultChecked={(row.frameStyle ?? 'ring') === s.id} /> {s.label}. {s.hint}</label>
+                    <label key={s.id}><input type="radio" name="style" value={s.id} defaultChecked={(row.frameStyle ?? (row.filterId ? '' : 'ring')) === s.id} /> {s.label}. {s.hint}</label>
                   ))}
                 </fieldset>
                 <fieldset>
-                  <legend>Color</legend>
+                  <legend>Frame color</legend>
                   {FRAME_COLORS.map((c) => (
                     <label key={c.id}><input type="radio" name="color" value={c.id} defaultChecked={(row.frameColor ?? 'orange') === c.id} /> {c.label}</label>
                   ))}
                 </fieldset>
-                <Button type="submit" variant="primary" disabled={awayOn}>Save frame</Button>
-                {awayOn && <p>Turn off out-of-office to change your frame.</p>}
+                <fieldset>
+                  <legend>Filter</legend>
+                  <label><input type="radio" name="filter" value="" defaultChecked={!row.filterId} /> No filter</label>
+                  {FILTERS.map((f) => (
+                    <label key={f.id}><input type="radio" name="filter" value={f.id} defaultChecked={row.filterId === f.id} /> {f.label}. {f.hint}</label>
+                  ))}
+                </fieldset>
+                <Button type="submit" variant="primary" disabled={awayOn}>Save look</Button>
+                {awayOn && <p>Turn off out-of-office to change your look.</p>}
               </form>
               {framed && (
                 <form action={deleteFrame}>
-                  <Button type="submit" variant="danger" disabled={awayOn}>Remove frame</Button>
+                  <Button type="submit" variant="danger" disabled={awayOn}>Remove look</Button>
                 </form>
               )}
             </>

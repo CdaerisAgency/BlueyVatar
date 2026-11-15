@@ -5,6 +5,7 @@ import { PUBLIC_URL } from '../../../lib/oauth'
 import { reportError } from '../../../lib/obs'
 import { limitedResult } from '../../../lib/rate-guard'
 import { limitedResponse } from '../../../lib/rate-limit'
+import { trackAccountInTap } from '../../../lib/tap'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
 
   if (result.state !== 'link') {
     await setSessionCookie(result.did)
+    await trackAccountInTap(result.did) // best effort: asks Tap to follow the account (#223)
     return NextResponse.redirect(new URL(await takeNext(), PUBLIC_URL), 303)
   }
   const o = result.outcome!

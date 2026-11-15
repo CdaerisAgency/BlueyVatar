@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { StoredImage } from '../repo'
 import type { Plan } from '../records'
-import { canUse, parseFrame } from './catalog'
+import { canUse, parseFrame, type EffectId } from './catalog'
 import { applyFrame, removeFrame, scheduleAway, tickAway, turnOffAway, type FlowDeps } from './flow'
 import { memoryEffectsStore } from './store'
 
@@ -11,7 +11,7 @@ const img = (rkey: string, extra: Partial<StoredImage['value']> = {}): StoredIma
   value: { image: { $type: 'blob', ref: { $link: `blob-${rkey}` }, mimeType: 'image/png', size: 1 }, createdAt: '2026-01-01T00:00:00Z', ...extra },
 })
 
-function setup(opts: { plan?: Plan; images?: StoredImage[]; now?: Date; screenOk?: boolean } = {}) {
+function setup(opts: { plan?: Plan; images?: StoredImage[]; now?: Date; screenOk?: boolean; grants?: EffectId[] } = {}) {
   const images = opts.images ?? [img('orig', { isDefault: true, alt: 'Me', labels: { values: [{ val: 'sexual' }] } })]
   let now = opts.now ?? new Date('2026-11-14T12:00:00Z')
   let n = 0
@@ -39,6 +39,7 @@ function setup(opts: { plan?: Plan; images?: StoredImage[]; now?: Date; screenOk
       },
     },
     plan: async () => opts.plan ?? 'plus',
+    grants: async () => opts.grants ?? [],
     render: vi.fn(async (input) => ({ ok: true as const, value: { bytes: input.bytes, mime: 'image/png' as const } })),
     prepare: vi.fn(async (bytes) => ({ ok: true as const, value: { bytes, mime: 'image/png' as const } })),
     screen: vi.fn(async () => (opts.screenOk === false ? { ok: false as const, error: 'blocked' } : { ok: true as const })),
@@ -71,6 +72,31 @@ describe('frame', () => {
     expect(s.calls).toEqual(['add:new1:Me:labels'])
     expect(s.images.find((i) => i.rkey === 'new1')?.value.isDefault).toBe(true)
     expect(await s.store.get(DID)).toMatchObject({ frameStyle: 'ring', frameColor: 'blue', frameSourceRkey: 'orig', frameImageRkey: 'new1' })
+  })
+  it('saves a frame plus a filter, or a filter alone, as one look', async () => {
+    const s = setup()
+    expect((await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: 'dotted', color: 'pink', filter: 'sepia' })).ok).toBe(true)
+    expect(s.deps.render).toHaveBeenLastCalledWith(expect.objectContaining({ look: { frame: { style: 'dotted', color: 'pink' }, filter: 'sepia' } }))
+    expect(await s.store.get(DID)).toMatchObject({ frameStyle: 'dotted', filterId: 'sepia' })
+    expect((await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '', filter: 'mono' })).ok).toBe(true)
+    expect(await s.store.get(DID)).toMatchObject({ frameStyle: null, frameColor: null, filterId: 'mono' })
+  })
+  it('needs a frame or a filter, and a known filter', async () => {
+    const s = setup()
+    expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '' })).toMatchObject({ ok: false })
+    expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '', filter: 'blur' })).toMatchObject({ ok: false })
+  })
+  it('lets a free account save an effect granted by an admin offer, and only that effect', async () => {
+    const s = setup({ plan: 'free', grants: ['frame:ring'] })
+    expect((await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: 'ring', color: 'blue' })).ok).toBe(true)
+    const t = setup({ plan: 'free', grants: ['frame:ring'] })
+    expect(await applyFrame(t.deps, DID, { sourceRkey: 'orig', style: 'dotted', color: 'blue' })).toMatchObject({ ok: false })
+    expect(await applyFrame(t.deps, DID, { sourceRkey: 'orig', style: 'ring', color: 'blue', filter: 'sepia' })).toMatchObject({ ok: false })
+  })
+  it('a filter alone is Plus only', async () => {
+    const s = setup({ plan: 'free' })
+    expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '', filter: 'cool' })).toMatchObject({ ok: false })
+    expect(s.calls).toEqual([])
   })
   it('is Plus only', async () => {
     const s = setup({ plan: 'free' })
