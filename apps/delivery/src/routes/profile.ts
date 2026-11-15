@@ -114,7 +114,6 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
     })
     c.header('content-type', EXPORT_CONTENT_TYPES[format])
     c.header('content-disposition', `attachment; filename="${exportFileName(identity.handle, format)}"`)
-    c.header('x-content-type-options', 'nosniff')
     return c.body(buildExport(format, file))
   })
 }
