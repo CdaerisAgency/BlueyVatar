@@ -49,7 +49,7 @@ jobs:
       - name: Deploy indexer (staging)
         run: flyctl deploy --remote-only --config fly/indexer.toml --app blueyvatar-indexer-staging --dockerfile Dockerfile --env TAP_URL=http://blueyvatar-tap-staging.internal:2480
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -94,7 +94,7 @@ jobs:
       - name: Deploy indexer
         run: flyctl deploy --remote-only --config fly/indexer.toml --dockerfile Dockerfile
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
