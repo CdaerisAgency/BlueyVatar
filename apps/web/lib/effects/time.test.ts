@@ -13,6 +13,12 @@ describe('startOfLocalDate', () => {
     expect(startOfLocalDate('2026-11-01', 'America/New_York').toISOString()).toBe('2026-11-01T04:00:00.000Z')
     expect(startOfLocalDate('2026-11-02', 'America/New_York').toISOString()).toBe('2026-11-02T05:00:00.000Z')
   })
+  it('handles a skipped midnight and a repeated hour', () => {
+    expect(startOfLocalDate('2018-11-04', 'America/Sao_Paulo').toISOString()).toBe('2018-11-04T03:00:00.000Z') // midnight skipped, day starts at 01:00
+    expect(startOfLocalDate('2018-11-05', 'America/Sao_Paulo').toISOString()).toBe('2018-11-05T02:00:00.000Z')
+    expect(startOfLocalDate('2026-03-29', 'Europe/London').toISOString()).toBe('2026-03-29T00:00:00.000Z')
+    expect(startOfLocalDate('2026-10-25', 'Europe/London').toISOString()).toBe('2026-10-24T23:00:00.000Z')
+  })
   it('handles a 30 minute shift', () => {
     expect(startOfLocalDate('2026-04-05', 'Australia/Lord_Howe').toISOString()).toBe('2026-04-04T13:00:00.000Z') // +11 before the change
     expect(startOfLocalDate('2026-04-06', 'Australia/Lord_Howe').toISOString()).toBe('2026-04-05T13:30:00.000Z') // +10:30 after

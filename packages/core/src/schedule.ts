@@ -5,6 +5,8 @@
  * uses these functions to decide which image should be the default right now.
  */
 
+import { DATE_RE, RKEY_RE } from './patterns.js'
+
 /** Weekday number, 0 = Sunday through 6 = Saturday (same as `Date#getUTCDay`). */
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6
 
@@ -45,8 +47,6 @@ export const MAX_DATE_ENTRIES = 1000
 /** How far nextChange looks ahead, in local days. */
 export const MAX_LOOKAHEAD_DAYS = 400
 
-const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
-const RKEY_RE = /^[A-Za-z0-9._:~-]{1,512}$/
 const DAY_MS = 86_400_000
 const STEP_MS = 30 * 60_000
 
