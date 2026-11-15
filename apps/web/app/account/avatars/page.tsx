@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
+import { EmptyState, Notices, PageHeader, PageMain, Section } from '../../../components/Page'
 import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
@@ -47,9 +47,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <PageHeader title="Avatars" intro="Upload, import, and choose the images apps show for you." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
 
       <PushNotices items={pushApps} from="avatars" />
       <p>

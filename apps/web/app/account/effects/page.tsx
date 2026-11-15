@@ -1,4 +1,4 @@
-import { EmptyState, Note, PageHeader, PageMain, Section } from '../../../components/Page'
+import { EmptyState, Note, Notices, PageHeader, PageMain, Section } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { Field } from '../../../components/Field'
 import { requireDid } from '../../../lib/auth'
@@ -47,9 +47,7 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <PageHeader title="Effects" intro="Add a frame, a filter, or an out-of-office badge to your avatar. Each look is saved as a new image." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
       <Note>
         <p>Effects are drawn from your original image and saved to your Bluesky account like any upload, so they are public, count toward your image limit, and go through the same checks. Your original stays as it is.</p>
       </Note>

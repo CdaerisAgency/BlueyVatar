@@ -1,4 +1,4 @@
-import { BackLink, PageHeader, PageMain, Section } from '../../../../components/Page'
+import { BackLink, Notices, PageHeader, PageMain, Section } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { BILLING_RETENTION_YEARS, DELETE_CONFIRMATION } from '../../../../lib/account-data'
 import { Field } from '../../../../components/Field'
@@ -25,7 +25,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
         Signed in as {displayName(viewer)}
         <small className="block text-bv-ink-3">Account ID: {did}</small>
       </p>
-      {error && <p role="alert">{error}</p>}
+      <Notices error={error} />
 
       <Section title="Download a copy" id="download">
         <p>

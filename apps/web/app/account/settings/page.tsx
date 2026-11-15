@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Button } from '../../../components/Button'
-import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
+import { EmptyState, Notices, PageHeader, PageMain, Section } from '../../../components/Page'
 import { currentSession, requireDid } from '../../../lib/auth'
 import { getStore } from '../../../lib/store'
 import { viewerFor } from '../../../lib/viewer'
@@ -33,8 +33,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </Section>
       ))}
 
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
+      <Notices error={error} done={done} />
       <Section title="Sessions" id="sessions" intro="Browsers and devices signed in to this account. Sessions older than 30 days expire on their own.">
       {sessions.length === 0 ? (
         <EmptyState>No tracked sessions yet. Older sign-ins may not be listed here. &quot;Sign out everywhere&quot; ends those too.</EmptyState>

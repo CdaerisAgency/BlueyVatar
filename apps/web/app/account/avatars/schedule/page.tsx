@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { EmptyState, Note, PageHeader, PageMain, Section } from '../../../../components/Page'
+import { EmptyState, Note, Notices, PageHeader, PageMain, Section } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { Field } from '../../../../components/Field'
 import { requireDid } from '../../../../lib/auth'
@@ -59,9 +59,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   return (
     <PageMain>
       <PageHeader title="Avatar calendar" intro="Choose which of your images is your default avatar on which day. Your own default comes back on days with no entry." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
       <Note>
         <p>Looking for holidays? Choose a country and an image per holiday on the <Link href="/account/avatars/holidays">Holiday avatars</Link> page. On each change, BlueyVatar sets the scheduled image as your default image in your Bluesky account, the same way the Default button does, and pushes it to apps you turned on. Dates and image choices are kept by BlueyVatar and are not public. Only your original images can be scheduled. A saved frame or filter look stays applied, and out-of-office wins: the calendar waits until it ends.</p>
       </Note>

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BackLink, EmptyState, Note, PageHeader, PageMain, Section } from '../../../../components/Page'
+import { BackLink, EmptyState, Note, Notices, PageHeader, PageMain, Section } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { Field } from '../../../../components/Field'
 import { requireDid } from '../../../../lib/auth'
@@ -71,9 +71,7 @@ export default async function HolidaysPage({ searchParams }: { searchParams: Pro
     <PageMain>
       <BackLink href="/account/avatars/schedule">Back to the avatar calendar</BackLink>
       <PageHeader title="Holiday avatars" intro="Pick your country, then choose an image for each holiday you care about. It shows from a few days before the holiday until a few days after." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
       <Note>
         <p>
           Only holidays you pick are used, and your own default avatar shows on every other day. A day entry on the avatar calendar beats a holiday, and a holiday beats a weekly entry. If two holidays overlap, the holiday whose own days include today wins, then the closest one, then the one coming up over the one just past, then the one you picked first. A day starts at midnight in your own time zone, not the country&apos;s. Your picks are kept by BlueyVatar and are not public.

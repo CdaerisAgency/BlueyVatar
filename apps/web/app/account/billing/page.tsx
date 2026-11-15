@@ -12,6 +12,7 @@ import { PRICING, formatPrice } from '../../../lib/pricing'
 import { canManageBilling } from '../../../lib/orgs/roles'
 import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
+import { SignedInAs } from '../../../components/SignedInAs'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
 import { LicenseUsage } from './LicenseUsage'
@@ -50,7 +51,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <PageHeader title="Plan and billing" intro="See your plan, change it, and manage payment and invoices." />
-      <p>Signed in as {displayName(await viewerFor(did))}</p>
+      <SignedInAs did={did} />
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.done && <p role="status">{q.done}</p>}
       {q.error && <p role="alert">{q.error}</p>}
@@ -217,7 +218,7 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
     <PageMain>
       <BackLink href={`/account/orgs/${orgId}`}>Back to {org.name}</BackLink>
       <PageHeader title={`Plan and billing: ${org.name}`} intro="Billing for this organization stays with its billing owner." />
-      <p>Signed in as {displayName(await viewerFor(did))}</p>
+      <SignedInAs did={did} />
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.error && <p role="alert">{q.error}</p>}
       <p>Billing for this organization stays with its billing owner, {displayName(await viewerFor(lic.billingDid))}. Any owner can start or manage the subscription.</p>

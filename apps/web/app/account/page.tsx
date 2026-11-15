@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, PageMain, Section } from '../../components/Page'
+import { EmptyState, Notices, PageHeader, PageMain, Section } from '../../components/Page'
 import { Button, ButtonLink } from '../../components/Button'
 import { Field } from '../../components/Field'
 import { cookies } from 'next/headers'
@@ -19,8 +19,7 @@ import { MAX_LINKED_EMAILS, HOLD_DAYS } from '../../lib/email-policy'
 import { PUBLIC_URL } from '../../lib/oauth'
 import { getProfile, listImages, repoSession, type ProfileRecord } from '../../lib/repo'
 import { getStore } from '../../lib/store'
-import { viewerFor } from '../../lib/viewer'
-import { displayName } from '../../lib/viewer-core'
+import { SignedInAs } from '../../components/SignedInAs'
 import CopyField from './CopyField'
 import GallerySection from './GallerySection'
 import LinkedEmail from './LinkedEmail'
@@ -81,7 +80,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <PageHeader title="Overview" intro="Your linked emails, your avatar link, and where to go next." />
-      <p>Signed in as {displayName(await viewerFor(did))}</p>
+      <SignedInAs did={did} />
       {list && showChecklist(list.complete, prefs.showAgain) && (
         <Section title={`Get started (${list.done} of ${list.total} done)`} id="checklist" intro={list.complete ? 'Everything is set up.' : 'Work through these in any order.'}>
           <ol>
@@ -105,7 +104,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           Setup is complete. <form action={setChecklistShown} className="inline"><input type="hidden" name="show" value="1" /><button type="submit" className="cursor-pointer border-0 bg-transparent p-0 text-bv-blue underline">Show the checklist again</button></form>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      <Notices error={error} />
       <Section
         id="linked-emails"
         title={<>{COPY.linkedEmails.title} <small className="text-base font-normal text-bv-ink-2">({links.length} of {MAX_LINKED_EMAILS})</small></>}

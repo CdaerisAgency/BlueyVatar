@@ -1,4 +1,4 @@
-import { EmptyState, Note, PageHeader, PageMain, Section, TableBox } from '../../../components/Page'
+import { EmptyState, Note, Notices, PageHeader, PageMain, Section, TableBox } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
 import { cfSaasConfig, fallbackOrigin, getHostname, type HostnameState } from '../../../lib/cf-saas'
@@ -38,7 +38,7 @@ export default async function DomainPage({ searchParams }: { searchParams: Promi
   return (
     <PageMain>
       <PageHeader title="Custom profile domain" intro="Serve your profile from your own subdomain, such as me.example.com." />
-      {error && <p role="alert">{error}</p>}
+      <Notices error={error} />
 
       {!cfg || !target ? (
         <p>Custom domains are not available yet. Check back soon.</p>
