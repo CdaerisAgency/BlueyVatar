@@ -1,5 +1,5 @@
 import Holidays from 'date-holidays'
-import type { HolidayOccurrence, OccurrenceSource } from '@blueyvatar/core'
+import type { HolidayOccurrence, OccurrenceSource } from '@blueyvatar/core/holidays'
 
 /**
  * Holiday data (issue #220) from the `date-holidays` library, pinned in package.json. Its data is CC BY-SA 4.0

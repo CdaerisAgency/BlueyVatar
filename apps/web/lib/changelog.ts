@@ -1,5 +1,5 @@
-/** Parser and Atom feed for CHANGELOG.md at the repo root (issue #178). */
-import { readFileSync } from 'node:fs'
+/** Parser and Atom feed for CHANGELOG.md and the changelog.d/ fragments at the repo root (issue #178). */
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { absoluteUrl } from './site'
 import { xmlEscape } from './seo'
@@ -27,6 +27,21 @@ export function readChangelogFile(cwd: string = process.cwd()): string {
     }
   }
   return ''
+}
+
+/** Reads changelog.d/YYYY-MM-DD-*.md (README.md and other names are ignored), sorted by name. Same locations as the file. */
+export function readChangelogFragments(cwd: string = process.cwd()): { date: string; md: string }[] {
+  for (const dir of [join(cwd, '../../changelog.d'), join(cwd, 'changelog.d')]) {
+    try {
+      return readdirSync(dir)
+        .filter((f) => /^\d{4}-\d{2}-\d{2}-.+\.md$/.test(f))
+        .sort()
+        .map((f) => ({ date: f.slice(0, 10), md: readFileSync(join(dir, f), 'utf8') }))
+    } catch {
+      // try the next location
+    }
+  }
+  return []
 }
 
 const DATE_HEADING = /^##\s+(\d{4}-\d{2}-\d{2})\s*$/
@@ -62,6 +77,32 @@ export function parseChangelog(md: string): ChangelogEntry[] {
     if (it && group) group.items.push(it[1]!)
   }
   return entries.filter((e) => e.groups.some((x) => x.items.length > 0))
+}
+
+/** Merges fragments into parsed entries: items join the section for the fragment's date (created in date order, newest first) under the matching group. */
+export function mergeFragments(entries: ChangelogEntry[], fragments: { date: string; md: string }[]): ChangelogEntry[] {
+  const out: ChangelogEntry[] = entries.map((e) => ({ date: e.date, groups: e.groups.map((g) => ({ ...g, items: [...g.items] })) }))
+  for (const f of fragments) {
+    for (const part of parseChangelog(`## ${f.date}\n${f.md}`)) {
+      let entry = out.find((e) => e.date === part.date)
+      if (!entry) {
+        entry = { date: part.date, groups: [] }
+        const at = out.findIndex((e) => e.date < part.date)
+        out.splice(at === -1 ? out.length : at, 0, entry)
+      }
+      for (const g of part.groups) {
+        const into = entry.groups.find((x) => x.name === g.name)
+        if (into) into.items.push(...g.items)
+        else entry.groups.push({ name: g.name, items: [...g.items] })
+      }
+    }
+  }
+  return out
+}
+
+/** CHANGELOG.md plus fragments, ready to render. */
+export function loadChangelog(cwd: string = process.cwd()): ChangelogEntry[] {
+  return mergeFragments(parseChangelog(readChangelogFile(cwd)), readChangelogFragments(cwd))
 }
 
 export const changelogAnchor = (e: ChangelogEntry): string => e.date

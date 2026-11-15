@@ -1,3 +1,6 @@
+// This barrel is frozen: do not add a line here for a new module.
+// Import new modules by subpath instead, for example `@blueyvatar/core/holidays`,
+// so parallel pull requests no longer conflict on the end of this file.
 export * from './hash.js'
 export * from './ratings.js'
 export * from './tiers.js'
