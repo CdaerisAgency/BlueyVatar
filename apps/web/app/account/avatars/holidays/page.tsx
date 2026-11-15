@@ -12,13 +12,10 @@ import { isValidTimeZone, localDate, windowOf, MAX_WINDOW_DAYS, resolveHoliday, 
 import { occurrenceSource } from '../../../../lib/holidays/data'
 import { removeHolidayPickAction, saveHolidayCountry, saveHolidayPick } from './actions'
 import { HolidayCredit } from './HolidayCredit'
+import { longDate } from '../../../../components/longDate'
 
 
 const imageName = (i: StoredImage | undefined) => (i ? i.value.alt || `Image from ${i.value.createdAt.slice(0, 10)}` : 'Image missing')
-
-function longDate(date: string, withYear = true): string {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: withYear ? 'long' : undefined, year: withYear ? 'numeric' : undefined, month: 'long', day: 'numeric' })
-}
 
 export default async function HolidaysPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string; popular?: string }> }) {
   const did = await requireDid('/account/avatars/holidays')

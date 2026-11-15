@@ -12,6 +12,7 @@ import { liveHolidayData } from '../../../../lib/holidays/data'
 import { activeEntry, isValidTimeZone, localDate, nextChange } from '@blueyvatar/core'
 import { addScheduleDate, removeScheduleDate, saveScheduleTimezone, saveScheduleWeekly } from './actions'
 import { TimezoneInput } from './TimezoneInput'
+import { longDate } from '../../../../components/longDate'
 
 
 const WEEKDAYS = [
@@ -20,10 +21,6 @@ const WEEKDAYS = [
 ] as const
 
 const imageName = (i: StoredImage | undefined) => (i ? i.value.alt || `Image from ${i.value.createdAt.slice(0, 10)}` : 'Image missing')
-
-function longDate(date: string): string {
-  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-}
 
 export default async function SchedulePage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
   const did = await requireDid('/account/avatars/schedule')
