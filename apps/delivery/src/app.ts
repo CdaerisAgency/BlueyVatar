@@ -11,8 +11,9 @@ import {
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
 } from '@blueyvatar/core'
-import { checkEntitlement, type EntitlementResult } from './entitlement.js'
+import { createCtx, isRestricted, type Ok } from './context.js'
 import { errorBody, type ErrorCode } from './errors.js'
+import { fail, overloaded } from './http.js'
 import type { UsageAlerts } from './alerts.js'
 import { cleanInitials, defaultSvg, initialsFromName } from './defaults.js'
 import { hostAllowed, type LicenseStore, type RateLimiter } from './licenses.js'
@@ -72,58 +73,7 @@ export interface AppDeps {
   metricsToken?: string
 }
 
-type Ok = Extract<EntitlementResult, { ok: true }>
-
-function fail(c: Context, status: number, code: ErrorCode, message: string) {
-  // Server errors carry the request id in the body so a user can quote it. Client errors do not:
-  // hash lookups must answer byte for byte the same whether or not a link exists (issue 59).
-  return c.json(errorBody(code, message, status >= 500 ? (c.get('requestId' as never) as string | undefined) : undefined), status as 400)
-}
-
-/** Shed response when the resize queue is full: 503 with Retry-After, never cached. */
-function overloaded(c: Context, err: ResizeBusyError) {
-  c.header('retry-after', String(err.retryAfterSeconds))
-  c.header('cache-control', 'no-store')
-  return fail(c, 503, 'overloaded', 'Image processing is busy; retry shortly')
-}
-
-function rateHeaders(c: Context, e: EntitlementResult, metered = true) {
-  const w = e.window
-  if (w && w.limit > 0) {
-    c.header('x-rate-limit-limit', String(w.limit))
-    c.header('x-rate-limit-remaining', String(w.remaining))
-    c.header('x-rate-limit-reset', String(w.reset))
-  }
-  if (e.ok) {
-    c.header('x-tier', e.tier)
-    if (e.licenseId && metered) c.header('x-usage-cost', '1')
-  }
-}
-
-function originHost(c: Context): string | null {
-  for (const v of [c.req.header('origin'), c.req.header('referer')]) {
-    if (!v) continue
-    try {
-      return new URL(v).hostname
-    } catch {
-      /* ignore */
-    }
-  }
-  return null
-}
-
-/** True when the request carries an Origin header that is neither this service's host nor the profile site's host. */
-function isCrossOriginRequest(origin: string | undefined, ownHosts: readonly string[]): boolean {
-  if (!origin) return false
-  try {
-    return !ownHosts.includes(new URL(origin).host)
-  } catch {
-    return true
-  }
-}
-
 const QR_DEFAULT_SIZE = 256
-const DEFAULT_PROFILE_BASE_URL = 'https://blueyvatar.com'
 
 const PLATFORM_SLUG = /^[a-z0-9-]+$/
 
@@ -145,14 +95,10 @@ const isPng = (b: Uint8Array) => b.length > 8 && b[0] === 0x89 && b[1] === 0x50 
 
 const IMG_FILE = /^(\d{1,4})(?:-q(\d{1,3}))?\.(png|jpeg|webp)$/
 
-function isRestricted(v: Visibility): boolean {
-  return v.keyedOnly || v.domainAllowlist.length > 0
-}
-
 export function createApp(deps: AppDeps) {
   const app = new Hono()
-  const logger = deps.logger ?? createLogger({ app: 'delivery', write: () => {} })
-  const metrics = deps.metrics ?? new Metrics()
+  const ctx = createCtx(deps)
+  const { logger, metrics, entitle, isCrossOrigin, visibilityAllows, signedPath, findIdentity, profileBase } = ctx
 
   // Request id first, so every response, including origin lock rejections and errors, carries it.
   app.use('*', async (c, next) => {
@@ -179,36 +125,6 @@ export function createApp(deps: AppDeps) {
 
   if (deps.originSecret) app.use('*', originLock(deps.originSecret))
 
-  const clientIp = (c: Context) =>
-    (deps.trustCloudflare ? c.req.header('cf-connecting-ip') : undefined)
-    ?? deps.remoteAddress?.(c)
-    ?? 'unknown'
-
-  async function entitle(c: Context, metered = true) {
-    const e = await checkEntitlement(
-      {
-        headerKey: c.req.header('x-api-key'),
-        tokenParam: c.req.query('token'),
-        origin: c.req.header('origin'),
-        referer: c.req.header('referer'),
-        clientIp: clientIp(c),
-      },
-      deps.licenses,
-      deps.limiter,
-    )
-    rateHeaders(c, e, metered)
-    if (!e.ok && e.status === 429) metrics.inc('delivery_rate_limit_rejections_total')
-    if (!e.ok && e.status === 429 && e.window) {
-      c.header('retry-after', String(Math.max(1, e.window.reset - Math.floor(Date.now() / 1000))))
-    }
-    return e
-  }
-
-  function isCrossOrigin(c: Context): boolean {
-    const own = [new URL(c.req.url).host, new URL(deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).host]
-    return isCrossOriginRequest(c.req.header('origin'), own)
-  }
-
   function respondDefault(c: Context, p: AvatarParams, seed: string, initials: string) {
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     if (p.default.kind === 'style' && p.default.style === '404') {
@@ -224,29 +140,6 @@ export function createApp(deps: AppDeps) {
   function respondJsonMiss(c: Context, p: AvatarParams) {
     c.header('cache-control', `private, max-age=${p.ttlSeconds}`)
     return c.json({ did: null, handle: null, found: false, source: 'default', rating: null, url: null, updatedDate: null })
-  }
-
-  /** The visibility rules when this caller may fetch the avatar (spec section 10.2), else null. */
-  async function visibilityAllows(c: Context, did: string, e: Ok): Promise<Visibility | null> {
-    const v = await deps.index.visibility(did)
-    if (v.keyedOnly && !e.licenseId) return null
-    if (v.domainAllowlist.length > 0) {
-      const host = originHost(c)
-      if (!host || !hostAllowed(host, v.domainAllowlist)) return null
-    }
-    return v
-  }
-
-  // Signed /img path for this caller (issues #68 and #72). Public avatars get an empty scope, so
-  // the URL is the same for everyone and the CDN caches it once. Restricted avatars carry the
-  // key id or the allowed origin host plus a day bucket, so they cache per caller per day and a
-  // leaked URL dies by the end of the next day. The size and format are signed, so a caller
-  // only gets the sizes the redirect route granted under its tier.
-  function signedPath(c: Context, e: Ok, v: Visibility, did: string, cid: string, size: number, format: ImageFormat, quality?: number) {
-    const scope = isRestricted(v)
-      ? restrictedScope(e.licenseId ? `k:${e.licenseId}` : `d:${originHost(c) ?? ''}`, deps.now?.())
-      : ''
-    return imagePath(deps.imgSigningSecret, did, cid, size, format, quality, scope)
   }
 
   /**
@@ -417,14 +310,6 @@ export function createApp(deps: AppDeps) {
     exposeHeaders: ['x-rate-limit-limit', 'x-rate-limit-remaining', 'x-rate-limit-reset', 'x-tier'],
   }))
 
-  async function findIdentity(id: NonNullable<ReturnType<typeof parseIdentifier>>): Promise<Identity | null> {
-    if (id.kind === 'hash') {
-      const did = await deps.index.didForEmailHash(id.value)
-      return did ? await deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
-    }
-    return deps.resolver.resolveIdentity(id)
-  }
-
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
@@ -516,7 +401,7 @@ export function createApp(deps: AppDeps) {
     const file = toExportProfile({
       profile: body,
       deliveryOrigin: (deps.publicUrl ?? new URL(c.req.url).origin).replace(/\/+$/, ''),
-      profileBaseUrl: (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, ''),
+      profileBaseUrl: profileBase,
     })
     c.header('content-type', EXPORT_CONTENT_TYPES[format])
     c.header('content-disposition', `attachment; filename="${exportFileName(identity.handle, format)}"`)
@@ -601,7 +486,7 @@ export function createApp(deps: AppDeps) {
       return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
     }
 
-    const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
+    const base = profileBase
     const target = to ? `${base}/go/${encodeURIComponent(identity.handle)}/${to}` : `${base}/p/${identity.handle}`
     let body: Uint8Array | string
     try {
@@ -646,7 +531,7 @@ export function createApp(deps: AppDeps) {
     if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
     if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
 
-    const base = (deps.profileBaseUrl ?? DEFAULT_PROFILE_BASE_URL).replace(/\/+$/, '')
+    const base = profileBase
     const fallback = `${base}/p/${identity.handle}`
     const platform = c.req.param('platform').toLowerCase()
     let target = fallback
