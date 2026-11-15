@@ -1,6 +1,6 @@
 import sharp from 'sharp'
 import { describe, expect, it } from 'vitest'
-import { FRAME_COLORS, FRAME_STYLES } from './catalog'
+import { FILTERS, FRAME_COLORS, FRAME_STYLES } from './catalog'
 import { overlaySvg, renderLook } from './render'
 
 const photo = async (w = 600, h = 400) =>
@@ -49,6 +49,29 @@ describe('renderLook', () => {
     const r = await renderLook({ bytes: img, crop: { x: 5000, y: 0, size: 5000 }, look: { badge: 'away' } })
     if (!r.ok) throw new Error(r.error)
     expect(await px(r.value.bytes, 20, 20)).toMatchObject({ r: 0, b: 255 })
+  })
+  it('renders every filter and changes the picture the way its name says', async () => {
+    const bytes = await photo(300, 300)
+    const out: Record<string, { r: number; g: number; b: number; a: number }> = {}
+    for (const id of FILTERS.map((f) => f.id)) {
+      const r = await renderLook({ bytes, look: { filter: id } })
+      if (!r.ok) throw new Error(r.error)
+      out[id] = await px(r.value.bytes, 150, 150)
+      expect(out[id]!.a).toBe(255)
+    }
+    expect(out.mono!.r).toBe(out.mono!.b) // grey
+    expect(out.sepia!.r).toBeGreaterThan(out.sepia!.b)
+    expect(out.cool!.b).toBeGreaterThan(40)
+    expect(out.warm!.b).toBeLessThan(40)
+    expect(out.contrast!.r).toBeGreaterThan(200)
+  })
+  it('combines a frame and a filter, filtering the picture but not the ring', async () => {
+    const r = await renderLook({ bytes: await photo(300, 300), look: { frame: { style: 'ring', color: 'blue' }, filter: 'mono' } })
+    if (!r.ok) throw new Error(r.error)
+    const mid = await px(r.value.bytes, 150, 150)
+    expect(mid.r).toBe(mid.b)
+    const ring = await px(r.value.bytes, 150, 5)
+    expect(ring.b).toBeGreaterThan(ring.r)
   })
   it('rejects bytes that are not an image', async () => {
     expect(await renderLook({ bytes: new Uint8Array([1, 2, 3]), look: { badge: 'away' } })).toMatchObject({ ok: false })
