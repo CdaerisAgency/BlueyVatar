@@ -72,6 +72,24 @@ describe('frame', () => {
     expect(s.images.find((i) => i.rkey === 'new1')?.value.isDefault).toBe(true)
     expect(await s.store.get(DID)).toMatchObject({ frameStyle: 'ring', frameColor: 'blue', frameSourceRkey: 'orig', frameImageRkey: 'new1' })
   })
+  it('saves a frame plus a filter, or a filter alone, as one look', async () => {
+    const s = setup()
+    expect((await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: 'dotted', color: 'pink', filter: 'sepia' })).ok).toBe(true)
+    expect(s.deps.render).toHaveBeenLastCalledWith(expect.objectContaining({ look: { frame: { style: 'dotted', color: 'pink' }, filter: 'sepia' } }))
+    expect(await s.store.get(DID)).toMatchObject({ frameStyle: 'dotted', filterId: 'sepia' })
+    expect((await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '', filter: 'mono' })).ok).toBe(true)
+    expect(await s.store.get(DID)).toMatchObject({ frameStyle: null, frameColor: null, filterId: 'mono' })
+  })
+  it('needs a frame or a filter, and a known filter', async () => {
+    const s = setup()
+    expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '' })).toMatchObject({ ok: false })
+    expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '', filter: 'blur' })).toMatchObject({ ok: false })
+  })
+  it('a filter alone is Plus only', async () => {
+    const s = setup({ plan: 'free' })
+    expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: '', color: '', filter: 'cool' })).toMatchObject({ ok: false })
+    expect(s.calls).toEqual([])
+  })
   it('is Plus only', async () => {
     const s = setup({ plan: 'free' })
     expect(await applyFrame(s.deps, DID, { sourceRkey: 'orig', style: 'ring', color: 'blue' })).toMatchObject({ ok: false })

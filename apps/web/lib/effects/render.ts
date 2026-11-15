@@ -1,8 +1,8 @@
-import sharp from 'sharp'
+import sharp, { type Sharp } from 'sharp'
 import { BusyError, centerPixelCrop, limitConcurrency, pixelCrop, resizeLimitsFromEnv, type CropParams } from '@blueyvatar/core'
 import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, type Check } from '../records'
 import { MAX_INPUT_PIXELS, BUSY_MESSAGE } from '../server-resize'
-import { colorHex, type Look } from './catalog'
+import { colorHex, type FilterId, type Look } from './catalog'
 
 /**
  * Renders a look into a new avatar image (issues #218 and #283). The input is the stored original, never a
@@ -10,7 +10,7 @@ import { colorHex, type Look } from './catalog'
  * corner outside a round frame. The caller sends the result through the same upload steps as any picture
  * (prepareUpload, screenUpload) before it is written to the user's repository.
  *
- * Order: rotate by EXIF, crop to the square the record asks for (center when it has none), resize, then clip to a
+ * Order: rotate by EXIF, crop to the square the record asks for (center when it has none), resize, apply the filter, then clip to a
  * circle and draw the frame, then the badge. Everything drawn here is built in this file from fixed numbers and the
  * fixed palette, so no user text or free color reaches the SVG.
  */
@@ -38,6 +38,19 @@ function frameSvg(e: number, style: NonNullable<Look['frame']>['style'], hex: st
       `<circle cx="${c}" cy="${c}" r="${f(c - outer - gap - thin / 2)}" fill="none" stroke="${hex}" stroke-width="${thin}"/>`
     )
   }
+  if (style === 'thick') {
+    const t = Math.round(w * 1.7)
+    return `<circle cx="${c}" cy="${c}" r="${f(c - t / 2)}" fill="none" stroke="${hex}" stroke-width="${t}"/>`
+  }
+  if (style === 'dotted') {
+    const r = c - w / 2
+    const step = (2 * Math.PI * r) / 36
+    return `<circle cx="${c}" cy="${c}" r="${f(r)}" fill="none" stroke="${hex}" stroke-width="${w}" stroke-linecap="round" stroke-dasharray="0 ${f(step)}"/>`
+  }
+  if (style === 'inset') {
+    const thin = Math.max(2, Math.round(w * 0.45)), gap = Math.round(w * 0.9)
+    return `<circle cx="${c}" cy="${c}" r="${f(c - gap - thin / 2)}" fill="none" stroke="${hex}" stroke-width="${thin}"/>`
+  }
   const r = c - w / 2
   const dash = (2 * Math.PI * r) / 48
   return `<circle cx="${c}" cy="${c}" r="${f(r)}" fill="none" stroke="${hex}" stroke-width="${w}" stroke-dasharray="${f(dash)} ${f(dash)}"/>`
@@ -57,6 +70,20 @@ function awayBadge(e: number): string {
   )
 }
 
+/** Color matrices for the filters, applied to the picture before the mask, frame and badge so those keep their own colors. */
+const RECOMB: Partial<Record<FilterId, [[number, number, number], [number, number, number], [number, number, number]]>> = {
+  sepia: [[0.393, 0.769, 0.189], [0.349, 0.686, 0.168], [0.272, 0.534, 0.131]],
+  warm: [[1.1, 0, 0], [0, 1.02, 0], [0, 0, 0.85]],
+  cool: [[0.88, 0, 0], [0, 1, 0], [0, 0, 1.12]],
+}
+
+function applyFilter(img: Sharp, filter: FilterId | undefined): Sharp {
+  if (!filter) return img
+  if (filter === 'mono') return img.greyscale()
+  if (filter === 'contrast') return img.linear(1.35, -(128 * 0.35))
+  return img.recomb(RECOMB[filter]!)
+}
+
 export function overlaySvg(e: number, look: Look): Buffer {
   const hex = look.frame ? colorHex(look.frame.color) : undefined
   const body = (look.frame && hex ? frameSvg(e, look.frame.style, hex) : '') + (look.badge === 'away' ? awayBadge(e) : '')
@@ -73,7 +100,13 @@ async function renderAt(input: RenderInput, edge: number): Promise<Buffer> {
   const h = (swap ? meta.width : meta.height) ?? 0
   const r = input.crop ? pixelCrop(input.crop, w, h) : centerPixelCrop(w, h)
   const e = Math.max(80, Math.min(edge, r.size))
-  let img = src.rotate().extract({ left: r.left, top: r.top, width: r.size, height: r.size }).resize(e, e, { fit: 'cover' }).toColourspace('srgb').ensureAlpha()
+  let img: Sharp = src.rotate().extract({ left: r.left, top: r.top, width: r.size, height: r.size }).resize(e, e, { fit: 'cover' }).toColourspace('srgb')
+  if (input.look.filter) {
+    // Filters run on the flattened picture in their own step: sharp applies queued operations in its own order, so removing and re-adding alpha has to be two pipelines.
+    const flat = await img.removeAlpha().png().toBuffer()
+    img = applyFilter(sharp(flat), input.look.filter).toColourspace('srgb')
+  }
+  img = img.ensureAlpha()
   if (input.look.frame) img = sharp(await img.composite([{ input: circleMask(e), blend: 'dest-in' }]).png().toBuffer())
   return img.composite([{ input: overlaySvg(e, input.look) }]).png({ compressionLevel: 9 }).toBuffer()
 }
