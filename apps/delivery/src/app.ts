@@ -11,7 +11,7 @@ import {
   parseIdentifier, pickCandidate, qrSvg, restrictedScope, scopeExpired, verifyImageSig, type AvatarParams, type DefaultStyle,
   type ImageFormat, WARM_HEADER, REQUEST_ID_HEADER, requestIdFrom, statusClass, type Logger, type ErrorTracker,
 } from '@blueyvatar/core'
-import { createCtx, isRestricted, type Ok } from './context.js'
+import { createCtx, gateProfile, isRestricted, type Ok } from './context.js'
 import { errorBody, type ErrorCode } from './errors.js'
 import { fail, overloaded } from './http.js'
 import type { UsageAlerts } from './alerts.js'
@@ -343,13 +343,10 @@ export function createApp(deps: AppDeps) {
     if (identity === undefined) identity = await findIdentity(id)
     metrics.inc('delivery_resolutions_total', { route: 'profile', result: identity ? 'found' : 'miss' })
     if (e.licenseId) await deps.usage.add(e.licenseId, 'profile_json')
-    if (!identity || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
-    const vis = await deps.index.visibility(identity.did)
-    if (vis.hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
-    if (!(await visibilityAllows(c, identity.did, e))) {
-      // A hash lookup must not tell a restricted profile apart from an unlinked hash.
-      return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
-    }
+    const gate = await gateProfile(c, ctx, id, e, identity)
+    if (!gate.ok) return gate.res
+    identity = gate.identity
+    const vis = gate.vis
     // Same condition as the profile_json meter, so the keyed-call count has one source of truth. Never blocks the response.
     if (e.licenseId) await deps.usage.addProfileCall(identity.did).catch(() => undefined)
 
@@ -471,20 +468,12 @@ export function createApp(deps: AppDeps) {
     const quietRaw = c.req.query('quiet')
     if (quietRaw !== undefined && !/^\d{1,2}$/.test(quietRaw)) return fail(c, 400, 'invalid_qr_option', 'quiet must be a whole number of modules')
 
-    let identity: Identity | null
-    if (id.kind === 'hash') {
-      const did = await deps.index.didForEmailHash(id.value)
-      identity = did ? await deps.resolver.resolveIdentity({ kind: 'did', value: did }) : null
-    } else {
-      identity = await deps.resolver.resolveIdentity(id)
-    }
+    const identity0 = await findIdentity(id)
     if (e.licenseId) await deps.usage.add(e.licenseId, 'origin_resolution')
     // The profile page lives at /p/{handle}, so an identity without a handle has no QR target.
-    if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
-    if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
-    if (!(await visibilityAllows(c, identity.did, e))) {
-      return id.kind === 'hash' ? fail(c, 404, 'not_found', 'No profile') : fail(c, 403, 'access_denied', 'Profile not available to this caller')
-    }
+    const gate = await gateProfile(c, ctx, id, e, identity0, { requireHandle: true })
+    if (!gate.ok) return gate.res
+    const identity = gate.identity
 
     const base = profileBase
     const target = to ? `${base}/go/${encodeURIComponent(identity.handle)}/${to}` : `${base}/p/${identity.handle}`
@@ -526,10 +515,11 @@ export function createApp(deps: AppDeps) {
     if (!e.ok) return fail(c, e.status, e.code, e.message)
     const id = parseIdentifier(c.req.param('handle'))
     if (!id || id.kind !== 'handle') return fail(c, 404, 'not_found', 'No profile')
-    const identity = await deps.resolver.resolveIdentity(id)
+    const identity0 = await deps.resolver.resolveIdentity(id)
     if (e.licenseId) await deps.usage.add(e.licenseId, 'origin_resolution')
-    if (!identity?.handle || !(await deps.index.isRepoActive(identity.did))) return fail(c, 404, 'not_found', 'No profile')
-    if ((await deps.index.visibility(identity.did)).hiddenProfile) return fail(c, 404, 'not_found', 'No profile')
+    const gate = await gateProfile(c, ctx, id, e, identity0, { requireHandle: true, visibility: false })
+    if (!gate.ok) return gate.res
+    const identity = gate.identity
 
     const base = profileBase
     const fallback = `${base}/p/${identity.handle}`

@@ -2,7 +2,7 @@ import { createLogger, restrictedScope, imagePath, Metrics, type ImageFormat, ty
 import type { Context } from 'hono'
 import type { AppDeps } from './app.js'
 import { checkEntitlement, type EntitlementResult } from './entitlement.js'
-import { isCrossOriginRequest, originHost, rateHeaders } from './http.js'
+import { fail, isCrossOriginRequest, originHost, rateHeaders } from './http.js'
 import { hostAllowed } from './licenses.js'
 import type { Identity } from './resolver.js'
 import type { Visibility } from './store.js'
@@ -98,4 +98,44 @@ export function createCtx(deps: AppDeps): Ctx {
   }
 
   return { deps, logger, metrics, profileBase, clientIp, entitle, isCrossOrigin, visibilityAllows, signedPath, findIdentity }
+}
+
+export type GateResult<I extends Identity = Identity> =
+  | { ok: true; identity: I; vis: Visibility }
+  | { ok: false; res: ReturnType<typeof fail> }
+
+/**
+ * The checks every profile-shaped route runs after resolving an identity: it exists (and has a
+ * handle when `requireHandle`), its repo is active, the profile is not hidden, and, unless
+ * `visibility` is false, this caller passes the visibility rules. A miss and a hidden profile
+ * answer 404. A restricted profile answers 403 for a handle or DID and 404 for a hash, so a hash
+ * lookup cannot tell a restricted profile from an unlinked one.
+ */
+export type HandledIdentity = Identity & { handle: string }
+
+export async function gateProfile(
+  c: Context, ctx: Ctx, id: ParsedId, e: Ok, identity: Identity | null,
+  opts: { requireHandle: true; visibility?: boolean },
+): Promise<GateResult<HandledIdentity>>
+export async function gateProfile(
+  c: Context, ctx: Ctx, id: ParsedId, e: Ok, identity: Identity | null,
+  opts?: { requireHandle?: boolean; visibility?: boolean },
+): Promise<GateResult>
+export async function gateProfile(
+  c: Context,
+  ctx: Ctx,
+  id: ParsedId,
+  e: Ok,
+  identity: Identity | null,
+  opts: { requireHandle?: boolean; visibility?: boolean } = {},
+): Promise<GateResult> {
+  const { deps } = ctx
+  const miss = { ok: false, res: fail(c, 404, 'not_found', 'No profile') } as const
+  if (!identity || (opts.requireHandle && !identity.handle) || !(await deps.index.isRepoActive(identity.did))) return miss
+  const vis = await deps.index.visibility(identity.did)
+  if (vis.hiddenProfile) return miss
+  if (opts.visibility !== false && !(await ctx.visibilityAllows(c, identity.did, e))) {
+    return id.kind === 'hash' ? miss : { ok: false, res: fail(c, 403, 'access_denied', 'Profile not available to this caller') }
+  }
+  return { ok: true, identity: identity as HandledIdentity, vis }
 }
