@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useRef } from 'react'
+import { Button } from '../../../components/Button'
 import { FieldError, FormNotices, fieldProps, useFocusResult } from '../../../components/FormNotices'
 import { CREATE_ORG_FIELDS, type CreateOrgState } from '../../../lib/orgs/form-limits'
 import { createOrg } from './actions'
@@ -17,7 +18,7 @@ export function CreateOrgForm() {
         Name <input {...fieldProps('org', 'name', error)} name="name" key={state.values ? 'r' : 'i'} defaultValue={state.values?.name ?? ''} required maxLength={80} />
         <FieldError prefix="org" name="name" error={error} />
       </label>{' '}
-      <button type="submit">Create organization</button>
+      <Button type="submit" variant="primary">Create organization</Button>
     </form>
   )
 }

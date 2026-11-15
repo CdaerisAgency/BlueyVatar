@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Note, PageMain, TableBox } from '../../../components/Page'
+import { Note, PageHeader, PageMain, TableBox } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { resolvePlan } from '../../../lib/plan'
 import { STATS_DAYS, statsForPlan } from '../../../lib/profile-views'
@@ -19,7 +19,7 @@ export default async function StatsPage() {
 
   return (
     <PageMain>
-      <h1>Profile views</h1>
+      <PageHeader title="Profile views" intro="See how often people open your public profile each day (Plus)." />
       {!plus && (
         <Note>
           <p>

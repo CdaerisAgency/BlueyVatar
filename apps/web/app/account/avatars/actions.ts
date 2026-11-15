@@ -9,7 +9,7 @@ import { prepareUpload } from '../../../lib/server-resize'
 import { reportError } from '../../../lib/obs'
 import { checkUploadForm } from '../../../lib/upload-caps'
 import { screenUpload } from '../../../lib/upload-screen'
-import { syncBlueskyAfterDefaultChange } from '../../../lib/bsky-sync-server'
+import { pushAfterDefaultChange } from '../../../lib/push-server'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -52,7 +52,7 @@ export async function uploadImage(form: FormData): Promise<void> {
   } catch (err) {
     return fail(err)
   }
-  const note = fields.value.isDefault ? await syncBlueskyAfterDefaultChange(did) : null
+  const note = fields.value.isDefault ? await pushAfterDefaultChange(did) : null
   return back('done', note ? `Image added. ${note}` : 'Image added.')
 }
 
@@ -66,7 +66,7 @@ export async function makeDefault(form: FormData): Promise<void> {
   } catch (err) {
     return fail(err)
   }
-  const note = await syncBlueskyAfterDefaultChange(did)
+  const note = await pushAfterDefaultChange(did)
   return back('done', note ? `Default image updated. ${note}` : 'Default image updated.')
 }
 

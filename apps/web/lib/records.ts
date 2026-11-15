@@ -159,6 +159,11 @@ export function limitMessage(plan: Plan): string {
   return `The ${plan === 'free' ? 'Free' : 'Plus'} plan allows ${imageLimit(plan)} images. Delete one to add another.`
 }
 
+/** The paragraph above the upload form (owner-approved wording, issue #227 item 6). N is the plan's image limit. */
+export function uploadNotice(plan: Plan): string {
+  return `Images you save are stored in your Bluesky account and are public. Your plan allows up to ${imageLimit(plan)} images. Visibility settings control what blueyvatar shows. They can't hide an image from other apps, and copies others already have can't be recalled.`
+}
+
 /** The three crop form fields (integers in 1/10000 of the image, see CROP_SCALE). All blank means no crop, so delivery centers. */
 export type CropInput = { cropX?: string; cropY?: string; cropSize?: string }
 

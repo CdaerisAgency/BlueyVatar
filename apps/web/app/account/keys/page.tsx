@@ -1,11 +1,12 @@
-import { PageMain, TableBox } from '../../../components/Page'
+import { COPY } from '../../../lib/copy'
+import { PageHeader, PageMain, Section } from '../../../components/Page'
 import { viewerFor } from '../../../lib/viewer'
 import { displayName } from '../../../lib/viewer-core'
-import { ENTITLEMENTS, historyDays } from '@blueyvatar/core'
+import { ENTITLEMENTS } from '@blueyvatar/core'
 import Link from 'next/link'
 import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
-import { alertState, checkKeyLimit, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
+import { checkKeyLimit } from '../../../lib/keys'
 import { isExpired } from '../../../lib/key-expiry'
 import { isScope, resolveScope } from '../../../lib/orgs/scope'
 import { getOrganization } from '../../../lib/orgs/store'
@@ -13,9 +14,6 @@ import { getPool } from '../../../lib/store'
 import { CreateKeyForm, KeyActions } from './KeyControls'
 
 export const dynamic = 'force-dynamic'
-
-const n = (v: number | null) => (v === null ? 'Custom' : v.toLocaleString('en-US'))
-const ALERT_TEXT = { ok: 'Below 80 percent of included volume.', warn80: 'At or above 80 percent of included volume.', over100: 'Included volume reached.', 'n/a': 'No monthly alert for this tier.' }
 
 export default async function KeysPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
   const did = await requireDid('/account/keys')
@@ -25,7 +23,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   if (!isScope(scope)) {
     return (
       <PageMain>
-        <h1>API keys and license</h1>
+        <PageHeader title="API keys" intro="Create, rotate, and revoke the keys apps use to call the BlueyVatar API." />
         <p role="alert">{scope.error}</p>
       </PageMain>
     )
@@ -34,113 +32,37 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   const org = orgId ? await getOrganization(getPool()!, orgId) : null
   const keys = await store.listKeys(license.licenseId)
   const now = new Date()
-  const period = periodStartOf(now)
-  const periods = historyPeriods(license.tier, now)
-  const usage = await store.usage(license.licenseId, [period, ...periods])
-  const days = historyDays(license.tier, now)
-  const daily = await store.usageDaily(license.licenseId, days)
-  const sent = await store.alertsSent(license.licenseId, period)
   const ent = ENTITLEMENTS[license.tier]
-  const inc = includedVolume(license.tier)
-  const used = usage.get(`${period}|origin_resolution`) ?? 0
   const active = keys.filter((k) => !k.revokedAt && !isExpired(k.expiresAt, now))
   const activeKeys = active.map((k) => ({ hash: k.hash, kind: k.kind }))
   const canPub = checkKeyLimit(license.tier, 'publishable', activeKeys).ok
   const canSec = checkKeyLimit(license.tier, 'secret', activeKeys).ok
-  const state = alertState(license.tier, used)
   const reason = license.status !== 'active' ? `This license is ${license.status.replace('_', ' ')}. New keys are disabled.` : !canPub && !canSec ? 'Key limit reached for this tier. Revoke a key to add another.' : null
 
   return (
     <PageMain>
-      <h1>API keys and license</h1>
+      <PageHeader title="API keys" intro="Create, rotate, and revoke the keys apps use to call the BlueyVatar API." />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {org && <p>Organization: {org.name}. Every member of this organization can manage its keys. <Link href={`/account/orgs/${org.orgId}`}>Members</Link></p>}
 
       <p>New to the API? Read the <Link href="/docs">API docs</Link> for parameters, error codes, rate-limit headers, and copy-paste examples, or fetch the <a href="https://img.blueyvatar.com/openapi.json">OpenAPI description</a>.</p>
 
-      <h2>License</h2>
-      <ul>
-        <li>Tier: {license.tier}</li>
-        <li>Status: {license.status.replace('_', ' ')}</li>
-        <li>Term: {license.term}</li>
-        <li>
-          Included volume: {inc.volume === null ? 'Custom' : `${n(inc.volume)} keyed requests per ${inc.per}`}
-        </li>
-        <li>
-          Usage this period ({period}): {n(used)} origin resolutions
-          {inc.per === 'month' && inc.volume ? ` of ${n(inc.volume)} (${Math.round((used / inc.volume) * 100)} percent)` : ''}
-        </li>
-        <li>
-          Alerts: {ALERT_TEXT[state]} {sent.length > 0 ? `Sent this period: ${sent.map((t) => `${t} percent`).join(', ')}.` : 'None sent this period.'}
-        </li>
-        {inc.per === 'day' && <li>Free limits are per day, so the monthly total above is for reference.</li>}
-      </ul>
-      <p>Change your plan on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Plan and billing</Link> page.</p>
+      <p>Your license, plan limits, and usage are on the <Link href={orgId ? `/account/billing?org=${orgId}` : '/account/billing'}>Plan and billing</Link> page.</p>
 
-      {periods.length > 0 && (
-        <>
-          <h2>Usage history</h2>
-          <TableBox label="Usage history">
-          <table>
-            <thead>
-              <tr>
-                <th align="left">Month</th>
-                <th align="right">Origin resolutions</th>
-                <th align="right">Profile JSON calls</th>
-                <th align="right">Transforms</th>
-              </tr>
-            </thead>
-            <tbody>
-              {periods.map((p) => (
-                <tr key={p}>
-                  <td>{p.slice(0, 7)}</td>
-                  <td align="right">{n(usage.get(`${p}|origin_resolution`) ?? 0)}</td>
-                  <td align="right">{n(usage.get(`${p}|profile_json`) ?? 0)}</td>
-                  <td align="right">{n(usage.get(`${p}|transform`) ?? 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </TableBox>
-          <p>{license.tier === 'plus' ? 'Plus shows 30 days of history.' : 'Shows up to 12 months of history.'}</p>
-          <h3>Last 30 days</h3>
-          <TableBox label="Daily usage">
-          <table>
-            <thead>
-              <tr>
-                <th align="left">Day (UTC)</th>
-                <th align="right">Origin resolutions</th>
-                <th align="right">Profile JSON calls</th>
-              </tr>
-            </thead>
-            <tbody>
-              {days.map((d) => (
-                <tr key={d}>
-                  <td>{d}</td>
-                  <td align="right">{n(daily.get(`${d}|origin_resolution`) ?? 0)}</td>
-                  <td align="right">{n(daily.get(`${d}|profile_json`) ?? 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </TableBox>
-          <p>The same numbers are available from code with <code>GET /usage</code> and a secret key. See the API docs.</p>
-        </>
-      )}
-
-      <h2>Keys ({active.length}{ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)</h2>
+      <Section title={`Keys (${active.length}${ent.maxKeys === null ? '' : ` of ${ent.maxKeys}`} active)`}>
       {keys.length === 0 && <p>You have no keys yet. Create a website key below to use BlueyVatar from a web page or app. Server keys are for your own servers.</p>}
       <ul>
         {keys.map((k) => (
           <li key={k.hash} className="mb-4">
-            <code>{k.prefix}...</code> {k.kind === 'secret' ? 'Server key' : 'Website key'} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
-            {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : isExpired(k.expiresAt, now) ? ` (Expired ${k.expiresAt!.toISOString().slice(0, 10)})` : k.expiresAt ? `. Expires ${k.expiresAt.toISOString().slice(0, 10)}` : '. Never expires'}
+            <code>{k.prefix}...</code> {k.kind === 'secret' ? COPY.keys.serverKey : COPY.keys.websiteKey} {k.label ? `"${k.label}"` : ''} created {k.createdAt.toISOString().slice(0, 10)}
+            {k.revokedAt ? ` (revoked ${k.revokedAt.toISOString().slice(0, 10)})` : isExpired(k.expiresAt, now) ? ` (Expired ${k.expiresAt!.toISOString().slice(0, 10)})` : k.expiresAt ? `. Expires ${k.expiresAt.toISOString().slice(0, 10)}` : `. Lasts ${COPY.keys.forever}`}
             {k.kind === 'publishable' && !k.revokedAt && !isExpired(k.expiresAt, now) && ent.domainRestrictions && <> Domains: {k.domains.length ? k.domains.join(', ') : 'any host'}</>}
             {!k.revokedAt && !isExpired(k.expiresAt, now) && <KeyActions hash={k.hash} kind={k.kind} domains={k.domains} domainsEnabled={ent.domainRestrictions} orgId={orgId ?? ''} />}
           </li>
         ))}
       </ul>
       <p>Only a SHA256 hash and a short prefix are stored, so a lost key cannot be shown again. Revoke it and create a new one, or rotate it.</p>
+      </Section>
 
       <CreateKeyForm allowSecret={canSec} allowPublishable={canPub} disabledReason={reason} orgId={orgId ?? ''} />
     </PageMain>

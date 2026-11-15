@@ -239,10 +239,44 @@ When a limit is hit, server actions show "Too many requests. Try again in N minu
 | `key.did`, `key.ip` (create and rotate) | DID, IP | 20, 60 | 1 hour |
 | `addEmail.did`, `addEmail.ip` (new codes) | DID, IP | 5, 20 | 1 hour |
 | `codeFail.did` (wrong codes across all codes, then lockout) | DID | 10 failures | 1 hour |
+| `bugReport.did`, `bugReport.ip` (bug report button) | DID, IP | 5, 20 | 1 hour |
 
 The per-code cap of 5 attempts and the 60 second resend gap still apply. Report submissions keep their own limit of 5 per IP per hour.
 
 Per-account caps, enforced on the server: images by plan (Free 3, Plus 20), gallery images (`GALLERY_MAX`), 10 linked emails, 10 profile links, claims (`MAX_CLAIMS`, checked against both the repo and the database), one custom domain, and active keys by tier. Uploads must carry exactly one file of at most 5 MiB (5,242,880 bytes, the reference PDS default), checked before the file is read, whatever the browser resized. An image above 4096 pixels on the long side is downscaled by the web server with sharp if the browser did not already do it (spec section 5). Server actions accept bodies up to 6 MB.
+## Bug reports
+
+The bug report button (issue 266) is a floating button on every page. A signed-in person describes the problem, optionally attaches a screenshot, and the web server files a GitHub issue. The browser never holds a token.
+
+### Owner step: create and store the token
+
+1. In GitHub, create a fine-grained personal access token. Resource owner: the organization that owns the repository. Repository access: only the repository that receives the issues. Repository permissions: **Issues: Read and write** (Metadata read-only is added automatically). Nothing else. Pick an expiry and note the renewal date.
+2. Store it in Infisical as `GITHUB_FEEDBACK_TOKEN` (staging: `STAGING_GITHUB_FEEDBACK_TOKEN`).
+3. Set it on the web app as a Fly secret, and optionally the repository: `fly secrets set GITHUB_FEEDBACK_TOKEN=<value> --app <web app>`. Do the staging app first and file a test issue before production. Use `GITHUB_FEEDBACK_REPO=owner/name` to point staging at a test repository. It defaults to `CdaerisAgency/BlueyVatar`.
+
+Agents do not create or set this token. Names only are in `.env.example`.
+
+### Behavior to know
+
+- **Variable unset:** the button is hidden on every page and `POST /api/bug-report` answers 503 "Bug reports are unavailable right now." Nothing else changes. The value is read at request time, so a Fly secret change takes effect on the next machine restart.
+- **Who can file:** signed-in accounts only (401 otherwise; signed-out visitors who open the button see a sign-in link). Limits are in the Web rate limits table: 5 per account and 20 per network per hour. A hidden field that people never see catches simple bots (the request looks successful and files nothing), the description is 10 to 2,000 characters with at most 3 links, and the request body is capped at 16 KB.
+- **The issue:** the title is the first line of the description (no `Bug report:` prefix, at most 200 characters, with links, `#numbers`, and `@names` removed, per `FEEDBACK-ISSUE-CONVENTIONS-v4.md` in CdaerisAgency/cadence-v2). The body has the description, the page path (no query string or fragment), window size, browser string, and the build (`SENTRY_RELEASE`, else `FLY_IMAGE_REF`). `@names` and `#numbers` are defused so a report cannot ping people or link issues. The handle is named only if the person ticks the box (it falls back to the account ID, as in notification emails), and the contact email only if they type one; the dialog says both can be public. The only label is `bug`, the conventions' kind label, which exists. The route never creates labels, adds no status or other labels, and does no triage.
+- **Screenshots** (migration 0040, table `bug_report_screenshots`): GitHub has no REST endpoint that uploads an image to an issue, so the dialog sends the picture with the report and the server keeps it in Postgres. The browser re-draws it as a JPEG; the server then re-encodes it again with sharp (metadata dropped, 1,600 pixels on the long side, at most 1 MB, PNG, JPEG, or WebP in, at most 40 megapixels). The issue holds one line with a link to `/admin/bug-reports/<id>/screenshot`. That route uses `requireAdmin`: 404 unless the account is on `ADMIN_DIDS`, and the admin password and TOTP session is required (an admin without one is sent to `/admin/login` and opens the link again afterwards). If the issue cannot be filed the stored picture is deleted. The indexer job `scheduleScreenshotPurge` deletes screenshots older than 90 days daily. Account deletion removes the account's screenshots, and the data export includes them (base64).
+- **Privacy:** the repository will be public (issues 213 and 214), so every issue is public, but screenshots are not: they are in the database behind the admin sign-in. The dialog warns about this and about personal information in screenshots, and the privacy page has a section on report screenshots.
+
+### What differs from Cadence
+
+| Cadence | BlueyVatar |
+| --- | --- |
+| Icon beside Help in the signed-in app header | Floating button on every page (the site has no signed-in app header) |
+| Screenshot saved in Cadence's database, linked from the issue | Same: saved in Postgres, linked from the issue, admins only, deleted after 90 days |
+| Up to 3 screenshots, drag and drop, paste | One screenshot: capture this tab (where the browser supports it) or attach a picture |
+| Token `FEEDBACK_GITHUB_TOKEN`, repository a constant | `GITHUB_FEEDBACK_TOKEN`, repository in `GITHUB_FEEDBACK_REPO` |
+| No limit beyond sign-in and body length | Per-account and per-network limits, hidden field, link cap |
+| Issue names the reporter and company | Handle only with consent; contact email only if typed |
+| Cadence labels (21-label standard) | Only `bug`. The 21 labels are not created here; see issue 266 |
+| Report kinds, help requests, Feedback board mirror | Bugs only; the feature only files issues |
+
 ## Email routing
 
 Cloudflare Email Routing (free) forwards domain addresses to a real inbox. It receives and forwards only; it does not send mail.
@@ -425,7 +459,7 @@ Do these in test mode first, then live mode. Never commit keys, price ids, or pr
 - **Plus.** Plus is $9 per month, approved by the owner, and combines the old Plus and Pro plans. A DID has Plus while it holds a Plus subscription, or a Business subscription on its own license, that is `active`, `trialing`, or `past_due` inside the same 7 day grace period, or while it is listed in `PLUS_DIDS`. `PLUS_DIDS` stays as a manual grant for testing and gifts and needs no subscription. The web app and delivery both read the subscription, so the gallery, extra avatar slots, and custom domain follow a purchase within a webhook delivery. A license holds one subscription at a time.
 - **Overage.** Metered overage is not billed yet. It needs the per-miss cost measured after deploy, then a metered price and usage reporting.
 
-## Verified account providers
+## Linked account providers
 
 Issue #58. Research and per-platform status: `docs/research/verified-accounts-v1.md`. Set these on the **web** app only (the indexer's re-check needs no provider keys). Every provider is off until its flag is exactly `true` and both credentials are set, so a platform whose app review is not finished stays hidden on the claims page. The redirect (callback) URL to register with every provider is `https://<PUBLIC_URL host>/account/claims/callback`. Values live in Infisical and are pushed with `fly secrets set --app blueyvatar-web`; never commit them.
 
@@ -449,7 +483,7 @@ Infisical stays the secret store. The team uses only the `prod` environment, so 
 | --- | --- |
 | delivery | `DATABASE_URL` (pooled), `DATABASE_URL_DIRECT` (for the release command), `ORIGIN_SECRET`, `IMG_SIGNING_SECRET`; optional `WARM_SECRET`, `DEFAULT_URL_ALLOWLIST`, `PG_POOL_MAX`, `IMG_MAX_CONCURRENT`, `IMG_QUEUE_MAX`, `IMG_QUEUE_WAIT_MS`, `RATE_BATCH_MS`, `SENTRY_DSN`, `METRICS_TOKEN` |
 | indexer | `DATABASE_URL` (pooled), `TAP_ADMIN_PASSWORD`, `CF_ZONE_ID`, `CF_API_TOKEN`, `PUBLIC_DELIVERY_URL`, `IMG_SIGNING_SECRET` (same value as delivery, for warming and `files` mode purges); moderation digest (optional `MODERATION_DIGEST_TO`, `MODERATION_DIGEST_HOUR_UTC`, `MODERATION_DIGEST_ALWAYS`, `MODERATION_SLA_HOURS`; `ADMIN_DIDS` as the default recipient source); re-verification (with `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL` so revoked attestations are deleted from the service repo, plus `PUBLIC_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, and `TOKEN_ENCRYPTION_KEY` with the same value as web, which decrypts the primary email for revocation notices; without it in production the indexer cannot send them); optional `WARM_SECRET` (same value as delivery), `WARM_SIZES`, `WARM_FORMATS`, `WARM_CONCURRENCY`, `WARM_MAX_PER_MINUTE`, `REVERIFY_INTERVAL_HOURS` (24), `REVERIFY_AFTER_DAYS` (30), `CF_PURGE_MODE`, `PG_POOL_MAX`, `SENTRY_DSN`. `TAP_URL` is set in `fly/indexer.toml` |
-| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), optional `OAUTH_REQUEST_BSKY_PROFILE` (see Bluesky avatar permission), `TRUSTED_PDS_HOSTS`, `ADMIN_DIDS` and `ADMIN_TOTP_SECRET` (review portal; see Web admin page), optional `MODERATION_SLA_HOURS`, `MODERATION_POLICIES`, `MODERATION_CHILD_SAFETY_DIDS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_ALLOW_PROMO_CODES` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN` |
+| web | `SESSION_SECRET`, `TOKEN_ENCRYPTION_KEY` (`openssl rand -base64 32`; required in production, encrypts OAuth tokens and the stored primary email in Postgres), `OAUTH_PRIVATE_JWK`, `PUBLIC_URL`, `DELIVERY_URL`, optional `OAUTH_USE_PERMISSION_SET` (see Publish the lexicons), optional `OAUTH_PUSH_APPS` (see Avatar push permission), `TRUSTED_PDS_HOSTS`, `ADMIN_DIDS` and `ADMIN_TOTP_SECRET` (review portal; see Web admin page), optional `MODERATION_SLA_HOURS`, `MODERATION_POLICIES`, `MODERATION_CHILD_SAFETY_DIDS`, `RESEND_API_KEY`, `EMAIL_FROM`; if enabled: `CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, the provider keys in Verified account providers below, `SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`; Stripe billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PLUS`, `STRIPE_PRICE_BUSINESS`, optional `STRIPE_ALLOW_PROMO_CODES` (see Stripe billing); `DATABASE_URL` (pooled) if web reads the database; to purge cached images when a user deletes their data (issue #140): `CF_ZONE_ID`, `CF_API_TOKEN`, and `PUBLIC_DELIVERY_URL` (same values as the indexer, prefix purge only); optional `SENTRY_DSN`, `METRICS_TOKEN`; bug report button: `GITHUB_FEEDBACK_TOKEN`, optional `GITHUB_FEEDBACK_REPO` (see Bug reports) |
 | tap | `TAP_ADMIN_PASSWORD` |
 
 `SENTRY_DSN` and `METRICS_TOKEN` are new secrets (see Observability). `SENTRY_DSN` can be the same project DSN on all three apps, since events are tagged with `app`. `METRICS_TOKEN` should differ per app. Staging uses `STAGING_SENTRY_DSN` and `STAGING_METRICS_TOKEN`, ideally pointing at a separate Sentry project or environment. Non-secret tuning values (`LOG_LEVEL`, `READY_TIMEOUT_MS`, `INDEXER_STALL_SECONDS`, `TAP_PROBE_INTERVAL_SECONDS`, `HEALTH_PORT`) are listed in `.env.example` and can go in `fly/*.toml` `[env]`.
@@ -821,21 +855,27 @@ No cost estimate is given here beyond Fly's published list prices: a continuousl
 
 Signed-in users can download their data and delete it at `/account/data`. Deletion removes everything except Stripe billing rows (`billing_customers`, `subscriptions`), which are marked `deleted_at` and kept for 7 years for tax and accounting. It cancels active Stripe subscriptions first, so `STRIPE_SECRET_KEY` must be set on web for that step. The indexer runs a daily job (`apps/indexer/src/billing-retention.ts`) that deletes billing rows 7 years after `deleted_at`, and `stripe_events` rows 7 years after they were processed (they hold no DID). Email hashes stay as 30-day holds, as for any deleted account.
 
-## Profile avatar permission
+## Avatar push permission
 
-Letting users change their profile avatar from BlueyVatar needs one more sign-in scope, `repo:app.bsky.actor.profile?action=update` (issue #241, spec section 10.1). It is behind `OAUTH_REQUEST_BSKY_PROFILE`, which is off by default, because the permission spec does not say whether Bluesky's authorization server lets a third-party app request write access to an `app.bsky.*` collection. A refused scope would break sign-in for everyone.
+The Integrations page lets a signed-in person choose, per app, whether BlueyVatar pushes their default image to that app's profile record (issue #298; the apps are listed in `apps/web/lib/push-apps.ts`, and `docs/integrations-push-v1.md` explains how to add one). Each app needs its own permission, `repo:<collection>?action=create&action=update`, for example `repo:app.bsky.actor.profile?action=create&action=update`. Both actions are needed because the reference PDS checks `create` and `update` on every `putRecord` (issue #297). The permission is requested only when the person ticks that app's box. Sign-in for everyone else is unchanged and never carries it.
+
+The page is behind `OAUTH_PUSH_APPS`, off by default. Turning it on adds the apps' scopes to the OAuth client metadata (`/oauth-client-metadata.json`), because a client can request only scopes its metadata declares, and every sign-in sends that metadata to the authorization server. The permission spec does not say whether Bluesky's authorization server lets a third-party client declare or request write access to an `app.bsky.*` collection, so test it before production.
 
 | Setting | Where | Notes |
 | --- | --- | --- |
-| `OAUTH_REQUEST_BSKY_PROFILE` | web app secret (Infisical, then Fly) | `true` or `1` turns the scope on. Unset or anything else leaves it off. Read per request, so a restart is enough and no rebuild is needed. Remove it to roll back. |
+| `OAUTH_PUSH_APPS` | web app secret (Infisical, then Fly) | `true` or `1` turns the page and the metadata scopes on. Unset or anything else leaves them off, and the page says pushing is not switched on. Read per request, so a restart is enough and no rebuild is needed. Remove it to roll back. It replaces `OAUTH_REQUEST_BSKY_PROFILE`, which asked for the permission at every sign-in and is no longer read. |
 
-Turn it on in this order:
+Turn it on in this order (owner steps; agents do not deploy):
 
 1. Set it on staging only, with the staging web app's secrets.
-2. Sign in on staging with the owner's account. Confirm the consent screen lists the Bluesky profile permission and the sign-in succeeds.
-3. On the Avatars page, use "Use as my avatar on <server name>" on a G image, confirm the picture changes on the profile and the rest of the profile is unchanged, then use "Restore my previous avatar". Repeat once with an account hosted on a non-Bluesky server.
-4. Also test an account with no profile record yet. The code never creates the record and tells the user to save their profile once in an app that uses it, so confirm that message appears. If Bluesky requires `create` for that case, the scope needs `action=create` added and this page updated.
-5. Only after steps 2 to 4 pass, set it on production. Existing users see "Sign in again to allow this" until their next sign-in.
+2. Sign in on staging with the owner's account. Confirm sign-in still succeeds with the new metadata scope list.
+3. On `/integrations`, tick Bluesky and choose Save. Confirm the consent screen lists the profile permission for `app.bsky.actor.profile` (this is the check that Bluesky's authorization server lets a third-party app request it), grant it, and confirm the page offers "Turn on pushing to Bluesky". Turn it on, then confirm the picture changes on the profile and the rest of the profile is unchanged. Use "Restore my previous Bluesky picture" on the Avatars page.
+4. Repeat with an account hosted on a non-Bluesky server, and with an account that has no `app.bsky.actor.profile` record yet. The page must ask before creating one, and the created record must hold only `$type` and `avatar`.
+5. Tick Tangled with an account that has Tangled records and confirm its picture changes and its other profile fields stay.
+6. Untick a box and confirm later default-image changes no longer reach that app, and that the record keeps its picture.
+7. Only after steps 2 to 6 pass, set it on production.
 
-The migration `db/migrations/0033_bsky_avatar_sync.sql` adds the per-account switch, the saved previous avatar, and an insert-only log of every change to a Bluesky profile.
+A later sign-in replaces the session and drops the app permissions, so a ticked box then shows "BlueyVatar no longer holds the permission" with a way to allow it again.
+
+The migration `db/migrations/0033_bsky_avatar_sync.sql` added the per-account state, the saved previous avatar, and an insert-only log of every change to a profile. `db/migrations/0039_avatar_push_apps.sql` makes both tables per app (`app` column, primary key `did, app`), adds `enabled`, `may_create`, and `consent_started_at`, and starts every existing row switched off. The tables keep their names so the account export and deletion code keeps working.
 The account data export lists both tables for the signed-in person only: the switch and previous avatar reference, and the change log (action and image references with times, no account ID or row ids). Account deletion removes them.

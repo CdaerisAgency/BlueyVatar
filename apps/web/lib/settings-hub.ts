@@ -10,7 +10,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
       { href: '/account/avatars', label: 'Avatars', description: 'Upload, import, and choose your default avatar and its rating.' },
       { href: '/account/profile', label: 'Profile', description: 'Job title, location, pronouns, and other public details.' },
       { href: '/account/stats', label: 'Profile views', description: 'Daily profile views for the last 30 days (Plus).' },
-      { href: '/account/claims', label: 'Verified accounts', description: 'Verify accounts on other sites and see the atproto apps you use.' },
+      { href: '/account/claims', label: 'Linked accounts', description: 'Link accounts on other sites, verify them, and see the atproto apps you use.' },
     ],
   },
   {
@@ -23,7 +23,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     title: 'Developer',
     links: [
-      { href: '/account/keys', label: 'API keys and license', description: 'Your license, API keys, and usage.' },
+      { href: '/account/keys', label: 'API keys', description: 'Create, rotate, and revoke your API keys.' },
       { href: '/account/domain', label: 'Custom profile domain', description: 'Serve your profile from your own subdomain (Plus).' },
     ],
   },

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { Fraunces, Inter } from 'next/font/google'
+import BugReport from '../components/BugReport'
 import { SiteFooter, SiteNav } from '../components/SiteChrome'
 import { defaultOgImage, siteUrl } from '../lib/site'
 import './globals.css'
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <SiteNav />
         {children}
         <SiteFooter />
+        <BugReport />
       </body>
     </html>
   )
