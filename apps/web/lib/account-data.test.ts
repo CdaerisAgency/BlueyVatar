@@ -14,6 +14,18 @@ describe('confirmationMatches', () => {
   })
 })
 
+describe('exportAccountData shape', () => {
+  it('keeps the top-level key order and runs one query per source', async () => {
+    const query = vi.fn(async () => ({ rows: [] }))
+    const out = await exportAccountData({ query } as never, 'did:plc:x', new Date('2026-11-15T00:00:00Z'))
+    expect(Object.keys(out)).toEqual([
+      'exportedAt', 'did', 'note', 'emails', 'profileLinks', 'claims', 'attestations', 'visibilityRules', 'licenses', 'apiKeys', 'customDomain',
+      'organizations', 'appeals', 'effects', 'effectOffers', 'avatarCalendar', 'bugReportScreenshots', 'avatarSync', 'billing', 'profileViews', 'indexed',
+    ])
+    expect(query).toHaveBeenCalledTimes(24)
+  })
+})
+
 describe('purgeImagePrefixes', () => {
   const env = { CF_ZONE_ID: 'z', CF_API_TOKEN: 't', PUBLIC_DELIVERY_URL: 'https://img.example.com/' }
   it('sends prefixes in batches of 30 and reports failure without throwing', async () => {
