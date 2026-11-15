@@ -1,0 +1,41 @@
+name: Set up workspace
+description: >-
+  Isolated pnpm and Node, install, lexicon types, and the workspace libraries the apps import.
+  Run after actions/checkout. Used by the check and e2e jobs in ci.yml.
+
+runs:
+  using: composite
+  steps:
+    # Each job gets its own pnpm home and store so concurrent jobs on the shared self-hosted runner cannot
+    # remove each other's pnpm binary or share a half-written store.
+    - name: Isolate pnpm per job
+      shell: bash
+      run: |
+        home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
+        mkdir -p "$home/store"
+        echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
+        echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
+        echo "$home" >> "$GITHUB_PATH"
+
+    - uses: pnpm/action-setup@v6
+      with:
+        version: 10.28.0
+        # Install into the per-job folder. The default (~/setup-pnpm) is shared by
+        # every runner on the machine, so concurrent jobs removed each other's pnpm.
+        dest: ${{ env.PNPM_HOME }}/setup
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 22
+
+    - name: Install
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Generate lexicon types
+      shell: bash
+      run: pnpm lex:build
+
+    - name: Build workspace libraries
+      shell: bash
+      run: pnpm build:libs
