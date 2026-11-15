@@ -5,6 +5,7 @@ import { scheduleScreenshotPurge } from './bug-report-retention.js'
 import { scheduleModerationDigest } from './moderation-digest.js'
 import { scheduleKeyExpiryReminders } from './key-expiry-reminder.js'
 import { scheduleEffectsSwitch } from './effects-switch.js'
+import { scheduleScheduleSwitch } from './schedule-switch.js'
 import { scheduleEffectOffers } from './effect-offers.js'
 import { purgerFromEnv } from './cloudflare.js'
 import { warmerFromEnv } from './warm.js'
@@ -51,6 +52,8 @@ function writes(): IndexWrites {
     scheduleKeyExpiryReminders(pool)
     // Out-of-office switch-on and switch-off (issue #283). Asks the web app to do each step.
     scheduleEffectsSwitch(pool)
+    // Avatar calendar (issue #219): same secret, asks the web app to change the default image when an entry starts or ends.
+    scheduleScheduleSwitch(pool)
     // One email when a free effect offer with notify on starts (issue #308).
     scheduleEffectOffers(pool)
     const warm = warmerFromEnv()

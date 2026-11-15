@@ -19,11 +19,11 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  * Everything blueyvatar holds about one DID, as plain JSON. Never includes key hashes or secrets, the stored
  * primary email beyond a masked form, reports filed against the DID, or an admin's internal decision note on an appeal. Billing rows are included as a summary.
  * Beyond the fields most people expect, the file also holds email holds, organization memberships and their audit history, the Stripe
- * customer ID, bug report screenshots (kept 90 days, admins only), free effect offers you were listed for, emailed about, or dismissed, avatar effect settings (frame choice, out-of-office dates and time zone, and the default to restore), and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
+ * customer ID, bug report screenshots (kept 90 days, admins only), free effect offers you were listed for, emailed about, or dismissed, avatar effect settings (frame choice, out-of-office dates and time zone, and the default to restore), the avatar calendar (dates, weekly choices and time zone), and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
-  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog, bugShots, effects, offers] = await Promise.all([
+  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog, bugShots, effects, offers, calendar] = await Promise.all([
     q('SELECT email_hash, method, is_primary, email_domain, email_enc, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
     q('SELECT email_hash, reason, released_at FROM email_holds WHERE did = $1 ORDER BY released_at'),
     q('SELECT email_enc FROM notice_emails WHERE did = $1'),
@@ -47,6 +47,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q("SELECT issue_number, created_at, encode(image, 'base64') AS image_base64 FROM bug_report_screenshots WHERE did = $1 ORDER BY created_at, id"),
     q("SELECT frame_style, frame_color, filter_id, to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone, away_prev_default_rkey FROM avatar_effects WHERE did = $1"),
     q("SELECT o.name, o.effect, u.listed, u.emailed_at, u.dismissed_at FROM effect_offer_users u JOIN effect_offers o ON o.id = u.offer_id WHERE u.did = $1 ORDER BY o.id"),
+    q('SELECT schedule, timezone, next_change_at, state, applied_image, prev_default, created_at, updated_at FROM avatar_schedule WHERE did = $1'),
   ])
   let primaryEmail: string | null = null
   if (notice[0]) {
@@ -87,6 +88,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     appeals: dates(appeals),
     effects: dates(effects)[0] ?? null,
     effectOffers: dates(offers),
+    avatarCalendar: dates(calendar)[0] ?? null,
     bugReportScreenshots: dates(bugShots).map(({ image_base64, ...r }) => ({ ...r, mimeType: 'image/jpeg', imageBase64: image_base64 })),
     avatarSync: { settings: dates(avatarSync)[0] ?? null, log: dates(avatarLog) },
     billing: { customers: dates(customers), subscriptions: dates(subs) },
@@ -164,6 +166,7 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     await c.query('DELETE FROM bug_report_screenshots WHERE did = $1', [did])
     await c.query('DELETE FROM avatar_effects WHERE did = $1', [did])
     await c.query('DELETE FROM effect_offer_users WHERE did = $1', [did])
+    await c.query('DELETE FROM avatar_schedule WHERE did = $1', [did])
     const images = await c.query('DELETE FROM images WHERE did = $1', [did])
     await c.query('DELETE FROM profiles WHERE did = $1', [did])
     const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])

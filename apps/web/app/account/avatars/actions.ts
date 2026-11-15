@@ -10,6 +10,8 @@ import { reportError } from '../../../lib/obs'
 import { checkUploadForm } from '../../../lib/upload-caps'
 import { screenUpload } from '../../../lib/upload-screen'
 import { pushAfterDefaultChange } from '../../../lib/push-server'
+import { stripImage } from '../../../lib/schedule/flow'
+import { getScheduleStore } from '../../../lib/schedule/store'
 
 const back = (key: 'error' | 'done', value: string): never => redirect(`/account/avatars?${key}=${encodeURIComponent(value)}`)
 
@@ -76,6 +78,8 @@ export async function removeImage(form: FormData): Promise<void> {
   if (!/^[A-Za-z0-9._~:-]{1,512}$/.test(rkey)) return back('error', 'Invalid image.')
   try {
     await deleteImage(await repoSession(did), rkey)
+    // The avatar calendar keeps image choices in our database, so a deleted image leaves it too (issue #219).
+    await stripImage(getScheduleStore(), did, rkey)
   } catch (err) {
     return fail(err)
   }

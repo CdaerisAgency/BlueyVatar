@@ -16,6 +16,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
       { href: '/account/profile', label: 'Profile' },
       { href: '/account/stats', label: 'Profile views' },
       { href: '/account/avatars', label: 'Avatars' },
+      { href: '/account/avatars/schedule', label: 'Avatar calendar' },
       { href: '/account/effects', label: 'Effects' },
       { href: '/account/visibility', label: 'Visibility' },
     ],
