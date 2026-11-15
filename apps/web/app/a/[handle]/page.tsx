@@ -3,6 +3,7 @@ import { PageMain } from '../../../components/Page'
 import type { Metadata } from 'next'
 import type { PublicProfile } from '../../../lib/profile-page'
 import { absoluteUrl, defaultOgImage } from '../../../lib/site'
+import { trimSlash } from '../../../lib/trim-slash'
 import { ReportForm } from '../../report/ReportForm'
 
 const DELIVERY_URL = process.env.DELIVERY_URL ?? 'http://localhost:3001'
@@ -16,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
   if (!p || !p.avatar) return { title: 'Avatar not found', robots: { index: false } }
   const title = p.displayName ?? p.handle ?? handle
   const url = absoluteUrl(`/a/${encodeURIComponent(handle)}`)
-  const images = [`${PUBLIC_DELIVERY_URL.replace(/\/+$/, '')}${p.avatar.url}`]
+  const images = [`${trimSlash(PUBLIC_DELIVERY_URL)}${p.avatar.url}`]
   return {
     title: `${title} | BlueyVatar`,
     description: `${title}'s avatar on BlueyVatar.`,

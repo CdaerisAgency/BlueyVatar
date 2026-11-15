@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type pg from 'pg'
+import { DID_RE } from '@blueyvatar/core/did'
 
 export { REASONS, REASON_LABELS, type Reason }
 export type Source = 'profile' | 'avatar'
@@ -17,7 +18,6 @@ export type ReportField = 'did' | 'reason' | 'details' | 'contact'
 export type ReportInput = { did: string; reporterDid: string; source: Source; reason: Reason; details: string; contact: string }
 export type Parsed = { ok: true; value: ReportInput } | { ok: false; error: string; field: ReportField }
 
-const DID_RE = /^did:(plc|web):[A-Za-z0-9._:%-]{1,200}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /** Validates raw form values. Pure, so it is easy to test. Reason, details, and email are all required. */

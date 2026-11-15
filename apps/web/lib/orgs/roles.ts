@@ -4,7 +4,7 @@ export type Role = (typeof ROLES)[number]
 
 export const isRole = (v: unknown): v is Role => v === 'owner' || v === 'member'
 
-export const DID_RE = /^did:(plc|web):[A-Za-z0-9._:%-]{1,200}$/
+export { DID_RE } from '@blueyvatar/core/did'
 
 export const canManageKeys = (role: Role | null): boolean => role === 'owner' || role === 'member'
 export const canManageMembership = (role: Role | null): boolean => role === 'owner'

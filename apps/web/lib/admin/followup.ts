@@ -1,8 +1,7 @@
 import type pg from 'pg'
 import { reportOutcomeNotice, type EmailSender } from '@blueyvatar/core/verification'
+import { EMAIL_RE } from '@blueyvatar/core/patterns'
 import { reportError } from '../obs'
-
-const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
 
 export type FollowUp = { sent: number; skipped: number; failed: number }
 
