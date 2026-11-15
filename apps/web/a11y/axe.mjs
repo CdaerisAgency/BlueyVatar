@@ -9,22 +9,25 @@ const DELIVERY_PORT = Number(process.env.A11Y_DELIVERY_PORT ?? WEB_PORT + 1)
 const base = `http://localhost:${WEB_PORT}`
 
 const PUBLIC = ['/', '/pricing', '/integrations', '/docs', '/login', '/login?error=Handle%20not%20found', '/p/alice.example.com', '/p/alice.example.com?report=invalid', '/policy', '/privacy', '/accessibility']
-const ACCOUNT = ['/account', '/account/profile', '/account/avatars', '/account/billing', '/account/claims', '/account/domain', '/account/keys', '/account/notifications', '/account/visibility']
+const ACCOUNT = ['/account', '/account/profile', '/account/avatars', '/account/avatars/schedule', '/account/billing', '/account/claims', '/account/domain', '/account/effects', '/account/keys', '/account/notifications', '/account/visibility']
+// Second pass at a 390 px phone width, for the pages added with effects and the avatar calendar (#316, #321).
+const PHONE = ['/account/effects', '/account/avatars/schedule']
+// /admin/effects (#319) is not scanned: admin pages need the admin TOTP session (lib/admin/session.ts), which this
+// script does not seed. Add it here once the script can seed an admin session.
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']
 
 const delivery = await startDelivery(DELIVERY_PORT)
 const web = await startWeb(WEB_PORT, DELIVERY_PORT)
 const browser = await chromium.launch()
 let failed = 0
-try {
-  const context = await browser.newContext()
-  const anon = await context.newPage()
-  await context.addCookies([{ name: 'bv_session', value: sessionCookie(), url: base, httpOnly: true }])
-  for (const path of [...PUBLIC, ...ACCOUNT]) {
+
+/** Scans each path in its own page of the context and reports violations; returns how many paths failed. */
+async function scan(context, paths, label) {
+  for (const path of paths) {
     const page = await context.newPage()
     const res = await page.goto(base + path, { waitUntil: 'networkidle' })
     if (!res || res.status() >= 500) {
-      console.error(`FAIL ${path}: HTTP ${res?.status()}`)
+      console.error(`FAIL ${label}${path}: HTTP ${res?.status()}`)
       failed++
       await page.close()
       continue
@@ -35,10 +38,23 @@ try {
     const where = new URL(page.url()).pathname
     if (violations.length) {
       failed += violations.length
-      for (const v of violations) console.error(`FAIL ${path} (landed ${where}): ${v.id} [${v.impact}] ${v.help}\n  ${v.nodes.map((n) => n.target.join(' ')).join('\n  ')}`)
-    } else console.log(`ok   ${path} (landed ${where})`)
+      for (const v of violations) console.error(`FAIL ${label}${path} (landed ${where}): ${v.id} [${v.impact}] ${v.help}\n  ${v.nodes.map((n) => n.target.join(' ')).join('\n  ')}`)
+    } else console.log(`ok   ${label}${path} (landed ${where})`)
     await page.close()
   }
+}
+
+try {
+  const context = await browser.newContext()
+  const anon = await context.newPage()
+  await context.addCookies([{ name: 'bv_session', value: sessionCookie(), url: base, httpOnly: true }])
+  await scan(context, [...PUBLIC, ...ACCOUNT], '')
+
+  const phone = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  await phone.addCookies([{ name: 'bv_session', value: sessionCookie(), url: base, httpOnly: true }])
+  await scan(phone, PHONE, '[390px] ')
+  await phone.close()
+
   // Skip link: the first Tab stop on every page, and it moves focus to <main id="main">.
   for (const path of ['/', '/pricing', '/integrations', '/login', '/privacy']) {
     await anon.goto(base + path)
@@ -52,6 +68,7 @@ try {
     } else console.log(`ok   ${path} skip link`)
   }
   await anon.close()
+  await context.close()
   console.log(`seeded session: ${DID}`)
 } finally {
   await browser.close()
