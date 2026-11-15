@@ -4,12 +4,9 @@ import type { Plan } from '../records'
 import { emptyRow, type EffectsRow } from '../effects/store'
 import { removeDateEntry, saveTimezone, setDateEntry, setWeekly, stripImage, tickSchedule, RETRY_MS, type ScheduleDeps } from './flow'
 import { memoryScheduleStore, pgScheduleStore } from './store'
+import { DID, img as fixtureImg } from '../testing/fixtures'
 
-const DID = 'did:plc:alice'
-const img = (rkey: string, isDefault = false): StoredImage => ({
-  uri: `at://${DID}/com.blueyvatar.image/${rkey}`, cid: `cid-${rkey}`, rkey,
-  value: { image: { $type: 'blob', ref: { $link: `blob-${rkey}` }, mimeType: 'image/png', size: 1 }, createdAt: '2026-01-01T00:00:00Z', isDefault },
-})
+const img = (rkey: string, isDefault = false) => fixtureImg(rkey, { isDefault })
 
 function setup(opts: { plan?: Plan; images?: StoredImage[]; effects?: Partial<EffectsRow>; now?: Date } = {}) {
   const images = opts.images ?? [img('home', true), img('a'), img('b')]

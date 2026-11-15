@@ -4,12 +4,8 @@ import type { Plan } from '../records'
 import { canUse, parseFrame, type EffectId } from './catalog'
 import { applyFrame, removeFrame, scheduleAway, tickAway, turnOffAway, type FlowDeps } from './flow'
 import { memoryEffectsStore } from './store'
+import { DID, img } from '../testing/fixtures'
 
-const DID = 'did:plc:alice'
-const img = (rkey: string, extra: Partial<StoredImage['value']> = {}): StoredImage => ({
-  uri: `at://${DID}/com.blueyvatar.image/${rkey}`, cid: `cid-${rkey}`, rkey,
-  value: { image: { $type: 'blob', ref: { $link: `blob-${rkey}` }, mimeType: 'image/png', size: 1 }, createdAt: '2026-01-01T00:00:00Z', ...extra },
-})
 
 function setup(opts: { plan?: Plan; images?: StoredImage[]; now?: Date; screenOk?: boolean; grants?: EffectId[] } = {}) {
   const images = opts.images ?? [img('orig', { isDefault: true, alt: 'Me', labels: { values: [{ val: 'sexual' }] } })]

@@ -19,15 +19,8 @@ import {
   validateProfile,
 } from './records'
 import { ratingFromLabels } from '@blueyvatar/core'
+import { pngBytes } from './testing/fixtures'
 
-function pngBytes(w: number, h: number, extra = 0): Uint8Array {
-  const b = new Uint8Array(24 + extra)
-  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52])
-  const v = new DataView(b.buffer)
-  v.setUint32(16, w)
-  v.setUint32(20, h)
-  return b
-}
 const PNG = pngBytes(100, 100)
 const JPG = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0])
 const blank = { jobTitle: '', company: '', location: '', pronouns: '', pronunciation: '', timezone: '', interests: '' }
