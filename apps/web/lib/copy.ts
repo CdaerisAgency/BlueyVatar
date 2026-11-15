@@ -76,6 +76,13 @@ export const COPY = {
     serverKey: 'Server key (read only, keeps usage and stays private)',
     forever: 'Forever',
   },
+  timezone: {
+    label: 'Time zone',
+    notSet: 'Not set',
+    useCurrent: 'Use my current time zone',
+    savedSuffix: 'saved',
+    help: 'Pick the zone that matches your clock. Zones that always share the same time are listed once.',
+  },
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const

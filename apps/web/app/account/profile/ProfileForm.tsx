@@ -1,6 +1,8 @@
 'use client'
-import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { Button } from '../../../components/Button'
+import { COPY } from '../../../lib/copy'
+import { TIMEZONE_ENTRIES, entryForZone, isListedZone, zoneLabel } from '../../../lib/timezones'
 import {
   INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, MAX_INTEREST_CHARS, interestStats, countGraphemes, fieldId,
   MAX_LANGUAGES, MAX_LANGUAGE_TAG_LENGTH, MAX_SOCIAL_LINKS, MAX_SOCIAL_LABEL_GRAPHEMES, MAX_SOCIAL_URL_LENGTH,
@@ -11,36 +13,6 @@ import { saveProfile } from './actions'
 
 const NOT_SET = ''
 
-function offsetLabel(zone: string, now: Date): string {
-  try {
-    const part = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(now).find((x) => x.type === 'timeZoneName')?.value ?? ''
-    const o = part === 'GMT' ? '+00:00' : part.replace('GMT', '')
-    return `${zone.replace(/_/g, ' ')} (UTC${o})`
-  } catch {
-    return zone
-  }
-}
-
-function zoneGroups(saved: string): { region: string; zones: { value: string; label: string }[] }[] {
-  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
-  let list: string[] = []
-  try {
-    list = intl.supportedValuesOf?.('timeZone') ?? []
-  } catch {
-    list = []
-  }
-  if (!list.includes('UTC')) list = [...list, 'UTC']
-  const now = new Date()
-  const groups = new Map<string, { value: string; label: string }[]>()
-  for (const z of list) {
-    const region = z.includes('/') ? z.split('/')[0]! : 'Other'
-    groups.set(region, [...(groups.get(region) ?? []), { value: z, label: offsetLabel(z, now) }])
-  }
-  const out = [...groups].map(([region, zones]) => ({ region, zones }))
-  // A saved value that is not in the list still shows as the selected option.
-  if (saved && !list.includes(saved)) out.unshift({ region: 'Saved value', zones: [{ value: saved, label: saved }] })
-  return out
-}
 
 /** Rows carry a stable key so removing one row does not shuffle what is typed in the others. */
 type Keyed<T> = T & { key: number }
@@ -64,7 +36,17 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
   const [socialLinks, setSocialLinks] = useState<Keyed<SocialLinkRow>[]>(() => withKeys(v.socialLinks))
   const [wallets, setWallets] = useState<Keyed<WalletRow>[]>(() => withKeys(v.wallets))
   const summary = useRef<HTMLDivElement>(null)
-  const groups = useMemo(() => zoneGroups(initial.timezone), [initial.timezone])
+
+  // When nothing is saved, preselect the list entry that matches this browser's clock.
+  useEffect(() => {
+    if (initial.timezone) return
+    try {
+      const entry = entryForZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      if (entry) setTimezone((cur) => cur || entry.id)
+    } catch {
+      // No detection available: the field stays on Not set.
+    }
+  }, [initial.timezone])
 
   // After a result comes back, keep the typed values and move focus to the first problem.
   useEffect(() => {
@@ -124,20 +106,29 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       {text('pronouns', 'Pronouns', 400)}
       {text('pronunciation', 'Name pronunciation', 1000)}
       <label>
-        Time zone
-        <select id="profile-timezone" name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} aria-invalid={err('timezone') ? true : undefined} aria-describedby={described('timezone')} suppressHydrationWarning>
-          <option value={NOT_SET}>Not set</option>
-          {groups.map((g) => (
-            <optgroup key={g.region} label={g.region}>
-              {g.zones.map((z) => (
-                <option key={z.value} value={z.value}>{z.label}</option>
-              ))}
-            </optgroup>
+        {COPY.timezone.label}
+        <select id="profile-timezone" name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} aria-invalid={err('timezone') ? true : undefined} aria-describedby={described('timezone', 'profile-timezone-help')}>
+          <option value={NOT_SET}>{COPY.timezone.notSet}</option>
+          {/* A stored zone that is not in the short list stays selected under its own name. */}
+          {timezone && !isListedZone(timezone) && <option value={timezone}>{timezone} ({COPY.timezone.savedSuffix})</option>}
+          {TIMEZONE_ENTRIES.map((e) => (
+            <option key={e.id} value={e.id}>{zoneLabel(e)}</option>
           ))}
         </select>
         {err('timezone') && <span id="profile-timezone-error" className="field-error">{err('timezone')}</span>}
       </label>
-      <Button type="button" onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use my current time zone</Button>
+      <p id="profile-timezone-help">{COPY.timezone.help}</p>
+      <Button
+        type="button"
+        onClick={() => {
+          const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+          const entry = entryForZone(zone)
+          if (entry) setTimezone(entry.id)
+          else if (zone) setTimezone(zone)
+        }}
+      >
+        {COPY.timezone.useCurrent}
+      </Button>
       <label>
         Interests
         <textarea
