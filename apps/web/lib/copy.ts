@@ -76,6 +76,12 @@ export const COPY = {
     serverKey: 'Server key (read only, keeps usage and stays private)',
     forever: 'Forever',
   },
+  share: {
+    title: 'Share your profile',
+    intro: 'These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.',
+    unavailable: 'Your QR code and downloads are unavailable until your handle can be loaded.',
+    pointer: 'Your QR code and downloads are on the overview page.',
+  },
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const
