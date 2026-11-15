@@ -9,6 +9,7 @@ import { screenUpload } from '../upload-screen'
 import type { FlowDeps, RepoPort } from './flow'
 import { renderLook } from './render'
 import { getEffectsStore } from './store'
+import { myOffers } from './my-offers'
 
 /** The repository port for one signed-in account, using the same record writes as an upload. */
 export function repoPort(session: OAuthSession): RepoPort {
@@ -51,6 +52,7 @@ export async function liveDeps(did: string): Promise<FlowDeps> {
     store: getEffectsStore(),
     repo: repoPort(session),
     plan: () => resolvePlan(did),
+    grants: async () => (await myOffers(did)).map((o) => o.effect),
     render: renderLook,
     prepare: prepareUpload,
     screen: (bytes, mime) => screenUpload(did, bytes, mime),

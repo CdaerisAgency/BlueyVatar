@@ -39,7 +39,9 @@ export default async function EffectsPage({ searchParams }: { searchParams: Prom
   const renders = new Set([row.frameImageRkey, row.awayImageRkey])
   const originals = images.filter((i) => !renders.has(i.rkey))
   const framed = images.find((i) => i.rkey === row.frameImageRkey)
-  const canFrame = canUse('frame:ring', plan, (await myOffers(did)).map((o) => o.effect))
+  const grants = (await myOffers(did)).map((o) => o.effect)
+  // A granted effect opens the look form; the save step still checks each chosen effect against the grants.
+  const canFrame = canUse('frame:ring', plan) || grants.length > 0
   const awayOn = row.awayState === 'active'
   const defaultSource = row.frameSourceRkey ?? originals.find((i) => i.value.isDefault)?.rkey ?? originals[0]?.rkey
 
