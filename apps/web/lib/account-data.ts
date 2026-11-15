@@ -3,6 +3,7 @@ import { maskEmail } from './mask'
 import { maskDomain } from './linked-emails'
 import { decryptJson } from './token-crypto'
 import { releaseAllPg } from './store'
+import { DELETE_STEPS, EXPORT_SOURCES, type SourceKey } from './account-data/sources'
 
 /** Stripe billing rows are kept this long after a user deletes their data (owner decision on issue #140). */
 export const BILLING_RETENTION_YEARS = 7
@@ -23,32 +24,9 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
-  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog, bugShots, effects, offers, calendar] = await Promise.all([
-    q('SELECT email_hash, method, is_primary, email_domain, email_enc, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
-    q('SELECT email_hash, reason, released_at FROM email_holds WHERE did = $1 ORDER BY released_at'),
-    q('SELECT email_enc FROM notice_emails WHERE did = $1'),
-    q('SELECT rkey, url, title, created_at FROM profile_links WHERE did = $1 ORDER BY created_at, rkey'),
-    q('SELECT rkey, platform, uri, record, indexed_at FROM claims WHERE did = $1 ORDER BY rkey'),
-    q('SELECT uri, claim_rkey, result, method, created_at FROM attestations WHERE claim_did = $1 ORDER BY created_at'),
-    q('SELECT keyed_only, domain_allowlist, hidden_profile, email_lookup_opt_out, updated_at FROM visibility_rules WHERE did = $1'),
-    q('SELECT license_id, org_id, tier, status, term, entitlements, grace_ends_at, created_at FROM licenses WHERE owner = $1 ORDER BY created_at'),
-    q('SELECT k.prefix, k.kind, k.label, k.domains, k.created_at, k.revoked_at, k.expires_at FROM api_keys k JOIN licenses l ON l.license_id = k.license_id WHERE l.owner = $1 ORDER BY k.created_at'),
-    q('SELECT hostname, status, created_at, verified_at FROM custom_domains WHERE did = $1'),
-    q('SELECT stripe_customer_id, created_at FROM billing_customers WHERE did = $1'),
-    q('SELECT stripe_subscription_id, tier, status, current_period_end, cancel_at_period_end, deleted_at FROM subscriptions WHERE did = $1 ORDER BY stripe_subscription_id'),
-    q('SELECT rkey, cid, mime_type, rating, is_default, license, created_at FROM images WHERE did = $1 ORDER BY created_at, rkey'),
-    q('SELECT record FROM profiles WHERE did = $1'),
-    q("SELECT to_char(day, 'YYYY-MM-DD') AS day, views, json_calls FROM profile_view_counters WHERE did = $1 ORDER BY day"),
-    q('SELECT o.org_id, o.name, m.role, m.added_at FROM organization_members m JOIN organizations o ON o.org_id = m.org_id WHERE m.did = $1 ORDER BY m.added_at, o.org_id'),
-    q('SELECT org_id, actor, action, target_did, detail, created_at FROM organization_audit WHERE actor = $1 OR target_did = $1 ORDER BY id'),
-    q("SELECT p.id, a.action AS appealed_action, p.action_id, p.statement, p.status, p.created_at, p.decided_at FROM appeals p JOIN admin_actions a ON a.id = p.action_id WHERE p.did = $1 ORDER BY p.id"),
-    q('SELECT auto_sync, previous_avatar, has_previous, last_source_cid, last_sent_cid, auto_notice_pending, auto_count, updated_at FROM bsky_avatar_sync WHERE did = $1'),
-    q('SELECT action, from_cid, to_cid, source_cid, created_at FROM bsky_avatar_log WHERE did = $1 ORDER BY id'),
-    q("SELECT issue_number, created_at, encode(image, 'base64') AS image_base64 FROM bug_report_screenshots WHERE did = $1 ORDER BY created_at, id"),
-    q("SELECT frame_style, frame_color, filter_id, to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone, away_prev_default_rkey FROM avatar_effects WHERE did = $1"),
-    q("SELECT o.name, o.effect, u.listed, u.emailed_at, u.dismissed_at FROM effect_offer_users u JOIN effect_offers o ON o.id = u.offer_id WHERE u.did = $1 ORDER BY o.id"),
-    q('SELECT schedule, holidays, timezone, next_change_at, state, applied_image, prev_default, created_at, updated_at FROM avatar_schedule WHERE did = $1'),
-  ])
+  const results = await Promise.all(EXPORT_SOURCES.map((e) => q(e.sql)))
+  const r = Object.fromEntries(EXPORT_SOURCES.map((e, i) => [e.key, results[i]!]))
+  const { links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog, bugShots, effects, offers, calendar } = r as Record<SourceKey, Record<string, unknown>[]>
   let primaryEmail: string | null = null
   if (notice[0]) {
     try {
@@ -152,25 +130,8 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
   try {
     await c.query('BEGIN')
     const emailLinksHeld = await releaseAllPg(c, did)
-    await c.query('DELETE FROM oauth_session WHERE sub = $1', [did])
-    await c.query('DELETE FROM web_session WHERE did = $1', [did])
-    await c.query('DELETE FROM session_floor WHERE did = $1', [did])
-    await c.query('DELETE FROM profile_links WHERE did = $1', [did])
-    await c.query('DELETE FROM visibility_rules WHERE did = $1', [did])
-    await c.query('DELETE FROM verification_state WHERE did = $1', [did])
-    await c.query('DELETE FROM custom_domains WHERE did = $1', [did])
-    await c.query('DELETE FROM profile_view_counters WHERE did = $1', [did])
-    await c.query('DELETE FROM appeals WHERE did = $1', [did])
-    await c.query('DELETE FROM bsky_avatar_sync WHERE did = $1', [did])
-    await c.query('DELETE FROM bsky_avatar_log WHERE did = $1', [did])
-    await c.query('DELETE FROM bug_report_screenshots WHERE did = $1', [did])
-    await c.query('DELETE FROM avatar_effects WHERE did = $1', [did])
-    await c.query('DELETE FROM effect_offer_users WHERE did = $1', [did])
-    await c.query('DELETE FROM avatar_schedule WHERE did = $1', [did])
-    const images = await c.query('DELETE FROM images WHERE did = $1', [did])
-    await c.query('DELETE FROM profiles WHERE did = $1', [did])
-    const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])
-    await c.query('DELETE FROM attestations WHERE claim_did = $1', [did])
+    const removed: Record<string, number> = {}
+    for (const { table, column } of DELETE_STEPS) removed[table] = (await c.query(`DELETE FROM ${table} WHERE ${column} = $1`, [did])).rowCount ?? 0
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
     await leaveOrganizations(c, did)
     // Cascades to api_keys, usage_counters, and usage_alerts. Billing rows no longer depend on the license (migration 0022).
@@ -178,7 +139,7 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     await c.query('UPDATE billing_customers SET deleted_at = coalesce(deleted_at, now()) WHERE did = $1', [did])
     await c.query("UPDATE subscriptions SET deleted_at = coalesce(deleted_at, now()), status = CASE WHEN status = 'incomplete' THEN 'incomplete_expired' ELSE 'canceled' END WHERE did = $1", [did])
     await c.query('COMMIT')
-    summary = { emailLinksHeld, images: images.rowCount ?? 0, claims: claims.rowCount ?? 0, subscriptionsCanceled: live.length }
+    summary = { emailLinksHeld, images: removed.images ?? 0, claims: removed.claims ?? 0, subscriptionsCanceled: live.length }
   } catch (err) {
     await c.query('ROLLBACK').catch(() => {})
     throw err
