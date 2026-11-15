@@ -1,28 +1,12 @@
 'use server'
 
-import { redirect } from 'next/navigation'
-import { currentDid } from '../../../../lib/auth'
-import { reportError } from '../../../../lib/obs'
-import { RepoError } from '../../../../lib/repo'
+import { actionRunner } from '../../../../lib/action-run'
 import { removeHolidayPick, setHolidayCountry, setHolidayPick } from '../../../../lib/schedule/holiday-flow'
 import { liveScheduleDeps } from '../../../../lib/schedule/live'
 import type { Result } from '../../../../lib/effects/flow'
 
-const back = (key: 'error' | 'done', value: string, popular: boolean): never =>
-  redirect(`/account/avatars/holidays?${key}=${encodeURIComponent(value)}${popular ? '&popular=1' : ''}`)
-
-async function run(form: FormData, go: (did: string) => Promise<Result>): Promise<never> {
-  const did = (await currentDid()) ?? redirect('/login')
-  const popular = form.get('popular') === '1'
-  let r: Result
-  try {
-    r = await go(did)
-  } catch (err) {
-    reportError('holiday action failed', err)
-    return back('error', err instanceof RepoError ? err.message : 'Something went wrong. Try again.', popular)
-  }
-  return r.ok ? back('done', r.message, popular) : back('error', r.error, popular)
-}
+const runAction = actionRunner('/account/avatars/holidays', 'holiday action failed')
+const run = (form: FormData, go: (did: string) => Promise<Result>) => runAction(go, { suffix: form.get('popular') === '1' ? '&popular=1' : '' })
 
 export async function saveHolidayCountry(form: FormData): Promise<void> {
   await run(form, async (did) => setHolidayCountry(await liveScheduleDeps(did), did, { country: String(form.get('country') ?? ''), region: String(form.get('region') ?? '') }))
