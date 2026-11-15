@@ -5,6 +5,7 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 ## 2026-11-15
 
 ### Added
+- Date logic for the avatar calendar (part of #219). A new pure module in `packages/core` works out an owner's local date in their time zone, finds local midnight by searching for the instant the date changes (so daylight saving shifts, 30 and 45 minute zones and invalid zones are handled), validates a schedule of date and weekly entries, and reports the active entry and the next time it changes. No visible change yet; the editor and the scheduled switch follow.
 - More frames and image filters on the Effects page (part of #218, migration 0042). Plus accounts get three more rings (thick, dotted, inset) and five filters (black and white, sepia, warm, cool, high contrast). A look is one frame, one filter, or one of each, drawn from your original and saved as a new image like the other effects. The out-of-office badge stays free. The data export includes the filter. See `docs/effects-v2.md`.
 
 ## 2026-11-14
