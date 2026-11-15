@@ -72,7 +72,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
   const err = (f: ProfileErrorKey) => errors[f]
   const described = (f: ProfileErrorKey, extra?: string) => [err(f) && `${fieldId(f)}-error`, extra].filter(Boolean).join(' ') || undefined
   const text = (name: ProfileTextField, label: string, max: number) => (
-    <label>
+    <label className="bv-setting">
       {label}
       <input id={`profile-${name}`} name={name} defaultValue={v[name]} key={`${name}-${state.values ? 'r' : 'i'}`} maxLength={max} aria-invalid={err(name) ? true : undefined} aria-describedby={described(name)} />
       {err(name) && <span id={`profile-${name}-error`} className="field-error">{err(name)}</span>}
@@ -105,6 +105,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       {text('location', 'Location', 1000)}
       {text('pronouns', 'Pronouns', 400)}
       {text('pronunciation', 'Name pronunciation', 1000)}
+      <div className="bv-setting">
       <label>
         {COPY.timezone.label}
         <select id="profile-timezone" name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} aria-invalid={err('timezone') ? true : undefined} aria-describedby={described('timezone', 'profile-timezone-help')}>
@@ -118,6 +119,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         {err('timezone') && <span id="profile-timezone-error" className="field-error">{err('timezone')}</span>}
       </label>
       <p id="profile-timezone-help">{COPY.timezone.help}</p>
+      <div>
       <Button
         type="button"
         onClick={() => {
@@ -129,6 +131,9 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       >
         {COPY.timezone.useCurrent}
       </Button>
+      </div>
+      </div>
+      <div className="bv-setting">
       <label>
         Interests
         <textarea
@@ -146,7 +151,8 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       <p id="profile-interests-help" aria-live="polite">
         Up to {MAX_INTERESTS} interests, {MAX_INTEREST_CHARS} characters each. Separate them with commas or new lines. {stats.count} of {MAX_INTERESTS} interests. {interestProblems}
       </p>
-      <fieldset id="profile-languages" tabIndex={-1}>
+      </div>
+      <fieldset className="bv-setting" id="profile-languages" tabIndex={-1}>
         <legend>Languages</legend>
         <p id="profile-languages-help">
           Up to {MAX_LANGUAGES} languages, in the order you want them shown. Use a language tag such as en, es, fr, or pt-BR. {languages.length} of {MAX_LANGUAGES} languages.
@@ -184,7 +190,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         })}
         <Button type="button" disabled={languages.length >= MAX_LANGUAGES} onClick={() => setLanguages([...languages, ...withKeys([{ tag: '', primary: false }])])}>Add a language</Button>
       </fieldset>
-      <fieldset id="profile-socialLinks" tabIndex={-1}>
+      <fieldset className="bv-setting" id="profile-socialLinks" tabIndex={-1}>
         <legend>Links</legend>
         <p id="profile-socialLinks-help">
           Up to {MAX_SOCIAL_LINKS} links to your other accounts and sites, shown in this order. Addresses must start with https://. These are self-declared and not verified. {socialLinks.length} of {MAX_SOCIAL_LINKS} links.
@@ -230,7 +236,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         })}
         <Button type="button" disabled={socialLinks.length >= MAX_SOCIAL_LINKS} onClick={() => setSocialLinks([...socialLinks, ...withKeys([{ label: '', url: '' }])])}>Add a link</Button>
       </fieldset>
-      <fieldset id="profile-wallets" tabIndex={-1}>
+      <fieldset className="bv-setting" id="profile-wallets" tabIndex={-1}>
         <legend>Wallets</legend>
         <p id="profile-wallets-help">
           Up to {MAX_WALLETS} wallet addresses. Each one stays hidden unless you check Show on my public profile. Anyone can type any address, so your page labels shown wallets as not verified. Double-check each address before you save. {wallets.length} of {MAX_WALLETS} wallets.
@@ -270,6 +276,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         })}
         <Button type="button" disabled={wallets.length >= MAX_WALLETS} onClick={() => setWallets([...wallets, ...withKeys([{ chain: '', address: '', label: '', visible: false }])])}>Add a wallet</Button>
       </fieldset>
+      <div className="bv-setting">
       <label>
         Page background color
         <span className="color-row">
@@ -294,6 +301,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       <label>
         <input type="checkbox" name="clearBackgroundColor" checked={useDefault} onChange={(e) => setUseDefault(e.target.checked)} /> Use the default colors (clears the background color)
       </label>
+      </div>
       <Button type="submit" variant="primary" disabled={pending}>
         Save profile
       </Button>
