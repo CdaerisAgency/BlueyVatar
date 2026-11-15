@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { EmptyState, Note, PageHeader, PageMain, Section } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
 import { Field } from '../../../../components/Field'
@@ -6,6 +7,8 @@ import { RepoError, blobUrl, getProfile, listImages, pdsUrl, repoSession, type S
 import { resolvePlan } from '../../../../lib/plan'
 import { getEffectsStore } from '../../../../lib/effects/store'
 import { getScheduleStore } from '../../../../lib/schedule/store'
+import { holidayHook } from '../../../../lib/schedule/flow'
+import { liveHolidayData } from '../../../../lib/holidays/data'
 import { activeEntry, isValidTimeZone, localDate, nextChange } from '@blueyvatar/core'
 import { addScheduleDate, removeScheduleDate, saveScheduleTimezone, saveScheduleWeekly } from './actions'
 import { TimezoneInput } from './TimezoneInput'
@@ -47,9 +50,10 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   const now = new Date()
   const zoneOk = !!row && isValidTimeZone(row.timezone)
   const today = zoneOk ? localDate(now, row.timezone) : ''
-  const nowEntry = zoneOk ? activeEntry(row.schedule, row.timezone, now) : null
-  const next = zoneOk ? nextChange(row.schedule, row.timezone, now) : null
-  const nextEntry = zoneOk && next ? activeEntry(row.schedule, row.timezone, next) : null
+  const holiday = zoneOk && plus ? holidayHook({ holidays: liveHolidayData }, row) : undefined
+  const nowEntry = zoneOk ? activeEntry(row.schedule, row.timezone, now, { holiday }) : null
+  const next = zoneOk ? nextChange(row.schedule, row.timezone, now, { holiday }) : null
+  const nextEntry = zoneOk && next ? activeEntry(row.schedule, row.timezone, next, { holiday }) : null
   const weekly = new Map((row?.schedule.weekly ?? []).map((w) => [w.weekday, w.image]))
   const upcoming = (row?.schedule.dates ?? []).filter((d) => d.date >= today)
 
@@ -60,7 +64,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
       <Note>
-        <p>On each change, BlueyVatar sets the scheduled image as your default image in your Bluesky account, the same way the Default button does, and pushes it to apps you turned on. Dates and image choices are kept by BlueyVatar and are not public. Only your original images can be scheduled. A saved frame or filter look stays applied, and out-of-office wins: the calendar waits until it ends.</p>
+        <p>Looking for holidays? Choose a country and an image per holiday on the <Link href="/account/avatars/holidays">Holiday avatars</Link> page. On each change, BlueyVatar sets the scheduled image as your default image in your Bluesky account, the same way the Default button does, and pushes it to apps you turned on. Dates and image choices are kept by BlueyVatar and are not public. Only your original images can be scheduled. A saved frame or filter look stays applied, and out-of-office wins: the calendar waits until it ends.</p>
       </Note>
 
       {!plus ? (

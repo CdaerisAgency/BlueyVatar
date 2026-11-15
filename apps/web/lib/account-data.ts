@@ -19,7 +19,7 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  * Everything blueyvatar holds about one DID, as plain JSON. Never includes key hashes or secrets, the stored
  * primary email beyond a masked form, reports filed against the DID, or an admin's internal decision note on an appeal. Billing rows are included as a summary.
  * Beyond the fields most people expect, the file also holds email holds, organization memberships and their audit history, the Stripe
- * customer ID, bug report screenshots (kept 90 days, admins only), free effect offers you were listed for, emailed about, or dismissed, avatar effect settings (frame choice, out-of-office dates and time zone, and the default to restore), the avatar calendar (dates, weekly choices and time zone), and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
+ * customer ID, bug report screenshots (kept 90 days, admins only), free effect offers you were listed for, emailed about, or dismissed, avatar effect settings (frame choice, out-of-office dates and time zone, and the default to restore), the avatar calendar (dates, weekly choices, holiday country and picks, and time zone), and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
@@ -47,7 +47,7 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q("SELECT issue_number, created_at, encode(image, 'base64') AS image_base64 FROM bug_report_screenshots WHERE did = $1 ORDER BY created_at, id"),
     q("SELECT frame_style, frame_color, filter_id, to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone, away_prev_default_rkey FROM avatar_effects WHERE did = $1"),
     q("SELECT o.name, o.effect, u.listed, u.emailed_at, u.dismissed_at FROM effect_offer_users u JOIN effect_offers o ON o.id = u.offer_id WHERE u.did = $1 ORDER BY o.id"),
-    q('SELECT schedule, timezone, next_change_at, state, applied_image, prev_default, created_at, updated_at FROM avatar_schedule WHERE did = $1'),
+    q('SELECT schedule, holidays, timezone, next_change_at, state, applied_image, prev_default, created_at, updated_at FROM avatar_schedule WHERE did = $1'),
   ])
   let primaryEmail: string | null = null
   if (notice[0]) {

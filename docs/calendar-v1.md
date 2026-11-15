@@ -4,7 +4,7 @@ Issue #219. Page: `/account/avatars/schedule` ("Avatar calendar" under Profile i
 
 ## How it works
 - **Settings live in our database** (table `avatar_schedule`, migration 0044), one row per account: the schedule, the time zone, when the next change is due, and the bookkeeping the switch needs. They are not in the lexicon, so they are private and not portable.
-- **Entries** are specific dates and weekly days, each naming one of the user's original images by record key. A date entry beats a weekly entry. The `holiday` hook in `packages/core/src/schedule.ts` is unused (holidays are #220). Renders made by the effects feature cannot be scheduled.
+- **Entries** are specific dates and weekly days, each naming one of the user's original images by record key. A date entry beats a weekly entry. The `holiday` hook in `packages/core/src/schedule.ts` carries holiday avatars (`docs/holidays-v1.md`). Renders made by the effects feature cannot be scheduled.
 - **A time zone is required** before any entry can be saved. The page prefills the browser's zone (or the profile's). A day starts at midnight in that zone. The date logic is `packages/core/src/schedule.ts`.
 - **One look per profile.** The calendar changes which image is the default. It does not store a look of its own.
 
@@ -27,4 +27,3 @@ The table is in the account export (`avatarCalendar`) and is deleted with the ac
 ## Known gaps
 - Needs `EFFECTS_TICK_SECRET` on the web app and the indexer, like out-of-office. Until then the route answers 404 and the job logs that it is off.
 - A page for axe and 390 px checks (`apps/web/a11y/axe.mjs`) is not added yet.
-- Holidays (#220) plug into the `holiday` option later.
