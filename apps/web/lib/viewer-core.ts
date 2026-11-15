@@ -1,4 +1,5 @@
 /** Pure helpers for showing who is signed in. No server imports, so they are easy to test. */
+import { trimSlash } from './trim-slash'
 
 /** What to show for a person: their handle, or the DID when the handle could not be resolved. */
 export function displayName(v: { did: string; handle: string | null }): string {
@@ -33,7 +34,7 @@ export function makeTtlCache<V>(ttlMs: number, max = 500, now: () => number = Da
 
 /** The header avatar for a person: the delivery service's image for their DID, at menu size. `d=404` makes it answer 404 when they have no avatar, so the menu keeps the letter. Null without a delivery base. */
 export function avatarSrcFor(did: string, deliveryBase: string | null | undefined): string | null {
-  return deliveryBase ? `${deliveryBase.replace(/\/+$/, '')}/u/${encodeURIComponent(did)}?s=88&d=404` : null
+  return deliveryBase ? `${trimSlash(deliveryBase)}/u/${encodeURIComponent(did)}?s=88&d=404` : null
 }
 
 export type ViewerPayload = { signedIn: false } | { signedIn: true; name: string; initial: string; avatarSrc: string | null }

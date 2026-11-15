@@ -28,8 +28,8 @@ export type Plan = keyof typeof PLAN_IMAGE_LIMITS
 export const planFor = (did: string): Plan => (isPlusDid(did, process.env.PLUS_DIDS) ? 'plus' : 'free')
 
 export type Check<T> = { ok: true; value: T } | { ok: false; error: string }
-const ok = <T>(value: T): Check<T> => ({ ok: true, value })
-const fail = (error: string): Check<never> => ({ ok: false, error })
+export const ok = <T>(value: T): Check<T> => ({ ok: true, value })
+export const fail = (error: string): Check<never> => ({ ok: false, error })
 
 // ---------- text helpers ----------
 

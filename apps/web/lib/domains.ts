@@ -5,10 +5,7 @@
  * https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/
  */
 import { parse } from 'tldts'
-import type { Check } from './records'
-
-const ok = <T>(value: T): Check<T> => ({ ok: true, value })
-const fail = (error: string): Check<never> => ({ ok: false, error })
+import { fail, ok, type Check } from './records'
 
 export const APEX_MESSAGE =
   'That is a root domain. Custom profile domains work for subdomains such as me.example.com. ' +
