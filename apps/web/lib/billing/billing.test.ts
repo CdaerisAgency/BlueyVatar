@@ -472,6 +472,8 @@ describe.skipIf(!url)('postgres billing store', () => {
     await admin.end()
     pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
     for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql', '0026_organizations.sql', '0036_license_tier_plus.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
+    // The column from migration 0043 (the rest of that migration needs tables this subset does not create).
+    await pool.query('ALTER TABLE notification_prefs ADD COLUMN IF NOT EXISTS offer_notices boolean NOT NULL DEFAULT true')
   })
   afterAll(async () => {
     await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
@@ -483,7 +485,7 @@ describe.skipIf(!url)('postgres billing store', () => {
     expect(await d.prefs(DID)).toEqual({ usageAlerts: true, billingNotices: true })
     await d.setPrefs(DID, { usageAlerts: false, billingNotices: true })
     await d.setPrefs(DID, { usageAlerts: false, billingNotices: false })
-    expect(await d.prefs(DID)).toEqual({ usageAlerts: false, billingNotices: false })
+    expect(await d.prefs(DID)).toEqual({ usageAlerts: false, billingNotices: false, offerNotices: true })
     expect(await d.prefs('did:plc:other')).toEqual({ usageAlerts: true, billingNotices: true })
   })
   it('applies events end to end, writes the license row, and is idempotent under concurrent redelivery', async () => {

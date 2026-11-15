@@ -25,6 +25,8 @@ export interface FlowDeps {
   store: EffectsStore
   repo: RepoPort
   plan(): Promise<Plan>
+  /** Effects granted to this account by live admin offers (#308). Missing means none. */
+  grants?(): Promise<EffectId[]>
   render(input: RenderInput): Promise<Check<{ bytes: Uint8Array; mime: 'image/png' }>>
   /** Same steps as an upload: validate and strip metadata, before screening. */
   prepare(bytes: Uint8Array): Promise<Check<{ bytes: Uint8Array; mime: ImageMime }>>
@@ -71,7 +73,8 @@ export async function applyFrame(deps: FlowDeps, did: string, input: { sourceRke
   const look = parsed.value
   const plan = await deps.plan()
   const ids: EffectId[] = [...(look.frame ? [`frame:${look.frame.style}` as const] : []), ...(look.filter ? [`filter:${look.filter}` as const] : [])]
-  if (!ids.every((id) => canUse(id, plan))) return fail('Frames and filters are part of the Plus plan.')
+  const grants = (await deps.grants?.()) ?? []
+  if (!ids.every((id) => canUse(id, plan, grants))) return fail('Frames and filters are part of the Plus plan.')
   const row = await deps.store.get(did)
   if (row.awayState === 'active') return fail('Out-of-office is on. Turn it off before you change your look.')
   const images = await deps.repo.list()
