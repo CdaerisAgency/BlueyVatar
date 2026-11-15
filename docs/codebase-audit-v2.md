@@ -1,12 +1,73 @@
 <img src="https://cdaeris.com/wp-content/uploads/2025/09/Circle-Text-for-Light-Background.png" alt="Cdaeris" width="200">
 
-# BlueyVatar codebase audit v1
+# BlueyVatar codebase audit v2
+
+v2, 2026-11-15: adds the results of phases 1 and 2 (#335 to #347) and corrects the v1 line count. The v1 text follows below, unchanged except for the size figure.
+
+## Results
+
+### Correction
+
+v1 said the codebase was about 40,300 lines. The count dropped part of the file list. The real figure at `8b04126` was **48,628 lines** (15,273 tests, 33,355 source).
+
+### Line count after the work
+
+| | Before (`8b04126`) | After (`a05efa0`) | Change |
+|---|---|---|---|
+| Total | 48,628 | 48,835 | +207 |
+| Tests | 15,273 | 15,127 | -146 |
+| Source | 33,355 | 33,708 | +353 |
+
+The work did not reduce lines overall. v1 estimated each removed duplicate and missed the cost of the new files, imports and helper signatures a split adds. Splitting one 765-line file into ten route files, for example, repeats imports in each.
+
+| Lane | PR | v1 estimate | Actual net (all files, from the PR) |
+|---|---|---|---|
+| A: changelog fragments | #336 | conflict fix | +126 |
+| B: core subpath exports | #337 | conflict fix | +3 |
+| C: deploy doc and env split | #338 | about -60 | +22 |
+| D: migration number test | #335 | conflict fix | +10 |
+| E: CI setup action | #339 | about -20 | -19 |
+| F: delivery routes | #344 | about -150 | +223 |
+| G: indexer jobs | #341 | about -150 | -5 |
+| H: web admin | #342 | about -170 | -97 |
+| I: web lib plumbing | #345 | about -190 | -114 |
+| J: account data and copy | #346 | about -12 | +38 |
+| K: account pages | #343 | about -280 | +19 |
+| L: shared helpers | #347 | about -75 | +17 |
+
+### Conflict points after the work
+
+| File | Before | After | A new feature now |
+|---|---|---|---|
+| `CHANGELOG.md` | edited by every PR | not edited | adds a file in `changelog.d/` |
+| `docs/deploy.md` | 881 lines | 32-line index | adds a file in `docs/deploy/` and one index line |
+| `.env.example` | 190 lines | 92 (shared only) | edits its own app's `.env.example` |
+| `packages/core/src/index.ts` | one line per module | frozen | imports `@blueyvatar/core/<name>` |
+| `apps/delivery/src/app.ts` | 765 lines | 119 | adds a file in `src/routes/` and one mount line |
+| `apps/delivery/src/app.test.ts` | 1,065 lines | deleted | adds a per-route test file |
+| `apps/indexer/src/index.ts` | import and call per job | one list | adds a job file and one list line |
+| `apps/web/lib/copy.ts` | 104 lines | 10 | edits its area file in `lib/copy/` |
+| `apps/web/lib/account-data.ts` | query, delete and doc per table | data list | adds an entry in `account-data/sources.ts` |
+| `apps/web/lib/store.ts` | 487 lines | 205 | edits the store file for its concern |
+| `apps/web/lib/admin/review.ts` | 492 lines | split into 5 files | edits the file for its concern |
+| `.github/workflows/ci.yml` | 231 lines | 167 | adds a library to `build:libs` |
+
+A test now fails when two migrations share a number. `AGENTS.md` describes the new layout.
+
+### Still open
+
+- **In-memory stores in `apps/web/lib` (about 470 lines):** owner decision. Removing them means web development and tests always need a database.
+- **`tools/loadtest` (about 600 lines):** owner decision.
+- **Pattern variants left on purpose:** these accept different input from the shared core versions, so unifying them would change behavior. `records.ts` time zone check (stricter than core); DID checks in indexer `moderation-digest.ts` and `admin/config.ts` (any non-space body), `tick-route.ts` (any lowercase method, body up to 512), `labels.ts` in core and indexer (no length cap); email checks in `reports.ts` and `bug-report.ts` (looser).
+
+---
+
 
 2026-11-15, against `main` at `8b04126`. Read-only audit: no code was changed.
 
 ## Summary
 
-- **Size:** about 40,300 lines of code. About 25,000 are source and 15,300 are tests.
+- **Size:** 48,628 lines of code (corrected in v2; v1 said about 40,300). About 33,400 are source and 15,300 are tests.
 - **Line reduction available:** about 1,300 lines (3%) without any owner decision. Up to about 2,400 (6%) if the owner also approves removing the in-memory stores and the load-test tool (section 4).
 - **Over-caution:** very little. Almost every `try/catch` and re-check guards a real trust boundary or a documented fail-open path. The few real cases are in section 3.
 - **The larger gain is parallel work.** Eight shared files account for most merge conflicts. Each has a fix that turns "edit the shared file" into "add a new file" (section 1). Under main's up-to-date rule, every conflict costs a branch update and a full CI run, so these come first.
