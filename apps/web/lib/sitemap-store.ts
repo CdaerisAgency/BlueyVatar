@@ -9,6 +9,7 @@ import type pg from 'pg'
 import { selfLabelValues } from '@blueyvatar/core'
 import { TtlCache } from './host-cache'
 import { SITEMAP_MAX_URLS } from './seo'
+import { trimSlash } from './trim-slash'
 
 const ELIGIBLE = `
   FROM profiles p
@@ -39,7 +40,7 @@ export async function eligibleProfiles(pool: pg.Pool, limit = SITEMAP_MAX_URLS, 
 
 export type LabelCheck = (did: string) => Promise<boolean>
 
-const APPVIEW = () => (process.env.BSKY_APPVIEW_URL || 'https://public.api.bsky.app').replace(/\/+$/, '')
+const APPVIEW = () => trimSlash(process.env.BSKY_APPVIEW_URL || 'https://public.api.bsky.app')
 const labelCache = new TtlCache<boolean>(6 * 60 * 60 * 1000, 100_000)
 
 /**

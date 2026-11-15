@@ -1,4 +1,4 @@
-import { getPool } from './store'
+import { getPool } from './pool'
 import { bskyLabelCheck, countEligibleProfiles, eligibleProfiles } from './sitemap-store'
 import type { SitemapSource } from './sitemap'
 

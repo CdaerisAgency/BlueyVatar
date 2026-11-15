@@ -1,19 +1,21 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { canUse } from './catalog'
 import { activeGrants, changeOffer, createOffer, dismissOffer, endOffer, listOffers, offersFor, parseOffer, type OfferInput } from './grants'
+import { testDbUrl, useSchema } from '../testing/pg-schema'
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_grants_${process.pid}_${Date.now()}`
 const ADMIN = 'did:plc:admin'
 const A = 'did:plc:alice'
 const B = 'did:plc:bob'
 const NOW = new Date('2026-12-10T12:00:00Z')
 const base: OfferInput = { effect: 'frame:ring', name: 'Winter ring', startDay: '2026-12-01', endDay: '2026-12-31', audience: 'everyone', planName: '', accounts: '', notify: false }
 
-describe.skipIf(!url)('free effect offers', () => {
-  let pool: pg.Pool
+describe.skipIf(!testDbUrl)('free effect offers', () => {
+  const pool = useSchema('grants', {
+    migrations: 'all',
+    setup: async (p) => {
+      await p.query("INSERT INTO repos (did, handle, active) VALUES ($1, 'alice.test', true)", [A])
+    },
+  })
   const make = async (over: Partial<OfferInput> = {}) => {
     const p = await parseOffer(pool, { ...base, ...over }, NOW)
     if (!p.ok) throw new Error(p.error)
@@ -21,23 +23,6 @@ describe.skipIf(!url)('free effect offers', () => {
   }
   const audit = async (id: number) => (await pool.query("SELECT action, actor FROM admin_actions WHERE action LIKE 'effect_offer_%' AND (detail->>'offerId')::int = $1 ORDER BY id", [id])).rows as { action: string; actor: string }[]
 
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    const dir = new URL('../../../../db/migrations/', import.meta.url)
-    for (const f of readdirSync(dir).filter((n) => n.endsWith('.sql')).sort()) await pool.query(readFileSync(new URL(f, dir), 'utf8'))
-    await pool.query("INSERT INTO repos (did, handle, active) VALUES ($1, 'alice.test', true)", [A])
-  })
-  afterAll(async () => {
-    await pool?.end()
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`DROP SCHEMA ${schema} CASCADE`)
-    await admin.end()
-  })
 
   it('validates the form', async () => {
     const bad = async (over: Partial<OfferInput>) => (await parseOffer(pool, { ...base, ...over }, NOW)).ok

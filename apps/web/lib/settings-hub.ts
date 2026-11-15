@@ -1,3 +1,4 @@
+import { trimSlash } from './trim-slash'
 /** Every settings route, grouped for /account/settings (issue #152). The account side menu has its own model in account-nav.ts. Settings itself lives in the profile menu. */
 export type SettingsLink = { href: string; label: string; description: string }
 export type SettingsGroup = { title: string; links: SettingsLink[] }
@@ -37,7 +38,7 @@ export const SETTINGS_LINKS: SettingsLink[] = [...SETTINGS_GROUPS.flatMap((g) =>
 
 /** The nav entry for a pathname: an exact match, else the longest entry the path sits under. /account itself only matches exactly. */
 export function currentHref(pathname: string, hrefs: readonly string[]): string | null {
-  const path = pathname.replace(/\/+$/, '') || '/'
+  const path = trimSlash(pathname) || '/'
   let best: string | null = null
   for (const h of hrefs) {
     const hit = path === h || (h !== '/account' && path.startsWith(`${h}/`))

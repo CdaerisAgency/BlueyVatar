@@ -1,5 +1,5 @@
 import { getDashboardStore, type LicenseRow } from '../dashboard-store'
-import { getPool } from '../store'
+import { getPool } from '../pool'
 import { listOrganizations, listMembers, memberRole, orgLicense, recordOrgAudit, type AuditAction } from './store'
 import { canManageBilling, canManageKeys, type Role } from './roles'
 

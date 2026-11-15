@@ -1,6 +1,7 @@
+import { trimSlash } from './trim-slash'
 /** Embed snippets for the account page. The image is the user's own primary email hash on the public avatar route. */
 export function avatarUrl(base: string, emailHash: string, size = 200): string {
-  return `${base.replace(/\/+$/, '')}/avatar/${emailHash}?s=${size}`
+  return `${trimSlash(base)}/avatar/${emailHash}?s=${size}`
 }
 
 export function imgSnippet(url: string, size = 200): string {

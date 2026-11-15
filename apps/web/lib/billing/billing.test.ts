@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs'
-import pg from 'pg'
 import Stripe from 'stripe'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { effectiveTier, normalizeTier } from '@blueyvatar/core'
 import { NOT_CONFIGURED, billingEnabled, missingForCheckout, missingForWebhook, planEnabled, priceFor, tierForPrice } from './config'
 import { memoryBillingStore, postgresBillingStore } from './store'
@@ -10,16 +8,13 @@ import { handleStripeWebhook } from './webhook'
 import { pgNoticeDirectory } from '@blueyvatar/core/verification'
 import { resolvePlan } from '../plan'
 import { formatPrice, PRICING } from '../pricing'
+import { testDbUrl, useSchema } from '../testing/pg-schema'
+import { billingEnv, DAY, DID, SECRET, sec, T0 } from '../testing/fixtures'
 
 vi.spyOn(console, 'info').mockImplementation(() => {})
 vi.spyOn(console, 'error').mockImplementation(() => {})
 
-const SECRET = 'whsec_test_secret'
-const env = { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_PRICE_BUSINESS: 'price_biz', STRIPE_PRICE_PLUS: 'price_plus,price_pro' }
-const DID = 'did:plc:alice'
-const DAY = 86_400_000
-const T0 = Date.parse('2026-11-01T00:00:00Z')
-const sec = (ms: number) => Math.floor(ms / 1000)
+const env = billingEnv('price_plus,price_pro')
 
 let n = 0
 function ev(type: string, object: object, at = T0): { payload: string; id: string } {
@@ -461,23 +456,13 @@ describe('Plus', () => {
   })
 })
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_billing_${process.pid}_${Date.now()}`
-describe.skipIf(!url)('postgres billing store', () => {
-  let pool: pg.Pool
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0015_billing.sql', '0017_plus_subscriptions.sql', '0019_notification_prefs.sql', '0022_account_deletion.sql', '0026_organizations.sql', '0036_license_tier_plus.sql']) await pool.query(readFileSync(new URL(`../../../../db/migrations/${f}`, import.meta.url), 'utf8'))
-    // The column from migration 0043 (the rest of that migration needs tables this subset does not create).
-    await pool.query('ALTER TABLE notification_prefs ADD COLUMN IF NOT EXISTS offer_notices boolean NOT NULL DEFAULT true')
-  })
-  afterAll(async () => {
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
+describe.skipIf(!testDbUrl)('postgres billing store', () => {
+  const pool = useSchema('billing', {
+    migrations: ['0001_init', '0015_billing', '0017_plus_subscriptions', '0019_notification_prefs', '0022_account_deletion', '0026_organizations', '0036_license_tier_plus'],
+    setup: async (p) => {
+      // The column from migration 0043 (the rest of that migration needs tables this subset does not create).
+      await p.query('ALTER TABLE notification_prefs ADD COLUMN IF NOT EXISTS offer_notices boolean NOT NULL DEFAULT true')
+    },
   })
 
   it('stores notification preferences, defaulting to on', async () => {

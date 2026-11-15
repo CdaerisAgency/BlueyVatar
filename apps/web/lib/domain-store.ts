@@ -1,4 +1,4 @@
-import { getPool } from './store'
+import { getPool, singleton } from './pool'
 import type { DomainStatus } from './cf-saas'
 
 export type DomainRow = { did: string; hostname: string; cfId: string; status: DomainStatus; createdAt: Date; verifiedAt: Date | null }
@@ -79,10 +79,6 @@ function postgres(pool: NonNullable<ReturnType<typeof getPool>>): DomainStore {
   }
 }
 
-const g = globalThis as { __bvDomains?: DomainStore }
-
 export function getDomainStore(): DomainStore {
-  const pool = getPool()
-  g.__bvDomains ??= pool ? postgres(pool) : memory()
-  return g.__bvDomains
+  return singleton('__bvDomains', postgres, memory)
 }

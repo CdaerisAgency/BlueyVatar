@@ -2,6 +2,7 @@
 import type { PublicProfile } from './profile-page'
 import { pageLinks } from './profile-page'
 import { absoluteUrl, siteUrl } from './site'
+import { trimSlash } from './trim-slash'
 
 /** The hostname the profile is served from when the owner has a verified custom domain, otherwise /p/{handle} on the site. */
 export function profileCanonical(handle: string, customHostname: string | null | undefined, base: string = siteUrl()): string {
@@ -32,7 +33,7 @@ export function personJsonLd(p: PublicProfile, canonical: string, imageBase: str
   if (name) out.name = name
   if (clean(p.handle) && clean(p.handle) !== name) out.alternateName = clean(p.handle)
   if (clean(p.description)) out.description = clean(p.description)
-  if (p.avatar) out.image = `${imageBase.replace(/\/+$/, '')}${p.avatar.url}`
+  if (p.avatar) out.image = `${trimSlash(imageBase)}${p.avatar.url}`
   if (clean(p.jobTitle)) out.jobTitle = clean(p.jobTitle)
   if (company) out.worksFor = { '@type': 'Organization', name: company }
   if (location) out.homeLocation = { '@type': 'Place', name: location }

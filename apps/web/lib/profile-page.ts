@@ -1,6 +1,7 @@
 /** Pure helpers for /p/[handle]: link-preview metadata and the fields the page shows. */
 import { GALLERY_MAX, cleanWallet, profileColors, sanitizeLanguages, sanitizeProfileLinks, sanitizeSocialLinks, type ProfileLink, type ProfileLanguage, type ProfileWallet } from '@blueyvatar/core'
 import { defaultOgImage } from './site'
+import { trimSlash } from './trim-slash'
 
 export interface PublicProfile {
   did: string
@@ -134,7 +135,7 @@ export function profileMetadata(p: PublicProfile, handle: string, imageBase: str
     200,
   )
   // Profiles without an avatar fall back to the site's default image.
-  const images = p.avatar ? [`${imageBase.replace(/\/+$/, '')}${p.avatar.url}`] : [defaultOgImage(siteBase)]
+  const images = p.avatar ? [`${trimSlash(imageBase)}${p.avatar.url}`] : [defaultOgImage(siteBase)]
   return {
     title,
     description,

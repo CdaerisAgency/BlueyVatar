@@ -1,5 +1,5 @@
 import { SCAN_OUTAGE_MESSAGE, SCAN_REJECT_MESSAGE, decideScan, scannerFromEnv, type ContentScanner } from '@blueyvatar/core'
-import { getPool } from './store'
+import { getPool } from './pool'
 import { log, metrics } from './obs'
 
 /**

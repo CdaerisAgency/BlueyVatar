@@ -6,12 +6,9 @@ import { liveHolidayData } from '../holidays/data'
 import { saveTimezone, stripImage, tickSchedule, type ScheduleDeps } from './flow'
 import { NO_DEFAULT, removeHolidayPick, setHolidayCountry, setHolidayPick } from './holiday-flow'
 import { memoryScheduleStore } from './store'
+import { DID, img as fixtureImg } from '../testing/fixtures'
 
-const DID = 'did:plc:alice'
-const img = (rkey: string, isDefault = false): StoredImage => ({
-  uri: `at://${DID}/com.blueyvatar.image/${rkey}`, cid: `cid-${rkey}`, rkey,
-  value: { image: { $type: 'blob', ref: { $link: `blob-${rkey}` }, mimeType: 'image/png', size: 1 }, createdAt: '2026-01-01T00:00:00Z', isDefault },
-})
+const img = (rkey: string, isDefault = false) => fixtureImg(rkey, { isDefault })
 
 function setup(opts: { plan?: Plan; images?: StoredImage[]; now?: Date } = {}) {
   const images = opts.images ?? [img('home', true), img('turkey'), img('flag')]

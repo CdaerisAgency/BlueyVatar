@@ -1,7 +1,7 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import type pg from 'pg'
+import { describe, expect, it } from 'vitest'
 import { incrementView, isBotRequest, lastDaysStats, recordProfileView, statsForPlan, utcDay } from './profile-views'
+import { testDbUrl, useSchema } from './testing/pg-schema'
 
 const h = (o: Record<string, string>) => ({ get: (k: string) => o[k.toLowerCase()] ?? null })
 const CHROME = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36'
@@ -40,24 +40,9 @@ describe('statsForPlan', () => {
   })
 })
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_pviews_${process.pid}_${Date.now()}`
 
-describe.skipIf(!url)('profile view counters', () => {
-  let pool: pg.Pool
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    const dir = new URL('../../../db/migrations/', import.meta.url)
-    for (const f of readdirSync(dir).filter((n) => n.endsWith('.sql')).sort()) await pool.query(readFileSync(new URL(f, dir), 'utf8'))
-  }, 60_000)
-  afterAll(async () => {
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
-  }, 60_000)
+describe.skipIf(!testDbUrl)('profile view counters', () => {
+  const pool = useSchema('views', { migrations: 'all' })
 
   const now = new Date('2026-11-07T23:59:00Z')
 
@@ -75,7 +60,7 @@ describe.skipIf(!url)('profile view counters', () => {
   })
 
   it('stores nothing but the DID, the day, and two counters', async () => {
-    const cols = (await pool.query("SELECT column_name FROM information_schema.columns WHERE table_schema = $1 AND table_name = 'profile_view_counters' ORDER BY column_name", [schema])).rows.map((r) => r.column_name)
+    const cols = (await pool.query("SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'profile_view_counters' ORDER BY column_name")).rows.map((r) => r.column_name)
     expect(cols).toEqual(['day', 'did', 'json_calls', 'views'])
   })
 

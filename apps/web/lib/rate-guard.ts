@@ -1,18 +1,13 @@
 import { headers } from 'next/headers'
-import { getPool } from './store'
+import { singleton } from './pool'
 import { reportError } from './obs'
 import {
   checkLimits, clientIp, isLockedOut, limitedMessage, memoryRateStore, pgRateStore, recordFailure,
   type BucketName, type LimitResult, type RateStore, type Who,
 } from './rate-limit'
 
-type G = typeof globalThis & { __bvRate?: RateStore }
-const g = globalThis as G
-
 export function getRateStore(): RateStore {
-  const pool = getPool()
-  g.__bvRate ??= pool ? pgRateStore(pool) : memoryRateStore()
-  return g.__bvRate
+  return singleton('__bvRate', pgRateStore, memoryRateStore)
 }
 
 async function whoFor(did?: string | null): Promise<Who> {

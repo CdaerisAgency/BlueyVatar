@@ -1,5 +1,5 @@
 import type pg from 'pg'
-import { getPool } from '../store'
+import { singleton } from '../pool'
 
 /** One account's effects state (migration 0041). A missing row means no frame and no out-of-office window. */
 export type AwayState = 'off' | 'scheduled' | 'active' | 'failed'
@@ -101,9 +101,6 @@ export function pgEffectsStore(pool: Pick<pg.Pool, 'query'>): EffectsStore {
   return store
 }
 
-const g = globalThis as { __bvEffects?: EffectsStore }
 export function getEffectsStore(): EffectsStore {
-  const pool = getPool()
-  g.__bvEffects ??= pool ? pgEffectsStore(pool) : memoryEffectsStore()
-  return g.__bvEffects
+  return singleton('__bvEffects', pgEffectsStore, memoryEffectsStore)
 }

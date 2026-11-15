@@ -1,6 +1,6 @@
 import type pg from 'pg'
 import { emptyHolidaySettings, parseHolidaySettings, parseSchedule, type HolidaySettings, type Schedule } from '@blueyvatar/core'
-import { getPool } from '../store'
+import { singleton } from '../pool'
 
 /** One account's avatar calendar (migration 0044). A missing row means no calendar. */
 export type ScheduleState = 'idle' | 'applied' | 'failed'
@@ -115,9 +115,6 @@ export function pgScheduleStore(pool: Pick<pg.Pool, 'query'>): ScheduleStore {
   return store
 }
 
-const g = globalThis as { __bvSchedule?: ScheduleStore }
 export function getScheduleStore(): ScheduleStore {
-  const pool = getPool()
-  g.__bvSchedule ??= pool ? pgScheduleStore(pool) : memoryScheduleStore()
-  return g.__bvSchedule
+  return singleton('__bvSchedule', pgScheduleStore, memoryScheduleStore)
 }

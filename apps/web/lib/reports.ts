@@ -9,6 +9,7 @@ export const RATE_LIMIT = 5
 /** Submissions allowed per signed-in account in the window, in addition to the per-IP limit. */
 export const RATE_LIMIT_DID = 5
 export const RATE_WINDOW_MS = 60 * 60 * 1000
+import { inTx } from './tx'
 import { MAX_CONTACT, MAX_DETAILS, MIN_DETAILS, REASONS, REASON_LABELS, type Reason } from './report-limits'
 export { MAX_CONTACT, MAX_DETAILS, MIN_DETAILS }
 
@@ -51,29 +52,20 @@ export type SubmitResult = { ok: true; id: number } | { ok: false; error: 'rate_
  */
 export async function submitReport(pool: pg.Pool, input: ReportInput, ipHash: string, now = new Date()): Promise<SubmitResult> {
   const since = new Date(now.getTime() - RATE_WINDOW_MS)
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
+  return inTx<SubmitResult>(
+    pool,
+    async (client, abort) => {
+      const { rows: counted } = await client.query('SELECT count(*)::int AS n FROM reports WHERE ip_hash = $1 AND created_at > $2', [ipHash, since])
+      const { rows: byDid } = await client.query('SELECT count(*)::int AS n FROM reports WHERE reporter_did = $1 AND created_at > $2', [input.reporterDid, since])
+      if (counted[0].n >= RATE_LIMIT || byDid[0].n >= RATE_LIMIT_DID) abort({ ok: false, error: 'rate_limited' })
+      const { rows } = await client.query(
+        `INSERT INTO reports (target_did, source, reason, details, reporter_contact, ip_hash, created_at, reporter_did)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        [input.did, input.source, input.reason, input.details, input.contact, ipHash, now, input.reporterDid],
+      )
+      return { ok: true, id: Number(rows[0].id) }
+    },
     // Serializes concurrent submissions from one IP so the limit cannot be raced.
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [ipHash])
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [input.reporterDid])
-    const { rows: counted } = await client.query('SELECT count(*)::int AS n FROM reports WHERE ip_hash = $1 AND created_at > $2', [ipHash, since])
-    const { rows: byDid } = await client.query('SELECT count(*)::int AS n FROM reports WHERE reporter_did = $1 AND created_at > $2', [input.reporterDid, since])
-    if (counted[0].n >= RATE_LIMIT || byDid[0].n >= RATE_LIMIT_DID) {
-      await client.query('ROLLBACK')
-      return { ok: false, error: 'rate_limited' }
-    }
-    const { rows } = await client.query(
-      `INSERT INTO reports (target_did, source, reason, details, reporter_contact, ip_hash, created_at, reporter_did)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [input.did, input.source, input.reason, input.details, input.contact, ipHash, now, input.reporterDid],
-    )
-    await client.query('COMMIT')
-    return { ok: true, id: Number(rows[0].id) }
-  } catch (err) {
-    await client.query('ROLLBACK').catch(() => {})
-    throw err
-  } finally {
-    client.release()
-  }
+    { lock: [ipHash, input.reporterDid] },
+  )
 }

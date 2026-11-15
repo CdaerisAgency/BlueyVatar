@@ -4,17 +4,13 @@ import { memoryBillingStore, type SubscriptionRow } from './store'
 import { cancelScheduledChange, changePlan, getPendingChange, setCancelAtPeriodEnd, subscriptionToSwitch } from './stripe'
 import { longDate, summarize } from './summary'
 import { handleStripeWebhook } from './webhook'
+import { billingEnv, DAY, DID, SECRET, sec, T0 } from '../testing/fixtures'
 
 vi.spyOn(console, 'info').mockImplementation(() => {})
 vi.spyOn(console, 'error').mockImplementation(() => {})
 
 // All identifiers here are fake. No Stripe call is made: the client is a mock.
-const SECRET = 'whsec_test_secret'
-const env = { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: SECRET, STRIPE_PRICE_BUSINESS: 'price_biz', STRIPE_PRICE_PLUS: 'price_plus,price_old_pro,price_old_plus' }
-const DID = 'did:plc:alice'
-const DAY = 86_400_000
-const T0 = Date.parse('2026-11-01T00:00:00Z')
-const sec = (ms: number) => Math.floor(ms / 1000)
+const env = billingEnv('price_plus,price_old_pro,price_old_plus')
 
 async function seed(rows: Array<Partial<SubscriptionRow> & { id: string; tier: SubscriptionRow['tier'] }>) {
   const store = memoryBillingStore()

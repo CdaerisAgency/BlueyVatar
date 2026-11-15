@@ -1,5 +1,5 @@
 import { resolvePlan } from '../plan'
-import { getPool } from '../store'
+import { getPool } from '../pool'
 import { offersFor, type MyOffer } from './grants'
 
 /** Live offers for one account. Empty without a database (local dev) or when the lookup fails, so a page never breaks on it. */

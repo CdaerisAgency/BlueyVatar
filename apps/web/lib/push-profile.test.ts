@@ -2,7 +2,7 @@ import sharp from 'sharp'
 import { describe, expect, it, vi } from 'vitest'
 import { PUSH_APPS, pushApp } from './push-apps'
 import { currentAvatar, pushMessages, restoreProfileAvatar, setProfileAvatar } from './push-profile'
-import { mockHomeServer, testJpeg } from './push-test-server'
+import { mockHomeServer, testJpeg } from './testing/push-test-server'
 
 const BSKY = pushApp('bluesky')!
 const TANGLED = pushApp('tangled')!

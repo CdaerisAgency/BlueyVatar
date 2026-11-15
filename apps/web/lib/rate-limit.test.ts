@@ -1,12 +1,11 @@
-import { readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { checkUploadForm } from './upload-caps'
 import { MAX_BLOB_BYTES } from './upload-limits'
 import {
   BUCKETS, checkLimits, clientIp, formatRetry, isLockedOut, limitedMessage, limitedResponse, memoryRateStore, pgRateStore, recordFailure,
   type BucketName, type RateStore,
 } from './rate-limit'
+import { testDbUrl, useSchema } from './testing/pg-schema'
 
 const headers = (o: Record<string, string>) => ({ get: (n: string) => o[n.toLowerCase()] ?? null })
 
@@ -92,22 +91,8 @@ function suite(make: () => RateStore) {
 
 describe('memory store', () => suite(() => memoryRateStore()))
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_rate_${process.pid}_${Date.now()}`
-describe.skipIf(!url)('Postgres store (rate_windows)', () => {
-  let pool: pg.Pool
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    await pool.query(readFileSync(new URL('../../../db/migrations/0001_init.sql', import.meta.url), 'utf8'))
-  })
-  afterAll(async () => {
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
-  })
+describe.skipIf(!testDbUrl)('Postgres store (rate_windows)', () => {
+  const pool = useSchema('rate', { migrations: ['0001_init'] })
   suite(() => pgRateStore(pool))
   it('shares counts across store instances', async () => {
     const t0 = new Date('2026-02-01T00:00:00Z')

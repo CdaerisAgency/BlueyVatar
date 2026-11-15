@@ -1,39 +1,23 @@
-import type { NodeSavedSession, NodeSavedSessionStore, NodeSavedState, NodeSavedStateStore } from '@atproto/oauth-client-node'
-import pg from 'pg'
+import type { NodeSavedSessionStore, NodeSavedStateStore } from '@atproto/oauth-client-node'
+import type pg from 'pg'
 import type { PendingCode } from './codes'
-import { decideLink, HOLD_DAYS, HOLD_MS, type LinkDecision, type LinkFacts } from './email-policy'
-import { randomBytes } from 'node:crypto'
-import { decryptJson, encryptJson } from './token-crypto'
+import { pgLinks } from './email-links-pg'
+import { decideLink, HOLD_MS, type LinkDecision, type LinkFacts } from './email-policy'
+import { memoryOauthStores, pgOauthStores } from './oauth-stores'
+import { singleton } from './pool'
+import { memorySessions, pgSessions, type WebSessions } from './web-sessions'
+
+// Kept so older importers keep working after the split.
+export { getPool } from './pool'
+export { releaseAllPg } from './email-links-pg'
+export { SESSION_TOUCH_MS, type WebSession } from './web-sessions'
 
 export type LinkMethod = 'trusted_pds' | 'code'
 /** `emailDomain` is the domain of the linked address, or null for links made before migration 0016. `emailEnc` is the address encrypted (`v1:` envelope), or null for links made before migration 0037. */
 export type LinkRow = { emailHash: string; method: LinkMethod; verifiedAt: Date; primary: boolean; emailDomain: string | null; emailEnc: string | null }
 
-/** One signed-in browser or device. `device` is a coarse hint such as "Firefox on Linux". */
-export type WebSession = { id: string; device: string; createdAt: Date; lastUsedAt: Date }
-
-/** A session row counts as used again only when its last use is older than this, so reads stay cheap. */
-export const SESSION_TOUCH_MS = 5 * 60 * 1000
-const SESSION_KEEP_MS = 30 * 24 * 60 * 60 * 1000
-const newSessionId = (): string => `s${randomBytes(16).toString('base64url')}`
-
 export interface Store {
-  /** Signed-in web sessions (migration 0023). The session cookie carries the id of one row. */
-  sessions: {
-    create(did: string, device: string): Promise<string>
-    /**
-     * Whether a cookie is still good. A cookie with a session id needs its row; one without (issued before
-     * sessions were tracked) is good unless the account signed out everywhere after `issuedAt`. A good check
-     * also refreshes the row's last-used time, at most once per SESSION_TOUCH_MS.
-     */
-    valid(did: string, sid: string | null, issuedAt: number): Promise<boolean>
-    /** Newest use first. */
-    list(did: string): Promise<WebSession[]>
-    /** False when the DID has no such session. */
-    revoke(did: string, id: string): Promise<boolean>
-    /** Deletes every session and invalidates older cookies. Returns how many rows were removed. */
-    revokeAll(did: string): Promise<number>
-  }
+  sessions: WebSessions
   oauthState: NodeSavedStateStore
   oauthSession: NodeSavedSessionStore
   links: {
@@ -66,8 +50,6 @@ export interface Store {
 }
 
 export function memoryStore(clock: () => number = Date.now): Store {
-  const states = new Map<string, NodeSavedState>()
-  const sessions = new Map<string, NodeSavedSession>()
   type MemLink = { did: string; method: LinkMethod; verifiedAt: Date; emailMd5?: string; emailDomain?: string; emailEnc?: string; primary: boolean }
   const links = new Map<string, MemLink>()
   const holds = new Map<string, { did: string; releasedAt: number }>()
@@ -93,43 +75,9 @@ export function memoryStore(clock: () => number = Date.now): Store {
     return { owner: !cur ? 'none' : cur.did === did ? 'self' : 'other', heldByOtherUntil: until, count: ownedBy(did).length }
   }
   const codes = new Map<string, PendingCode>()
-  const webSessions = new Map<string, { did: string; device: string; createdAt: number; lastUsedAt: number }>()
-  const floors = new Map<string, number>()
   return {
-    sessions: {
-      async create(did, device) {
-        const id = newSessionId()
-        webSessions.set(id, { did, device, createdAt: clock(), lastUsedAt: clock() })
-        return id
-      },
-      async valid(did, sid, issuedAt) {
-        if (issuedAt <= (floors.get(did) ?? 0)) return false
-        if (!sid) return true
-        const row = webSessions.get(sid)
-        if (!row || row.did !== did) return false
-        if (clock() - row.lastUsedAt >= SESSION_TOUCH_MS) row.lastUsedAt = clock()
-        return true
-      },
-      async list(did) {
-        return [...webSessions]
-          .filter(([, v]) => v.did === did)
-          .map(([id, v]) => ({ id, device: v.device, createdAt: new Date(v.createdAt), lastUsedAt: new Date(v.lastUsedAt) }))
-          .sort((a, b) => b.lastUsedAt.getTime() - a.lastUsedAt.getTime())
-      },
-      async revoke(did, id) {
-        if (webSessions.get(id)?.did !== did) return false
-        webSessions.delete(id)
-        return true
-      },
-      async revokeAll(did) {
-        let n = 0
-        for (const [id, v] of [...webSessions]) if (v.did === did) (webSessions.delete(id), n++)
-        floors.set(did, clock())
-        return n
-      },
-    },
-    oauthState: { get: (k) => states.get(k), set: (k, v) => void states.set(k, v), del: (k) => void states.delete(k) },
-    oauthSession: { get: (k) => sessions.get(k), set: (k, v) => void sessions.set(k, v), del: (k) => void sessions.delete(k) },
+    sessions: memorySessions(clock),
+    ...memoryOauthStores(),
     links: {
       async list(did) {
         return ownedBy(did)
@@ -205,230 +153,11 @@ export function memoryStore(clock: () => number = Date.now): Store {
   }
 }
 
-type Q = Pick<pg.Pool, 'query'>
-
-async function inTx<T>(pool: pg.Pool, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect()
-  try {
-    await c.query('BEGIN')
-    const out = await fn(c)
-    await c.query('COMMIT')
-    return out
-  } catch (err) {
-    await c.query('ROLLBACK').catch(() => {})
-    throw err
-  } finally {
-    c.release()
-  }
-}
-
-/** Serializes link changes per hash, then per account (always in that order, so no deadlock). */
-async function lockFor(c: Q, emailHash: string, did: string): Promise<void> {
-  await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`email:${emailHash}`])
-  await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`did:${did}`])
-}
-
-async function pgFacts(c: Q, did: string, emailHash: string): Promise<LinkFacts> {
-  const cur = await c.query('SELECT did FROM email_links WHERE email_hash = $1', [emailHash])
-  const held = await c.query(
-    `SELECT did, extract(epoch FROM released_at) * 1000 AS at FROM email_holds
-      WHERE email_hash = $1 AND released_at > now() - make_interval(days => $2)`,
-    [emailHash, HOLD_DAYS],
-  )
-  const n = await c.query('SELECT count(*)::int AS n FROM email_links WHERE did = $1', [did])
-  const h = held.rows[0]
-  return {
-    owner: !cur.rows[0] ? 'none' : cur.rows[0].did === did ? 'self' : 'other',
-    heldByOtherUntil: h && h.did !== did ? Number(h.at) + HOLD_MS : undefined,
-    count: n.rows[0].n,
-  }
-}
-
-/** Keeps notice_emails in step with the primary link: only the current primary's address survives. */
-async function reconcilePg(c: Q, did: string, emailHash?: string, enc?: string): Promise<void> {
-  if (emailHash) await c.query('DELETE FROM notice_emails WHERE email_hash = $1 AND did <> $2', [emailHash, did])
-  await c.query(
-    `DELETE FROM notice_emails WHERE did = $1
-        AND email_hash NOT IN (SELECT email_hash FROM email_links WHERE did = $1 AND is_primary)`,
-    [did],
-  )
-  if (emailHash && enc) {
-    await c.query(
-      `INSERT INTO notice_emails (did, email_hash, email_enc)
-            SELECT did, email_hash, $3 FROM email_links WHERE did = $1 AND email_hash = $2 AND is_primary
-       ON CONFLICT (did) DO UPDATE SET email_hash = EXCLUDED.email_hash, email_enc = EXCLUDED.email_enc, updated_at = now()`,
-      [did, emailHash, enc],
-    )
-  }
-}
-
-async function promotePg(c: Q, did: string): Promise<void> {
-  await c.query(
-    `UPDATE email_links SET is_primary = true
-      WHERE email_hash = (SELECT email_hash FROM email_links WHERE did = $1 ORDER BY verified_at, email_hash LIMIT 1)
-        AND NOT EXISTS (SELECT 1 FROM email_links WHERE did = $1 AND is_primary)`,
-    [did],
-  )
-}
-
-/** The indexer runs the same statements when Tap reports an account as deleted (apps/indexer/src/pg-writes.ts). */
-export async function releaseAllPg(c: Q, did: string): Promise<number> {
-  await c.query(
-    `INSERT INTO email_holds (email_hash, did, reason)
-          SELECT email_hash, did, 'account_deleted' FROM email_links WHERE did = $1
-     ON CONFLICT (email_hash) DO UPDATE SET did = EXCLUDED.did, released_at = now(), reason = EXCLUDED.reason`,
-    [did],
-  )
-  const r = await c.query('DELETE FROM email_links WHERE did = $1', [did])
-  await c.query('DELETE FROM email_codes WHERE did = $1', [did])
-  await c.query('DELETE FROM notice_emails WHERE did = $1', [did])
-  await c.query('DELETE FROM notification_prefs WHERE did = $1', [did])
-  return r.rowCount ?? 0
-}
-
 export function pgStore(pool: pg.Pool): Store {
   return {
-    sessions: {
-      async create(did, device) {
-        const id = newSessionId()
-        await pool.query('INSERT INTO web_session (id, did, device) VALUES ($1, $2, $3)', [id, did, device])
-        // Rows past the cookie lifetime can never be used again.
-        await pool.query('DELETE FROM web_session WHERE did = $1 AND last_used_at < now() - ($2::bigint * interval \'1 millisecond\')', [did, SESSION_KEEP_MS])
-        return id
-      },
-      async valid(did, sid, issuedAt) {
-        const f = await pool.query('SELECT 1 FROM session_floor WHERE did = $1 AND revoked_at >= to_timestamp($2::double precision / 1000)', [did, issuedAt])
-        if (f.rowCount) return false
-        if (!sid) return true
-        const r = await pool.query(
-          `UPDATE web_session SET last_used_at = CASE WHEN last_used_at < now() - ($3::bigint * interval '1 millisecond') THEN now() ELSE last_used_at END
-           WHERE id = $1 AND did = $2`,
-          [sid, did, SESSION_TOUCH_MS],
-        )
-        return (r.rowCount ?? 0) > 0
-      },
-      async list(did) {
-        const r = await pool.query('SELECT id, device, created_at, last_used_at FROM web_session WHERE did = $1 ORDER BY last_used_at DESC, id', [did])
-        return r.rows.map((x) => ({ id: x.id, device: x.device, createdAt: x.created_at, lastUsedAt: x.last_used_at }))
-      },
-      async revoke(did, id) {
-        const r = await pool.query('DELETE FROM web_session WHERE id = $1 AND did = $2', [id, did])
-        return (r.rowCount ?? 0) > 0
-      },
-      async revokeAll(did) {
-        return inTx(pool, async (c) => {
-          await c.query('INSERT INTO session_floor (did, revoked_at) VALUES ($1, now()) ON CONFLICT (did) DO UPDATE SET revoked_at = now()', [did])
-          const r = await c.query('DELETE FROM web_session WHERE did = $1', [did])
-          return r.rowCount ?? 0
-        })
-      },
-    },
-    oauthState: {
-      async get(key) {
-        const r = await pool.query('SELECT value FROM oauth_state WHERE key = $1', [key])
-        return r.rows[0] ? decryptJson<NodeSavedState>(r.rows[0].value) : undefined
-      },
-      async set(key, value) {
-        await pool.query(
-          'INSERT INTO oauth_state (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
-          [key, encryptJson(value)],
-        )
-        // Pending requests older than an hour are abandoned.
-        await pool.query("DELETE FROM oauth_state WHERE created_at < now() - interval '1 hour'")
-      },
-      async del(key) {
-        await pool.query('DELETE FROM oauth_state WHERE key = $1', [key])
-      },
-    },
-    oauthSession: {
-      async get(sub) {
-        const r = await pool.query('SELECT value FROM oauth_session WHERE sub = $1', [sub])
-        return r.rows[0] ? decryptJson<NodeSavedSession>(r.rows[0].value) : undefined
-      },
-      async set(sub, value) {
-        await pool.query(
-          'INSERT INTO oauth_session (sub, value) VALUES ($1, $2) ON CONFLICT (sub) DO UPDATE SET value = EXCLUDED.value, updated_at = now()',
-          [sub, encryptJson(value)],
-        )
-      },
-      async del(sub) {
-        await pool.query('DELETE FROM oauth_session WHERE sub = $1', [sub])
-      },
-    },
-    links: {
-      async list(did) {
-        const r = await pool.query(
-          'SELECT email_hash, method, verified_at, is_primary, email_domain, email_enc FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash',
-          [did],
-        )
-        return r.rows.map((x) => ({ emailHash: x.email_hash, method: x.method, verifiedAt: x.verified_at, primary: x.is_primary, emailDomain: x.email_domain ?? null, emailEnc: x.email_enc ?? null }))
-      },
-      async inspect(did, emailHash) {
-        return pgFacts(pool, did, emailHash)
-      },
-      async noticeAddress(did) {
-        const r = await pool.query('SELECT email_enc FROM notice_emails WHERE did = $1', [did])
-        return r.rows[0]?.email_enc ?? undefined
-      },
-      async link(emailHash, did, method, emailMd5, emailEnc, emailDomain) {
-        return inTx(pool, async (c) => {
-          await lockFor(c, emailHash, did)
-          const f = await pgFacts(c, did, emailHash)
-          const d = decideLink(f)
-          if (!d.ok) return d
-          if (f.owner === 'self') {
-            await c.query(
-              `UPDATE email_links SET method = $2, verified_at = now(), email_md5 = coalesce($3, email_md5), email_domain = coalesce($4, email_domain), email_enc = coalesce($5, email_enc) WHERE email_hash = $1`,
-              [emailHash, method, emailMd5 ?? null, emailDomain ?? null, emailEnc ?? null],
-            )
-            await reconcilePg(c, did, emailHash, emailEnc)
-            return d
-          }
-          if (f.owner === 'other') {
-            const old = await c.query('DELETE FROM email_links WHERE email_hash = $1 RETURNING did, is_primary', [emailHash])
-            if (old.rows[0]?.is_primary) await promotePg(c, old.rows[0].did)
-            if (old.rows[0]) await reconcilePg(c, old.rows[0].did)
-          }
-          await c.query(
-            'INSERT INTO email_links (email_hash, did, method, email_md5, is_primary, email_domain, email_enc) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-            [emailHash, did, method, emailMd5 ?? null, f.count === 0, emailDomain ?? null, emailEnc ?? null],
-          )
-          await c.query('DELETE FROM email_holds WHERE email_hash = $1', [emailHash])
-          await reconcilePg(c, did, emailHash, emailEnc)
-          return d
-        })
-      },
-      async remove(did, emailHash) {
-        return inTx(pool, async (c) => {
-          await lockFor(c, emailHash, did)
-          const r = await c.query('DELETE FROM email_links WHERE did = $1 AND email_hash = $2 RETURNING is_primary', [did, emailHash])
-          if (!r.rows[0]) return false
-          await c.query(
-            `INSERT INTO email_holds (email_hash, did, reason) VALUES ($1, $2, 'unlinked')
-             ON CONFLICT (email_hash) DO UPDATE SET did = EXCLUDED.did, released_at = now(), reason = EXCLUDED.reason`,
-            [emailHash, did],
-          )
-          await c.query('DELETE FROM email_holds WHERE released_at < now() - make_interval(days => $1)', [HOLD_DAYS])
-          if (r.rows[0].is_primary) await promotePg(c, did)
-          await reconcilePg(c, did)
-          return true
-        })
-      },
-      async setPrimary(did, emailHash) {
-        return inTx(pool, async (c) => {
-          await lockFor(c, emailHash, did)
-          const own = await c.query('SELECT 1 FROM email_links WHERE did = $1 AND email_hash = $2', [did, emailHash])
-          if (!own.rows[0]) return false
-          await c.query('UPDATE email_links SET is_primary = false WHERE did = $1 AND is_primary AND email_hash <> $2', [did, emailHash])
-          await c.query('UPDATE email_links SET is_primary = true WHERE did = $1 AND email_hash = $2', [did, emailHash])
-          await reconcilePg(c, did)
-          return true
-        })
-      },
-      async releaseAll(did) {
-        return inTx(pool, async (c) => releaseAllPg(c, did))
-      },
-    },
+    sessions: pgSessions(pool),
+    ...pgOauthStores(pool),
+    links: pgLinks(pool),
     codes: {
       async get(did) {
         const r = await pool.query('SELECT * FROM email_codes WHERE did = $1', [did])
@@ -470,18 +199,7 @@ export function pgStore(pool: pg.Pool): Store {
   }
 }
 
-const g = globalThis as { __bvStore?: Store; __bvPool?: pg.Pool }
-
-/** The shared Postgres pool, or null when DATABASE_URL is unset (in-memory dev mode). */
-export function getPool(): pg.Pool | null {
-  if (!process.env.DATABASE_URL) return null
-  g.__bvPool ??= new pg.Pool({ connectionString: process.env.DATABASE_URL, max: Number(process.env.PG_POOL_MAX) || 5 })
-  return g.__bvPool
-}
-
 /** Postgres when DATABASE_URL is set, otherwise in-memory (dev only, lost on restart). */
 export function getStore(): Store {
-  const pool = getPool()
-  g.__bvStore ??= pool ? pgStore(pool) : memoryStore()
-  return g.__bvStore
+  return singleton('__bvStore', pgStore, memoryStore)
 }
