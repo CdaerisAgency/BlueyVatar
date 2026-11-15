@@ -10,7 +10,6 @@ export function maskDomain(domain: string): string {
 }
 
 export type LinkedEmailView = {
-  emailHash: string
   /** The full address (for the signed-in owner) or a masked form such as `***@cdaeris.com`. */
   text: string
   /** True when `text` is the full address. */
@@ -21,8 +20,7 @@ export type LinkedEmailView = {
 
 /**
  * What the owner sees for each linked email. Every link made since migration 0037 keeps its address encrypted, so it is
- * shown in full. Older links keep only a hash and a domain: they are masked, with a prompt to link the address again, and
- * the hash is left for a "Details" disclosure. The primary email falls back to the copy kept for notices.
+ * shown in full. Older links keep only a hash and a domain: they are masked, with a prompt to link the address again. The primary email falls back to the copy kept for notices.
  */
 export function describeLinkedEmails(
   links: LinkRow[],
@@ -31,9 +29,9 @@ export function describeLinkedEmails(
 ): LinkedEmailView[] {
   return links.map((l) => {
     const stored = readPrimaryAddress(l.emailEnc ?? undefined, decrypt) ?? (l.primary ? primaryAddress : null)
-    if (stored) return { emailHash: l.emailHash, text: stored, full: true, method: l.method, primary: l.primary }
+    if (stored) return { text: stored, full: true, method: l.method, primary: l.primary }
     const masked = l.emailDomain ? `***@${l.emailDomain}` : 'Address hidden'
-    return { emailHash: l.emailHash, text: masked, full: false, method: l.method, primary: l.primary }
+    return { text: masked, full: false, method: l.method, primary: l.primary }
   })
 }
 

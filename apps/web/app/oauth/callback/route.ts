@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(new URL(await takeNext(), PUBLIC_URL), 303)
   }
   const o = result.outcome!
-  if (o.kind === 'linked') return back('/account', 'linked', o.masked)
+  if (o.kind === 'linked') return NextResponse.redirect(new URL('/account', PUBLIC_URL), 303)
   if (o.kind === 'code_sent') return NextResponse.redirect(new URL('/account/verify', PUBLIC_URL), 303)
   return back('/account', 'error', o.message)
 }

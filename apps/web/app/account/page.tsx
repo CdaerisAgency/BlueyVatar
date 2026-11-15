@@ -28,9 +28,9 @@ import { setChecklistShown } from './checklist/actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; linked?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
   const did = await requireDid('/account')
-  const { error, linked, qr, galleryError, galleryDone } = await searchParams
+  const { error, qr, galleryError, galleryDone } = await searchParams
   const links = await getStore().links.list(did)
   const emails = describeLinkedEmails(links, readPrimaryAddress(await getStore().links.noticeAddress(did).catch(() => undefined)))
 
@@ -106,7 +106,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {linked && <p>Linked {linked}.</p>}
       <Section
         id="linked-emails"
         title={<>{COPY.linkedEmails.title} <small className="text-base font-normal text-bv-ink-2">({links.length} of {MAX_LINKED_EMAILS})</small></>}
@@ -150,7 +149,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       <Section title="Your avatar URL" id="preview">
         {url ? (
           <>
-            <p>This is how apps see the avatar for your primary email. The link holds a hash of your address, not the address itself.</p>
+            <p>This is how apps see the avatar for your primary email.</p>
             <div className="flex items-center gap-3">
               {avatarCount === 0 ? (
                 <span className="flex size-20 items-center justify-center rounded-full border border-solid border-bv-line text-sm" role="img" aria-label="No avatar yet">

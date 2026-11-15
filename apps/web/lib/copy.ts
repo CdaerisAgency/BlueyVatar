@@ -83,8 +83,6 @@ export const COPY = {
     unsavedTitle: 'Linked email (address not saved yet)',
     unsavedHelp: 'Link the same address again to see it here.',
     linkAgain: 'Link again',
-    technical: 'Technical details',
-    technicalId: 'Technical ID',
     empty: 'No email linked yet. Link one so websites can find your avatar from your address.',
     emptyAction: 'Link an email',
   },

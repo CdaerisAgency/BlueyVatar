@@ -76,7 +76,7 @@ export async function verifyCode(form: FormData): Promise<void> {
   if (result.ok) {
     const outcome = await confirmLink(did, pending, store)
     if (outcome.kind === 'error') return to('/account', 'error', outcome.message)
-    return to('/account', 'linked', pending.masked)
+    return redirect('/account')
   }
   if (result.reason === 'expired') {
     await store.codes.delete(did)
