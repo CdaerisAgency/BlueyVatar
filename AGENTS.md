@@ -23,17 +23,21 @@ Rules for AI agents and people working in this repository. `CLAUDE.md` points he
 6. **Link the issue.** Use "Closes #N" only when the PR finishes the issue. Otherwise write "Part of #N".
 
 ## Deploying
-- The full runbook is `docs/deploy.md`. Read it before any deploy-related work.
+- The runbook index is `docs/deploy.md`, with one topic file each under `docs/deploy/`. Read the topics that apply before any deploy-related work.
 - Agents may deploy, run `fly` commands, change Fly secrets, and run migrations against staging or production, but only when the owner asks for that specific action in the current conversation. Never deploy on your own initiative, never deploy automatically (for example after a merge), and treat one approval as covering only the action named. Say what will be deployed and where, then wait for the go-ahead.
 - CI deploys are opt-in. `.github/workflows/deploy.yml` runs on push to `main` only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Merging a PR can trigger a deploy, and any migration in it, when that variable is on, so say so in the PR when it adds a migration.
 - Staging comes first. Test risky changes on staging with the owner before production.
 
 ## Files that many pull requests touch
 These cause most merge conflicts. Handle them carefully.
-- **`CHANGELOG.md`:** add one entry for user-visible changes, under the current date, in Added, Changed, or Fixed. On a conflict, keep both sides' entries.
-- **Migrations (`db/migrations`):** take the next unused number at the time you open the PR. Check open PRs for the same number. If it is taken when you merge, renumber yours.
+- **Changelog:** for a user-visible change, add one fragment file `changelog.d/YYYY-MM-DD-short-slug.md` with Added, Changed, or Fixed headings (see `changelog.d/README.md`). Do not edit `CHANGELOG.md`; the changelog page reads the fragments, and `pnpm changelog:fold` folds them in later.
+- **Migrations (`db/migrations`):** take the next unused number at the time you open the PR. Check open PRs for the same number. If it is taken when you merge, renumber yours. A test in `tools/migrate` fails when two files share a number.
 - **Spec (`docs/spec`):** one PR at a time edits the spec. A file rename gets its own PR.
 - **Shared copy (`apps/web/lib/copy.ts`) and shared layout components:** keep edits small and merge main before you finish.
+- **`packages/core`:** the `src/index.ts` barrel is frozen. Import a new module by subpath (`@blueyvatar/core/<name>`) and add no line to the barrel.
+- **Deploy docs:** a new feature adds its own file under `docs/deploy/` (`<topic>-v1.md`) and one line in the `docs/deploy.md` index. Do not append to a shared topic file.
+- **Environment variables:** a variable one app reads goes in that app's `.env.example` (`apps/web`, `apps/delivery`, `apps/indexer`). The root `.env.example` holds only shared ones.
+- **CI setup:** shared setup steps live in `.github/actions/setup`. A new workspace library is added to the root `build:libs` script, not to each job.
 
 ## Documents and versions
 - When you revise a document, add or increment its version suffix (`-v1`, `-v2`). Update links that point to the old name in the same PR.
