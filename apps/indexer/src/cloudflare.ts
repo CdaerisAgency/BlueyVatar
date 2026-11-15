@@ -18,10 +18,10 @@ import { errors, log } from './obs.js'
  * `host/img/{did}/{cid}/` in one operation and covers every variant, at the cost of the 5 per
  * minute limit.
  */
-export interface PurgeLogger { info(msg: string, meta?: unknown): void; error(msg: string, meta?: unknown): void }
-export type PurgeMode = 'files' | 'prefix'
+interface PurgeLogger { info(msg: string, meta?: unknown): void; error(msg: string, meta?: unknown): void }
+type PurgeMode = 'files' | 'prefix'
 
-export interface CloudflarePurgerOptions {
+interface CloudflarePurgerOptions {
   zoneId: string
   apiToken: string
   /** Public origin of the delivery API, such as https://blueyvatar.com. */

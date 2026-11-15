@@ -3,8 +3,10 @@ import {
   type EmailSender, type Fetcher, type TxtResolver, type VerifyOutcome,
 } from '@blueyvatar/core/verification'
 import type pg from 'pg'
-import type { DueClaim, OnRevoked, Verifier } from './reverify.js'
+import { job, type JobFactory } from './jobs/schedule.js'
+import { pgReverifyStore, reverifyDue, type DueClaim, type OnRevoked, type Verifier } from './reverify.js'
 import { errors, log } from './obs.js'
+import { publicUrl as sitePublicUrl } from './public-url.js'
 
 const GITHUB_LOGIN = /^https:\/\/github\.com\/([A-Za-z\d-]{1,39})$/
 const OAUTH_METHODS = new Set(['instagram-oauth', 'threads-oauth', 'tiktok-oauth', 'youtube-oauth', 'twitch-oauth'])
@@ -59,7 +61,7 @@ export function makeVerifier(publicUrl: string, f: Fetcher = safeFetch, txt?: Tx
 }
 
 /** Resolves a DID to a deliverable address, or null. */
-export type RecipientLookup = (did: string) => Promise<string | null>
+type RecipientLookup = (did: string) => Promise<string | null>
 
 /** Reads the account's primary email from notice_emails and decrypts it (TOKEN_ENCRYPTION_KEY). Never logs the address. */
 export function pgRecipientLookup(pool: Pick<pg.Pool, 'query'>, master?: Buffer): RecipientLookup {
@@ -91,8 +93,8 @@ export function emailNotice(sender: EmailSender, lookup: RecipientLookup, public
   }
 }
 
-export function reverifyFromEnv(pool: Pick<pg.Pool, 'query'>, env: Record<string, string | undefined> = process.env) {
-  const publicUrl = env.PUBLIC_URL ?? 'https://blueyvatar.com'
+function reverifyFromEnv(pool: Pick<pg.Pool, 'query'>, env: Record<string, string | undefined> = process.env) {
+  const publicUrl = sitePublicUrl(env)
   const writer = attestationWriterFromEnv(env)
   return {
     verify: makeVerifier(publicUrl),
@@ -101,4 +103,18 @@ export function reverifyFromEnv(pool: Pick<pg.Pool, 'query'>, env: Record<string
     afterMs: Number(env.REVERIFY_AFTER_DAYS ?? 30) * 86_400_000,
     everyMs: Number(env.REVERIFY_INTERVAL_HOURS ?? 24) * 3_600_000,
   }
+}
+
+/**
+ * Re-checks attested claims older than REVERIFY_AFTER_DAYS every REVERIFY_INTERVAL_HOURS. The first pass waits one
+ * interval (startNow is off) so a restart does not trigger a pass.
+ */
+export const reverifyJob: JobFactory = (pool, env = process.env) => {
+  const rv = reverifyFromEnv(pool, env)
+  const store = pgReverifyStore(pool)
+  return job({
+    name: 'reverify_pass', label: 'reverify pass', everyMs: rv.everyMs, startNow: false,
+    run: () => reverifyDue({ store, verify: rv.verify, remove: rv.remove, onRevoked: rv.onRevoked }, { afterMs: rv.afterMs, minGapMs: rv.everyMs * 0.8 }),
+    summarize: (r) => r.checked > 0 && { ...r },
+  })
 }

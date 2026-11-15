@@ -9,7 +9,7 @@ import type { Label, LabelFrame, LabelSource } from './labels.js'
  * Endpoint comes from the labeler's DID document service entry `#atproto_labeler`.
  * https://atproto.com/specs/label
  */
-export async function labelerEndpoint(did: string, resolver = new IdResolver({})): Promise<string> {
+async function labelerEndpoint(did: string, resolver = new IdResolver({})): Promise<string> {
   const doc = await resolver.did.resolve(did)
   const svc = doc?.service?.find((s) => s.id === '#atproto_labeler' || s.id === `${did}#atproto_labeler`)
   if (!svc || typeof svc.serviceEndpoint !== 'string') throw new Error('labeler service endpoint not found in DID document')
@@ -17,7 +17,7 @@ export async function labelerEndpoint(did: string, resolver = new IdResolver({})
 }
 
 /** Parses one stream message. Returns null for non-label frames; throws on an error frame. */
-export function parseLabelMessage(data: Uint8Array): LabelFrame | null {
+function parseLabelMessage(data: Uint8Array): LabelFrame | null {
   const [header, body] = cborDecodeMulti(data) as [{ op?: number; t?: string }, Record<string, unknown>]
   if (header?.op === -1) throw new Error(`label stream error: ${String((body as { error?: unknown })?.error ?? 'unknown')}`)
   if (header?.t !== '#labels' || typeof body?.seq !== 'number' || !Array.isArray(body.labels)) return null
