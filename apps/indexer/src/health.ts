@@ -1,13 +1,13 @@
 import { createServer, type Server } from 'node:http'
 import type { Metrics } from '@blueyvatar/core'
 
-export interface HealthOptions {
+interface HealthOptions {
   /** Fail readiness when neither an event nor a heartbeat arrived within this many milliseconds. */
   windowMs: number
   now?: () => number
 }
 
-export interface ReadyState {
+interface ReadyState {
   ready: boolean
   reason?: string
   lastEventAgeMs: number
@@ -82,7 +82,7 @@ export function firstNumber(v: unknown): number | null {
   return null
 }
 
-export interface TapProbeOptions {
+interface TapProbeOptions {
   tapUrl: string
   adminPassword?: string
   fetch?: typeof fetch
@@ -116,7 +116,7 @@ export async function probeTap(o: TapProbeOptions, health: IndexerHealth): Promi
   return true
 }
 
-export interface HealthServerOptions {
+interface HealthServerOptions {
   health: IndexerHealth
   metrics: Metrics
   port: number

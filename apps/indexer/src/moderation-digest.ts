@@ -2,7 +2,9 @@ import { emailSender, type EmailSender } from '@blueyvatar/core/verification'
 import { buildDigest, digestIsQuiet, formatDigest, slaHours } from '@blueyvatar/core/moderation'
 import type pg from 'pg'
 import { pgRecipientLookup } from './reverify-wiring.js'
+import { job, type JobFactory } from './jobs/schedule.js'
 import { errors, log } from './obs.js'
+import { publicUrl } from './public-url.js'
 
 type Env = Record<string, string | undefined>
 const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
@@ -23,7 +25,7 @@ export async function digestRecipients(pool: Pick<pg.Pool, 'query'>, env: Env = 
   return []
 }
 
-export type DigestRun = 'early' | 'already' | 'no_recipient' | 'quiet' | 'sent' | 'failed'
+type DigestRun = 'early' | 'already' | 'no_recipient' | 'quiet' | 'sent' | 'failed'
 
 /**
  * Sends the daily moderation digest at most once per UTC day, from MODERATION_DIGEST_HOUR_UTC (default 13) on. A row in
@@ -44,7 +46,7 @@ export async function runModerationDigest(pool: pg.Pool, sender: EmailSender, en
       log.warn('moderation digest not sent: set MODERATION_DIGEST_TO, or ADMIN_DIDS with an account that has an email on file')
       return 'no_recipient'
     }
-    const mail = formatDigest(digest, env.PUBLIC_URL ?? 'https://blueyvatar.com')
+    const mail = formatDigest(digest, publicUrl(env))
     for (const a of to) await sender.send({ to: a, ...mail })
     await pool.query('UPDATE moderation_digest_runs SET sent = true WHERE run_day = $1', [day])
     return 'sent'
@@ -56,11 +58,11 @@ export async function runModerationDigest(pool: pg.Pool, sender: EmailSender, en
   }
 }
 
-/** Checks every 15 minutes and sends once per day. Runs in the indexer because it is always on; the web and delivery apps scale to zero. */
-export function scheduleModerationDigest(pool: pg.Pool, env: Env = process.env, sender: EmailSender = emailSender(env), everyMs = 15 * 60_000): NodeJS.Timeout {
-  const run = () => void runModerationDigest(pool, sender, env).then((r) => { if (r === 'sent' || r === 'failed') log.info('moderation digest', { result: r }) })
-  run()
-  const timer = setInterval(run, everyMs)
-  timer.unref()
-  return timer
+/**
+ * Daily moderation digest email to the admin address (counts only). Checks every 15 minutes and sends once per day.
+ * Off until an address or ADMIN_DIDS exists. Runs in the indexer because it is always on; the web and delivery apps scale to zero.
+ */
+export const moderationDigestJob: JobFactory = (pool, env = process.env) => {
+  const sender = emailSender(env)
+  return job({ name: 'moderation_digest', everyMs: 15 * 60_000, run: () => runModerationDigest(pool, sender, env), summarize: (r) => (r === 'sent' || r === 'failed') && { result: r } })
 }

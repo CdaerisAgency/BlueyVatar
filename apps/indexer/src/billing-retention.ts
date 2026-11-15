@@ -1,9 +1,10 @@
 import type pg from 'pg'
+import { job, type JobFactory } from './jobs/schedule.js'
 
 /** Stripe billing rows are kept this long after a user deletes their data (issue #140, owner decision). */
-export const BILLING_RETENTION_YEARS = 7
+const BILLING_RETENTION_YEARS = 7
 
-export type PurgeResult = { customers: number; subscriptions: number; events: number }
+type PurgeResult = { customers: number; subscriptions: number; events: number }
 
 /**
  * Deletes billing rows whose owner deleted their data more than 7 years before `now` (`deleted_at`, set by the web app).
@@ -17,14 +18,8 @@ export async function purgeExpiredBilling(pool: Pick<pg.Pool, 'query'>, now: Dat
   return { customers: cust.rowCount ?? 0, subscriptions: subs.rowCount ?? 0, events: ev.rowCount ?? 0 }
 }
 
-/** Runs the purge now and then daily. Failures are logged and retried on the next tick. */
-export function scheduleBillingPurge(pool: Pick<pg.Pool, 'query'>, everyMs = 24 * 60 * 60 * 1000): NodeJS.Timeout {
-  const run = () =>
-    purgeExpiredBilling(pool)
-      .then((r) => (r.customers || r.subscriptions || r.events) && console.log('billing retention purge', JSON.stringify(r)))
-      .catch((err) => console.error('billing retention purge failed', err instanceof Error ? err.message : 'unknown'))
-  void run()
-  const timer = setInterval(run, everyMs)
-  timer.unref()
-  return timer
-}
+/** Deletes Stripe billing rows 7 years after their owner deleted their data. Runs now and then daily. */
+export const billingPurgeJob: JobFactory = (pool) => job({
+  name: 'billing_retention_purge', everyMs: 24 * 60 * 60 * 1000, run: () => purgeExpiredBilling(pool),
+  summarize: (r) => (r.customers || r.subscriptions || r.events) && r,
+})
