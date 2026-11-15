@@ -2,6 +2,11 @@
 
 New features, changes, and fixes to BlueyVatar, newest first. Each entry is dated and grouped under Added, Changed, and Fixed. Early entries come from the titles of merged pull requests.
 
+## 2026-11-15
+
+### Changed
+- Signing in now asks Tap to follow your account (`POST /repos/add`), so the indexer records it right away, even before you save a profile (closes #223). It is best effort with a 2 second limit and never blocks sign-in. It runs only when `TAP_URL` and `TAP_ADMIN_PASSWORD` are set on the web app.
+
 ## 2026-11-14
 
 ### Added
