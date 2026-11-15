@@ -1,5 +1,6 @@
 import { emailSender, type EmailSender } from '@blueyvatar/core/verification'
 import { buildDigest, digestIsQuiet, formatDigest, slaHours } from '@blueyvatar/core/moderation'
+import { EMAIL_RE } from '@blueyvatar/core/patterns'
 import type pg from 'pg'
 import { pgRecipientLookup } from './reverify-wiring.js'
 import { job, type JobFactory } from './jobs/schedule.js'
@@ -7,7 +8,6 @@ import { errors, log } from './obs.js'
 import { publicUrl } from './public-url.js'
 
 type Env = Record<string, string | undefined>
-const EMAIL_RE = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]+$/
 const DID_RE = /^did:(plc|web):\S+$/
 
 /**

@@ -4,6 +4,7 @@
  * Dates are `YYYY-MM-DD` strings in the owner's time zone. The holiday's country zone is never used.
  */
 import { addDays, type HolidayLookup } from './schedule.js'
+import { DATE_RE, RKEY_RE } from './patterns.js'
 
 export interface HolidayPick {
   /** Holiday id, derived by the web app from the library's English name. */
@@ -34,8 +35,6 @@ export type OccurrenceSource = (id: string, year: number) => HolidayOccurrence[]
 export const MAX_HOLIDAY_PICKS = 100
 export const MAX_WINDOW_DAYS = 14
 
-const RKEY_RE = /^[A-Za-z0-9._:~-]{1,512}$/
-const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 const ID_MAX = 64
 
 export const emptyHolidaySettings = (): HolidaySettings => ({ country: '', region: '', picks: [] })
