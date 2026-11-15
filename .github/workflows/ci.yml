@@ -18,8 +18,8 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
-# Each job gets its own pnpm home and store so concurrent jobs on the shared self-hosted runner cannot
-# remove each other's pnpm binary or share a half-written store.
+# Shared setup (per-job pnpm home and store, Node, install, lexicon types, library builds) lives in
+# .github/actions/setup so a version bump or a new library package is one edit.
 
 jobs:
   check:
@@ -45,39 +45,7 @@ jobs:
       - name: Point tests at the service port
         run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
-      - name: Isolate pnpm per job
-        run: |
-          home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
-          mkdir -p "$home/store"
-          echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
-          echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
-          echo "$home" >> "$GITHUB_PATH"
-
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.28.0
-          # Install into the per-job folder. The default (~/setup-pnpm) is shared by
-          # every runner on the machine, so concurrent jobs removed each other's pnpm.
-          dest: ${{ env.PNPM_HOME }}/setup
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate lexicon types
-        run: pnpm lex:build
-
-      - name: Build core
-        run: pnpm --filter @blueyvatar/core build
-
-      - name: Build hovercards
-        run: pnpm --filter @blueyvatar/hovercards build
-
-      - name: Build avatar
-        run: pnpm --filter @blueyvatar/avatar build
+      - uses: ./.github/actions/setup
 
       - name: Typecheck
         run: pnpm -r typecheck
@@ -171,39 +139,7 @@ jobs:
       - name: Point the app at the service port
         run: echo "E2E_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
-      - name: Isolate pnpm per job
-        run: |
-          home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
-          mkdir -p "$home/store"
-          echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
-          echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
-          echo "$home" >> "$GITHUB_PATH"
-
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.28.0
-          # Install into the per-job folder. The default (~/setup-pnpm) is shared by
-          # every runner on the machine, so concurrent jobs removed each other's pnpm.
-          dest: ${{ env.PNPM_HOME }}/setup
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate lexicon types
-        run: pnpm lex:build
-
-      - name: Build core
-        run: pnpm --filter @blueyvatar/core build
-
-      - name: Build hovercards
-        run: pnpm --filter @blueyvatar/hovercards build
-
-      - name: Build avatar
-        run: pnpm --filter @blueyvatar/avatar build
+      - uses: ./.github/actions/setup
 
       - name: Apply migrations
         run: pnpm db:migrate
