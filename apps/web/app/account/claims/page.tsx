@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
+import { EmptyState, Notices, PageHeader, PageMain, Section } from '../../../components/Page'
 import CopyField from '../CopyField'
 import { Button } from '../../../components/Button'
 import { Field } from '../../../components/Field'
@@ -13,7 +13,6 @@ import { detectAtprotoApps, type AtprotoApp } from '@blueyvatar/core'
 import { RepoError, repoSession, xrpc } from '../../../lib/repo'
 import { addClaim, deleteClaimAction, setHidden, verifyClaim } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 const HELP: Record<string, string> = {
   github: 'GitHub asks you to sign in once. BlueyVatar reads only your username.',
@@ -114,9 +113,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
   return (
     <PageMain>
       <PageHeader title="Linked accounts" intro="Link your GitHub, Mastodon, website, or other accounts to your profile. BlueyVatar checks each one, and only checked accounts appear on your profile." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
       <p>Accounts you hide stay verified but are left off your profile page and hover cards.</p>
       <details className="mb-5">
         <summary>What does &quot;link back to your profile&quot; mean?</summary>

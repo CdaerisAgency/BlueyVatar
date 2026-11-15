@@ -7,7 +7,6 @@ import { verifyCode } from '../../actions'
 import { requireDid } from '../../../lib/auth'
 import { getStore } from '../../../lib/store'
 
-export const dynamic = 'force-dynamic'
 
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const did = await requireDid('/account/verify')

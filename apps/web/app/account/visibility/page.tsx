@@ -4,7 +4,6 @@ import { getDashboardStore } from '../../../lib/dashboard-store'
 import { isPublic, PUBLIC_DATA_NOTICE } from '../../../lib/visibility'
 import { VisibilityForm } from './VisibilityForm'
 
-export const dynamic = 'force-dynamic'
 
 export default async function VisibilityPage() {
   const did = await requireDid('/account/visibility')

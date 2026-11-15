@@ -1,4 +1,4 @@
-import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
+import { EmptyState, Notices, PageHeader, PageMain, Section } from '../../../components/Page'
 import { Button, ButtonLink } from '../../../components/Button'
 import { ratingFromLabels } from '@blueyvatar/core'
 import { redirect } from 'next/navigation'
@@ -19,7 +19,6 @@ import { consentOpen } from '../../../lib/push-status'
 import LinkedEmail from '../LinkedEmail'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AvatarsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
   const did = await requireDid('/account/avatars')
@@ -48,9 +47,7 @@ export default async function AvatarsPage({ searchParams }: { searchParams: Prom
   return (
     <PageMain>
       <PageHeader title="Avatars" intro="Upload, import, and choose the images apps show for you." />
-      {error && <p role="alert">{error}</p>}
-      {done && <p role="status">{done}</p>}
-      {loadError && <p role="alert">{loadError}</p>}
+      <Notices error={error} done={done} loadError={loadError} />
 
       <PushNotices items={pushApps} from="avatars" />
       <p>
