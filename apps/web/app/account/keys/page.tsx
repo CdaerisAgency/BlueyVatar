@@ -13,7 +13,6 @@ import { getOrganization } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
 import { CreateKeyForm, KeyActions } from './KeyControls'
 
-export const dynamic = 'force-dynamic'
 
 export default async function KeysPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
   const did = await requireDid('/account/keys')

@@ -8,7 +8,6 @@ import { displayName } from '../../../lib/viewer-core'
 import { DANGER_ZONE, SETTINGS_GROUPS } from '../../../lib/settings-hub'
 import { signOutEverywhere, signOutSession } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 const when = (d: Date) => d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
 

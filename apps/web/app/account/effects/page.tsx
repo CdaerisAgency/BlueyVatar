@@ -10,7 +10,6 @@ import { FreeEffectsSection } from '../../../components/FreeEffectsSection'
 import { myOffers } from '../../../lib/effects/my-offers'
 import { cancelAway, deleteFrame, saveAway, saveFrame } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 const STATE_TEXT = {
   off: 'Out-of-office is off.',

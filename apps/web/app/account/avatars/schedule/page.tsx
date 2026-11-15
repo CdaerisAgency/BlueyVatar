@@ -13,7 +13,6 @@ import { activeEntry, isValidTimeZone, localDate, nextChange } from '@blueyvatar
 import { addScheduleDate, removeScheduleDate, saveScheduleTimezone, saveScheduleWeekly } from './actions'
 import { TimezoneInput } from './TimezoneInput'
 
-export const dynamic = 'force-dynamic'
 
 const WEEKDAYS = [
   { n: 1, label: 'Monday' }, { n: 2, label: 'Tuesday' }, { n: 3, label: 'Wednesday' }, { n: 4, label: 'Thursday' },

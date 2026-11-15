@@ -27,7 +27,6 @@ import LinkedEmail from './LinkedEmail'
 import { ShareSection } from './ShareSection'
 import { setChecklistShown } from './checklist/actions'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ error?: string; qr?: string; galleryError?: string; galleryDone?: string }> }) {
   const did = await requireDid('/account')

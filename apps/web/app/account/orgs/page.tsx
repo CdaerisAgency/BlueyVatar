@@ -6,7 +6,6 @@ import { getPool } from '../../../lib/store'
 import { CreateOrgForm } from './CreateOrgForm'
 
 
-export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Organizations' }
 
 export default async function OrgsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {

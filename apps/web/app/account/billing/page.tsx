@@ -17,7 +17,6 @@ import { displayName } from '../../../lib/viewer-core'
 import { LicenseUsage } from './LicenseUsage'
 import { cancelPlanChange, cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 const NOTICE: Record<string, string> = {
   success: 'Thanks. Your subscription is being set up. This page updates when Stripe confirms the payment, usually within a minute.',

@@ -9,7 +9,6 @@ import { viewerFor } from '../../../../lib/viewer'
 import { displayName } from '../../../../lib/viewer-core'
 import { deleteMyData } from './actions'
 
-export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Danger zone' }
 
 export default async function DangerZonePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {

@@ -13,7 +13,6 @@ import { occurrenceSource } from '../../../../lib/holidays/data'
 import { removeHolidayPickAction, saveHolidayCountry, saveHolidayPick } from './actions'
 import { HolidayCredit } from './HolidayCredit'
 
-export const dynamic = 'force-dynamic'
 
 const imageName = (i: StoredImage | undefined) => (i ? i.value.alt || `Image from ${i.value.createdAt.slice(0, 10)}` : 'Image missing')
 

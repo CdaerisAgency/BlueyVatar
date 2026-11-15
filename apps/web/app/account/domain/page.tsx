@@ -10,7 +10,6 @@ import { DomainForm } from './DomainForm'
 
 import { PollRefresh } from './PollRefresh'
 
-export const dynamic = 'force-dynamic'
 
 export default async function DomainPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const did = await requireDid('/account/domain')

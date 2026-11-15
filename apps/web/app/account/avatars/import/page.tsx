@@ -9,7 +9,6 @@ import { limited } from '../../../../lib/rate-guard'
 import { ImportForm } from './ImportForm'
 
 
-export const dynamic = 'force-dynamic'
 
 export default async function ImportPage({ searchParams }: { searchParams: Promise<{ source?: string; error?: string }> }) {
   const did = await requireDid('/account/avatars/import')

@@ -19,7 +19,6 @@ import { consentOpen } from '../../../lib/push-status'
 import LinkedEmail from '../LinkedEmail'
 import { makeDefault, removeImage, uploadImage } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 export default async function AvatarsPage({ searchParams }: { searchParams: Promise<{ error?: string; done?: string }> }) {
   const did = await requireDid('/account/avatars')

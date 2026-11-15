@@ -13,7 +13,6 @@ import { detectAtprotoApps, type AtprotoApp } from '@blueyvatar/core'
 import { RepoError, repoSession, xrpc } from '../../../lib/repo'
 import { addClaim, deleteClaimAction, setHidden, verifyClaim } from './actions'
 
-export const dynamic = 'force-dynamic'
 
 const HELP: Record<string, string> = {
   github: 'GitHub asks you to sign in once. BlueyVatar reads only your username.',

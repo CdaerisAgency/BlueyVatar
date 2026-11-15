@@ -9,7 +9,6 @@ import { changeOrgRole, removeOrgMember } from '../actions'
 import { AddMemberForm } from './AddMemberForm'
 
 
-export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Organization' }
 
 export default async function OrgPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; done?: string }> }) {

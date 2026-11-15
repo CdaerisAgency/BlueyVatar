@@ -6,7 +6,6 @@ import { requireDid } from '../../../lib/auth'
 import { getPool } from '../../../lib/store'
 import { submitAppealAction } from './actions'
 
-export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Appeal a decision' }
 
 const LABEL = { takedown: 'Images removed', block_image: 'Image removed', suspend: 'Account suspended', warn: 'Warning', rating_change: 'Image rating changed' } as const
