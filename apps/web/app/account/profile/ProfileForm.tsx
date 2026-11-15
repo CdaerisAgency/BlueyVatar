@@ -1,6 +1,8 @@
 'use client'
-import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { Button } from '../../../components/Button'
+import { COPY } from '../../../lib/copy'
+import { TIMEZONE_ENTRIES, entryForZone, isListedZone, zoneLabel } from '../../../lib/timezones'
 import {
   INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, MAX_INTEREST_CHARS, interestStats, countGraphemes, fieldId,
   MAX_LANGUAGES, MAX_LANGUAGE_TAG_LENGTH, MAX_SOCIAL_LINKS, MAX_SOCIAL_LABEL_GRAPHEMES, MAX_SOCIAL_URL_LENGTH,
@@ -11,36 +13,6 @@ import { saveProfile } from './actions'
 
 const NOT_SET = ''
 
-function offsetLabel(zone: string, now: Date): string {
-  try {
-    const part = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' }).formatToParts(now).find((x) => x.type === 'timeZoneName')?.value ?? ''
-    const o = part === 'GMT' ? '+00:00' : part.replace('GMT', '')
-    return `${zone.replace(/_/g, ' ')} (UTC${o})`
-  } catch {
-    return zone
-  }
-}
-
-function zoneGroups(saved: string): { region: string; zones: { value: string; label: string }[] }[] {
-  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
-  let list: string[] = []
-  try {
-    list = intl.supportedValuesOf?.('timeZone') ?? []
-  } catch {
-    list = []
-  }
-  if (!list.includes('UTC')) list = [...list, 'UTC']
-  const now = new Date()
-  const groups = new Map<string, { value: string; label: string }[]>()
-  for (const z of list) {
-    const region = z.includes('/') ? z.split('/')[0]! : 'Other'
-    groups.set(region, [...(groups.get(region) ?? []), { value: z, label: offsetLabel(z, now) }])
-  }
-  const out = [...groups].map(([region, zones]) => ({ region, zones }))
-  // A saved value that is not in the list still shows as the selected option.
-  if (saved && !list.includes(saved)) out.unshift({ region: 'Saved value', zones: [{ value: saved, label: saved }] })
-  return out
-}
 
 /** Rows carry a stable key so removing one row does not shuffle what is typed in the others. */
 type Keyed<T> = T & { key: number }
@@ -64,7 +36,17 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
   const [socialLinks, setSocialLinks] = useState<Keyed<SocialLinkRow>[]>(() => withKeys(v.socialLinks))
   const [wallets, setWallets] = useState<Keyed<WalletRow>[]>(() => withKeys(v.wallets))
   const summary = useRef<HTMLDivElement>(null)
-  const groups = useMemo(() => zoneGroups(initial.timezone), [initial.timezone])
+
+  // When nothing is saved, preselect the list entry that matches this browser's clock.
+  useEffect(() => {
+    if (initial.timezone) return
+    try {
+      const entry = entryForZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      if (entry) setTimezone((cur) => cur || entry.id)
+    } catch {
+      // No detection available: the field stays on Not set.
+    }
+  }, [initial.timezone])
 
   // After a result comes back, keep the typed values and move focus to the first problem.
   useEffect(() => {
@@ -90,7 +72,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
   const err = (f: ProfileErrorKey) => errors[f]
   const described = (f: ProfileErrorKey, extra?: string) => [err(f) && `${fieldId(f)}-error`, extra].filter(Boolean).join(' ') || undefined
   const text = (name: ProfileTextField, label: string, max: number) => (
-    <label>
+    <label className="bv-setting">
       {label}
       <input id={`profile-${name}`} name={name} defaultValue={v[name]} key={`${name}-${state.values ? 'r' : 'i'}`} maxLength={max} aria-invalid={err(name) ? true : undefined} aria-describedby={described(name)} />
       {err(name) && <span id={`profile-${name}-error`} className="field-error">{err(name)}</span>}
@@ -123,21 +105,35 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       {text('location', 'Location', 1000)}
       {text('pronouns', 'Pronouns', 400)}
       {text('pronunciation', 'Name pronunciation', 1000)}
+      <div className="bv-setting">
       <label>
-        Time zone
-        <select id="profile-timezone" name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} aria-invalid={err('timezone') ? true : undefined} aria-describedby={described('timezone')} suppressHydrationWarning>
-          <option value={NOT_SET}>Not set</option>
-          {groups.map((g) => (
-            <optgroup key={g.region} label={g.region}>
-              {g.zones.map((z) => (
-                <option key={z.value} value={z.value}>{z.label}</option>
-              ))}
-            </optgroup>
+        {COPY.timezone.label}
+        <select id="profile-timezone" name="timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} aria-invalid={err('timezone') ? true : undefined} aria-describedby={described('timezone', 'profile-timezone-help')}>
+          <option value={NOT_SET}>{COPY.timezone.notSet}</option>
+          {/* A stored zone that is not in the short list stays selected under its own name. */}
+          {timezone && !isListedZone(timezone) && <option value={timezone}>{timezone} ({COPY.timezone.savedSuffix})</option>}
+          {TIMEZONE_ENTRIES.map((e) => (
+            <option key={e.id} value={e.id}>{zoneLabel(e)}</option>
           ))}
         </select>
         {err('timezone') && <span id="profile-timezone-error" className="field-error">{err('timezone')}</span>}
       </label>
-      <Button type="button" onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use my current time zone</Button>
+      <p id="profile-timezone-help">{COPY.timezone.help}</p>
+      <div>
+      <Button
+        type="button"
+        onClick={() => {
+          const zone = Intl.DateTimeFormat().resolvedOptions().timeZone
+          const entry = entryForZone(zone)
+          if (entry) setTimezone(entry.id)
+          else if (zone) setTimezone(zone)
+        }}
+      >
+        {COPY.timezone.useCurrent}
+      </Button>
+      </div>
+      </div>
+      <div className="bv-setting">
       <label>
         Interests
         <textarea
@@ -155,7 +151,8 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       <p id="profile-interests-help" aria-live="polite">
         Up to {MAX_INTERESTS} interests, {MAX_INTEREST_CHARS} characters each. Separate them with commas or new lines. {stats.count} of {MAX_INTERESTS} interests. {interestProblems}
       </p>
-      <fieldset id="profile-languages" tabIndex={-1}>
+      </div>
+      <fieldset className="bv-setting" id="profile-languages" tabIndex={-1}>
         <legend>Languages</legend>
         <p id="profile-languages-help">
           Up to {MAX_LANGUAGES} languages, in the order you want them shown. Use a language tag such as en, es, fr, or pt-BR. {languages.length} of {MAX_LANGUAGES} languages.
@@ -193,7 +190,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         })}
         <Button type="button" disabled={languages.length >= MAX_LANGUAGES} onClick={() => setLanguages([...languages, ...withKeys([{ tag: '', primary: false }])])}>Add a language</Button>
       </fieldset>
-      <fieldset id="profile-socialLinks" tabIndex={-1}>
+      <fieldset className="bv-setting" id="profile-socialLinks" tabIndex={-1}>
         <legend>Links</legend>
         <p id="profile-socialLinks-help">
           Up to {MAX_SOCIAL_LINKS} links to your other accounts and sites, shown in this order. Addresses must start with https://. These are self-declared and not verified. {socialLinks.length} of {MAX_SOCIAL_LINKS} links.
@@ -239,7 +236,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         })}
         <Button type="button" disabled={socialLinks.length >= MAX_SOCIAL_LINKS} onClick={() => setSocialLinks([...socialLinks, ...withKeys([{ label: '', url: '' }])])}>Add a link</Button>
       </fieldset>
-      <fieldset id="profile-wallets" tabIndex={-1}>
+      <fieldset className="bv-setting" id="profile-wallets" tabIndex={-1}>
         <legend>Wallets</legend>
         <p id="profile-wallets-help">
           Up to {MAX_WALLETS} wallet addresses. Each one stays hidden unless you check Show on my public profile. Anyone can type any address, so your page labels shown wallets as not verified. Double-check each address before you save. {wallets.length} of {MAX_WALLETS} wallets.
@@ -279,6 +276,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         })}
         <Button type="button" disabled={wallets.length >= MAX_WALLETS} onClick={() => setWallets([...wallets, ...withKeys([{ chain: '', address: '', label: '', visible: false }])])}>Add a wallet</Button>
       </fieldset>
+      <div className="bv-setting">
       <label>
         Page background color
         <span className="color-row">
@@ -303,6 +301,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
       <label>
         <input type="checkbox" name="clearBackgroundColor" checked={useDefault} onChange={(e) => setUseDefault(e.target.checked)} /> Use the default colors (clears the background color)
       </label>
+      </div>
       <Button type="submit" variant="primary" disabled={pending}>
         Save profile
       </Button>

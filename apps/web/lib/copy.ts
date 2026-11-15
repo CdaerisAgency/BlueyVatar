@@ -76,6 +76,13 @@ export const COPY = {
     serverKey: 'Server key (read only, keeps usage and stays private)',
     forever: 'Forever',
   },
+  timezone: {
+    label: 'Time zone',
+    notSet: 'Not set',
+    useCurrent: 'Use my current time zone',
+    savedSuffix: 'saved',
+    help: 'Pick the zone that matches your clock. Zones that always share the same time are listed once.',
+  },
   share: {
     title: 'Share your profile',
     intro: 'These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.',

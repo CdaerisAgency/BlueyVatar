@@ -246,18 +246,14 @@ export type ProfileFields = {
   wallets?: { chain: string; address: string; label?: string; visible: boolean }[]
 }
 
-/** IANA zone check. Uses Intl.supportedValuesOf when available; UTC is always allowed. */
+/**
+ * IANA zone check. Accepts any name the runtime knows, including alias names such as Asia/Kolkata,
+ * which Intl.supportedValuesOf may list only under an older spelling (Asia/Calcutta).
+ * Offset strings such as +05:00 are not IANA names and are rejected.
+ */
 export function isValidTimezone(tz: string): boolean {
   if (tz.length === 0 || tz.length > 64) return false
-  if (tz === 'UTC') return true
-  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
-  if (typeof intl.supportedValuesOf === 'function') {
-    try {
-      return intl.supportedValuesOf('timeZone').includes(tz)
-    } catch {
-      // fall through to the constructor check
-    }
-  }
+  if (!/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/.test(tz)) return false
   try {
     new Intl.DateTimeFormat('en', { timeZone: tz })
     return true

@@ -49,6 +49,39 @@
   }
 }
 
+/*
+ * One setting inside a long form. Every setting after the first gets a rule above it (the same 1.5px
+ * line color as the card borders) and room around it, so a new setting picks this up automatically.
+ * It is a border, so screen readers do not announce it. Fieldsets lose their default box.
+ */
+@utility bv-setting {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+
+  &:is(fieldset) {
+    margin: 0;
+    padding: 0;
+    border: 0;
+
+    /* A floated legend sits inside the box instead of cutting through the rule above it. */
+    & > legend {
+      float: left;
+      width: 100%;
+      padding: 0;
+    }
+
+    & > legend + * {
+      clear: both;
+    }
+  }
+
+  & + & {
+    padding-top: 20px;
+    border-top: 1.5px solid var(--color-bv-line);
+  }
+}
+
 /* The hint under a field label (Field). */
 @utility bv-hint {
   font-size: var(--text-bv-small);
