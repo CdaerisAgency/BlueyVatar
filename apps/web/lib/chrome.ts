@@ -10,3 +10,11 @@ export function pricingTarget(tier: string, signedIn: boolean): string | null {
   if (!signedIn) return '/login'
   return tier === 'free' ? '/account' : null
 }
+
+/** Where the landing page call to action goes for this visitor. */
+export function heroTarget(signedIn: boolean): string {
+  return signedIn ? '/account' : '/login'
+}
+
+/** Routes whose HTML depends on the session cookie. They are never stored in a shared cache. */
+export const SESSION_ROUTES = ['/login', '/account/:path*', '/report', '/integrations', '/p/:handle*'] as const

@@ -9,6 +9,8 @@ export type EffectsRow = {
   frameColor: string | null
   frameSourceRkey: string | null
   frameImageRkey: string | null
+  /** Image filter id (migration 0042). With frameStyle, this is the one look; the render is frameImageRkey. */
+  filterId: string | null
   awayState: AwayState
   awayStartOn: string | null
   awayEndOn: string | null
@@ -22,7 +24,7 @@ export type EffectsRow = {
 }
 
 export const emptyRow = (did: string): EffectsRow => ({
-  did, frameStyle: null, frameColor: null, frameSourceRkey: null, frameImageRkey: null,
+  did, frameStyle: null, frameColor: null, frameSourceRkey: null, frameImageRkey: null, filterId: null,
   awayState: 'off', awayStartOn: null, awayEndOn: null, awayTimezone: null, awayStartAt: null, awayEndAt: null,
   awayImageRkey: null, awayPrevDefaultRkey: null, awayError: null, awayRetryAt: null,
 })
@@ -49,13 +51,13 @@ export function memoryEffectsStore(): EffectsStore & { rows: Map<string, Effects
 }
 
 const COLUMNS: Record<keyof Omit<EffectsRow, 'did'>, string> = {
-  frameStyle: 'frame_style', frameColor: 'frame_color', frameSourceRkey: 'frame_source_rkey', frameImageRkey: 'frame_image_rkey',
+  frameStyle: 'frame_style', frameColor: 'frame_color', frameSourceRkey: 'frame_source_rkey', frameImageRkey: 'frame_image_rkey', filterId: 'filter_id',
   awayState: 'away_state', awayStartOn: 'away_start_on', awayEndOn: 'away_end_on', awayTimezone: 'away_timezone',
   awayStartAt: 'away_start_at', awayEndAt: 'away_end_at', awayImageRkey: 'away_image_rkey',
   awayPrevDefaultRkey: 'away_prev_default_rkey', awayError: 'away_error', awayRetryAt: 'away_retry_at',
 }
 
-const SELECT = `SELECT did, frame_style, frame_color, frame_source_rkey, frame_image_rkey, away_state,
+const SELECT = `SELECT did, frame_style, frame_color, frame_source_rkey, frame_image_rkey, filter_id, away_state,
   to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone,
   away_start_at, away_end_at, away_image_rkey, away_prev_default_rkey, away_error, away_retry_at FROM avatar_effects WHERE did = $1`
 
@@ -66,6 +68,7 @@ const fromDb = (r: DbRow): EffectsRow => ({
   frameColor: (r.frame_color as string | null) ?? null,
   frameSourceRkey: (r.frame_source_rkey as string | null) ?? null,
   frameImageRkey: (r.frame_image_rkey as string | null) ?? null,
+  filterId: (r.filter_id as string | null) ?? null,
   awayState: r.away_state as AwayState,
   awayStartOn: (r.away_start_on as string | null) ?? null,
   awayEndOn: (r.away_end_on as string | null) ?? null,
