@@ -15,6 +15,9 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 - Signed-in visitors on public pages (part of #225). The landing page button now asks `/api/viewer` in the browser instead of reading the cookie on the server, so `/` is a static page again and no signed-in copy can reach a signed-out visitor. Pages that read the session on the server (`/login`, `/account`, `/report`, `/integrations`, profile pages) now send `Cache-Control: private, no-store`. Assets and `/img` caching are unchanged. The `www` redirect and the `PUBLIC_URL` host check are still owner steps.
 - Product spec v14 (`docs/spec/blueyvatar-product-spec-v14.md`) covers the work merged since v13: avatar effects and free offers, the Integrations page, API key types, lifetimes and labels, Linked accounts naming, and home server wording. Documentation only. Version 13 stays in place.
 
+### Fixed
+- Security advisories in test tooling. Vitest moves to 4.1.12 in every workspace package, which clears the `@vitest/mocker` advisory. The local live-stack test project (`apps/indexer/live-stack`, not part of the pnpm workspace) gets patched transitive versions through npm overrides for undici, minimatch, glob, nodemailer, sharp, kysely, and html-to-text, and `@atproto/dev-env` moves to 0.7.11. `npm audit` reports 33 high findings there, all from zod 3 (below 4.6.7), which every current `@atproto` release pins; zod 4 breaks their runtime, so it stays until those packages support zod 4. The stack is local test tooling only.
+
 ## 2026-11-14
 
 ### Added
