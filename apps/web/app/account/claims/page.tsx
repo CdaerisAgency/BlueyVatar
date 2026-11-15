@@ -1,6 +1,8 @@
-import { PageMain } from '../../../components/Page'
+import { EmptyState, PageHeader, PageMain, Section } from '../../../components/Page'
 import CopyField from '../CopyField'
 import { Button } from '../../../components/Button'
+import { Field } from '../../../components/Field'
+import { fieldProps } from '../../../lib/field-props'
 import { requireDid } from '../../../lib/auth'
 import { getClaimStore } from '../../../lib/claim-store'
 import { DNS_PROOF_LABEL, PLATFORMS, PLATFORM_LABELS, dnsProofName, isPlatform, profileLinkFor, proofToken, type Platform } from '../../../lib/claims'
@@ -111,13 +113,10 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
 
   return (
     <PageMain>
-      <h1>Verified accounts</h1>
+      <PageHeader title="Linked accounts" intro="Link your GitHub, Mastodon, website, or other accounts to your profile. BlueyVatar checks each one, and only checked accounts appear on your profile." />
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
-      <p>
-        A claim connects another account you own, such as GitHub, Mastodon, or your website, to your BlueyVatar profile. BlueyVatar checks each claim, and only checked claims appear on your profile.
-      </p>
       <p>Accounts you hide stay verified but are left off your profile page and hover cards.</p>
       <details className="mb-5">
         <summary>What does &quot;link back to your profile&quot; mean?</summary>
@@ -126,9 +125,9 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         </p>
       </details>
 
-      <h2>Your verified accounts</h2>
+      <Section title="Your linked accounts">
       {claims.length === 0 ? (
-        <p>You have no accounts yet. Add one below to show a verified link to your GitHub, Mastodon, website, or another account on your profile. Each one is checked before it appears.</p>
+        <EmptyState>You have no linked accounts yet. Add one below to show a verified link to your GitHub, Mastodon, website, or another account on your profile. Each one is checked before it appears.</EmptyState>
       ) : (
         <ul>
           {claims.map((c) => {
@@ -159,7 +158,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
                   </form>
                   <form action={deleteClaimAction}>
                     <input type="hidden" name="rkey" value={c.rkey} />
-                    <Button type="submit">Delete</Button>
+                    <Button type="submit" variant="danger">Delete</Button>
                   </form>
                 </div>
               </li>
@@ -167,8 +166,9 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
           })}
         </ul>
       )}
+      </Section>
 
-      <h2>Add an account</h2>
+      <Section title="Add an account">
       <form action={addClaim}>
         <label>
           Platform{' '}
@@ -180,15 +180,16 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
             ))}
           </select>
         </label>{' '}
-        <label>
-          Account or address <input name="account" required maxLength={300} placeholder="username, @name@instance, or https://..." />
-        </label>
+        <Field prefix="claim" name="account" label="Account or address" required>
+          <input {...fieldProps('claim', 'account', undefined)} name="account" required maxLength={300} placeholder="username, @name@instance, or https://..." />
+        </Field>
         <Button type="submit" variant="primary">Add account</Button>
       </form>
+      </Section>
 
-      <h2>atproto apps</h2>
+      <Section title="atproto apps">
       {apps.length === 0 ? (
-        <p>No other atproto apps found in your repo yet.</p>
+        <EmptyState>No other atproto apps found in your repo yet.</EmptyState>
       ) : (
         <>
           <p>Your repo has records from these apps. They count as linked because you signed in with this account. Nothing to verify.</p>
@@ -201,6 +202,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
           </ul>
         </>
       )}
+      </Section>
 
       <details>
         <summary>How each platform is checked</summary>

@@ -1,5 +1,6 @@
 import { PAID_PLANS, PAST_DUE_GRACE_DAYS, effectiveTier, type PaidPlan } from '@blueyvatar/core'
-import { PageMain } from '../../../components/Page'
+import { BackLink, PageHeader, PageMain, Section } from '../../../components/Page'
+import { Button } from '../../../components/Button'
 import { requireDid } from '../../../lib/auth'
 import { billingEnabled, planEnabled } from '../../../lib/billing/config'
 import { longDate, summarize } from '../../../lib/billing/summary'
@@ -11,6 +12,9 @@ import { PRICING, formatPrice } from '../../../lib/pricing'
 import { canManageBilling } from '../../../lib/orgs/roles'
 import { getOrganization, memberRole, orgLicense } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
+import { viewerFor } from '../../../lib/viewer'
+import { displayName } from '../../../lib/viewer-core'
+import { LicenseUsage } from './LicenseUsage'
 import { cancelPlanChange, cancelSubscription, openPortal, resumeSubscription, startCheckout, switchPlan } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +24,7 @@ const NOTICE: Record<string, string> = {
   canceled: 'Checkout was canceled. You were not charged.',
 }
 
-const UNAVAILABLE = 'Billing is not available yet on this deployment. To change your plan now, email support@blueyvatar.com.'
+const UNAVAILABLE = 'Billing is not available yet on this deployment, so plan changes are handled by hand. To change your plan now, email support@blueyvatar.com and include your handle.'
 const PLAN_NAME: Record<string, string> = { plus: 'Plus', business: 'Business' }
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ checkout?: string; error?: string; done?: string; change?: string; org?: string }> }) {
@@ -46,13 +50,13 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageMain>
-      <h1>Plan and billing</h1>
-      <p>Signed in as {did}</p>
+      <PageHeader title="Plan and billing" intro="See your plan, change it, and manage payment and invoices." />
+      <p>Signed in as {displayName(await viewerFor(did))}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.done && <p role="status">{q.done}</p>}
       {q.error && <p role="alert">{q.error}</p>}
 
-      <h2>Your plan</h2>
+      <Section title="Your plan">
       {subs.length === 0 && (
         <ul>
           <li>Plan: {enterprise ? 'Enterprise (set by contract)' : plan === 'plus' ? 'Plus (included with your account)' : 'Free ($0)'}</li>
@@ -76,13 +80,14 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
           account returns to Free limits. Update your payment method in Manage billing. Your data, avatars, and profile are never deleted.
         </p>
       )}
+      </Section>
 
       {!enabled && <p>{UNAVAILABLE}</p>}
 
       {target && held.has(target) && <p role="status">You are already on {PLAN_NAME[target]}.</p>}
       {target && !held.has(target) && canSwitchTo(target) && subs.length > 0 && <ConfirmSwitch target={target} subs={subs} endsOn={subs[0]!.currentPeriodEnd} />}
 
-      <h2>Plans</h2>
+      <Section title="Plans">
       <ul>
         {PRICING.map((p) => {
           const id = p.id
@@ -94,7 +99,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
               {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length === 0 && (
                 <form action={startCheckout} style={{ display: 'inline', marginLeft: 12 }}>
                   <input type="hidden" name="tier" value={id} />
-                  <button type="submit">Subscribe to {p.name}</button>
+                  <Button type="submit" variant="primary">Subscribe to {p.name}</Button>
                 </form>
               )}
               {id !== 'free' && !isCurrent && canSwitchTo(id) && subs.length > 0 && !pending && (
@@ -108,48 +113,50 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
       </ul>
       {subs.length > 0 && <p>To go back to Free, cancel your subscription below. You keep your paid plan until the end of the period you paid for.</p>}
       <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout based on your billing address.</p>
-      <h2>How changes work</h2>
+      </Section>
+      <Section title="How changes work">
       <ul>
         <li>Upgrades apply now, and you are charged the difference for the rest of the period.</li>
         <li>Downgrades apply at the end of the current period. You keep your plan until then.</li>
         <li>Cancellations end at the end of the period you paid for.</li>
         <li>Partial periods are not refunded.</li>
       </ul>
+      </Section>
 
       {enabled && pending && (
-        <section aria-label="Scheduled plan change">
-          <h2>Scheduled plan change</h2>
+        <Section title="Scheduled plan change">
           <form action={cancelPlanChange}>
             <p>Your plan changes to {PLAN_NAME[pending.tier]} on {longDate(pending.at)}. To keep {PLAN_NAME[subs[0]!.tier]}, cancel the scheduled change.</p>
-            <button type="submit">Cancel the scheduled change (keep {PLAN_NAME[subs[0]!.tier]})</button>
+            <Button type="submit">Cancel the scheduled change (keep {PLAN_NAME[subs[0]!.tier]})</Button>
           </form>
-        </section>
+        </Section>
       )}
 
       {enabled && subs.map((x) => (
-        <section key={`manage-${x.id}`}>
-          <h2>{PLAN_NAME[x.tier]} subscription</h2>
+        <Section key={`manage-${x.id}`} title={`${PLAN_NAME[x.tier]} subscription`}>
           {x.cancelAtPeriodEnd ? (
             <form action={resumeSubscription}>
               <p>Your subscription is set to end. You can keep it any time before it ends.</p>
-              <button type="submit">Resume {PLAN_NAME[x.tier]}</button>
+              <Button type="submit" variant="primary">Resume {PLAN_NAME[x.tier]}</Button>
             </form>
           ) : (
             <form action={cancelSubscription}>
               <p>Cancel any time. Your plan stays until the end of the period you paid for, and you are not charged again.</p>
-              <button type="submit">Cancel {PLAN_NAME[x.tier]} at the end of the period</button>
+              <Button type="submit" variant="danger">Cancel {PLAN_NAME[x.tier]} at the end of the period</Button>
             </form>
           )}
-        </section>
+        </Section>
       ))}
 
       {enabled && (customer || subs.length > 0) && (
-        <form action={openPortal}>
-          <h2>Payment method and invoices</h2>
-          <p>Update your card, see past invoices, and download receipts in the Stripe customer portal.</p>
-          <button type="submit">Manage billing</button>
-        </form>
+        <Section title="Payment method and invoices" intro="Update your card, see past invoices, and download receipts in the Stripe customer portal.">
+          <form action={openPortal}>
+            <Button type="submit">Manage billing</Button>
+          </form>
+        </Section>
       )}
+
+      <LicenseUsage license={license} />
     </PageMain>
   )
 }
@@ -161,8 +168,7 @@ function ConfirmSwitch({ target, subs, endsOn }: { target: PaidPlan; subs: Array
   const t = PRICING.find((p) => p.id === target)!
   const upgrade = from ? t.amount > (PRICING.find((p) => p.id === from)?.amount ?? 0) : true
   return (
-    <section aria-label={`Switch to ${name}`}>
-      <h2>Switch to {name}</h2>
+    <Section title={`Switch to ${name}`}>
       <p>
         {name} is {formatPrice(t.amount)} per month, plus tax.{' '}
         {upgrade
@@ -171,10 +177,10 @@ function ConfirmSwitch({ target, subs, endsOn }: { target: PaidPlan; subs: Array
       </p>
       <form action={switchPlan}>
         <input type="hidden" name="tier" value={target} />
-        <button type="submit">{upgrade ? `Confirm switch to ${name}` : `Schedule the change to ${name}`}</button>
-        <a href="/account/billing" style={{ marginLeft: 12 }}>Keep my current plan</a>
+        <Button type="submit" variant="primary">{upgrade ? `Confirm switch to ${name}` : `Schedule the change to ${name}`}</Button>{' '}
+        <a href="/account/billing">Keep my current plan</a>
       </form>
-    </section>
+    </Section>
   )
 }
 
@@ -189,7 +195,8 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   if (!pool || !org || !lic) {
     return (
       <PageMain>
-        <h1>Plan and billing</h1>
+        <BackLink href="/account/orgs">Back to organizations</BackLink>
+        <PageHeader title="Plan and billing" intro="See the plan and billing for an organization." />
         <p role="alert">You are not a member of that organization.</p>
       </PageMain>
     )
@@ -197,7 +204,8 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   if (!canManageBilling(role)) {
     return (
       <PageMain>
-        <h1>Plan and billing: {org.name}</h1>
+        <BackLink href={`/account/orgs/${orgId}`}>Back to {org.name}</BackLink>
+        <PageHeader title={`Plan and billing: ${org.name}`} intro="See the plan and billing for this organization." />
         <p role="alert">Only organization owners can manage billing.</p>
       </PageMain>
     )
@@ -208,11 +216,12 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
   const business = PRICING.find((p) => p.id === 'business')
   return (
     <PageMain>
-      <h1>Plan and billing: {org.name}</h1>
-      <p>Signed in as {did}</p>
+      <BackLink href={`/account/orgs/${orgId}`}>Back to {org.name}</BackLink>
+      <PageHeader title={`Plan and billing: ${org.name}`} intro="Billing for this organization stays with its billing owner." />
+      <p>Signed in as {displayName(await viewerFor(did))}</p>
       {q.checkout && NOTICE[q.checkout] && <p role="status">{NOTICE[q.checkout]}</p>}
       {q.error && <p role="alert">{q.error}</p>}
-      <p>Billing for this organization stays with its billing owner, {lic.billingDid}. Any owner can start or manage the subscription.</p>
+      <p>Billing for this organization stays with its billing owner, {displayName(await viewerFor(lic.billingDid))}. Any owner can start or manage the subscription.</p>
       <ul>
         <li>Developer tier: {license?.tier ?? 'free'}</li>
         {sub && <li>Subscription: {sub.status.replace('_', ' ')}{sub.currentPeriodEnd ? `, ${sub.cancelAtPeriodEnd ? 'ends' : 'renews'} ${dateOf(sub.currentPeriodEnd)}` : ''}</li>}
@@ -222,16 +231,17 @@ async function OrgBilling({ did, orgId, q }: { did: string; orgId: string; q: { 
         <form action={startCheckout}>
           <input type="hidden" name="tier" value="business" />
           <input type="hidden" name="org" value={orgId} />
-          <button type="submit">Subscribe to Business ({formatPrice(business.amount)} per month)</button>
+          <Button type="submit" variant="primary">Subscribe to Business ({formatPrice(business.amount)} per month)</Button>
         </form>
       )}
       {enabled && sub && (
         <form action={openPortal}>
           <input type="hidden" name="org" value={orgId} />
-          <button type="submit">Manage billing</button>
+          <Button type="submit">Manage billing</Button>
         </form>
       )}
       <p>Prices exclude tax. Stripe Tax adds any sales tax or VAT at checkout.</p>
+      {license && <LicenseUsage license={license} />}
     </PageMain>
   )
 }

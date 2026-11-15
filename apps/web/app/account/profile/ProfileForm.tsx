@@ -137,7 +137,7 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         </select>
         {err('timezone') && <span id="profile-timezone-error" className="field-error">{err('timezone')}</span>}
       </label>
-      <button type="button" onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use my current time zone</button>
+      <Button type="button" onClick={() => setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use my current time zone</Button>
       <label>
         Interests
         <textarea
@@ -187,11 +187,11 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
                   onChange={() => setLanguages(languages.map((r) => ({ ...r, primary: r.key === row.key })))}
                 /> Primary language
               </label>
-              <button type="button" onClick={() => setLanguages(languages.filter((r) => r.key !== row.key))}>Remove language {i + 1}</button>
+              <Button type="button" variant="danger" onClick={() => setLanguages(languages.filter((r) => r.key !== row.key))}>Remove language {i + 1}</Button>
             </div>
           )
         })}
-        <button type="button" disabled={languages.length >= MAX_LANGUAGES} onClick={() => setLanguages([...languages, ...withKeys([{ tag: '', primary: false }])])}>Add a language</button>
+        <Button type="button" disabled={languages.length >= MAX_LANGUAGES} onClick={() => setLanguages([...languages, ...withKeys([{ tag: '', primary: false }])])}>Add a language</Button>
       </fieldset>
       <fieldset id="profile-socialLinks" tabIndex={-1}>
         <legend>Links</legend>
@@ -233,11 +233,11 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
                 />
                 {err(uk) && <span id={`${fieldId(uk)}-error`} className="field-error">{err(uk)}</span>}
               </label>
-              <button type="button" onClick={() => setSocialLinks(socialLinks.filter((r) => r.key !== row.key))}>Remove link {i + 1}</button>
+              <Button type="button" variant="danger" onClick={() => setSocialLinks(socialLinks.filter((r) => r.key !== row.key))}>Remove link {i + 1}</Button>
             </div>
           )
         })}
-        <button type="button" disabled={socialLinks.length >= MAX_SOCIAL_LINKS} onClick={() => setSocialLinks([...socialLinks, ...withKeys([{ label: '', url: '' }])])}>Add a link</button>
+        <Button type="button" disabled={socialLinks.length >= MAX_SOCIAL_LINKS} onClick={() => setSocialLinks([...socialLinks, ...withKeys([{ label: '', url: '' }])])}>Add a link</Button>
       </fieldset>
       <fieldset id="profile-wallets" tabIndex={-1}>
         <legend>Wallets</legend>
@@ -273,11 +273,11 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
               <label>
                 <input type="checkbox" name={`wallets.${i}.visible`} checked={row.visible} onChange={(e) => set({ visible: e.target.checked })} /> Show on my public profile
               </label>
-              <button type="button" onClick={() => setWallets(wallets.filter((r) => r.key !== row.key))}>Remove wallet {i + 1}</button>
+              <Button type="button" variant="danger" onClick={() => setWallets(wallets.filter((r) => r.key !== row.key))}>Remove wallet {i + 1}</Button>
             </div>
           )
         })}
-        <button type="button" disabled={wallets.length >= MAX_WALLETS} onClick={() => setWallets([...wallets, ...withKeys([{ chain: '', address: '', label: '', visible: false }])])}>Add a wallet</button>
+        <Button type="button" disabled={wallets.length >= MAX_WALLETS} onClick={() => setWallets([...wallets, ...withKeys([{ chain: '', address: '', label: '', visible: false }])])}>Add a wallet</Button>
       </fieldset>
       <label>
         Page background color

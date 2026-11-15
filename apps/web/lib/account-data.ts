@@ -19,12 +19,12 @@ const iso = (d: unknown): string | null => (d instanceof Date ? d.toISOString() 
  * Everything blueyvatar holds about one DID, as plain JSON. Never includes key hashes or secrets, the stored
  * primary email beyond a masked form, reports filed against the DID, or an admin's internal decision note on an appeal. Billing rows are included as a summary.
  * Beyond the fields most people expect, the file also holds email holds, organization memberships and their audit history, the Stripe
- * customer ID, and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
+ * customer ID, bug report screenshots (kept 90 days, admins only), avatar effect settings (frame choice, out-of-office dates and time zone, and the default to restore), and the avatar sync switch and change log (own rows only, no DID or row ids), and the indexed copy of avatars and profile (the data page text should list them; issue #223).
  */
 export async function exportAccountData(pool: Q, did: string, now: Date = new Date(), decrypt: (enc: string) => string = (e) => decryptJson<string>(e)) {
   const q = async (sql: string, params: unknown[] = [did]) => (await pool.query(sql, params)).rows as Record<string, unknown>[]
-  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog] = await Promise.all([
-    q('SELECT email_hash, method, is_primary, email_domain, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
+  const [links, holds, notice, profileLinks, claims, attestations, rules, licenses, keys, domains, customers, subs, images, profile, views, orgs, orgAudit, appeals, avatarSync, avatarLog, bugShots, effects] = await Promise.all([
+    q('SELECT email_hash, method, is_primary, email_domain, email_enc, verified_at FROM email_links WHERE did = $1 ORDER BY is_primary DESC, verified_at, email_hash'),
     q('SELECT email_hash, reason, released_at FROM email_holds WHERE did = $1 ORDER BY released_at'),
     q('SELECT email_enc FROM notice_emails WHERE did = $1'),
     q('SELECT rkey, url, title, created_at FROM profile_links WHERE did = $1 ORDER BY created_at, rkey'),
@@ -44,6 +44,8 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     q("SELECT p.id, a.action AS appealed_action, p.action_id, p.statement, p.status, p.created_at, p.decided_at FROM appeals p JOIN admin_actions a ON a.id = p.action_id WHERE p.did = $1 ORDER BY p.id"),
     q('SELECT auto_sync, previous_avatar, has_previous, last_source_cid, last_sent_cid, auto_notice_pending, auto_count, updated_at FROM bsky_avatar_sync WHERE did = $1'),
     q('SELECT action, from_cid, to_cid, source_cid, created_at FROM bsky_avatar_log WHERE did = $1 ORDER BY id'),
+    q("SELECT issue_number, created_at, encode(image, 'base64') AS image_base64 FROM bug_report_screenshots WHERE did = $1 ORDER BY created_at, id"),
+    q("SELECT frame_style, frame_color, to_char(away_start_on, 'YYYY-MM-DD') AS away_start_on, to_char(away_end_on, 'YYYY-MM-DD') AS away_end_on, away_timezone, away_prev_default_rkey FROM avatar_effects WHERE did = $1"),
   ])
   let primaryEmail: string | null = null
   if (notice[0]) {
@@ -54,12 +56,24 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     }
   }
   // The primary link's domain is masked like primaryMasked, because the account page promises the primary address only in masked form.
-  const maskedLinks = links.map((r) => (r.is_primary === true && typeof r.email_domain === 'string' ? { ...r, email_domain: maskDomain(r.email_domain) } : r))
+  // Each link also reports whether its address is stored (encrypted, migration 0037) and the masked form. The encrypted value itself never leaves.
+  const maskedLinks = links.map(({ email_enc, ...r }) => {
+    let addressMasked: string | null = null
+    if (typeof email_enc === 'string') {
+      try {
+        addressMasked = maskEmail(decrypt(email_enc))
+      } catch {
+        addressMasked = null
+      }
+    }
+    const base = { ...r, address_stored: typeof email_enc === 'string', address_masked: addressMasked }
+    return r.is_primary === true && typeof r.email_domain === 'string' ? { ...base, email_domain: maskDomain(r.email_domain) } : base
+  })
   const dates = <T extends Record<string, unknown>>(rows: T[]) => rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v instanceof Date ? iso(v) : v])))
   return {
     exportedAt: now.toISOString(),
     did,
-    note: "Records in your own atproto repository (avatars, profile, claims, links, gallery) are stored by your account's home server and are not part of this file.",
+    note: "Records in your own atproto repository (avatars, profile, claims, links, gallery) are stored by your Bluesky account's home server and are not part of this file.",
     emails: { primaryMasked: primaryEmail, links: dates(maskedLinks), holds: dates(holds) },
     profileLinks: dates(profileLinks),
     claims: dates(claims),
@@ -70,6 +84,8 @@ export async function exportAccountData(pool: Q, did: string, now: Date = new Da
     customDomain: dates(domains)[0] ?? null,
     organizations: { memberships: dates(orgs), audit: dates(orgAudit) },
     appeals: dates(appeals),
+    effects: dates(effects)[0] ?? null,
+    bugReportScreenshots: dates(bugShots).map(({ image_base64, ...r }) => ({ ...r, mimeType: 'image/jpeg', imageBase64: image_base64 })),
     avatarSync: { settings: dates(avatarSync)[0] ?? null, log: dates(avatarLog) },
     billing: { customers: dates(customers), subscriptions: dates(subs) },
     profileViews: views.map((r) => ({ day: r.day, views: Number(r.views), jsonCalls: Number(r.json_calls) })),
@@ -143,6 +159,8 @@ export async function deleteAccountData(pool: pg.Pool, did: string, deps: Delete
     await c.query('DELETE FROM appeals WHERE did = $1', [did])
     await c.query('DELETE FROM bsky_avatar_sync WHERE did = $1', [did])
     await c.query('DELETE FROM bsky_avatar_log WHERE did = $1', [did])
+    await c.query('DELETE FROM bug_report_screenshots WHERE did = $1', [did])
+    await c.query('DELETE FROM avatar_effects WHERE did = $1', [did])
     const images = await c.query('DELETE FROM images WHERE did = $1', [did])
     await c.query('DELETE FROM profiles WHERE did = $1', [did])
     const claims = await c.query('DELETE FROM claims WHERE did = $1', [did])

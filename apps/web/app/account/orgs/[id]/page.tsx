@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { PageMain } from '../../../../components/Page'
+import { BackLink, EmptyState, PageHeader, PageMain, Section } from '../../../../components/Page'
+import { Button } from '../../../../components/Button'
 import { requireDid } from '../../../../lib/auth'
 import { canManageMembership } from '../../../../lib/orgs/roles'
 import { getOrganization, listAudit, listMembers, memberRole, orgLicense } from '../../../../lib/orgs/store'
@@ -21,7 +22,8 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   if (!pool || !org || !role) {
     return (
       <PageMain>
-        <h1>Organization</h1>
+        <BackLink href="/account/orgs">Back to organizations</BackLink>
+        <PageHeader title="Organization" intro="Members, roles, and activity for one organization." />
         <p role="alert">You are not a member of that organization.</p>
       </PageMain>
     )
@@ -30,17 +32,18 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
   const [members, lic, audit] = await Promise.all([listMembers(pool, id), orgLicense(pool, id), owner ? listAudit(pool, id) : Promise.resolve([])])
   return (
     <PageMain>
-      <h1>{org.name}</h1>
+      <BackLink href="/account/orgs">Back to organizations</BackLink>
+      <PageHeader title={`${org.name}`} intro="Members manage keys. Only owners manage billing and membership." />
       <p>Signed in as {did}. Your role: {role}.</p>
       {q.error && <p role="alert">{q.error}</p>}
       {q.done && <p role="status">{q.done}</p>}
       <p>
-        <Link href={`/account/keys?org=${id}`}>API keys and license</Link>
+        <Link href={`/account/keys?org=${id}`}>API keys</Link>
         {owner && <> - <Link href={`/account/billing?org=${id}`}>Plan and billing</Link></>}
       </p>
-      <p>Members manage keys. Only owners manage billing and membership. Billing stays with the billing owner{lic ? `, ${lic.billingDid}` : ''}.</p>
+      <p>Billing stays with the billing owner{lic ? `, ${lic.billingDid}` : ''}.</p>
 
-      <h2>Members ({members.length})</h2>
+      <Section title={`Members (${members.length})`}>
       <ul>
         {members.map((m) => (
           <li key={m.did} className="mb-3">
@@ -53,28 +56,29 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
                   <option value="member">member</option>
                   <option value="owner">owner</option>
                 </select>{' '}
-                <button type="submit">Set role</button>
+                <Button type="submit">Set role</Button>
               </form>
             )}{' '}
             {(owner || m.did === did) && (
               <form action={removeOrgMember} className="inline">
                 <input type="hidden" name="org" value={id} />
                 <input type="hidden" name="member" value={m.did} />
-                <button type="submit">{m.did === did ? 'Leave' : 'Remove'}</button>
+                <Button type="submit" variant="danger">{m.did === did ? 'Leave' : 'Remove'}</Button>
               </form>
             )}
           </li>
         ))}
       </ul>
+      </Section>
 
       {owner && (
         <>
-          <h2>Add a member</h2>
-          <p>Enter the person&apos;s atproto DID. They are added right away and can sign in with that account. There are no email invites.</p>
-          <AddMemberForm orgId={id} />
+          <Section title="Add a member" intro="Enter the person's atproto DID. They are added right away and can sign in with that account. There are no email invites.">
+            <AddMemberForm orgId={id} />
+          </Section>
 
-          <h2>Activity</h2>
-          {audit.length === 0 ? <p>No activity yet.</p> : (
+          <Section title="Activity">
+          {audit.length === 0 ? <EmptyState>No activity yet.</EmptyState> : (
             <ul>
               {audit.map((a) => (
                 <li key={a.id}>
@@ -84,6 +88,7 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
               ))}
             </ul>
           )}
+          </Section>
         </>
       )}
     </PageMain>

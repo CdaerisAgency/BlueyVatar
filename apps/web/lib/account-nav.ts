@@ -16,6 +16,7 @@ export const ACCOUNT_NAV: NavGroup[] = [
       { href: '/account/profile', label: 'Profile' },
       { href: '/account/stats', label: 'Profile views' },
       { href: '/account/avatars', label: 'Avatars' },
+      { href: '/account/effects', label: 'Effects' },
       { href: '/account/visibility', label: 'Visibility' },
     ],
   },
@@ -24,12 +25,12 @@ export const ACCOUNT_NAV: NavGroup[] = [
     label: 'Identity',
     items: [
       { href: '/account/orgs', label: 'Organizations' },
-      { href: '/account/claims', label: 'Verified accounts' },
+      { href: '/account/claims', label: 'Linked accounts' },
       { href: '/account/verify', label: 'Verify' },
       { href: '/account/domain', label: 'Custom profile domain' },
     ],
   },
-  { id: 'developers', label: 'Developers', items: [{ href: '/account/keys', label: 'API keys and license' }] },
+  { id: 'developers', label: 'Developers', items: [{ href: '/account/keys', label: 'API keys' }] },
   { id: 'billing', label: 'Billing', items: [{ href: '/account/billing', label: 'Plan and billing' }] },
   {
     id: 'settings',

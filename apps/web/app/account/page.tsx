@@ -1,5 +1,6 @@
-import { PageMain } from '../../components/Page'
+import { EmptyState, PageHeader, PageMain, Section } from '../../components/Page'
 import { Button, ButtonLink } from '../../components/Button'
+import { Field } from '../../components/Field'
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { qrSvg } from '@blueyvatar/core'
@@ -78,12 +79,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const url = primary ? ownerAvatarUrl(primary.emailHash) : null
   return (
     <PageMain>
-      <h1>Overview</h1>
+      <PageHeader title="Overview" intro="Your linked emails, your avatar link, and where to go next." />
       <p>Signed in as {displayName(await viewerFor(did))}</p>
       {list && showChecklist(list.complete, prefs.showAgain) && (
-        <section id="checklist" aria-labelledby="checklist-h">
-          <h2 id="checklist-h">Get started ({list.done} of {list.total} done)</h2>
-          <p>{list.complete ? 'Everything is set up.' : 'Work through these in any order.'}</p>
+        <Section title={`Get started (${list.done} of ${list.total} done)`} id="checklist" intro={list.complete ? 'Everything is set up.' : 'Work through these in any order.'}>
           <ol>
             {list.steps.map((st) => (
               <li key={st.id}>
@@ -98,7 +97,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               <Button type="submit">Hide checklist</Button>
             </form>
           )}
-        </section>
+        </Section>
       )}
       {list && list.complete && !prefs.showAgain && (
         <div>
@@ -106,10 +105,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {linked && <p>Linked {linked}. A hash of it is stored, and an encrypted copy of your primary email.</p>}
-      <h2>Linked emails ({links.length} of {MAX_LINKED_EMAILS})</h2>
+      {linked && <p>Linked {linked}. A hash of it is stored, and an encrypted copy so it can be shown here.</p>}
+      <Section title={`Linked emails (${links.length} of ${MAX_LINKED_EMAILS})`}>
       {links.length === 0 ? (
-        <p>No email linked yet. <a href="#link-email">Link one below</a> so apps can find your avatar from your address.</p>
+        <EmptyState action={{ href: '#link-email', label: 'Link an email' }}>No email linked yet. Link one so apps can find your avatar from your address.</EmptyState>
       ) : (
         <ul>
           {links.map((l, i) => (
@@ -123,33 +122,30 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               )}{' '}
               <form action={unlink} className="inline">
                 <input type="hidden" name="hash" value={l.emailHash} />
-                <Button type="submit">Unlink</Button>
+                <Button type="submit" variant="danger">Unlink</Button>
               </form>
             </li>
           ))}
         </ul>
       )}
-      <h2 id="link-email">Link email</h2>
+      </Section>
+      <Section title="Link email" id="link-email" intro={`You can link up to ${MAX_LINKED_EMAILS} emails. An address you unlink is held for ${HOLD_DAYS} days: only this account can link it again until then.`}>
       <p>
-        You can link up to {MAX_LINKED_EMAILS} emails. An address you unlink is held for {HOLD_DAYS} days: only this account can
-        link it again until then.
-      </p>
-      <p>
-        We keep a hash of each linked email. For your primary email we also keep the address itself, encrypted, so we can tell you
-        if a claim is removed or your email moves to another account. It is deleted when you unlink or replace it, or delete your
-        data.
+        We keep a hash of each linked email and the address itself, encrypted, so we can show it here and tell you if a claim is
+        removed or your email moves to another account. The address is deleted when you unlink it or delete your data. Emails you
+        linked before this change show as masked until you link them again.
       </p>
       <form action={linkEmail}>
         <Button type="submit" variant="primary">Use the email from my account</Button>
       </form>
       <form action={addEmail}>
-        <label>
-          Add another email by code <input name="email" type="email" required autoComplete="email" />
-        </label>
+        <Field prefix="email" name="email" label="Add another email by code" required>
+          <input id="email-email" name="email" type="email" required autoComplete="email" />
+        </Field>
         <Button type="submit" variant="primary">Send code</Button>
       </form>
-      <section id="preview">
-        <h2>Your avatar URL</h2>
+      </Section>
+      <Section title="Your avatar URL" id="preview">
         {url ? (
           <>
             <p>This is how apps see the avatar for your primary email. The link holds a hash of your address, not the address itself.</p>
@@ -173,9 +169,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         ) : (
           <p>Link an email above to get a preview and embed snippets.</p>
         )}
-      </section>
+      </Section>
       <GallerySection did={did} error={galleryError} done={galleryDone} />
-      <h2>QR code</h2>
+      <Section title="QR code">
       {svg && qrUrl ? (
         <>
           <form method="get">
@@ -203,14 +199,16 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       ) : (
         <p>Your QR code is unavailable until your handle can be loaded.</p>
       )}
-      <h2>Your data</h2>
+      </Section>
+      <Section title="Your data">
       <p>
         Go to <Link href="/account/settings/danger">Danger zone</Link> to download your data or delete it. Deleting removes what BlueyVatar holds about you, except
-        billing records, which we keep for 7 years. Records in your own atproto repository stay on your account's home server.
+        billing records, which we keep for 7 years. Records in your own atproto repository stay on your Bluesky account's home server. The home server is the service that stores your Bluesky account and everything you post.
       </p>
       <form action="/logout" method="post">
         <Button type="submit">Sign out</Button>
       </form>
+      </Section>
     </PageMain>
   )
 }
