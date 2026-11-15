@@ -30,7 +30,7 @@ async function run(bucketed: boolean, go: (did: string) => Promise<Result>): Pro
 /** Rendering writes an image to the repository, so it shares the upload rate limit. */
 export async function saveFrame(form: FormData): Promise<void> {
   await run(true, async (did) => applyFrame(await liveDeps(did), did, {
-    sourceRkey: String(form.get('source') ?? ''), style: String(form.get('style') ?? ''), color: String(form.get('color') ?? ''),
+    sourceRkey: String(form.get('source') ?? ''), style: String(form.get('style') ?? ''), color: String(form.get('color') ?? ''), filter: String(form.get('filter') ?? ''),
   }))
 }
 
