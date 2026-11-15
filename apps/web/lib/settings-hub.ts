@@ -6,7 +6,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     title: 'Profile',
     links: [
-      { href: '/account', label: 'Account', description: 'Linked emails, your gallery, and a QR code for your profile.' },
+      { href: '/account', label: 'Account', description: 'Linked emails, your gallery, and sharing your profile (QR code and downloads).' },
       { href: '/account/avatars', label: 'Avatars', description: 'Upload, import, and choose your default avatar and its rating.' },
       { href: '/account/profile', label: 'Profile', description: 'Job title, location, pronouns, and other public details.' },
       { href: '/account/stats', label: 'Profile views', description: 'Daily profile views for the last 30 days (Plus).' },

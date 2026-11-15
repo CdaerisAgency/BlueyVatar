@@ -76,6 +76,12 @@ export const COPY = {
     serverKey: 'Server key (read only, keeps usage and stays private)',
     forever: 'Forever',
   },
+  share: {
+    title: 'Share your profile',
+    intro: 'These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.',
+    unavailable: 'Your QR code and downloads are unavailable until your handle can be loaded.',
+    pointer: 'Your QR code and downloads are on the overview page.',
+  },
   linkedEmails: {
     title: 'Emails that show your avatar',
     intro: 'Websites that use blueyvatar look up your avatar by email. Add every address you use.',
