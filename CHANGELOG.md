@@ -7,6 +7,9 @@ New features, changes, and fixes to BlueyVatar, newest first. Each entry is date
 ### Added
 - More frames and image filters on the Effects page (part of #218, migration 0042). Plus accounts get three more rings (thick, dotted, inset) and five filters (black and white, sepia, warm, cool, high contrast). A look is one frame, one filter, or one of each, drawn from your original and saved as a new image like the other effects. The out-of-office badge stays free. The data export includes the filter. See `docs/effects-v2.md`.
 
+### Changed
+- Signing in now asks Tap to follow your account (`POST /repos/add`), so the indexer records it right away, even before you save a profile (closes #223). It is best effort with a 2 second limit and never blocks sign-in. It runs only when `TAP_URL` and `TAP_ADMIN_PASSWORD` are set on the web app.
+
 ## 2026-11-14
 
 ### Added
