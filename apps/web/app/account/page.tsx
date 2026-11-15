@@ -9,6 +9,7 @@ import { requireDid } from '../../lib/auth'
 import { imgSnippet, markdownSnippet } from '../../lib/avatar-snippets'
 import { ownerAvatarUrl } from '../../lib/avatar-preview'
 import { describeLinkedEmails, readPrimaryAddress } from '../../lib/linked-emails'
+import { COPY } from '../../lib/copy'
 import { getDashboardStore } from '../../lib/dashboard-store'
 import { CHECKLIST_COOKIE, checklist, parsePrefs, showChecklist } from '../../lib/onboarding'
 import { getClaimStore } from '../../lib/claim-store'
@@ -105,36 +106,37 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {linked && <p>Linked {linked}. A hash of it is stored, and an encrypted copy so it can be shown here.</p>}
-      <Section title={`Linked emails (${links.length} of ${MAX_LINKED_EMAILS})`}>
+      {linked && <p>Linked {linked}.</p>}
+      <Section
+        id="linked-emails"
+        title={<>{COPY.linkedEmails.title} <small className="text-base font-normal text-bv-ink-2">({links.length} of {MAX_LINKED_EMAILS})</small></>}
+        intro={COPY.linkedEmails.intro}
+      >
       {links.length === 0 ? (
-        <EmptyState action={{ href: '#link-email', label: 'Link an email' }}>No email linked yet. Link one so apps can find your avatar from your address.</EmptyState>
+        <EmptyState action={{ href: '#link-email', label: COPY.linkedEmails.emptyAction }}>{COPY.linkedEmails.empty}</EmptyState>
       ) : (
-        <ul>
+        <ul className="m-0 list-none space-y-4 p-0">
           {links.map((l, i) => (
             <li key={l.emailHash}>
-              <LinkedEmail item={emails[i]!} />{' '}
-              {!l.primary && (
-                <form action={makePrimary} className="inline">
+              <LinkedEmail item={emails[i]!}>
+                {!l.primary && (
+                  <form action={makePrimary} className="inline">
+                    <input type="hidden" name="hash" value={l.emailHash} />
+                    <Button type="submit">Make primary</Button>
+                  </form>
+                )}
+                <form action={unlink} className="inline">
                   <input type="hidden" name="hash" value={l.emailHash} />
-                  <Button type="submit">Make primary</Button>
+                  <Button type="submit" variant="danger">Unlink</Button>
                 </form>
-              )}{' '}
-              <form action={unlink} className="inline">
-                <input type="hidden" name="hash" value={l.emailHash} />
-                <Button type="submit" variant="danger">Unlink</Button>
-              </form>
+              </LinkedEmail>
             </li>
           ))}
         </ul>
       )}
       </Section>
       <Section title="Link email" id="link-email" intro={`You can link up to ${MAX_LINKED_EMAILS} emails. An address you unlink is held for ${HOLD_DAYS} days: only this account can link it again until then.`}>
-      <p>
-        We keep a hash of each linked email and the address itself, encrypted, so we can show it here and tell you if a claim is
-        removed or your email moves to another account. The address is deleted when you unlink it or delete your data. Emails you
-        linked before this change show as masked until you link them again.
-      </p>
+      <p>We keep the address you link so we can show it here and tell you if a claim is removed or your email moves to another account. It is deleted when you unlink it or delete your data.</p>
       <form action={linkEmail}>
         <Button type="submit" variant="primary">Use the email from my account</Button>
       </form>
