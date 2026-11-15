@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { hashIp, parseReport, RATE_LIMIT, RATE_LIMIT_DID, RATE_WINDOW_MS, submitReport } from './reports'
+import { testDbUrl, useSchema } from './testing/pg-schema'
 
 describe('parseReport', () => {
   const ok = { did: 'did:plc:abc', reporterDid: 'did:plc:me', source: 'avatar', reason: 'spam', details: ' this is spam ', contact: ' a@b.test ' }
@@ -35,23 +34,9 @@ describe('parseReport', () => {
   })
 })
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_reports_${process.pid}_${Date.now()}`
-describe.skipIf(!url)('submitReport', () => {
-  let pool: pg.Pool
+describe.skipIf(!testDbUrl)('submitReport', () => {
+  const pool = useSchema('reports', { migrations: ['0012_reports', '0032_report_reporter_did'] })
   const input = { did: 'did:plc:abc', reporterDid: 'did:plc:me', source: 'profile' as const, reason: 'spam' as const, details: 'this is spam', contact: 'a@b.test' }
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0012_reports.sql', '0032_report_reporter_did.sql']) await pool.query(readFileSync(new URL(`../../../db/migrations/${f}`, import.meta.url), 'utf8'))
-  })
-  afterAll(async () => {
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
-  })
   it('stores reports, then limits one IP, and frees it after the window', async () => {
     const now = new Date()
     const who = (n: number) => ({ ...input, reporterDid: `did:plc:r${n}` })

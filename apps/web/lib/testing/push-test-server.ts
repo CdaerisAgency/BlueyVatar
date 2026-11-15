@@ -1,6 +1,6 @@
 import sharp from 'sharp'
-import type { BlobRef } from './repo'
-import type { HomeServer } from './push-profile'
+import type { BlobRef } from '../repo'
+import type { HomeServer } from '../push-profile'
 
 /** A mock home server for tests: one profile record in `collection` (Bluesky's by default), a blob store, and the XRPC calls this feature makes. Never touches the network. */
 export function mockHomeServer(opts: { did?: string; serverUrl?: string; collection?: string; profile?: Record<string, unknown> | null; scope?: string; failWith?: Record<string, number> } = {}) {

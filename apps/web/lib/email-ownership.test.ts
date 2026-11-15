@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs'
-import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { emailHash, emailMd5 } from '@blueyvatar/core'
 import { newPending } from './codes'
@@ -9,6 +8,7 @@ import { confirmLink, sendCode } from './link'
 import { emailDomain } from './mask'
 import { decryptJson, encryptJson } from './token-crypto'
 import { memoryStore, pgStore, type Store } from './store'
+import { createSchemaPool, testDbUrl, useSchema } from './testing/pg-schema'
 
 const A = 'did:plc:alice'
 const B = 'did:plc:bob'
@@ -301,51 +301,26 @@ suite('memory store', async () => {
   return { store: memoryStore(() => now), age: async (ms) => void (now += ms) }
 })
 
-const url = process.env.TEST_DATABASE_URL
 const m = (n: string) => readFileSync(new URL(`../../../db/migrations/${n}.sql`, import.meta.url), 'utf8')
-const schema = `t_web_${process.pid}_${Date.now()}`
-if (url) {
+if (testDbUrl) {
   suite('postgres store', async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    const pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs', '0037_linked_email_enc']) await pool.query(m(n))
+    const { pool, drop } = await createSchemaPool('web', { migrations: ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs', '0037_linked_email_enc'] })
     return {
       store: pgStore(pool),
       // Age every hold instead of waiting 30 days.
       age: async (ms) => void (await pool.query(`UPDATE email_holds SET released_at = released_at - ($1 * interval '1 millisecond')`, [ms])),
-      done: async () => {
-        await pool.query(`DROP SCHEMA ${schema} CASCADE`)
-        await pool.end()
-      },
+      done: drop,
     }
   })
 
   describe('postgres schema', () => {
-    let pool: pg.Pool
-    const s2 = `${schema}_b`
-    beforeAll(async () => {
-      const admin = new pg.Client({ connectionString: url })
-      await admin.connect()
-      await admin.query(`CREATE SCHEMA ${s2}`)
-      await admin.end()
-      pool = new pg.Pool({ connectionString: url, options: `-c search_path=${s2}` })
-      await pool.query(m('0001_init'))
-      await pool.query(m('0002_web_auth'))
-      await pool.query(m('0006_email_md5'))
-    })
-    afterAll(async () => {
-      await pool.query(`DROP SCHEMA ${s2} CASCADE`)
-      await pool.end()
-    })
+    const pool = useSchema('web_b', { migrations: ['0001_init', '0002_web_auth', '0006_email_md5'] })
     it('0016 adds email_domain to links and pending codes, is repeatable, and refuses an address', async () => {
       await pool.query(m('0010_email_ownership'))
       await pool.query(m('0013_notice_emails'))
       await pool.query(m('0016_email_domain'))
       await pool.query(m('0016_email_domain'))
-      const cols = await pool.query(`SELECT table_name FROM information_schema.columns WHERE table_schema = $1 AND column_name = 'email_domain' ORDER BY table_name`, [s2])
+      const cols = await pool.query(`SELECT table_name FROM information_schema.columns WHERE table_schema = current_schema() AND column_name = 'email_domain' ORDER BY table_name`)
       expect(cols.rows.map((r) => r.table_name)).toEqual(['email_codes', 'email_links'])
       await pool.query(`INSERT INTO email_links (email_hash, did, method, email_domain) VALUES ($1, 'did:plc:d16', 'code', 'example.com')`, [h(601)])
       await pool.query(`INSERT INTO email_links (email_hash, did, method) VALUES ($1, 'did:plc:d16', 'code')`, [h(602)])
@@ -378,28 +353,15 @@ if (url) {
   })
 }
 
-describe.skipIf(!url)('postgres: no plaintext address at rest', () => {
-  const s3 = `${schema}_c`
-  let pool: pg.Pool
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${s3}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${s3}` })
-    for (const n of ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs', '0037_linked_email_enc']) await pool.query(m(n))
-  })
-  afterAll(async () => {
-    await pool.query(`DROP SCHEMA ${s3} CASCADE`)
-    await pool.end()
-  })
+describe.skipIf(!testDbUrl)('postgres: no plaintext address at rest', () => {
+  const pool = useSchema('web_c', { migrations: ['0001_init', '0002_web_auth', '0006_email_md5', '0010_email_ownership', '0013_notice_emails', '0016_email_domain', '0019_notification_prefs', '0037_linked_email_enc'] })
 
   it('keeps the address out of every table while a code is pending and after it is confirmed, including a move', async () => {
     const store = pgStore(pool)
     const outbox = new Outbox()
     const addr = 'Needle.Person@plaintext-check.test'
     const dump = async () => {
-      const tables = (await pool.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = $1`, [s3])).rows
+      const tables = (await pool.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()`)).rows
       let all = ''
       for (const t of tables) all += JSON.stringify((await pool.query(`SELECT * FROM "${t.table_name}"`)).rows)
       return all.toLowerCase()

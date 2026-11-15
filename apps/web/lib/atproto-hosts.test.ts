@@ -3,7 +3,7 @@ import { pushApp } from './push-apps'
 import { pushMessages, restoreProfileAvatar, setProfileAvatar } from './push-profile'
 import { pushToApp, restorePrevious, type SyncDeps } from './push-sync'
 import { memoryPushStore } from './push-store'
-import { mockHomeServer, testJpeg } from './push-test-server'
+import { mockHomeServer, testJpeg } from './testing/push-test-server'
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import { fetchBlueskyAvatar, type StoredImage } from './repo'
 

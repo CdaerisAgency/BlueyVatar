@@ -3,7 +3,7 @@ import { pushApp } from './push-apps'
 import { pushMessages } from './push-profile'
 import { ALREADY_MATCHES_MESSAGE, disableApp, enableApp, RATING_BLOCKED_MESSAGE, firstAutoNotice, pushBlockReason, pushToApp, restorePrevious, syncAfterDefaultChange, syncsAfterImport, type SyncDeps } from './push-sync'
 import { memoryPushStore } from './push-store'
-import { mockHomeServer, testJpeg } from './push-test-server'
+import { mockHomeServer, testJpeg } from './testing/push-test-server'
 import type { StoredImage } from './repo'
 
 const BSKY = pushApp('bluesky')!

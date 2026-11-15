@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import robots from '../app/robots'
 import { pageMetadata, pricingDescription, ROBOTS_ALLOW, ROBOTS_DISALLOW, siteUrl, STATIC_PAGES } from './site'
 import { PRICING } from './pricing'
@@ -8,6 +6,7 @@ import { jsonLdString, personJsonLd, profileCanonical, sitemapIndexXml, urlsetXm
 import { profileMetadata, type PublicProfile } from './profile-page'
 import { profilesSitemap, rootSitemap, type SitemapSource } from './sitemap'
 import { countEligibleProfiles, eligibleProfiles, filterByLabel, type SitemapProfile } from './sitemap-store'
+import { testDbUrl, useSchema } from './testing/pg-schema'
 
 const base = 'https://blueyvatar.com'
 
@@ -130,38 +129,28 @@ describe('sitemap documents', () => {
   })
 })
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_seo_${process.pid}_${Date.now()}`
-describe.skipIf(!url)('eligibleProfiles (Postgres)', () => {
-  let pool: pg.Pool
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    for (const f of ['0001_init.sql', '0005_custom_domains.sql']) await pool.query(readFileSync(new URL(`../../../db/migrations/${f}`, import.meta.url), 'utf8'))
-    const add = async (did: string, handle: string | null, o: { active?: boolean; rules?: string; domain?: string; noProfile?: boolean } = {}) => {
-      await pool.query('INSERT INTO repos (did, handle, active) VALUES ($1, $2, $3)', [did, handle, o.active ?? true])
-      if (!o.noProfile) await pool.query(`INSERT INTO profiles (did, record) VALUES ($1, '{}')`, [did])
-      if (o.rules) await pool.query(`INSERT INTO visibility_rules (did, ${o.rules}) VALUES ($1, ${o.rules === 'domain_allowlist' ? `'{a.test}'` : 'true'})`, [did])
-      if (o.domain) await pool.query(`INSERT INTO custom_domains (did, hostname, cf_id, status) VALUES ($1, $2, 'cf', 'active')`, [did, `${handle}.example.com`])
-    }
-    await add('did:plc:ok', 'ok.test')
-    await add('did:plc:hidden', 'hidden.test', { rules: 'hidden_profile' })
-    await add('did:plc:keyed', 'keyed.test', { rules: 'keyed_only' })
-    await add('did:plc:allow', 'allow.test', { rules: 'domain_allowlist' })
-    await add('did:plc:down', 'down.test', { active: false })
-    await add('did:plc:nohandle', null)
-    await add('did:plc:noprofile', 'noprofile.test', { noProfile: true })
-    await add('did:plc:custom', 'custom.test', { domain: 'x' })
-    await pool.query(`INSERT INTO repos (did, handle) VALUES ('did:plc:optout', 'optout.test')`)
-    await pool.query(`INSERT INTO profiles (did, record) VALUES ('did:plc:optout', '{}')`)
-    await pool.query(`INSERT INTO visibility_rules (did, email_lookup_opt_out) VALUES ('did:plc:optout', true)`)
-  })
-  afterAll(async () => {
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
+describe.skipIf(!testDbUrl)('eligibleProfiles (Postgres)', () => {
+  const pool = useSchema('seo', {
+    migrations: ['0001_init', '0005_custom_domains'],
+    setup: async (p) => {
+      const add = async (did: string, handle: string | null, o: { active?: boolean; rules?: string; domain?: string; noProfile?: boolean } = {}) => {
+        await p.query('INSERT INTO repos (did, handle, active) VALUES ($1, $2, $3)', [did, handle, o.active ?? true])
+        if (!o.noProfile) await p.query(`INSERT INTO profiles (did, record) VALUES ($1, '{}')`, [did])
+        if (o.rules) await p.query(`INSERT INTO visibility_rules (did, ${o.rules}) VALUES ($1, ${o.rules === 'domain_allowlist' ? `'{a.test}'` : 'true'})`, [did])
+        if (o.domain) await p.query(`INSERT INTO custom_domains (did, hostname, cf_id, status) VALUES ($1, $2, 'cf', 'active')`, [did, `${handle}.example.com`])
+      }
+      await add('did:plc:ok', 'ok.test')
+      await add('did:plc:hidden', 'hidden.test', { rules: 'hidden_profile' })
+      await add('did:plc:keyed', 'keyed.test', { rules: 'keyed_only' })
+      await add('did:plc:allow', 'allow.test', { rules: 'domain_allowlist' })
+      await add('did:plc:down', 'down.test', { active: false })
+      await add('did:plc:nohandle', null)
+      await add('did:plc:noprofile', 'noprofile.test', { noProfile: true })
+      await add('did:plc:custom', 'custom.test', { domain: 'x' })
+      await p.query(`INSERT INTO repos (did, handle) VALUES ('did:plc:optout', 'optout.test')`)
+      await p.query(`INSERT INTO profiles (did, record) VALUES ('did:plc:optout', '{}')`)
+      await p.query(`INSERT INTO visibility_rules (did, email_lookup_opt_out) VALUES ('did:plc:optout', true)`)
+    },
   })
   it('lists only public, active profiles with a handle', async () => {
     const rows = await eligibleProfiles(pool)

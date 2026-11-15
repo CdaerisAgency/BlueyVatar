@@ -1,11 +1,10 @@
-import { readdirSync, readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { deleteAccountData, DeletionBlocked, exportAccountData, ORG_BILLING_BLOCK } from '../account-data'
 import { postgresBillingStore } from '../billing/store'
 import { applyEvent } from '../billing/webhook'
 import { canManageBilling, canManageKeys, canManageMembership, checkChange, DID_RE, type Member } from './roles'
 import { addMember, createOrganization, listAudit, listMembers, listOrganizations, memberRole, orgLicense, removeMember, setRole } from './store'
+import { testDbUrl, useSchema } from '../testing/pg-schema'
 
 describe('roles', () => {
   it('lets members manage keys and only owners manage billing and membership', () => {
@@ -32,29 +31,14 @@ describe('roles', () => {
   })
 })
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_orgs_${process.pid}_${Date.now()}`
 const A = 'did:plc:alice'
 const B = 'did:plc:bob'
 const C = 'did:plc:carol'
 
-describe.skipIf(!url)('organizations', () => {
-  let pool: pg.Pool
+describe.skipIf(!testDbUrl)('organizations', () => {
+  const pool = useSchema('orgs', { migrations: 'all' })
   const n = async (sql: string, p: unknown[] = []) => (await pool.query(sql, p)).rows[0].c as number
 
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    const dir = new URL('../../../../db/migrations/', import.meta.url)
-    for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) await pool.query(readFileSync(new URL(f, dir), 'utf8'))
-  })
-  afterAll(async () => {
-    await pool?.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool?.end()
-  })
 
   it('creates an organization with an owner, a Free license, and an audit entry', async () => {
     const r = await createOrganization(pool, A, '  Acme   Inc ')

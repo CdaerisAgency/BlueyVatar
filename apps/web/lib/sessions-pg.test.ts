@@ -1,27 +1,12 @@
-import { readFileSync } from 'node:fs'
-import pg from 'pg'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { pgStore } from './store'
 import { SESSION_TOUCH_MS } from './web-sessions'
+import { testDbUrl, useSchema } from './testing/pg-schema'
 
-const url = process.env.TEST_DATABASE_URL
-const schema = `t_sess_${process.pid}_${Date.now()}`
 const DID = 'did:web:alice.example.com'
 
-describe.skipIf(!url)('postgres web sessions (migration 0023)', () => {
-  let pool: pg.Pool
-  beforeAll(async () => {
-    const admin = new pg.Client({ connectionString: url })
-    await admin.connect()
-    await admin.query(`CREATE SCHEMA ${schema}`)
-    await admin.end()
-    pool = new pg.Pool({ connectionString: url, options: `-c search_path=${schema}` })
-    await pool.query(readFileSync(new URL('../../../db/migrations/0023_web_sessions.sql', import.meta.url), 'utf8'))
-  })
-  afterAll(async () => {
-    await pool.query(`DROP SCHEMA ${schema} CASCADE`)
-    await pool.end()
-  })
+describe.skipIf(!testDbUrl)('postgres web sessions (migration 0023)', () => {
+  const pool = useSchema('sess', { migrations: ['0023_web_sessions'] })
 
   it('creates, lists, validates, and revokes', async () => {
     const s = pgStore(pool).sessions
