@@ -1,6 +1,6 @@
 # Self-hosting guide (v1)
 
-This guide covers running BlueyVatar on your own infrastructure (issue #39, spec section 3 row 30). It collects what the repository already documents in [deploy.md](deploy.md), `.env.example`, and the `fly/` configs. The project has no license yet, so check the repository for a `LICENSE` file before you rely on the code for your own deployment. Anything the repo does not document is marked "not yet documented".
+This guide covers running BlueyVatar on your own infrastructure (issue #39, spec section 3 row 30). It collects what the repository already documents in [deploy.md](deploy.md), `.env.example` (shared variables) with `apps/*/.env.example` (per app), and the `fly/` configs. The project has no license yet, so check the repository for a `LICENSE` file before you rely on the code for your own deployment. Anything the repo does not document is marked "not yet documented".
 
 Nothing here has been run as a self-hosted install by the maintainers. The Fly.io and Neon setup in [deploy.md](deploy.md) is the reference deployment.
 
@@ -30,7 +30,7 @@ The root `Dockerfile` does the same and produces one image that holds web, deliv
 
 ## Environment variables
 
-Names and meanings come from `.env.example`. Copy it to `.env` as a starting point. Never commit a filled-in file.
+Names and meanings come from `.env.example` (variables several apps share) and the per-app `apps/web/.env.example`, `apps/delivery/.env.example`, and `apps/indexer/.env.example`. Copy the root one to `.env` as a starting point and add the app-specific variables you need from the per-app files. Never commit a filled-in file.
 
 | Variable | Used by | Notes |
 | --- | --- | --- |
@@ -59,7 +59,7 @@ Names and meanings come from `.env.example`. Copy it to `.env` as a starting poi
 | `LOG_RETENTION_MAX_GB` | delivery | Optional size cap in GB per log store, default 5. Set your log destination to the same limits. |
 | `MIGRATIONS_DIR` | migrations | Optional override of `db/migrations`. |
 
-Optional features, each described in `.env.example`: custom profile domains (`CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`), GitHub verification (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`), and attestation records in a service repo (`SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`). The indexer needs the three `SERVICE_*` values to delete revoked attestations from the service repo. The full per-app secret list is in [deploy.md](deploy.md), section "Infisical secrets". That page also says which web variables are required in production was not audited beyond `.env.example`, so treat the web list as a starting point.
+Optional features, each described in `apps/web/.env.example` and `apps/indexer/.env.example`: custom profile domains (`CF_SAAS_ZONE_ID`, `CF_SAAS_API_TOKEN`, `CF_SAAS_FALLBACK_ORIGIN`), GitHub verification (`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`), and attestation records in a service repo (`SERVICE_REPO_DID`, `SERVICE_APP_PASSWORD`, `SERVICE_PDS_URL`). The indexer needs the three `SERVICE_*` values to delete revoked attestations from the service repo. The full per-app secret list is in [deploy.md](deploy.md), section "Infisical secrets". That page also says which web variables are required in production was not audited beyond `.env.example`, so treat the web list as a starting point.
 
 Log retention: the hosted service keeps logs 90 days or until a 5 GB size cap, whichever comes first, and says so on `/privacy`. If you run your own instance, publish your own period on your privacy page, and set the same limits at your log destination (Fly keeps logs only briefly). Sizing and per-destination settings are in [deploy.md](deploy.md), section "Log retention".
 
@@ -70,7 +70,7 @@ Log retention: the hosted service keeps logs 90 days or until a 5 GB size cap, w
 - Origin auth secret (`ORIGIN_SECRET`): `openssl rand -hex 32`. When set, every delivery request except `GET /healthz` must carry the header `x-origin-auth` with this value, or delivery answers 403 `origin_forbidden`. Your proxy or CDN has to add the header. [deploy.md](deploy.md) shows the Cloudflare Request Header Transform Rule for it. Leave it unset to accept all requests.
 - `SESSION_SECRET`: random hex string (the handoff doc generates it that way, `docs/handoff/local-agent-handoff-v6.md`).
 - `TAP_ADMIN_PASSWORD`: random hex string, the same on Tap and the indexer.
-- `OAUTH_PRIVATE_JWK`: `pnpm --filter @blueyvatar/web gen-jwk` (script `apps/web/scripts/gen-jwk.ts`). The output format and how to pass it are not yet documented beyond that comment in `.env.example`.
+- `OAUTH_PRIVATE_JWK`: `pnpm --filter @blueyvatar/web gen-jwk` (script `apps/web/scripts/gen-jwk.ts`). The output format and how to pass it are not yet documented beyond that comment in `apps/web/.env.example`.
 
 ## Migrations
 

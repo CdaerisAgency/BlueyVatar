@@ -35,7 +35,7 @@ Answers to the open questions:
 - `apps/web/lib/link.ts` `linkFromSession` calls getSession, reads `email` and `emailConfirmed`, takes the host from the token audience (`session.getTokenInfo`), and calls `linkMethod`.
 - `apps/web/lib/pds.ts` `linkMethod` returns `trusted_pds` only when `emailConfirmed === true` and the host is in the list. `parseTrustedHosts` splits the `TRUSTED_PDS_HOSTS` environment variable on commas and lowercases. Matching is exact on hostname, with no wildcards.
 - If the method is `trusted_pds` and the hash is not owned by another account, the link is created with no code. If another account owns the hash, it falls through to `sendCode`.
-- Default today: `.env.example` sets `TRUSTED_PDS_HOSTS=` (empty), so every link uses the mailed code. `docs/deploy.md` says the web deploy waits on this value.
+- Default today: `apps/web/.env.example` sets `TRUSTED_PDS_HOSTS=` (empty), so every link uses the mailed code. `docs/deploy.md` says the web deploy waits on this value.
 - The list lives in deployment configuration, not in the repo, so a change has no review trail.
 
 ## Options

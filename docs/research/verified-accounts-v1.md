@@ -29,7 +29,7 @@ Rule applied here: a platform is included when the pages I read describe no paid
 ## What was built
 
 - **Platforms in the claims UI:** GitHub, Mastodon, Website, Domain, Bluesky, Instagram, Threads, TikTok, YouTube, Twitch, and X (page check only, see below). Platforms that sign in through a provider app show "(not available yet)" until their flag is on. The "coming later" entries are gone.
-- **Flags:** a provider turns on only when `VERIFY_<PLATFORM>_ENABLED` is exactly `true` and both credentials are set. Names are in `.env.example` and `docs/deploy.md`.
+- **Flags:** a provider turns on only when `VERIFY_<PLATFORM>_ENABLED` is exactly `true` and both credentials are set. Names are in `apps/web/.env.example` and `docs/deploy.md`.
 - **Callbacks:** all providers share `/account/claims/callback`. A state row (single use, 15 minutes) names the provider and the claim. The callback checks that the account the provider reports is the claimed account, writes the attestation, and discards the token. Secrets come from the environment only.
 - **Claim addresses:** TikTok `https://www.tiktok.com/@name`, Threads `https://www.threads.com/@name`, Twitch `https://www.twitch.tv/name`, YouTube `https://www.youtube.com/channel/UC...` (the channel ID, because an `@handle` cannot be matched without a lookup), Bluesky `https://bsky.app/profile/<handle or DID>`, Domain `https://<host>`.
 - **Proof text:** `blueyvatar-verify=<DID>`. It names the DID, so a proof placed for one account does not verify another. Only someone who controls the bio or the DNS zone can place it.

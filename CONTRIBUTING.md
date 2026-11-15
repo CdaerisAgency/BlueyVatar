@@ -6,7 +6,7 @@ Requirements: Node 22 and pnpm 10.28.0 (`corepack enable` picks up the version f
 
 ```sh
 pnpm install
-cp .env.example .env            # optional for local runs
+cp .env.example .env            # optional for local runs (shared variables; app-specific ones are in apps/*/.env.example)
 pnpm lex:build                  # generate lexicon types
 pnpm --filter @blueyvatar/core build
 ```
