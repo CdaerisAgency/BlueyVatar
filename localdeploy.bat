@@ -1,8 +1,9 @@
 @echo off
 setlocal EnableExtensions
-rem blueyvatar deploy helper, v2
+rem blueyvatar deploy helper, v3
 rem Syncs the local clone with origin/main, then deploys to Fly one app at a time: delivery, web, indexer.
 rem Steps follow docs/deploy.md (Staging section and First-time setup). Tap is not deployed here.
+rem After a production deploy, the last step runs "pnpm lexicons:publish" (docs/deploy.md, Publish lexicons). Skip it with --no-lexicons.
 rem Run with --help for the options. Exit codes: 0 done, 1 failed, 2 bad usage, 3 stopped by the user.
 
 set "REPO=C:\dev\blueyvatar"
@@ -12,6 +13,7 @@ set "YES="
 set "PRODOK="
 set "NOPAUSE="
 set "NOSYNC="
+set "NOLEX="
 set "INTERACTIVE=1"
 set "RC=0"
 
@@ -25,6 +27,7 @@ if /i "%~1"=="-y" goto :p_yes
 if /i "%~1"=="--confirm-production" goto :p_prod
 if /i "%~1"=="--no-pause" goto :p_nopause
 if /i "%~1"=="--no-sync" goto :p_nosync
+if /i "%~1"=="--no-lexicons" goto :p_nolex
 if /i "%~1"=="--repo" goto :p_repo
 if /i "%~1"=="--help" goto :usage_ok
 if /i "%~1"=="-h" goto :usage_ok
@@ -64,6 +67,11 @@ goto :parse
 
 :p_nosync
 set "NOSYNC=1"
+shift
+goto :parse
+
+:p_nolex
+set "NOLEX=1"
 shift
 goto :parse
 
@@ -179,6 +187,28 @@ set /p "CONFIRM=Production is included. Type DEPLOY PRODUCTION to continue: "
 if /i not "%CONFIRM%"=="DEPLOY PRODUCTION" goto :quit
 :prod_ok
 
+rem The lexicon step runs after production. Check what it needs now, so a deploy never finishes and then stops at the last step.
+if not defined WANTPROD goto :lex_checked
+if defined NOLEX goto :lex_checked
+set "LEXMISS="
+if not defined LEXICON_PUBLISH_IDENTIFIER set "LEXMISS=1"
+if not defined LEXICON_PUBLISH_APP_PASSWORD set "LEXMISS=1"
+if not defined LEXICON_PUBLISH_SERVICE set "LEXMISS=1"
+if not defined LEXMISS goto :lex_env_ok
+echo The lexicon step needs these environment variables, and these are not set:
+if not defined LEXICON_PUBLISH_IDENTIFIER echo   LEXICON_PUBLISH_IDENTIFIER
+if not defined LEXICON_PUBLISH_APP_PASSWORD echo   LEXICON_PUBLISH_APP_PASSWORD
+if not defined LEXICON_PUBLISH_SERVICE echo   LEXICON_PUBLISH_SERVICE
+echo Set them and start again, or pass --no-lexicons. Nothing was deployed.
+goto :fail
+:lex_env_ok
+where pnpm >nul 2>&1
+if errorlevel 1 (
+  echo pnpm was not found on PATH, and the lexicon step needs it. Install pnpm or pass --no-lexicons. Nothing was deployed.
+  goto :fail
+)
+:lex_checked
+
 echo Target: %TARGET%
 echo.
 
@@ -197,6 +227,10 @@ if errorlevel 1 goto :quit
 call :do_production
 if errorlevel 3 goto :quit
 if errorlevel 1 goto :fail
+
+call :do_lexicons
+if errorlevel 3 goto :quit
+if errorlevel 1 goto :lexfail
 goto :done
 
 :done
@@ -215,6 +249,13 @@ goto :end
 echo.
 echo FAILED. Nothing further was run. Fix the problem above and run this file again.
 echo If delivery failed during migrations, the previous version is still running.
+set "RC=1"
+goto :end
+
+:lexfail
+echo.
+echo FAILED at the final step. The deploys already finished. Only the lexicon publish did not complete.
+echo Fix the problem above, then run "pnpm lexicons:publish" from the repo root.
 set "RC=1"
 goto :end
 
@@ -241,7 +282,7 @@ rem ---- Subroutines. Each returns 0 done, 1 failed, 3 declined. ----
 
 :usage
 echo Usage: localdeploy.bat [--env staging^|production^|both] [--yes] [--confirm-production]
-echo                        [--repo PATH] [--no-sync] [--no-pause] [--help]
+echo                        [--repo PATH] [--no-sync] [--no-pause] [--no-lexicons] [--help]
 echo.
 echo   --env NAME             staging, production, or both. Both deploys staging first, then production.
 echo   --yes, -y              No prompts. Needs --env. Runs every step without asking.
@@ -249,6 +290,11 @@ echo   --confirm-production   Required with --yes when production is included. R
 echo   --repo PATH            Use this clone instead of C:\dev\blueyvatar.
 echo   --no-sync              Skip the fetch and pull. Deploys whatever is checked out.
 echo   --no-pause             Do not wait for a key at the end.
+echo   --no-lexicons          Do not publish lexicons after the production deploy.
+echo.
+echo After production, the last step runs "pnpm lexicons:publish". It needs the environment variables
+echo LEXICON_PUBLISH_IDENTIFIER, LEXICON_PUBLISH_APP_PASSWORD, and LEXICON_PUBLISH_SERVICE. They are
+echo checked before any deploy starts.
 echo.
 echo Examples:
 echo   localdeploy.bat
@@ -300,5 +346,25 @@ if errorlevel 1 exit /b 1
 call :confirm "Step 3 of 3: deploy the indexer to production"
 if errorlevel 1 exit /b 3
 fly deploy --config fly/indexer.toml --dockerfile Dockerfile --remote-only
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:do_lexicons
+if not defined WANTPROD exit /b 0
+if defined NOLEX (
+  echo.
+  echo Skipping the lexicon publish, as --no-lexicons was given.
+  exit /b 0
+)
+echo.
+echo --- LEXICONS ---
+call :confirm "Final step: publish lexicons"
+if errorlevel 1 exit /b 3
+where pnpm >nul 2>&1
+if errorlevel 1 (
+  echo pnpm was not found on PATH.
+  exit /b 1
+)
+call pnpm lexicons:publish
 if errorlevel 1 exit /b 1
 exit /b 0

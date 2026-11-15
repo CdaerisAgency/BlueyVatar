@@ -9,7 +9,7 @@ import { useViewer } from './useViewer'
 export default function NavAccount() {
   const v = useViewer()
   return v.signedIn ? (
-    <ProfileMenu name={v.name} initial={v.initial} />
+    <ProfileMenu name={v.name} initial={v.initial} avatarSrc={v.avatarSrc} />
   ) : (
     <ButtonLink href="/login" variant="primary">
       {COPY.nav.signIn}

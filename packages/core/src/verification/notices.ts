@@ -10,17 +10,19 @@ const log = createLogger({ app: process.env.LOG_APP ?? 'core' })
  * usage and billing notices can be switched off per account on /account/notifications.
  * security notices cannot: they tell an owner about changes that may not have been theirs.
  */
-export type NoticeKind = 'usage' | 'billing' | 'security'
+export type NoticeKind = 'usage' | 'billing' | 'offers' | 'security'
 
 export interface NoticePrefs {
   usageAlerts: boolean
   billingNotices: boolean
+  /** Free effect offers (issue #308). Absent means on. */
+  offerNotices?: boolean
 }
 export const DEFAULT_NOTICE_PREFS: NoticePrefs = { usageAlerts: true, billingNotices: true }
 
 /** What the account page lists as always on. */
 export const SECURITY_NOTICES = [
-  'A verified account was removed from your profile after re-verification failed.',
+  'A linked account was removed from your profile after re-verification failed.',
   'Your email address was linked to a different account.',
   'One of your keys was revoked.',
   'Your images were removed, your account was suspended, or an appeal was decided.',
@@ -34,13 +36,21 @@ export interface Notice {
 const base = (publicUrl: string) => publicUrl.replace(/\/+$/, '')
 const day = (d: Date) => d.toISOString().slice(0, 10)
 
+const accountLine = (account: string) => `Account: ${account}`
+
+/** Swaps the DID on the "Account:" line for a handle. Text without that exact line is returned unchanged. */
+export function withAccount(n: Notice, did: string, handle: string | null | undefined): Notice {
+  if (!handle || handle === did) return n
+  return { ...n, text: n.text.replace(`\n${accountLine(did)}\n`, `\n${accountLine(handle)}\n`) }
+}
+
 /** Plain text only: no tracking pixels, no tracked links. Every message names the account and links the preferences page. */
-function frame(did: string, publicUrl: string, body: string, kind: NoticeKind): Notice['text'] {
+function frame(did: string, publicUrl: string, body: string, kind: NoticeKind, account?: string | null): Notice['text'] {
   const why =
     kind === 'security'
       ? 'This is a security notice. It is always sent.'
       : 'You can turn this kind of message off at the link below.'
-  return `${body}\n\n--\nAccount: ${did}\n${why}\nNotification settings: ${base(publicUrl)}/account/notifications`
+  return `${body}\n\n--\n${accountLine(account || did)}\n${why}\nNotification settings: ${base(publicUrl)}/account/notifications`
 }
 
 export interface UsageNoticeInput {
@@ -68,6 +78,15 @@ export function usageNotice(i: UsageNoticeInput): Notice {
   }
 }
 
+/** One email when an admin-issued free effect offer starts (issue #308). Only sent for offers with notify on. */
+export function effectOfferNotice(i: { did: string; name: string; endsAt: Date; publicUrl: string }): Notice {
+  const body =
+    `A free effect is available on your BlueyVatar account: ${i.name}.\n\n` +
+    `You can use it until ${day(new Date(i.endsAt.getTime() - 1))} (UTC). Avatars you make with it keep working after that.\n\n` +
+    `Try it at ${base(i.publicUrl)}/account/effects.`
+  return { subject: `Free for a limited time: ${i.name}`, text: frame(i.did, i.publicUrl, body, 'offers') }
+}
+
 export function paymentFailedNotice(i: { did: string; graceEnds: Date; publicUrl: string }): Notice {
   const body =
     `Your last BlueyVatar payment failed.\n\n` +
@@ -91,12 +110,50 @@ export function subscriptionCanceledNotice(i: { did: string; plan: string; publi
   return { subject: `Your BlueyVatar ${i.plan} subscription was canceled`, text: frame(i.did, i.publicUrl, body, 'billing') }
 }
 
-export function keyRevokedNotice(i: { did: string; prefix: string; label?: string | null; publicUrl: string }): Notice {
-  const name = i.label ? `${i.label} (${i.prefix})` : i.prefix
+export function keyRevokedNotice(i: {
+  did: string
+  prefix: string
+  label?: string | null
+  /** When the key was created. Used to name a key that has no label, such as "Unnamed key, created 2026-11-08". */
+  createdAt?: Date
+  /** What to show on the "Account:" line instead of the DID, usually the handle. Falls back to the DID. */
+  account?: string | null
+  publicUrl: string
+}): Notice {
+  const name = i.label?.trim() || (i.createdAt ? `Unnamed key, created ${day(i.createdAt)}` : 'Unnamed key')
   const body =
-    `The key ${name} was revoked and no longer works.\n\n` +
+    `The key "${name}" (${i.prefix}) was revoked and no longer works.\n\n` +
     `If you did not do this, sign in at ${base(i.publicUrl)}/account/keys, review your keys, and issue a new one.`
-  return { subject: i.label ? 'Your BlueyVatar key "' + i.label + '" was revoked' : 'A BlueyVatar key was revoked', text: frame(i.did, i.publicUrl, body, 'security') }
+  return { subject: `Your BlueyVatar key "${name}" was revoked`, text: frame(i.did, i.publicUrl, body, 'security', i.account || i.did) }
+}
+
+/** Plain names for the two key types, the same wording as the keys page and the API docs. */
+export const KEY_TYPE_LABELS = {
+  publishable: 'Website key (read only, safe to put in a web page)',
+  secret: 'Server key (read only, keeps usage and stays private)',
+} as const
+
+/**
+ * Heads-up that a key is about to stop working. Only keys that expire get this: a key made with the Forever
+ * lifetime has no expiry time, so `expiresAt` is required and there is no Forever variant.
+ */
+export function keyExpiringNotice(i: {
+  did: string
+  prefix: string
+  label?: string | null
+  kind: keyof typeof KEY_TYPE_LABELS
+  createdAt?: Date
+  expiresAt: Date
+  account?: string | null
+  publicUrl: string
+}): Notice {
+  const name = i.label?.trim() || (i.createdAt ? `Unnamed key, created ${day(i.createdAt)}` : 'Unnamed key')
+  const body =
+    `The key "${name}" (${i.prefix}) stops working on ${day(i.expiresAt)}.\n` +
+    `Type: ${KEY_TYPE_LABELS[i.kind]}\n\n` +
+    `Before then, sign in at ${base(i.publicUrl)}/account/keys, create a replacement key, and switch your site or server to it. ` +
+    `When you create the new key you can choose Forever, 30 days, 90 days, or 1 year.`
+  return { subject: `Your BlueyVatar key "${name}" expires on ${day(i.expiresAt)}`, text: frame(i.did, i.publicUrl, body, 'security', i.account || i.did) }
 }
 
 /**
@@ -234,12 +291,14 @@ export interface NoticeDirectory {
   /** The decrypted primary email, or null when none is on file. */
   address(did: string): Promise<string | null>
   prefs(did: string): Promise<NoticePrefs>
+  /** The account's handle for the "Account:" line, or null. Optional: without it the line shows the DID. */
+  handle?(did: string): Promise<string | null>
 }
 
 export type NoticeResult = 'sent' | 'off' | 'no_address' | 'failed'
 
 export const noticeAllowed = (p: NoticePrefs, kind: NoticeKind) =>
-  kind === 'usage' ? p.usageAlerts : kind === 'billing' ? p.billingNotices : true
+  kind === 'usage' ? p.usageAlerts : kind === 'billing' ? p.billingNotices : kind === 'offers' ? p.offerNotices !== false : true
 
 /** Sends notices honoring preferences. Never throws and never logs an address. */
 export class Notifier {
@@ -256,7 +315,8 @@ export class Notifier {
         log.warn(`${kind} notice not sent: no address on file`, { did })
         return 'no_address'
       }
-      await this.sender.send({ to, ...n })
+      const handle = await this.dir.handle?.(did).catch(() => null)
+      await this.sender.send({ to, ...withAccount(n, did, handle) })
       return 'sent'
     } catch (err) {
       log.error(`${kind} notice failed`, { error: err instanceof Error ? err.message : 'unknown' })
@@ -284,15 +344,16 @@ export function pgNoticeDirectory(pool: Query, master?: Buffer): NoticeDirectory
       }
     },
     async prefs(did) {
-      const r = await pool.query('SELECT usage_alerts, billing_notices FROM notification_prefs WHERE did = $1', [did])
+      const r = await pool.query('SELECT usage_alerts, billing_notices, offer_notices FROM notification_prefs WHERE did = $1', [did])
       const row = r.rows[0]
-      return row ? { usageAlerts: row.usage_alerts as boolean, billingNotices: row.billing_notices as boolean } : { ...DEFAULT_NOTICE_PREFS }
+      return row ? { usageAlerts: row.usage_alerts as boolean, billingNotices: row.billing_notices as boolean, offerNotices: row.offer_notices as boolean } : { ...DEFAULT_NOTICE_PREFS }
     },
     async setPrefs(did, p) {
       await pool.query(
-        `INSERT INTO notification_prefs (did, usage_alerts, billing_notices) VALUES ($1, $2, $3)
-         ON CONFLICT (did) DO UPDATE SET usage_alerts = EXCLUDED.usage_alerts, billing_notices = EXCLUDED.billing_notices, updated_at = now()`,
-        [did, p.usageAlerts, p.billingNotices],
+        `INSERT INTO notification_prefs (did, usage_alerts, billing_notices, offer_notices) VALUES ($1, $2, $3, coalesce($4, true))
+         ON CONFLICT (did) DO UPDATE SET usage_alerts = EXCLUDED.usage_alerts, billing_notices = EXCLUDED.billing_notices,
+           offer_notices = coalesce($4, notification_prefs.offer_notices), updated_at = now()`,
+        [did, p.usageAlerts, p.billingNotices, p.offerNotices ?? null],
       )
     },
   }

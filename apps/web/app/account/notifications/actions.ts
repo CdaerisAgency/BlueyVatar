@@ -13,7 +13,7 @@ export interface NotificationState {
 export async function saveNotifications(_prev: NotificationState, form: FormData): Promise<NotificationState> {
   const did = await currentDid()
   if (!did) return redirect('/login')
-  await getNoticeDirectory().setPrefs(did, { usageAlerts: form.get('usageAlerts') === 'on', billingNotices: form.get('billingNotices') === 'on' })
+  await getNoticeDirectory().setPrefs(did, { usageAlerts: form.get('usageAlerts') === 'on', billingNotices: form.get('billingNotices') === 'on', offerNotices: form.get('offerNotices') === 'on' })
   revalidatePath('/account/notifications')
   return { saved: true }
 }

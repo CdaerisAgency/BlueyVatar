@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { encryptJson } from './token-crypto.js'
 import {
-  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, pgNoticeDirectory, usageNotice,
+  appealOutcomeNotice, statementOfReasonsNotice, unfilledPlaceholders, keyRevokedNotice, keyExpiringNotice, KEY_TYPE_LABELS, suspensionNotice, takedownNotice, Notifier, reportOutcomeNotice, noticeAllowed, paymentFailedNotice, effectOfferNotice, pgNoticeDirectory, usageNotice, withAccount,
   type NoticeDirectory, type NoticePrefs,
 } from './notices.js'
 
@@ -12,12 +12,32 @@ describe('keyRevokedNotice', () => {
   it('puts the key name in the subject and leads the body with it', () => {
     const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', label: 'My site', publicUrl: URL })
     expect(n.subject).toBe('Your BlueyVatar key "My site" was revoked')
-    expect(n.text).toContain('The key My site (pk_abc123) was revoked')
+    expect(n.text).toContain('The key "My site" (pk_abc123) was revoked')
   })
-  it('falls back to the prefix when a key has no name', () => {
-    const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', publicUrl: URL })
-    expect(n.subject).toBe('A BlueyVatar key was revoked')
-    expect(n.text).toContain('The key pk_abc123 was revoked')
+  it('names an unnamed key by its creation date', () => {
+    const n = keyRevokedNotice({ did: DID, prefix: 'pk_abc123', label: '', createdAt: new Date('2026-11-08T15:30:40Z'), publicUrl: URL })
+    expect(n.subject).toBe('Your BlueyVatar key "Unnamed key, created 2026-11-08" was revoked')
+    expect(n.text).toContain('The key "Unnamed key, created 2026-11-08" (pk_abc123)')
+  })
+  it('shows the handle on the Account line, and the DID when there is none', () => {
+    expect(keyRevokedNotice({ did: DID, prefix: 'pk_a', label: 'x', account: 'alice.bsky.social', publicUrl: URL }).text).toContain('Account: alice.bsky.social')
+    expect(keyRevokedNotice({ did: DID, prefix: 'pk_a', label: 'x', account: null, publicUrl: URL }).text).toContain(`Account: ${DID}`)
+  })
+})
+
+describe('keyExpiringNotice', () => {
+  const base = { did: DID, prefix: 'sk_abc123', label: 'Billing job', kind: 'secret' as const, expiresAt: new Date('2027-02-06T12:00:00Z'), publicUrl: URL }
+  it('names the key, its expiry date and its plain type label', () => {
+    const n = keyExpiringNotice(base)
+    expect(n.subject).toBe('Your BlueyVatar key "Billing job" expires on 2027-02-06')
+    expect(n.text).toContain('stops working on 2027-02-06')
+    expect(n.text).toContain('Type: Server key (read only, keeps usage and stays private)')
+    expect(n.text).toContain('https://blueyvatar.com/account/keys')
+  })
+  it('uses the website key label and lists Forever among the choices for the replacement', () => {
+    const n = keyExpiringNotice({ ...base, kind: 'publishable' })
+    expect(n.text).toContain(KEY_TYPE_LABELS.publishable)
+    expect(n.text).toContain('Forever, 30 days, 90 days, or 1 year')
   })
 })
 
@@ -42,7 +62,7 @@ describe('templates', () => {
     expect(all[0]!.text).toContain('40,000 of 50,000')
     expect(all[1]!.subject).toContain('100 percent')
     expect(all[2]!.text).toContain('2026-11-08')
-    expect(all[3]!.text).toContain('site (bv_pub_ab12)')
+    expect(all[3]!.text).toContain('"site" (bv_pub_ab12)')
     expect(all[3]!.text).toContain('always sent')
   })
 })
@@ -72,12 +92,36 @@ describe('Notifier', () => {
     expect(await n.send(DID, 'usage', msg)).toBe('sent')
     expect(sent[0]).toMatchObject({ to: 'a@example.com', subject: 's' })
   })
+  it('shows the handle on the Account line, falling back to the DID', async () => {
+    const n = usageNotice({ did: DID, threshold: 80, used: 1, included: 2, period: '2026-11-01', publicUrl: URL })
+    const text = async (handle: string | null | 'throw') => {
+      const out: string[] = []
+      const d: NoticeDirectory = { ...dir(on), handle: async () => { if (handle === 'throw') throw new Error('x'); return handle } }
+      await new Notifier({ send: async (m) => void out.push(m.text) }, d).send(DID, 'usage', n)
+      return out[0]!
+    }
+    expect(await text('alice.bsky.social')).toContain('\nAccount: alice.bsky.social\n')
+    expect(await text(null)).toContain(`\nAccount: ${DID}\n`)
+    expect(await text('throw')).toContain(`\nAccount: ${DID}\n`)
+    expect(withAccount(reportOutcomeNotice({ reportId: 1, outcome: 'actioned', publicUrl: URL }), DID, 'a.b').text).not.toContain('Account:')
+  })
   it('reports a missing address and a sender failure without throwing', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(await setup(dir(on, null)).n.send(DID, 'billing', msg)).toBe('no_address')
     const bad = new Notifier({ send: async () => { throw new Error('boom') } }, dir(on))
     expect(await bad.send(DID, 'billing', msg)).toBe('failed')
+  })
+})
+
+describe('effectOfferNotice', () => {
+  it('names the effect and the last day, links preferences, and honors the offers opt-out', async () => {
+    const n = effectOfferNotice({ did: DID, name: 'Winter frame', endsAt: new Date('2026-12-26T00:00:00Z'), publicUrl: URL })
+    expect(n.subject).toContain('Winter frame')
+    expect(n.text).toContain('until 2026-12-25 (UTC)')
+    expect(n.text).toContain('/account/notifications')
+    expect(noticeAllowed({ usageAlerts: true, billingNotices: true, offerNotices: false }, 'offers')).toBe(false)
+    expect(noticeAllowed({ usageAlerts: false, billingNotices: false }, 'offers')).toBe(true)
   })
 })
 

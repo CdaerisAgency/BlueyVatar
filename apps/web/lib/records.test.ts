@@ -5,6 +5,8 @@ import {
   canAddImage,
   parseCropFields,
   imageLimit,
+  uploadNotice,
+  limitMessage,
   isValidTimezone,
   labelValues,
   labelsForRating,
@@ -87,6 +89,18 @@ describe('image bytes', () => {
   it('rejects empty and unsupported files', () => {
     expect(validateImageBytes(new Uint8Array(0)).ok).toBe(false)
     expect(validateImageBytes(new TextEncoder().encode('<svg></svg>')).ok).toBe(false)
+  })
+})
+
+describe('upload notice', () => {
+  it('uses the approved wording with the plan limit', () => {
+    const text = (n: number) => `Images you save are stored in your Bluesky account and are public. Your plan allows up to ${n} images. Visibility settings control what blueyvatar shows. They can't hide an image from other apps, and copies others already have can't be recalled.`
+    expect(uploadNotice('free')).toBe(text(3))
+    expect(uploadNotice('plus')).toBe(text(20))
+  })
+  it('names the right plan in the limit message', () => {
+    expect(limitMessage('plus')).toBe('The Plus plan allows 20 images. Delete one to add another.')
+    expect(limitMessage('free')).toContain('Free plan')
   })
 })
 

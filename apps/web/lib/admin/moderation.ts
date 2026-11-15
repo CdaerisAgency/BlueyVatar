@@ -4,6 +4,7 @@ import type { Purge } from './purge'
 export type AdminAction =
   | 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report' | 'appeal_upheld' | 'appeal_overturned'
   | 'acknowledge' | 'rating_change' | 'warn' | 'escalate' | 'reverse' | 'comment' | 'tag' | 'reveal_image' | 'divert' | 'notice_sent'
+  | 'effect_offer_create' | 'effect_offer_change' | 'effect_offer_end'
 export const DID_RE = /^did:(plc|web):[A-Za-z0-9._:%-]{1,200}$/
 export const MAX_REASON = 500
 

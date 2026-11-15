@@ -50,9 +50,9 @@ Gravatar source for all Gravatar cells in this section: [OpenAPI spec](https://a
 
 | Format | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
-| JSON | `.json` suffix, PoCo format, JSONP `callback` ([JSON docs](https://docs.gravatar.com/profiles/json/)) | None published | `/profile/{id}.json` and `?format=json` download the public fields; `GET /profile/:id` still returns the full JSON (`apps/delivery/src/app.ts`, `docs/api/exports-and-qr-v1.md`) |
-| Markdown | `.md` suffix ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | `/profile/{id}.md` (`docs/api/exports-and-qr-v1.md`) |
-| vCard | `.vcf` suffix; not all fields included, field list not published ([vCard docs](https://docs.gravatar.com/profiles/vcf-vcard/)) | None published | `/profile/{id}.vcf`, vCard 4.0 (`docs/api/exports-and-qr-v1.md`) |
+| JSON | `.json` suffix, PoCo format, JSONP `callback` ([JSON docs](https://docs.gravatar.com/profiles/json/)) | None published | `/profile/{id}.json` and `?format=json` download the public fields; `GET /profile/:id` still returns the full JSON (`apps/delivery/src/app.ts`, `docs/api/exports-and-qr-v2.md`) |
+| Markdown | `.md` suffix ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | `/profile/{id}.md` (`docs/api/exports-and-qr-v2.md`) |
+| vCard | `.vcf` suffix; not all fields included, field list not published ([vCard docs](https://docs.gravatar.com/profiles/vcf-vcard/)) | None published | `/profile/{id}.vcf`, vCard 4.0 (`docs/api/exports-and-qr-v2.md`) |
 | XML | `.xml` ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | None |
 | PHP serialized | `.php` ([LLMs guide](https://docs.gravatar.com/guides/llms-txt/)) | None published | None |
 | Account data export (owner) | Unknown | Unknown | JSON download at `/account/data/export` (`apps/web/app/account/data/export/route.ts`) |
@@ -66,7 +66,7 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 | Profile QR | `https://gravatar.com/{hash}.qr` or `{username}.qr`; also `/qr-code/{sha256_hash}` in the API, PNG ([QR docs](https://docs.gravatar.com/sdk/qr-codes/), [OpenAPI](https://api.gravatar.com/v3/openapi)) | None published | `/qr/{id}.svg` and `.png` (`apps/delivery/src/app.ts`) |
 | Size | `s` or `size`, default 80 | n/a | `s`, default 256, tier clamped (`docs/api/gravatar-differences-v1.md`) |
 | Style | `version=1` standard, `version=3` small dots | n/a | One style, ECC M, 4 module quiet zone (`packages/core/src/qr.ts`) |
-| Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | `center=avatar`, `center=logo`, or `none`, with error correction level H (`docs/api/exports-and-qr-v1.md`) |
+| Center image | `type=user` (avatar), `type=gravatar` (logo), blank for none | n/a | `center=avatar`, `center=logo`, or `none`, with error correction level H (`docs/api/exports-and-qr-v2.md`) |
 | Redirect to a social account | Unknown | n/a | `?to=<platform>` via `/go/:handle/:platform` (`apps/delivery/src/app.ts`) |
 | Encoded content | Link to the profile page only | n/a | Profile URL, or the `/go` redirect URL |
 | Access | Unknown (no tier restriction published on the pages read) | n/a | Every plan, including anonymous callers (`apps/delivery/src/app.ts`) |
@@ -85,11 +85,11 @@ Note: the OpenAPI spec defines no export endpoints ([OpenAPI](https://api.gravat
 
 | Feature | Gravatar | Libravatar | BlueyVatar today |
 | --- | --- | --- | --- |
-| Profile API | REST v3, `GET /profiles/{id}`, OpenAPI published ([REST docs](https://docs.gravatar.com/rest/api-data/)) | None published | `GET /profile/:id`, OpenAPI at `/openapi.json` (`apps/delivery/src/app.ts`, `docs/api/README-v1.md`) |
+| Profile API | REST v3, `GET /profiles/{id}`, OpenAPI published ([REST docs](https://docs.gravatar.com/rest/api-data/)) | None published | `GET /profile/:id`, OpenAPI at `/openapi.json` (`apps/delivery/src/app.ts`, `docs/api/README-v2.md`) |
 | Write API | `PATCH /me/profile`, avatar upload endpoints, OAuth ([OpenAPI](https://api.gravatar.com/v3/openapi)) | Unknown | Writes go to the person's atproto repo through atproto scopes (spec section 10.1); no write REST API |
 | Search by verified account | `/profiles/search/by-verified-account` ([OpenAPI](https://api.gravatar.com/v3/openapi)) | None published | None found |
 | Rate limits | 1,000 requests per hour per API key for Profiles; avatars not limited ([REST docs](https://docs.gravatar.com/rest/api-data/)) | Unknown | Anonymous 100 per day per IP; Free keyed 1,000 per day; paid monthly caps (`packages/core/src/tiers.ts`) |
-| Error format | `error` and `code` fields | Unknown | `errorBody` with code and message (`docs/api/errors-v1.md`) |
+| Error format | `error` and `code` fields | Unknown | `errorBody` with code and message (`docs/api/errors-v2.md`) |
 
 ## 7. Federation and lookup
 

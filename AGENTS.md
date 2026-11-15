@@ -24,7 +24,7 @@ Rules for AI agents and people working in this repository. `CLAUDE.md` points he
 
 ## Deploying
 - The full runbook is `docs/deploy.md`. Read it before any deploy-related work.
-- Agents never deploy, run `fly` commands, change Fly secrets, or run migrations against staging or production without the owner's approval for that specific action.
+- Agents may deploy, run `fly` commands, change Fly secrets, and run migrations against staging or production, but only when the owner asks for that specific action in the current conversation. Never deploy on your own initiative, never deploy automatically (for example after a merge), and treat one approval as covering only the action named. Say what will be deployed and where, then wait for the go-ahead.
 - CI deploys are opt-in. `.github/workflows/deploy.yml` runs on push to `main` only when the repository variable `FLY_DEPLOY_ENABLED` is `true`. Merging a PR can trigger a deploy, and any migration in it, when that variable is on, so say so in the PR when it adds a migration.
 - Staging comes first. Test risky changes on staging with the owner before production.
 

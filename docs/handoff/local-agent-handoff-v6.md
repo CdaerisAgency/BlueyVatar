@@ -7,13 +7,12 @@ Written November 4, 2026, from the cloud session that built phases 1 and 2. The 
 BlueyVatar (blueyvatar.com) is a Gravatar-style avatar and profile service built on atproto. Avatars and profile data live in each user's own atproto repository. The service adds email lookup, fast image delivery, and paid developer tiers. The full spec is `docs/spec/blueyvatar-product-spec-v13.md`.
 
 - Repository: `CdaerisAgency/BlueyVatar` (the old lowercase URL redirects; set your remote to `https://github.com/CdaerisAgency/BlueyVatar.git`)
-- Local path: `C:\Users\super\OneDrive\Documents\GitHub\BlueyVatar`
 - Do not touch `CdaerisAgency/atlas`. It is a different project.
 
 ## 2. Owner's standing rules
 
 1. **PRs:** open every PR as ready for review (not draft). Once both CI jobs, `check` and `docker`, pass, merge it with a merge commit. You don't need to ask first. The owner gave this as a permanent order.
-2. **CI** runs on GitHub-hosted runners (`runs-on: ubuntu-latest`) because the repository is public and a self-hosted runner on a public repository lets anyone who opens a pull request run code on that machine (<https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions>). The repository variable `CI_RUNNER` is retired. Only `deploy.yml` uses a self-hosted runner, named by the repository variable `DEPLOY_RUNNER` with no fallback. The pnpm cache was removed on purpose; leave it out unless the owner asks.
+2. **CI** runs on the owner’s on-prem runners through the repository variable `CI_RUNNER` (`runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}`; owner decision, November 8, 2026). The repository is public, and a self-hosted runner on a public repository lets anyone who opens a pull request run code on that machine unless fork pull requests need approval, so keep "Require approval for all outside collaborators" on (<https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions>). `deploy.yml` uses the runner named by `DEPLOY_RUNNER` with no fallback. `live-tap.yml` and `publish-npm.yml` stay on GitHub-hosted runners. The pnpm cache was removed on purpose; leave it out unless the owner asks.
 3. **Writing:** use U.S. English. Never use em-dashes. Avoid "not X, but Y" phrasing.
 4. **Versioning:** put a version number on every new document and on each revision (v1, v2, and so on).
 5. **Sources:** take facts from vendor documentation. If nothing is published on a point, say so instead of guessing, and mark the item **unconfirmed** in the docs.

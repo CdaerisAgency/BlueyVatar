@@ -1,5 +1,5 @@
 import { normalizeBackgroundColor } from '@blueyvatar/core'
-import { PageMain } from '../../../components/Page'
+import { PageHeader, PageMain, Section } from '../../../components/Page'
 import { requireDid } from '../../../lib/auth'
 import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { ProfileForm } from './ProfileForm'
@@ -27,8 +27,8 @@ export default async function ProfilePage() {
   const color = normalizeBackgroundColor(p.backgroundColor)
   return (
     <PageMain>
-      <h1>Profile</h1>
-      <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name and bio stay in your atproto profile. Wallets stay hidden unless you choose to show them.</p>
+      <PageHeader title="Profile" intro="Add public details such as your job title and location. Wallets stay hidden unless you choose to show them." />
+      <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name and bio stay in your atproto profile.</p>
       {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
       {loadError === null && (
         <ProfileForm
@@ -50,11 +50,9 @@ export default async function ProfilePage() {
         />
       )}
       {handle && (
-        <>
-          <h2>Download and QR code</h2>
-          <p>These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.</p>
+        <Section title="Download and QR code" intro="These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.">
           <ProfileShare handle={handle} deliveryBase={PUBLIC_DELIVERY_URL} profileUrl={`${siteUrl()}/p/${encodeURIComponent(handle)}`} />
-        </>
+        </Section>
       )}
     </PageMain>
   )

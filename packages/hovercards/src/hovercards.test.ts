@@ -11,7 +11,7 @@ describe('hovercard model', () => {
     const c = buildCard({ handle: 'a.example.com', displayName: 'Alice', pronouns: 'she/her', jobTitle: 'Dev', company: 'Acme', location: 'Paris', avatar: { url: '/img/did%3Aplc%3Aa/bafy/256.png' } }, API, WEB)
     expect(c).toEqual({ name: 'Alice', lines: ['she/her', 'Dev, Acme', 'Paris'], avatarUrl: `${API}/img/did%3Aplc%3Aa/bafy/256.png`, profileUrl: `${WEB}/p/a.example.com`, accounts: [], colors: null })
   })
-  it('omits hidden verified accounts', () => {
+  it('omits hidden linked accounts', () => {
     const c = buildCard({ handle: 'a.example.com', verifiedAccounts: [{ service: 'github', label: 'gh/a' }, { service: 'tiktok', hidden: true }, { service: 'threads' }] }, API, WEB)
     expect(c.accounts).toEqual(['gh/a', 'threads'])
   })

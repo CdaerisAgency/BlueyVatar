@@ -36,7 +36,7 @@ Add `json=true` to an avatar request (`/avatar/{hash}` or `/u/{id}`) to receive 
 - `Cache-Control: private, max-age=<ttl>` applies, as on the redirect. See [cache-ttl-v1.md](cache-ttl-v1.md).
 - A well-formed request with `json=true` always gets `200` JSON. When the lookup finds nothing, the repo is inactive, or visibility rules deny the caller, the body is `{"did": null, "handle": null, "found": false, "source": "default", "rating": null, "url": null, "updatedDate": null}`. All of these cases return the identical body, so a hash lookup cannot reveal whether a hash is linked to a restricted or inactive account. `d` is ignored in JSON mode.
 - Malformed requests (bad identifier or parameter) and key or rate limit failures still return the standard error body.
-- Errors use the standard error body. See [errors-v1.md](errors-v1.md).
+- Errors use the standard error body. See [errors-v2.md](errors-v2.md).
 
 ## Version policy
 
@@ -52,4 +52,4 @@ The `/profile/{id}` document includes `backgroundColor`, the profile's page back
 
 The `/profile/{id}` document includes `gallery`, an array of `{ "url": string, "caption": string or null }` with at most 12 entries. It is `[]` unless the profile owner is on the Plus plan. Each `url` is a signed `/img` path (512 pixel PNG) and follows the same visibility, rating, and blocklist rules as the avatar. Gallery images are never returned by the avatar routes.
 
-`/profile/{id}` can also return the public fields as a JSON, Markdown, or vCard file. See [exports-and-qr-v1.md](exports-and-qr-v1.md).
+`/profile/{id}` can also return the public fields as a JSON, Markdown, or vCard file. See [exports-and-qr-v2.md](exports-and-qr-v2.md).

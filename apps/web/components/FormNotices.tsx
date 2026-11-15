@@ -1,6 +1,10 @@
 'use client'
 import { useEffect, type RefObject } from 'react'
 import { firstInvalid, type FormState } from '../lib/form-state'
+import { fieldProps } from '../lib/field-props'
+
+// Re-exported so existing client forms keep their import. Server pages import it from lib/field-props.
+export { fieldProps }
 
 /** Error summary, form-level error, and success message. Same markup as the profile form. */
 export function FormNotices<F extends string>({ prefix, labels, state, summary }: {
@@ -42,15 +46,6 @@ export function useFocusResult<F extends string>(state: FormState<unknown, F>, p
     if (first) document.getElementById(`${prefix}-${first}`)?.focus()
     else summary.current?.focus()
   }, [state, prefix, order, summary])
-}
-
-/** Props that mark a field invalid and point to its message. */
-export function fieldProps(prefix: string, name: string, error: string | undefined, extra?: string) {
-  return {
-    id: `${prefix}-${name}`,
-    'aria-invalid': error ? (true as const) : undefined,
-    'aria-describedby': [error && `${prefix}-${name}-error`, extra].filter(Boolean).join(' ') || undefined,
-  }
 }
 
 export function FieldError({ prefix, name, error }: { prefix: string; name: string; error: string | undefined }) {

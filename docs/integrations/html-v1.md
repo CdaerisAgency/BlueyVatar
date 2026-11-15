@@ -1,6 +1,6 @@
 # Plain HTML (v1)
 
-Use this guide for a static page, a template, or any site you edit by hand. For the full parameter list, see [the API reference](../api/README-v1.md).
+Use this guide for a static page, a template, or any site you edit by hand. For the full parameter list, see [the API reference](../api/README-v2.md).
 
 ## 1. Compute the hash
 

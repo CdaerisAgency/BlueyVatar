@@ -359,10 +359,10 @@ export function createApp(deps: AppDeps) {
     if (!e.ok) return fail(c, e.status, e.code, e.message)
     c.header('cache-control', 'private, no-store')
     if (!e.licenseId || c.req.header('x-api-key') === undefined) {
-      return fail(c, 401, 'invalid_key', 'Send a secret key in the x-api-key header')
+      return fail(c, 401, 'invalid_key', 'Send a server key in the x-api-key header')
     }
     if (e.keyKind !== 'secret') {
-      return fail(c, 403, 'secret_key_required', 'Usage is available to secret keys only')
+      return fail(c, 403, 'secret_key_required', 'Usage is available to server keys only')
     }
     const now = new Date()
     const period = periodStartOf(now)

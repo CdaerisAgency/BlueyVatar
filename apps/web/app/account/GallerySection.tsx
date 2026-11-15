@@ -1,18 +1,19 @@
 import { GALLERY_CAPTION_MAX, GALLERY_MAX, ratingFromLabels } from '@blueyvatar/core'
 import { Button } from '../../components/Button'
+import { EmptyState, Section } from '../../components/Page'
 import { GALLERY_PLUS_MESSAGE, isPlus, listGallery } from '../../lib/gallery'
 import { RepoError, blobUrl, imageLabels, pdsUrl, repoSession, type StoredImage } from '../../lib/repo'
 import ImageFileInput from './avatars/ImageFileInput'
+import RatingFields from './avatars/RatingFields'
 import { moveGallery, removeGalleryImage, uploadGalleryImage } from './galleryActions'
 
 /** Account page Gallery section. Non-Plus users see one upsell line. */
 export default async function GallerySection({ did, error, done }: { did: string; error?: string; done?: string }) {
   if (!(await isPlus(did))) {
     return (
-      <section id="gallery">
-        <h2>Gallery</h2>
+      <Section title="Gallery" id="gallery">
         <p>{GALLERY_PLUS_MESSAGE} Upgrade to Plus to show up to {GALLERY_MAX} gallery images on your profile.</p>
-      </section>
+      </Section>
     )
   }
   let images: StoredImage[] = []
@@ -26,17 +27,14 @@ export default async function GallerySection({ did, error, done }: { did: string
   }
   const canAdd = !loadError && images.length < GALLERY_MAX
   return (
-    <section id="gallery">
-      <h2>
-        Gallery ({images.length} of {GALLERY_MAX})
-      </h2>
+    <Section title={`Gallery (${images.length} of ${GALLERY_MAX})`} id="gallery">
       <p>
-        Gallery images are saved to your repository on your PDS and are public there. They appear on your profile page and never become your avatar.
+        Gallery images are saved to your repository on your Bluesky account's home server and are public there. They appear on your profile page and never become your avatar.
       </p>
       {error && <p role="alert">{error}</p>}
       {done && <p role="status">{done}</p>}
       {loadError && <p role="alert">{loadError}</p>}
-      {images.length === 0 && !loadError ? <p>No gallery images yet.</p> : null}
+      {images.length === 0 && !loadError ? <EmptyState>No gallery images yet. Upload one below.</EmptyState> : null}
       <ul>
         {images.map((img, i) => (
           <li key={img.rkey} className="flex items-start gap-3">
@@ -65,7 +63,7 @@ export default async function GallerySection({ did, error, done }: { did: string
                 )}
                 <form action={removeGalleryImage}>
                   <input type="hidden" name="rkey" value={img.rkey} />
-                  <Button type="submit">Delete</Button>
+                  <Button type="submit" variant="danger">Delete</Button>
                 </form>
               </div>
             </div>
@@ -82,27 +80,12 @@ export default async function GallerySection({ did, error, done }: { did: string
           <label>
             Alt text (up to 300 characters) <textarea name="alt" maxLength={3000} rows={2} />
           </label>
-          <label>
-            Rating{' '}
-            <select name="rating" defaultValue="g">
-              <option value="g">G: suitable for all audiences</option>
-              <option value="pg">PG: non-sexual nudity or mild content</option>
-              <option value="r">R: sexually suggestive or graphic media</option>
-              <option value="x">X: adult content</option>
-            </select>
-          </label>
-          <label>
-            If R, label as{' '}
-            <select name="rLabel" defaultValue="sexual">
-              <option value="sexual">Sexual</option>
-              <option value="graphic-media">Graphic media</option>
-            </select>
-          </label>
+          <RatingFields idPrefix="gallery" />
           <Button type="submit" variant="primary">Upload to gallery</Button>
         </form>
       ) : (
         !loadError && <p>The gallery holds up to {GALLERY_MAX} images. Delete one to add another.</p>
       )}
-    </section>
+    </Section>
   )
 }

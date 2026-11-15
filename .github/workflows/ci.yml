@@ -10,14 +10,21 @@ on:
 permissions:
   contents: read
 
+# One queue per ref. Runs for the same ref wait their turn and a newer pending run replaces an older pending
+# one (GitHub keeps at most one running and one pending run per group). A single runner-wide group would
+# drop pending runs of other pull requests, so cross-PR safety comes from the per-job pnpm folders and the
+# free ports below instead.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+# Each job gets its own pnpm home and store so concurrent jobs on the shared self-hosted runner cannot
+# remove each other's pnpm binary or share a half-written store.
 
 jobs:
   check:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     services:
       postgres:
@@ -33,16 +40,27 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Point tests at the service port
         run: echo "TEST_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - name: Isolate pnpm per job
+        run: |
+          home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
+          mkdir -p "$home/store"
+          echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
+          echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
+          echo "$home" >> "$GITHUB_PATH"
+
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
+          # Install into the per-job folder. The default (~/setup-pnpm) is shared by
+          # every runner on the machine, so concurrent jobs removed each other's pnpm.
+          dest: ${{ env.PNPM_HOME }}/setup
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -78,16 +96,19 @@ jobs:
       - name: Install Chromium for accessibility checks
         run: pnpm --filter @blueyvatar/web exec playwright install --with-deps chromium
 
+      - name: Pick free ports
+        run: node .github/scripts/free-port.mjs A11Y_PORT A11Y_DELIVERY_PORT
+
       - name: Accessibility (axe-core and hovercard keyboard)
         run: pnpm --filter @blueyvatar/web a11y
 
   # PHP lint and unit test for the WordPress plugin in integrations/wordpress.
   wordpress-plugin:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Ensure PHP is installed
         run: command -v php >/dev/null || (sudo apt-get update && sudo apt-get install -y php-cli)
@@ -101,10 +122,10 @@ jobs:
   # Warns (never fails) when a pull request touches apps/ without a changelog line.
   changelog:
     if: github.event_name == 'pull_request' && !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -117,10 +138,10 @@ jobs:
 
   docker:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build image
         run: docker build -t blueyvatar:ci .
@@ -129,7 +150,7 @@ jobs:
   # services are called. Runs beside `check`, so it does not lengthen it.
   e2e:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     services:
       postgres:
@@ -145,16 +166,27 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Point the app at the service port
         run: echo "E2E_DATABASE_URL=postgres://postgres:postgres@localhost:${{ job.services.postgres.ports['5432'] }}/blueyvatar_test" >> "$GITHUB_ENV"
 
-      - uses: pnpm/action-setup@v4
+      - name: Isolate pnpm per job
+        run: |
+          home="$RUNNER_TEMP/pnpm-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}"
+          mkdir -p "$home/store"
+          echo "PNPM_HOME=$home" >> "$GITHUB_ENV"
+          echo "npm_config_store_dir=$home/store" >> "$GITHUB_ENV"
+          echo "$home" >> "$GITHUB_PATH"
+
+      - uses: pnpm/action-setup@v6
         with:
           version: 10.28.0
+          # Install into the per-job folder. The default (~/setup-pnpm) is shared by
+          # every runner on the machine, so concurrent jobs removed each other's pnpm.
+          dest: ${{ env.PNPM_HOME }}/setup
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -184,12 +216,15 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @blueyvatar/web exec playwright install --with-deps chromium
 
+      - name: Pick free ports
+        run: node .github/scripts/free-port.mjs E2E_PORT E2E_STUB_PORT
+
       - name: E2E
         run: pnpm e2e
 
       - name: Upload report
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: apps/web/playwright-report

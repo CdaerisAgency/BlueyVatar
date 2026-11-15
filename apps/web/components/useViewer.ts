@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-export type ClientViewer = { signedIn: false } | { signedIn: true; name: string; initial: string }
+export type ClientViewer = { signedIn: false } | { signedIn: true; name: string; initial: string; avatarSrc?: string | null }
 
 let inflight: Promise<ClientViewer> | null = null
 

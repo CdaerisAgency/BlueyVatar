@@ -59,7 +59,7 @@ export async function checkEntitlement(
     }
   }
   if (key.kind === 'secret' && info.headerKey === undefined) {
-    return { ok: false, status: 401, code: 'invalid_key', message: 'Secret keys must be sent in the x-api-key header' }
+    return { ok: false, status: 401, code: 'invalid_key', message: 'Server keys must be sent in the x-api-key header' }
   }
 
   const ent = entitlementsFor(license.tier)

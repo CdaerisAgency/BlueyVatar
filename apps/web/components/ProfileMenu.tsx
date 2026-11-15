@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 /** The signed-in header control: avatar (or letter) that opens a menu with the handle, Settings, and Log out. */
 export default function ProfileMenu({ name, initial, avatarSrc }: { name: string; initial: string; avatarSrc?: string | null }) {
   const [open, setOpen] = useState(false)
+  const [broken, setBroken] = useState<string | null>(null)
   const btn = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const id = useId()
@@ -53,9 +54,9 @@ export default function ProfileMenu({ name, initial, avatarSrc }: { name: string
         onClick={() => setOpen((o) => !o)}
         className="flex size-11 cursor-pointer items-center justify-center overflow-hidden rounded-full border-[1.5px] border-bv-black bg-bv-orange p-0 font-semibold text-bv-black"
       >
-        {avatarSrc ? (
+        {avatarSrc && broken !== avatarSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatarSrc} alt="" className="size-full object-cover" />
+          <img src={avatarSrc} alt="" className="size-full object-cover" onError={() => setBroken(avatarSrc)} />
         ) : (
           <span aria-hidden="true">{initial}</span>
         )}
