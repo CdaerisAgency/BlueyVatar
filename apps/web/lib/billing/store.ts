@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { ENTITLEMENTS, normalizePaidPlan, normalizeTier, plusEntitled, storedLicenseTier, type PaidPlan, type SubscriptionStatus, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
 import { getPool } from '../store'
+import { inTx } from '../tx'
 
 export interface SubscriptionRow {
   id: string
@@ -220,24 +221,13 @@ function pgTx(c: pg.PoolClient): BillingTx {
 export function postgresBillingStore(pool: pg.Pool): BillingStore {
   return {
     async process(eventId, type, fn) {
-      const c = await pool.connect()
-      try {
-        await c.query('BEGIN')
+      return inTx<'processed' | 'duplicate'>(pool, async (c, abort) => {
         // A concurrent delivery of the same event blocks on this insert until we commit, then sees the conflict.
         const ins = await c.query('INSERT INTO stripe_events (event_id, type) VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING', [eventId, type])
-        if ((ins.rowCount ?? 0) === 0) {
-          await c.query('ROLLBACK')
-          return 'duplicate'
-        }
+        if ((ins.rowCount ?? 0) === 0) abort('duplicate')
         await fn(pgTx(c))
-        await c.query('COMMIT')
         return 'processed'
-      } catch (e) {
-        await c.query('ROLLBACK').catch(() => {})
-        throw e
-      } finally {
-        c.release()
-      }
+      })
     },
     async customerFor(did) {
       return (await pool.query('SELECT stripe_customer_id FROM billing_customers WHERE did = $1', [did])).rows[0]?.stripe_customer_id ?? null

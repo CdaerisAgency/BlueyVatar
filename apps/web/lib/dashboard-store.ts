@@ -3,6 +3,7 @@ import { ENTITLEMENTS, effectiveTier, type Tier } from '@blueyvatar/core'
 import type pg from 'pg'
 import type { KeyKind } from './keys'
 import { getPool } from './store'
+import { inTx } from './tx'
 import { PUBLIC_RULES, type VisibilityRules } from './visibility'
 
 export interface LicenseRow {
@@ -135,22 +136,8 @@ const toKey = (r: Record<string, unknown>): KeyRow => ({
   expiresAt: (r.expires_at as Date | null) ?? null,
 })
 
-async function inTx<T>(pool: pg.Pool, did: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect()
-  try {
-    await c.query('BEGIN')
-    // Serializes work per owner. No unique index on licenses.owner exists, so this guards first-visit issuing too.
-    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
-    const out = await fn(c)
-    await c.query('COMMIT')
-    return out
-  } catch (e) {
-    await c.query('ROLLBACK').catch(() => {})
-    throw e
-  } finally {
-    c.release()
-  }
-}
+/** Serializes work per owner. No unique index on licenses.owner exists, so this guards first-visit issuing too. */
+const inLicenseTx = <T>(pool: pg.Pool, did: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> => inTx(pool, fn, { lock: `license:${did}` })
 
 function postgres(pool: pg.Pool): DashboardStore {
   const toLicense = (x: pg.QueryResultRow): LicenseRow => ({ licenseId: x.license_id, owner: x.owner, tier: effectiveTier({ tier: x.tier, status: x.status, graceEndsAt: x.grace_ends_at }, new Date()), status: x.status, term: x.term, graceEndsAt: x.grace_ends_at })
@@ -164,7 +151,7 @@ function postgres(pool: pg.Pool): DashboardStore {
     async ensureLicense(did) {
       const found = await readLicense(pool, did)
       if (found) return found
-      return inTx(pool, did, async (c) => {
+      return inLicenseTx(pool, did, async (c) => {
         const again = await readLicense(c, did)
         if (again) return again
         const id = newLicenseId()
@@ -211,7 +198,7 @@ function postgres(pool: pg.Pool): DashboardStore {
     async createKey(id, key, guard, replace) {
       const owner = (await pool.query('SELECT owner FROM licenses WHERE license_id = $1', [id])).rows[0]?.owner as string | undefined
       if (!owner) return 'License not found.'
-      return inTx(pool, owner, async (c) => {
+      return inLicenseTx(pool, owner, async (c) => {
         const cur = await c.query(`SELECT ${keyCols} FROM api_keys WHERE license_id = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > now())`, [id])
         const err = guard(cur.rows.map(toKey))
         if (err) return err

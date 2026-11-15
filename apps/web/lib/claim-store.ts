@@ -1,6 +1,7 @@
 import type { ClaimRecord, OAuthProvider } from './claims'
 import type { MastodonApp } from './mastodon-oauth'
 import { getPool } from './store'
+import { inTx } from './tx'
 
 export type AttestationRow = {
   uri: string
@@ -117,9 +118,7 @@ export function pgClaimStore(pool: import('pg').Pool): ClaimStore {
       return r.rows.map(toRow)
     },
     async recordVerified(row) {
-      const c = await pool.connect()
-      try {
-        await c.query('BEGIN')
+      return inTx(pool, async (c) => {
         const old = await c.query(
           `UPDATE attestations SET result = 'revoked' WHERE claim_did = $1 AND claim_rkey = $2 AND result = 'verified' RETURNING uri`,
           [row.claimDid, row.claimRkey],
@@ -129,14 +128,8 @@ export function pgClaimStore(pool: import('pg').Pool): ClaimStore {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [row.uri, row.cid, row.claimDid, row.claimRkey, row.claimCid, row.claimUri, row.result, row.method, row.createdAt],
         )
-        await c.query('COMMIT')
         return old.rows.map((x) => x.uri as string)
-      } catch (err) {
-        await c.query('ROLLBACK').catch(() => undefined)
-        throw err
-      } finally {
-        c.release()
-      }
+      })
     },
     async revokeForClaim(did, rkey) {
       const r = await pool.query(

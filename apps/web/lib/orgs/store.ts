@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { ENTITLEMENTS } from '@blueyvatar/core'
 import type pg from 'pg'
+import { inTx } from '../tx'
 import { checkChange, DID_RE, isRole, type Member, type Role } from './roles'
 
 export type AuditAction =
@@ -39,22 +40,8 @@ export async function recordOrgAudit(q: Q, orgId: string, actor: string | null, 
   await q.query('INSERT INTO organization_audit (org_id, actor, action, target_did, detail) VALUES ($1, $2, $3, $4, $5)', [orgId, actor, action, target ?? null, detail ?? null])
 }
 
-async function inTx<T>(pool: pg.Pool, orgId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect()
-  try {
-    await c.query('BEGIN')
-    // Serializes membership changes per organization, so two removals cannot both pass the last-owner check.
-    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`org:${orgId}`])
-    const out = await fn(c)
-    await c.query('COMMIT')
-    return out
-  } catch (e) {
-    await c.query('ROLLBACK').catch(() => {})
-    throw e
-  } finally {
-    c.release()
-  }
-}
+/** Serializes membership changes per organization, so two removals cannot both pass the last-owner check. */
+const inOrgTx = <T>(pool: pg.Pool, orgId: string, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> => inTx(pool, fn, { lock: `org:${orgId}` })
 
 export const cleanName = (raw: string): string | null => {
   const s = raw.trim().replace(/\s+/g, ' ')
@@ -66,31 +53,23 @@ export async function createOrganization(pool: pg.Pool, did: string, rawName: st
   const name = cleanName(rawName)
   if (!name) return { ok: false, error: 'Enter an organization name of 1 to 80 characters.' }
   const orgId = `org_${randomUUID()}`
-  const c = await pool.connect()
-  try {
-    await c.query('BEGIN')
-    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`license:${did}`])
-    const n = (await c.query('SELECT count(*)::int AS n FROM organizations WHERE created_by = $1', [did])).rows[0].n as number
-    if (n >= MAX_ORGS_PER_OWNER) {
-      await c.query('ROLLBACK')
-      return { ok: false, error: `You can create up to ${MAX_ORGS_PER_OWNER} organizations.` }
-    }
-    await c.query('INSERT INTO organizations (org_id, name, created_by) VALUES ($1, $2, $3)', [orgId, name, did])
-    await c.query("INSERT INTO organization_members (org_id, did, role, added_by) VALUES ($1, $2, 'owner', $2)", [orgId, did])
-    await c.query(
-      `INSERT INTO licenses (license_id, owner, tier, status, term, entitlements, org_id)
+  return inTx<OrgResult<{ orgId: string }>>(
+    pool,
+    async (c, abort) => {
+      const n = (await c.query('SELECT count(*)::int AS n FROM organizations WHERE created_by = $1', [did])).rows[0].n as number
+      if (n >= MAX_ORGS_PER_OWNER) abort({ ok: false, error: `You can create up to ${MAX_ORGS_PER_OWNER} organizations.` })
+      await c.query('INSERT INTO organizations (org_id, name, created_by) VALUES ($1, $2, $3)', [orgId, name, did])
+      await c.query("INSERT INTO organization_members (org_id, did, role, added_by) VALUES ($1, $2, 'owner', $2)", [orgId, did])
+      await c.query(
+        `INSERT INTO licenses (license_id, owner, tier, status, term, entitlements, org_id)
        VALUES ($1, $2, 'free', 'active', 'monthly', $3, $4)`,
-      [`lic_${randomUUID()}`, did, JSON.stringify(ENTITLEMENTS.free), orgId],
-    )
-    await recordOrgAudit(c, orgId, did, 'org_created', null, name)
-    await c.query('COMMIT')
-    return { ok: true, orgId }
-  } catch (e) {
-    await c.query('ROLLBACK').catch(() => {})
-    throw e
-  } finally {
-    c.release()
-  }
+        [`lic_${randomUUID()}`, did, JSON.stringify(ENTITLEMENTS.free), orgId],
+      )
+      await recordOrgAudit(c, orgId, did, 'org_created', null, name)
+      return { ok: true, orgId }
+    },
+    { lock: `license:${did}` },
+  )
 }
 
 export async function listOrganizations(q: Q, did: string): Promise<OrgSummary[]> {
@@ -128,7 +107,7 @@ export async function addMember(pool: pg.Pool, orgId: string, actor: string, did
   const target = did.trim()
   if (!DID_RE.test(target)) return { ok: false, error: 'Enter a valid atproto DID, such as did:plc:abc123.' }
   if (!isRole(role)) return { ok: false, error: 'Unknown role.' }
-  return inTx(pool, orgId, async (c) => {
+  return inOrgTx(pool, orgId, async (c) => {
     if (!(await getOrganization(c, orgId))) return { ok: false as const, error: 'Organization not found.' }
     const count = (await c.query('SELECT count(*)::int AS n FROM organization_members WHERE org_id = $1', [orgId])).rows[0].n as number
     if (count >= MAX_MEMBERS) return { ok: false as const, error: `An organization can have up to ${MAX_MEMBERS} members.` }
@@ -141,7 +120,7 @@ export async function addMember(pool: pg.Pool, orgId: string, actor: string, did
 
 /** Removes a member, or lets a member leave. Enforces the last-owner and billing-owner rules. */
 export async function removeMember(pool: pg.Pool, orgId: string, actor: string, did: string): Promise<OrgResult> {
-  return inTx(pool, orgId, async (c) => {
+  return inOrgTx(pool, orgId, async (c) => {
     const lic = await orgLicense(c, orgId)
     if (!lic) return { ok: false as const, error: 'Organization not found.' }
     const err = checkChange(await listMembers(c, orgId), lic.billingDid, { kind: 'remove', did })
@@ -154,7 +133,7 @@ export async function removeMember(pool: pg.Pool, orgId: string, actor: string, 
 
 export async function setRole(pool: pg.Pool, orgId: string, actor: string, did: string, role: Role): Promise<OrgResult> {
   if (!isRole(role)) return { ok: false, error: 'Unknown role.' }
-  return inTx(pool, orgId, async (c) => {
+  return inOrgTx(pool, orgId, async (c) => {
     const lic = await orgLicense(c, orgId)
     if (!lic) return { ok: false as const, error: 'Organization not found.' }
     const members = await listMembers(c, orgId)

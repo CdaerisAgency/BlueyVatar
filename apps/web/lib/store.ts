@@ -3,6 +3,7 @@ import pg from 'pg'
 import type { PendingCode } from './codes'
 import { decideLink, HOLD_DAYS, HOLD_MS, type LinkDecision, type LinkFacts } from './email-policy'
 import { randomBytes } from 'node:crypto'
+import { inTx } from './tx'
 import { decryptJson, encryptJson } from './token-crypto'
 
 export type LinkMethod = 'trusted_pds' | 'code'
@@ -207,26 +208,8 @@ export function memoryStore(clock: () => number = Date.now): Store {
 
 type Q = Pick<pg.Pool, 'query'>
 
-async function inTx<T>(pool: pg.Pool, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
-  const c = await pool.connect()
-  try {
-    await c.query('BEGIN')
-    const out = await fn(c)
-    await c.query('COMMIT')
-    return out
-  } catch (err) {
-    await c.query('ROLLBACK').catch(() => {})
-    throw err
-  } finally {
-    c.release()
-  }
-}
-
 /** Serializes link changes per hash, then per account (always in that order, so no deadlock). */
-async function lockFor(c: Q, emailHash: string, did: string): Promise<void> {
-  await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`email:${emailHash}`])
-  await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`did:${did}`])
-}
+const linkLocks = (emailHash: string, did: string): string[] => [`email:${emailHash}`, `did:${did}`]
 
 async function pgFacts(c: Q, did: string, emailHash: string): Promise<LinkFacts> {
   const cur = await c.query('SELECT did FROM email_links WHERE email_hash = $1', [emailHash])
@@ -371,8 +354,9 @@ export function pgStore(pool: pg.Pool): Store {
         return r.rows[0]?.email_enc ?? undefined
       },
       async link(emailHash, did, method, emailMd5, emailEnc, emailDomain) {
-        return inTx(pool, async (c) => {
-          await lockFor(c, emailHash, did)
+        return inTx(
+          pool,
+          async (c) => {
           const f = await pgFacts(c, did, emailHash)
           const d = decideLink(f)
           if (!d.ok) return d
@@ -396,11 +380,14 @@ export function pgStore(pool: pg.Pool): Store {
           await c.query('DELETE FROM email_holds WHERE email_hash = $1', [emailHash])
           await reconcilePg(c, did, emailHash, emailEnc)
           return d
-        })
+          },
+          { lock: linkLocks(emailHash, did) },
+        )
       },
       async remove(did, emailHash) {
-        return inTx(pool, async (c) => {
-          await lockFor(c, emailHash, did)
+        return inTx(
+          pool,
+          async (c) => {
           const r = await c.query('DELETE FROM email_links WHERE did = $1 AND email_hash = $2 RETURNING is_primary', [did, emailHash])
           if (!r.rows[0]) return false
           await c.query(
@@ -412,18 +399,23 @@ export function pgStore(pool: pg.Pool): Store {
           if (r.rows[0].is_primary) await promotePg(c, did)
           await reconcilePg(c, did)
           return true
-        })
+          },
+          { lock: linkLocks(emailHash, did) },
+        )
       },
       async setPrimary(did, emailHash) {
-        return inTx(pool, async (c) => {
-          await lockFor(c, emailHash, did)
+        return inTx(
+          pool,
+          async (c) => {
           const own = await c.query('SELECT 1 FROM email_links WHERE did = $1 AND email_hash = $2', [did, emailHash])
           if (!own.rows[0]) return false
           await c.query('UPDATE email_links SET is_primary = false WHERE did = $1 AND is_primary AND email_hash <> $2', [did, emailHash])
           await c.query('UPDATE email_links SET is_primary = true WHERE did = $1 AND email_hash = $2', [did, emailHash])
           await reconcilePg(c, did)
           return true
-        })
+          },
+          { lock: linkLocks(emailHash, did) },
+        )
       },
       async releaseAll(did) {
         return inTx(pool, async (c) => releaseAllPg(c, did))
