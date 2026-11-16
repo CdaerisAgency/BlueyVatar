@@ -47,7 +47,7 @@ export default async function EffectOffersPage({ searchParams }: { searchParams:
               <textarea name="accounts" rows={4} defaultValue={editing?.dids.join('\n') ?? ''} />
             </label>
           </fieldset>
-          <label><input type="checkbox" name="notify" defaultChecked={editing?.notify ?? false} /> Notify people: one email when the offer starts (to those who have not turned offer emails off) and a banner on account pages during the window. Leave off to add it quietly.</label>
+          <label className="min-h-11 items-center"><input type="checkbox" name="notify" defaultChecked={editing?.notify ?? false} /> Notify people: one email when the offer starts (to those who have not turned offer emails off) and a banner on account pages during the window. Leave off to add it quietly.</label>
           <Button type="submit" variant="primary">{editing ? 'Save changes' : 'Create offer'}</Button>
           {editing && <a href="/admin/effects">Cancel</a>}
         </form>

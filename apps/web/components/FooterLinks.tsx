@@ -10,9 +10,9 @@ export default function FooterLinks() {
   const v = useViewer()
   const links = footerLinksFor(COPY.footer.links, v.signedIn)
   return (
-    <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
+    <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-0">
       {links.map((l) => (
-        <Link key={l.href} href={l.href} className="text-bv-ink-3 no-underline hover:text-bv-blue hover:underline">
+        <Link key={l.href} href={l.href} className="inline-flex min-h-11 items-center text-bv-ink-3 no-underline hover:text-bv-blue hover:underline">
           {l.label}
         </Link>
       ))}

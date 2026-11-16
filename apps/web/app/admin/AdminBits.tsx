@@ -8,11 +8,11 @@ export const fmt = (d: Date | null) => (d ? d.toISOString().slice(0, 16).replace
 
 export function AdminNav({ did }: { did?: string }) {
   return (
-    <nav aria-label="Admin" className="mb-4 flex flex-wrap items-center gap-4">
-      <a href="/admin">Home</a>
-      {QUEUES.filter((q) => q.name !== 'child_safety' || !did || canViewChildSafety(did)).map((q) => <a key={q.name} href={`/admin/queue/${q.name}`}>{q.label}</a>)}
-      <a href="/admin/effects">Free effects</a>
-      <a href="/admin/audit">Audit log</a>
+    <nav aria-label="Admin" className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-0">
+      <a href="/admin" className="inline-flex min-h-11 items-center">Home</a>
+      {QUEUES.filter((q) => q.name !== 'child_safety' || !did || canViewChildSafety(did)).map((q) => <a key={q.name} href={`/admin/queue/${q.name}`} className="inline-flex min-h-11 items-center">{q.label}</a>)}
+      <a href="/admin/effects" className="inline-flex min-h-11 items-center">Free effects</a>
+      <a href="/admin/audit" className="inline-flex min-h-11 items-center">Audit log</a>
       <form action={adminLogout} className="ml-auto"><Button type="submit">End admin session</Button></form>
     </nav>
   )

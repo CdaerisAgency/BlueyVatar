@@ -10,12 +10,12 @@ export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
   return (
     <form action={action} aria-describedby={state.error ? 'visibility-error' : undefined}>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="keyedOnly" defaultChecked={rules.keyedOnly} /> Keyed only: only requests with a valid license key can fetch my avatar and profile.
         </label>
       </p>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="domainAllowlistOn" defaultChecked={rules.domainAllowlist.length > 0} /> Domain allowlist: only requests from the sites below can fetch.
         </label>
         <br />
@@ -24,12 +24,12 @@ export function VisibilityForm({ rules }: { rules: VisibilityRules }) {
         <span id="domains-help">One per line: exact host, *.example.com wildcard, or localhost.</span>
       </p>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="hiddenProfile" defaultChecked={rules.hiddenProfile} /> Hidden profile: my profile page and JSON return 404. My avatar is still served by hash or handle.
         </label>
       </p>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="emailLookupOptOut" defaultChecked={rules.emailLookupOptOut} /> Opt out of email lookup: people cannot find my avatar by email address.
         </label>
       </p>

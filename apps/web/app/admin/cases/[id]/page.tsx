@@ -61,7 +61,7 @@ export default async function CasePage({ params, searchParams }: { params: Promi
     { action: 'suspend', title: 'Suspend account', notice: noticeFacts },
     {
       action: 'escalate', title: 'Escalate',
-      body: <label><input type="checkbox" name="childSafety" /> Send to the restricted child-safety queue. The image is taken out of serving at once and no one else sees it in this portal.</label>,
+      body: <label className="min-h-11 items-center"><input type="checkbox" name="childSafety" /> Send to the restricted child-safety queue. The image is taken out of serving at once and no one else sees it in this portal.</label>,
     },
     {
       action: 'reverse', title: 'Reverse an action', notice: { facts: '' }, show: !!d.suspension || d.blocked.length > 0 || d.overrides.length > 0,
