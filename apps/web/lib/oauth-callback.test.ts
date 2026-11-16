@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeSavedSession, NodeSavedSessionStore, NodeSavedStateStore } from '@atproto/oauth-client-node'
 import { memoryOauthStores } from './oauth-stores'
+import { PUBLIC_URL } from './oauth'
 
 const DID = 'did:plc:abcdefghijklmnopqrstuvwx'
 const mem = memoryOauthStores()
@@ -51,7 +52,7 @@ describe('GET /oauth/callback', () => {
     await mem.oauthSession.set(DID, main)
     const res = await callback('link', 'k2')
     expect(res.status).toBe(303)
-    expect(res.headers.get('location')).toBe(new URL('/account', process.env.PUBLIC_URL ?? 'http://localhost:3000').toString())
+    expect(res.headers.get('location')).toBe(new URL('/account', PUBLIC_URL).toString())
     expect(await mem.oauthSession.get(DID)).toEqual(main)
     expect(await mem.oauthSession.get(`link:${DID}`)).toBeUndefined()
   })
