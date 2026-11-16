@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { EmptyState, Notices, PageHeader, PageMain, Section } from '../../../components/Page'
+import { SignedInAs } from '../../../components/SignedInAs'
 import { requireDid } from '../../../lib/auth'
 import { listOrganizations } from '../../../lib/orgs/store'
 import { getPool } from '../../../lib/store'
@@ -16,7 +17,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   return (
     <PageMain>
       <PageHeader title="Organizations" intro="An organization shares one license, with its API keys, among several people." />
-      <p>Signed in as {did}</p>
+      <SignedInAs did={did} />
       <Notices error={error} />
       {!pool && <p>Organizations need the database, which is not configured here.</p>}
       {orgs.length === 0 ? <EmptyState>You are not in any organization yet. Create one below.</EmptyState> : (

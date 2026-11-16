@@ -1,6 +1,7 @@
 import { SECURITY_NOTICES } from '@blueyvatar/core/verification'
 import Link from 'next/link'
 import { PageHeader, PageMain, Section } from '../../../components/Page'
+import { SignedInAs } from '../../../components/SignedInAs'
 import { requireDid } from '../../../lib/auth'
 import { getNoticeDirectory } from '../../../lib/notify'
 import { getStore } from '../../../lib/store'
@@ -13,7 +14,7 @@ export default async function NotificationsPage() {
   return (
     <PageMain>
       <PageHeader title="Notifications" intro="Pick which emails you get from BlueyVatar. Security notices always come." />
-      <p>Signed in as {did}</p>
+      <SignedInAs did={did} />
       {!address && <p role="status">No primary email is on file, so no notices can be sent. Link an email on the <Link href="/account/verify">Verify</Link> page to receive them.</p>}
       <Section title="Optional">
         <NotificationsForm usageAlerts={prefs.usageAlerts} billingNotices={prefs.billingNotices} offerNotices={prefs.offerNotices !== false} />

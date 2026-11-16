@@ -7,29 +7,51 @@ import { deviceHint } from './device'
 import { NEXT_COOKIE, loginPath, safeNext } from './next-path'
 import { PUBLIC_URL, clientMetadata } from './oauth'
 import { COOKIE_NAME, SESSION_TTL_MS, parseSession, signSession } from './session-cookie'
+import { LINK_SESSION_PREFIX, prefixedSessionStore } from './oauth-stores'
 import { getStore } from './store'
 
-const g = globalThis as { __bvClient?: Promise<NodeOAuthClient>; __bvDevSecret?: string }
+const g = globalThis as { __bvClient?: Promise<NodeOAuthClient>; __bvLinkClient?: Promise<NodeOAuthClient>; __bvDevSecret?: string }
 
 /** The signing key comes from OAUTH_PRIVATE_JWK (JSON JWK, kept in Infisical). */
+async function buildClient(sessionStore: NodeOAuthClientOptions['sessionStore']): Promise<NodeOAuthClient> {
+  const raw = process.env.OAUTH_PRIVATE_JWK
+  if (!raw) throw new Error('OAUTH_PRIVATE_JWK is not set. Generate one with `pnpm --filter @blueyvatar/web gen-jwk`.')
+  return new NodeOAuthClient({
+    // PUBLIC_URL is a runtime string, so the literal URL types need a cast.
+    clientMetadata: clientMetadata() as NodeOAuthClientOptions['clientMetadata'],
+    keyset: [await JoseKey.fromJWK(raw)],
+    stateStore: getStore().oauthState,
+    sessionStore,
+    allowHttp: PUBLIC_URL.startsWith('http://localhost'),
+  })
+}
+
 export function oauthClient(): Promise<NodeOAuthClient> {
-  g.__bvClient ??= (async () => {
-    const raw = process.env.OAUTH_PRIVATE_JWK
-    if (!raw) throw new Error('OAUTH_PRIVATE_JWK is not set. Generate one with `pnpm --filter @blueyvatar/web gen-jwk`.')
-    const store = getStore()
-    return new NodeOAuthClient({
-      // PUBLIC_URL is a runtime string, so the literal URL types need a cast.
-      clientMetadata: clientMetadata() as NodeOAuthClientOptions['clientMetadata'],
-      keyset: [await JoseKey.fromJWK(raw)],
-      stateStore: store.oauthState,
-      sessionStore: store.oauthSession,
-      allowHttp: PUBLIC_URL.startsWith('http://localhost'),
-    })
-  })()
+  g.__bvClient ??= buildClient(getStore().oauthSession)
   g.__bvClient.catch(() => {
     g.__bvClient = undefined
   })
   return g.__bvClient
+}
+
+/**
+ * The client for the email-link callback. Same state store, keys and scopes as the main client, but its sessions are
+ * kept under `link:<did>`, so finishing a link never replaces the main sign-in session and its signOut deletes only
+ * the link entry. Without this, linking an email left the person signed in to the site with no repository tokens.
+ */
+export function linkOauthClient(): Promise<NodeOAuthClient> {
+  g.__bvLinkClient ??= buildClient(prefixedSessionStore(getStore().oauthSession, LINK_SESSION_PREFIX))
+  g.__bvLinkClient.catch(() => {
+    g.__bvLinkClient = undefined
+  })
+  return g.__bvLinkClient
+}
+
+/** The client that must finish this callback: the link client when the saved state says `link`, else the main client. */
+export async function callbackClient(params: URLSearchParams): Promise<NodeOAuthClient> {
+  const key = params.get('state')
+  const saved = key ? ((await getStore().oauthState.get(key)) as { appState?: unknown } | undefined) : undefined
+  return saved?.appState === 'link' ? linkOauthClient() : oauthClient()
 }
 
 function sessionSecret(): string {

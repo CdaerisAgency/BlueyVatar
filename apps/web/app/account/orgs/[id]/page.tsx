@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BackLink, EmptyState, Notices, PageHeader, PageMain, Section } from '../../../../components/Page'
 import { Button } from '../../../../components/Button'
+import { SignedInAs } from '../../../../components/SignedInAs'
 import { requireDid } from '../../../../lib/auth'
 import { canManageMembership } from '../../../../lib/orgs/roles'
 import { getOrganization, listAudit, listMembers, memberRole, orgLicense } from '../../../../lib/orgs/store'
@@ -33,7 +34,8 @@ export default async function OrgPage({ params, searchParams }: { params: Promis
     <PageMain>
       <BackLink href="/account/orgs">Back to organizations</BackLink>
       <PageHeader title={`${org.name}`} intro="Members manage keys. Only owners manage billing and membership." />
-      <p>Signed in as {did}. Your role: {role}.</p>
+      <SignedInAs did={did} />
+      <p>Your role: {role}.</p>
       <Notices error={q.error} done={q.done} />
       <p>
         <Link href={`/account/keys?org=${id}`}>API keys</Link>
