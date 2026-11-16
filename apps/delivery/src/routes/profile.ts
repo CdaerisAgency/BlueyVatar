@@ -88,7 +88,16 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
       displayName: bsky?.displayName ?? null,
       description: bsky?.description ?? null,
       links: resolveProfileLinks(identity.did, bsky?.links, await deps.index.profileLinks(identity.did)),
-      avatar: picked.kind === 'image' ? { url: signedPath(c, e, vis, identity.did, picked.candidate.blob.cid, 256, 'png'), source: picked.candidate.source } : null,
+      // `url` stays the 256 pixel PNG. `variants` is additive: signed paths for responsive pages (webp 256 and 512, png 512).
+      avatar: picked.kind === 'image'
+        ? {
+            url: signedPath(c, e, vis, identity.did, picked.candidate.blob.cid, 256, 'png'),
+            source: picked.candidate.source,
+            variants: ([[256, 'webp', 85], [512, 'webp', 85], [512, 'png']] as const).map(([size, format, quality]) => ({
+              size, format, url: signedPath(c, e, vis, identity.did, picked.candidate.blob.cid, size, format, quality),
+            })),
+          }
+        : null,
       jobTitle: own?.jobTitle ?? null,
       company: own?.company ?? null,
       location: own?.location ?? null,

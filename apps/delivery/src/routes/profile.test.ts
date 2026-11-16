@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GALLERY_MAX, imagePath, restrictedScope } from '@blueyvatar/core'
+import { GALLERY_MAX, imagePath, restrictedScope, verifyImageSig } from '@blueyvatar/core'
 import { createApp } from '../app.js'
 import { PUBLIC_VISIBILITY } from '../store.js'
 import { DID, SECRET, setup } from '../test/harness.js'
@@ -50,6 +50,20 @@ describe('/profile', () => {
     const { app } = setup()
     const body = await (await app.request('/profile/alice.test')).json()
     expect(body).toMatchObject({ did: DID, displayName: 'Alice', handle: 'alice.test', verifiedAccounts: [], links: [{ label: 'Site', url: 'https://alice.example/' }] })
+  })
+
+  it('keeps avatar.url and adds signed variants that verify', async () => {
+    const { app } = setup()
+    const { avatar } = await (await app.request('/profile/alice.test')).json()
+    expect(avatar.url).toMatch(/\/256\.png$/)
+    expect(avatar.variants.map((v: { size: number; format: string }) => `${v.size}.${v.format}`)).toEqual(['256.webp', '512.webp', '512.png'])
+    for (const v of avatar.variants as { url: string }[]) {
+      const [, , did, cid, sig, file] = v.url.split('/')
+      expect(verifyImageSig(SECRET, decodeURIComponent(did!), cid!, file!, sig!)).toBe('')
+      expect(file).toMatch(/^(256|512)(-q85)?\.(webp|png)$/)
+    }
+    // Same CID as the existing url.
+    expect(avatar.variants.every((v: { url: string }) => v.url.split('/')[3] === avatar.url.split('/')[3])).toBe(true)
   })
 
   it('returns backgroundColor in the profile JSON, null when unset or malformed', async () => {
