@@ -129,7 +129,8 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trim
 
 /** Open Graph and Twitter card fields. `imageBase` is the public delivery origin, `canonical` the page's canonical URL, `siteBase` the public site origin for the default image. */
 export function profileMetadata(p: PublicProfile, handle: string, imageBase: string, canonical?: string, siteBase?: string) {
-  const title = p.displayName ?? p.handle ?? handle
+  // `??` keeps an empty display name, and Next omits <title> for an empty string, so blanks fall through to the handle.
+  const title = p.displayName?.trim() || p.handle?.trim() || handle.trim() || 'Profile'
   const description = clip(
     p.description?.trim() || [[p.jobTitle, p.company].filter(Boolean).join(', '), p.location].filter(Boolean).join(' | ') || `${title} on BlueyVatar`,
     200,
@@ -137,7 +138,7 @@ export function profileMetadata(p: PublicProfile, handle: string, imageBase: str
   // Profiles without an avatar fall back to the site's default image.
   const images = p.avatar ? [`${trimSlash(imageBase)}${p.avatar.url}`] : [defaultOgImage(siteBase)]
   return {
-    title,
+    title: `${title} | BlueyVatar`,
     description,
     ...(canonical ? { alternates: { canonical } } : {}),
     openGraph: { title, description, type: 'profile' as const, siteName: 'BlueyVatar', ...(canonical ? { url: canonical } : {}), images },
