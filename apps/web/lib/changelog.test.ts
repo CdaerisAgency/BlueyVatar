@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changelogFeed, inlineParts, mergeFragments, parseChangelog, readChangelogFile, readChangelogFragments } from './changelog'
+import { changelogFeed, emailParts, inlineParts, mergeFragments, parseChangelog, readChangelogFile, readChangelogFragments } from './changelog'
 
 const md = `# Changelog
 
@@ -85,5 +85,19 @@ describe('mergeFragments', () => {
   it('reads only dated fragment files, never README.md', () => {
     const files = readChangelogFragments()
     expect(files.every((f) => /^\d{4}-\d{2}-\d{2}$/.test(f.date))).toBe(true)
+  })
+})
+
+describe('emailParts', () => {
+  it('finds addresses and keeps the trailing period out of the domain', () => {
+    expect(emailParts('Write to support@blueyvatar.com.')).toEqual([
+      { email: null, text: 'Write to ' },
+      { email: { local: 'support', domain: 'blueyvatar.com' }, text: 'support@blueyvatar.com' },
+      { email: null, text: '.' },
+    ])
+  })
+  it('leaves scoped package names and plain text alone', () => {
+    expect(emailParts('@vitest/mocker and @atproto/dev-env')).toEqual([{ email: null, text: '@vitest/mocker and @atproto/dev-env' }])
+    expect(emailParts('')).toEqual([])
   })
 })
