@@ -8,7 +8,7 @@ const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
 /** Static markup. The account area is a client component that asks /api/viewer after load, so pages stay cacheable. */
 export function SiteNav() {
-  const link = 'text-bv-black no-underline hover:text-bv-blue hover:underline'
+  const link = 'inline-flex min-h-11 items-center text-bv-black no-underline hover:text-bv-blue hover:underline'
   return (
     <header>
       <a
@@ -20,10 +20,10 @@ export function SiteNav() {
       <div className={`${inner} flex flex-wrap items-center justify-between gap-4 py-5`}>
         <Link href="/" className="flex items-center gap-3 font-display text-2xl font-semibold tracking-[-0.01em] text-bv-black no-underline hover:text-bv-black">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpg" alt="" width={44} height={44} className="size-11 rounded-full object-cover" />
+          <img src="/logo-88.jpg" alt="" width={44} height={44} className="size-11 rounded-full object-cover" />
           <Wordmark />
         </Link>
-        <nav aria-label="Main" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] font-medium sm:gap-x-6">
+        <nav aria-label="Main" className="flex flex-wrap items-center gap-x-4 gap-y-0 text-[15px] font-medium sm:gap-x-6">
           <Link href="/#how" className={link}>
             {COPY.nav.how}
           </Link>
@@ -49,7 +49,7 @@ export function SiteNav() {
 export function SiteFooter() {
   return (
     <footer className="border-t-[1.5px] border-bv-line text-sm text-bv-ink-3">
-      <div className={`${inner} flex flex-wrap justify-between gap-x-6 gap-y-3 py-7`}>
+      <div className={`${inner} flex flex-wrap justify-between gap-x-6 gap-y-0 py-3.5`}>
         <span>{COPY.footer.tagline}</span>
         <FooterLinks />
       </div>

@@ -7,6 +7,9 @@ import { useEffect, useId, useRef, useState } from 'react'
 export default function ProfileMenu({ name, initial, avatarSrc }: { name: string; initial: string; avatarSrc?: string | null }) {
   const [open, setOpen] = useState(false)
   const [broken, setBroken] = useState<string | null>(null)
+  // Horizontal offset of the panel from the button, in px. The panel lines up with the button's right edge, then is
+  // moved so it stays 16 px inside the screen: when the header wraps on a phone the button can sit anywhere in the row.
+  const [offset, setOffset] = useState(0)
   const btn = useRef<HTMLButtonElement>(null)
   const panel = useRef<HTMLDivElement>(null)
   const id = useId()
@@ -51,7 +54,16 @@ export default function ProfileMenu({ name, initial, avatarSrc }: { name: string
         aria-expanded={open}
         aria-controls={id}
         aria-label={`Account menu for ${name}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          const r = btn.current?.getBoundingClientRect()
+          if (r) {
+            // The panel is 16rem wide, capped at the viewport minus 2rem (see its classes).
+            const width = Math.min(256, window.innerWidth - 32)
+            const left = Math.min(Math.max(r.right - width, 16), window.innerWidth - 16 - width)
+            setOffset(left - r.left)
+          }
+          setOpen((o) => !o)
+        }}
         className="flex size-11 cursor-pointer items-center justify-center overflow-hidden rounded-full border-[1.5px] border-bv-black bg-bv-orange p-0 font-semibold text-bv-black"
       >
         {avatarSrc && broken !== avatarSrc ? (
@@ -65,7 +77,8 @@ export default function ProfileMenu({ name, initial, avatarSrc }: { name: string
         <div
           ref={panel}
           id={id}
-          className="absolute right-0 z-40 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-bv-card border-[1.5px] border-bv-black bg-bv-white p-2 shadow-lg"
+          style={{ left: offset }}
+          className="absolute z-40 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-bv-card border-[1.5px] border-bv-black bg-bv-white p-2 shadow-lg"
         >
           <p className="m-0 px-3 py-2 text-sm break-all text-bv-ink-3">
             <span className="block text-xs tracking-[0.08em] uppercase">Signed in as</span>

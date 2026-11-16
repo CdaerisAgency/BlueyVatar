@@ -116,7 +116,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
       <Notices error={error} done={done} loadError={loadError} />
       <p>Accounts you hide stay verified but are left off your profile page and hover cards.</p>
       <details className="mb-5">
-        <summary>What does &quot;link back to your profile&quot; mean?</summary>
+        <summary className="py-2.5">What does &quot;link back to your profile&quot; mean?</summary>
         <p>
           For some accounts, BlueyVatar needs to see that the other page points back to your profile. You do that by adding a link to your BlueyVatar profile on that page. In web page code the link carries a small tag, <code>rel=&quot;me&quot;</code>, which tells sites that the link goes to another page of yours. You only need to copy the link we give you.
         </p>
@@ -202,7 +202,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
       </Section>
 
       <details>
-        <summary>How each platform is checked</summary>
+        <summary className="py-2.5">How each platform is checked</summary>
         <ul>
           {PLATFORMS.map((p) => (
             <li key={p}>
