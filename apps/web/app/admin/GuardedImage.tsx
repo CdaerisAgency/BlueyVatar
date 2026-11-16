@@ -47,7 +47,7 @@ export function GuardedImage({ caseId, cid, rating, initialBlur, initialGrayscal
         <label>Blur{' '}
           <input type="range" min={0} max={40} value={blur} onChange={(e) => setBlur(Number(e.target.value))} aria-label="Blur strength" />
         </label>
-        <label><input type="checkbox" checked={gray} onChange={(e) => setGray(e.target.checked)} /> Grayscale</label>
+        <label className="min-h-11 items-center"><input type="checkbox" checked={gray} onChange={(e) => setGray(e.target.checked)} /> Grayscale</label>
       </div>
       {problem && <p role="alert">{problem}</p>}
       <form action={saveWellnessAction} className="flex flex-wrap items-center gap-3">
