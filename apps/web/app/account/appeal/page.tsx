@@ -1,6 +1,7 @@
 import { BackLink, EmptyState, PageHeader, PageMain } from '../../../components/Page'
 import { Button } from '../../../components/Button'
 import { Field } from '../../../components/Field'
+import { SignedInAs } from '../../../components/SignedInAs'
 import { MAX_STATEMENT, appealableActions } from '../../../lib/appeals'
 import { requireDid } from '../../../lib/auth'
 import { getPool } from '../../../lib/store'
@@ -20,7 +21,7 @@ export default async function AppealPage({ searchParams }: { searchParams: Promi
     <PageMain>
       {chosen && <BackLink href="/account/appeal">Back to appeals</BackLink>}
       <PageHeader title="Appeal" intro={<>Ask us to reverse a takedown, suspension, warning, or rating change on your account. Each action can be appealed once. See the <a href="/policy#appeals">content policy</a>.</>} />
-      <p>Signed in as {did}</p>
+      <SignedInAs did={did} />
       {sp.error && <p role="alert">{sp.error}</p>}
       {sp.sent && <p role="status">Your appeal was received (number {sp.sent}). We will email you the outcome at the primary email on your account.</p>}
       {!pool && <p role="status">Appeals need the database, which is not configured here.</p>}
