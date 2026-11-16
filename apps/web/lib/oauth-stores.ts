@@ -4,6 +4,14 @@ import { decryptJson, encryptJson } from './token-crypto'
 
 export type OauthStores = { oauthState: NodeSavedStateStore; oauthSession: NodeSavedSessionStore }
 
+/** The same store with every key prefixed, so one flow's restore, refresh and signOut touch only its own entries. */
+export function prefixedSessionStore(inner: NodeSavedSessionStore, prefix: string): NodeSavedSessionStore {
+  return { get: (k) => inner.get(prefix + k), set: (k, v) => inner.set(prefix + k, v), del: (k) => inner.del(prefix + k) }
+}
+
+/** Sessions of the email-link flow live under this prefix, apart from the main sign-in session for the same DID. */
+export const LINK_SESSION_PREFIX = 'link:'
+
 export function memoryOauthStores(): OauthStores {
   const states = new Map<string, NodeSavedState>()
   const sessions = new Map<string, NodeSavedSession>()
