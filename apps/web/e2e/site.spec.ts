@@ -53,6 +53,17 @@ test.describe('profile page', () => {
     await expect(page.getByText('Lisbon')).toBeVisible()
   })
 
+  test('the avatar offers WebP at two sizes with a PNG fallback and loads first', async ({ page }) => {
+    await page.goto(`/p/${SEEDED.handle}`)
+    const source = page.locator('picture source[type="image/webp"]')
+    await expect(source).toHaveAttribute('srcset', /256-q85\.webp 256w, .*512-q85\.webp 512w/)
+    await expect(source).toHaveAttribute('sizes', /258px/)
+    const img = page.locator('picture img')
+    await expect(img).toHaveAttribute('src', /256\.png$/)
+    await expect(img).toHaveAttribute('fetchpriority', 'high')
+    await expect(img).not.toHaveAttribute('loading', 'lazy')
+  })
+
   test('an unknown handle says so', async ({ page }) => {
     await page.goto('/p/nobody.test')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Profile not found')

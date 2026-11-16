@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { currentDid, oauthClient, setSessionCookie, takeNext } from '../../../lib/auth'
+import { callbackClient, currentDid, setSessionCookie, takeNext } from '../../../lib/auth'
 import { linkFromSession, type LinkOutcome } from '../../../lib/link'
 import { PUBLIC_URL } from '../../../lib/oauth'
 import { reportError } from '../../../lib/obs'
@@ -19,11 +19,11 @@ export async function GET(req: Request) {
   if (!gate.ok) return limitedResponse(gate.retryAfterSec)
   let result: { did: string; state: string | null; outcome?: LinkOutcome }
   try {
-    const client = await oauthClient()
-    const { session, state } = await client.callback(new URL(req.url).searchParams)
+    const params = new URL(req.url).searchParams
+    const { session, state } = await (await callbackClient(params)).callback(params)
     result = { did: session.did, state }
     if (state === 'link') {
-      // The email-scoped session is short lived: read the email, then revoke it.
+      // The email-scoped session lives in the link store (link:<did>), apart from the main session. Read the email, then revoke it.
       try {
         result.outcome = (await currentDid()) === session.did
           ? await linkFromSession(session)

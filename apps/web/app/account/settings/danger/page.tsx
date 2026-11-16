@@ -33,7 +33,7 @@ export default async function DangerZonePage({ searchParams }: { searchParams: P
           secret keys), your custom domain, daily profile view counts, any appeals you filed, your avatar sync setting and the log of changes blueyvatar made to your profile avatar, your avatar frame, out-of-office, calendar and holiday settings, free effect offers you were listed for or dismissed, bug report screenshots you sent, and a summary of your subscriptions.
         </p>
         <p>
-          <a href="/account/data/export" download>Download my data</a>
+          <a href="/account/data/export" download className="inline-flex min-h-11 items-center">Download my data</a>
         </p>
       </Section>
 

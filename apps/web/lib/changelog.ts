@@ -115,6 +115,25 @@ export function inlineParts(text: string): { code: boolean; text: string }[] {
     .map((t) => (t.startsWith('`') && t.endsWith('`') && t.length > 2 ? { code: true, text: t.slice(1, -1) } : { code: false, text: t }))
 }
 
+const EMAIL = /([\w.+-]+)@([\w-]+(?:\.[\w-]+)+)/g
+
+/**
+ * Splits text into plain runs and email addresses. Cloudflare's email obfuscation rewrites any address it finds in
+ * served HTML into a "[email protected]" link, which no longer matches what React renders and logs hydration error
+ * #418 in the browser. The page renders each address with its "@" in its own element, so the proxy finds none.
+ */
+export function emailParts(text: string): { email: { local: string; domain: string } | null; text: string }[] {
+  const out: { email: { local: string; domain: string } | null; text: string }[] = []
+  let last = 0
+  for (const m of text.matchAll(EMAIL)) {
+    if (m.index > last) out.push({ email: null, text: text.slice(last, m.index) })
+    out.push({ email: { local: m[1]!, domain: m[2]! }, text: m[0] })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) out.push({ email: null, text: text.slice(last) })
+  return out
+}
+
 const plain = (text: string): string => text.replace(/`([^`]+)`/g, '$1')
 
 function entryHtml(e: ChangelogEntry): string {

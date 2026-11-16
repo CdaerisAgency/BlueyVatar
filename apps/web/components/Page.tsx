@@ -40,7 +40,7 @@ export function PageHeader({ title, intro, actions }: { title: string; intro?: R
 export function BackLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <p className="mb-3 text-bv-small">
-      <Link href={href}>
+      <Link href={href} className="inline-flex min-h-11 items-center">
         <span aria-hidden="true">&larr; </span>
         {children}
       </Link>

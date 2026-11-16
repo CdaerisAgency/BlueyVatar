@@ -9,7 +9,8 @@ export interface PublicProfile {
   displayName: string | null
   description: string | null
   links?: unknown
-  avatar: { url: string } | null
+  /** `variants` is absent on an older delivery service. */
+  avatar: { url: string; variants?: unknown } | null
   jobTitle: string | null
   company: string | null
   location: string | null
@@ -24,6 +25,26 @@ export interface PublicProfile {
   gallery?: unknown
   verifiedAccounts?: { platform: string; uri: string; hidden: boolean }[]
   atprotoApps?: unknown
+}
+
+/** Display size of the avatar picture in CSS px: the 380 px ring shows the image in 68% of it, capped by the viewport. */
+export const AVATAR_SIZES = '(min-width: 420px) 258px, 68vw'
+
+/**
+ * The WebP srcset for the avatar, built only from the signed `/img` paths the delivery service
+ * returned (the signing secret never leaves it). Null when the service sent no usable WebP variants.
+ */
+export function avatarWebpSrcSet(p: PublicProfile, base: string): string | null {
+  const raw = p.avatar?.variants
+  if (!Array.isArray(raw)) return null
+  const parts: string[] = []
+  for (const v of raw) {
+    if (!v || typeof v !== 'object') continue
+    const { size, format, url } = v as Record<string, unknown>
+    if (format !== 'webp' || typeof size !== 'number' || typeof url !== 'string' || !url.startsWith('/img/')) continue
+    parts.push(`${trimSlash(base)}${url} ${size}w`)
+  }
+  return parts.length >= 1 ? parts.join(', ') : null
 }
 
 /** App names for the profile page. Only entries with a string name and an https URL count, and each app shows once. */
@@ -129,7 +150,8 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trim
 
 /** Open Graph and Twitter card fields. `imageBase` is the public delivery origin, `canonical` the page's canonical URL, `siteBase` the public site origin for the default image. */
 export function profileMetadata(p: PublicProfile, handle: string, imageBase: string, canonical?: string, siteBase?: string) {
-  const title = p.displayName ?? p.handle ?? handle
+  // `??` keeps an empty display name, and Next omits <title> for an empty string, so blanks fall through to the handle.
+  const title = p.displayName?.trim() || p.handle?.trim() || handle.trim() || 'Profile'
   const description = clip(
     p.description?.trim() || [[p.jobTitle, p.company].filter(Boolean).join(', '), p.location].filter(Boolean).join(' | ') || `${title} on BlueyVatar`,
     200,
@@ -137,7 +159,7 @@ export function profileMetadata(p: PublicProfile, handle: string, imageBase: str
   // Profiles without an avatar fall back to the site's default image.
   const images = p.avatar ? [`${trimSlash(imageBase)}${p.avatar.url}`] : [defaultOgImage(siteBase)]
   return {
-    title,
+    title: `${title} | BlueyVatar`,
     description,
     ...(canonical ? { alternates: { canonical } } : {}),
     openGraph: { title, description, type: 'profile' as const, siteName: 'BlueyVatar', ...(canonical ? { url: canonical } : {}), images },
