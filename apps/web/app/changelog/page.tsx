@@ -1,5 +1,5 @@
 import { PageMain } from '../../components/Page'
-import { changelogAnchor, inlineParts, loadChangelog } from '../../lib/changelog'
+import { changelogAnchor, emailParts, inlineParts, loadChangelog } from '../../lib/changelog'
 import { pageMetadata } from '../../lib/site'
 
 // Rendered from CHANGELOG.md when the app is built.
@@ -7,6 +7,25 @@ export const dynamic = 'force-static'
 
 export const metadata = {
   ...pageMetadata('/changelog', 'Changelog | BlueyVatar', 'New features, changes, and fixes to BlueyVatar, newest first.'),
+}
+
+/** Text with each email address split around its "@" so the Cloudflare proxy leaves it alone (see emailParts). */
+function Text({ text }: { text: string }) {
+  return (
+    <>
+      {emailParts(text).map((p, i) =>
+        p.email ? (
+          <span key={i}>
+            {p.email.local}
+            <span>@</span>
+            {p.email.domain}
+          </span>
+        ) : (
+          p.text
+        ),
+      )}
+    </>
+  )
 }
 
 export default function ChangelogPage() {
@@ -30,7 +49,7 @@ export default function ChangelogPage() {
               <ul className="list-disc pl-5">
                 {g.items.map((item) => (
                   <li key={item} className="border-0! py-0.5!">
-                    {inlineParts(item).map((p, i) => (p.code ? <code key={i}>{p.text}</code> : p.text))}
+                    {inlineParts(item).map((p, i) => (p.code ? <code key={i}><Text text={p.text} /></code> : <Text key={i} text={p.text} />))}
                   </li>
                 ))}
               </ul>
