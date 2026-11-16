@@ -46,7 +46,7 @@ export default async function AdminHome({ searchParams }: { searchParams: Promis
         <form action={saveWellnessAction}>
           <input type="hidden" name="back" value="/admin" />
           <label>Blur strength (0 to 40 px) <input type="number" name="blur" min={0} max={40} defaultValue={well.blurPx} /></label>
-          <label><input type="checkbox" name="grayscale" defaultChecked={well.grayscale} /> Grayscale</label>
+          <label className="min-h-11 items-center"><input type="checkbox" name="grayscale" defaultChecked={well.grayscale} /> Grayscale</label>
           <Button type="submit">Save</Button>
         </form>
       </section>

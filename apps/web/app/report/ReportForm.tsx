@@ -22,7 +22,7 @@ export async function ReportForm({ did, source, back, status }: { did: string; s
     <section aria-label="Report">
       {status && NOTES[status] && <p role="status">{NOTES[status]}</p>}
       <details open={Boolean(status && status.startsWith('invalid'))}>
-        <summary>Report this {noun}</summary>
+        <summary className="py-2.5">Report this {noun}</summary>
         {signedIn ? (
           <>
             <p>Reports are tied to your signed-in account and are never shown publicly. All fields are required. See the <a href="/policy">content policy</a>.</p>
@@ -31,7 +31,7 @@ export async function ReportForm({ did, source, back, status }: { did: string; s
         ) : (
           <>
             <p>Sign in to send a report. See the <a href="/policy">content policy</a>.</p>
-            <p><a href={loginPath(back)}>Sign in to report this {noun}</a></p>
+            <p><a href={loginPath(back)} className="inline-flex min-h-11 items-center">Sign in to report this {noun}</a></p>
             <p>Cannot sign in? For legal or urgent notices, write to <a href="mailto:security@blueyvatar.com">security@blueyvatar.com</a>.</p>
           </>
         )}

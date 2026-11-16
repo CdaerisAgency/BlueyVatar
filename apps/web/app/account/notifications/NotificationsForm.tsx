@@ -8,17 +8,17 @@ export function NotificationsForm({ usageAlerts, billingNotices, offerNotices }:
   return (
     <form action={action}>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="usageAlerts" defaultChecked={usageAlerts} /> Usage alerts: an email when you reach 80 and 100 percent of your included monthly requests.
         </label>
       </p>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="billingNotices" defaultChecked={billingNotices} /> Billing notices: failed payments, the end of a grace period, and canceled subscriptions.
         </label>
       </p>
       <p>
-        <label>
+        <label className="min-h-11 items-center">
           <input type="checkbox" name="offerNotices" defaultChecked={offerNotices} /> Free effect offers: one email when a limited-time free effect becomes available to you.
         </label>
       </p>
