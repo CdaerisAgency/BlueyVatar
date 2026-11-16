@@ -18,7 +18,14 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify({
         did: SEEDED.did, handle: SEEDED.handle, displayName: SEEDED.displayName, description: SEEDED.description,
-        avatar: null, jobTitle: 'Engineer', company: 'Example Co', location: 'Lisbon', pronouns: 'she/her',
+        avatar: {
+          url: '/img/e2e/cid/sig/256.png',
+          variants: [
+            { size: 256, format: 'webp', url: '/img/e2e/cid/sig/256-q85.webp' },
+            { size: 512, format: 'webp', url: '/img/e2e/cid/sig/512-q85.webp' },
+            { size: 512, format: 'png', url: '/img/e2e/cid/sig/512.png' },
+          ],
+        }, jobTitle: 'Engineer', company: 'Example Co', location: 'Lisbon', pronouns: 'she/her',
         links: [], interests: ['birds'], verifiedAccounts: [],
       }))
       return

@@ -257,7 +257,7 @@ export const openApiDocument = {
           displayName: { type: ['string', 'null'] },
           description: { type: ['string', 'null'] },
           links: { type: 'array', items: { type: 'object' } },
-          avatar: { type: ['object', 'null'], properties: { url: { type: 'string' }, source: { type: 'string' } } },
+          avatar: { type: ['object', 'null'], properties: { url: { type: 'string', description: 'Signed /img path, 256 pixel PNG.' }, source: { type: 'string' }, variants: { type: 'array', description: 'Signed /img paths for responsive pages: WebP at 256 and 512, PNG at 512. Clients that do not know the field can ignore it.', items: { type: 'object', required: ['size', 'format', 'url'], properties: { size: { type: 'integer' }, format: { type: 'string', enum: ['webp', 'png'] }, url: { type: 'string' } } } } } },
           jobTitle: { type: ['string', 'null'] },
           company: { type: ['string', 'null'] },
           location: { type: ['string', 'null'] },

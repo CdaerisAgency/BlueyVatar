@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { GALLERY_MAX } from '@blueyvatar/core'
-import { pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
+import { AVATAR_SIZES, avatarWebpSrcSet, pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
 
 const base: PublicProfile = { did: 'did:plc:a', handle: 'alice.test', displayName: 'Alice', description: 'Hi there', avatar: { url: '/img/x/y/256.png' }, jobTitle: null, company: null, location: null, pronouns: null }
 
@@ -67,5 +67,25 @@ describe('profile page model', () => {
       expect(pageGallery(base, true)).toEqual([])
       expect(pageGallery({ ...base, gallery: 'nope' }, true)).toEqual([])
     })
+  })
+})
+
+describe('avatarWebpSrcSet', () => {
+  const withVariants = (variants: unknown): PublicProfile => ({ ...base, avatar: { url: '/img/x/y/s/256.png', variants } })
+  it('lists only the WebP variants, on the delivery origin', () => {
+    const p = withVariants([
+      { size: 256, format: 'webp', url: '/img/x/y/s/256-q85.webp' },
+      { size: 512, format: 'webp', url: '/img/x/y/s/512-q85.webp' },
+      { size: 512, format: 'png', url: '/img/x/y/s/512.png' },
+    ])
+    expect(avatarWebpSrcSet(p, 'https://img.example/')).toBe('https://img.example/img/x/y/s/256-q85.webp 256w, https://img.example/img/x/y/s/512-q85.webp 512w')
+  })
+  it('is null for an older delivery service, no avatar, or unsafe entries', () => {
+    expect(avatarWebpSrcSet(base, 'https://img.example')).toBeNull()
+    expect(avatarWebpSrcSet({ ...base, avatar: null }, 'https://img.example')).toBeNull()
+    expect(avatarWebpSrcSet(withVariants([{ size: 256, format: 'webp', url: 'https://evil.test/a.webp' }, null, { size: '256', format: 'webp', url: '/img/a.webp' }]), 'https://img.example')).toBeNull()
+  })
+  it('sizes match the 258 px picture box', () => {
+    expect(AVATAR_SIZES).toContain('258px')
   })
 })

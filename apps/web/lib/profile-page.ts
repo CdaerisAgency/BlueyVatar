@@ -9,7 +9,8 @@ export interface PublicProfile {
   displayName: string | null
   description: string | null
   links?: unknown
-  avatar: { url: string } | null
+  /** `variants` is absent on an older delivery service. */
+  avatar: { url: string; variants?: unknown } | null
   jobTitle: string | null
   company: string | null
   location: string | null
@@ -24,6 +25,26 @@ export interface PublicProfile {
   gallery?: unknown
   verifiedAccounts?: { platform: string; uri: string; hidden: boolean }[]
   atprotoApps?: unknown
+}
+
+/** Display size of the avatar picture in CSS px: the 380 px ring shows the image in 68% of it, capped by the viewport. */
+export const AVATAR_SIZES = '(min-width: 420px) 258px, 68vw'
+
+/**
+ * The WebP srcset for the avatar, built only from the signed `/img` paths the delivery service
+ * returned (the signing secret never leaves it). Null when the service sent no usable WebP variants.
+ */
+export function avatarWebpSrcSet(p: PublicProfile, base: string): string | null {
+  const raw = p.avatar?.variants
+  if (!Array.isArray(raw)) return null
+  const parts: string[] = []
+  for (const v of raw) {
+    if (!v || typeof v !== 'object') continue
+    const { size, format, url } = v as Record<string, unknown>
+    if (format !== 'webp' || typeof size !== 'number' || typeof url !== 'string' || !url.startsWith('/img/')) continue
+    parts.push(`${trimSlash(base)}${url} ${size}w`)
+  }
+  return parts.length >= 1 ? parts.join(', ') : null
 }
 
 /** App names for the profile page. Only entries with a string name and an https URL count, and each app shows once. */
