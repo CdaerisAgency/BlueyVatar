@@ -10,8 +10,8 @@ const base = `http://localhost:${WEB_PORT}`
 
 const PUBLIC = ['/', '/pricing', '/integrations', '/docs', '/login', '/login?error=Handle%20not%20found', '/p/alice.example.com', '/p/alice.example.com?report=invalid', '/policy', '/privacy', '/accessibility']
 const ACCOUNT = ['/account', '/account/profile', '/account/avatars', '/account/avatars/schedule', '/account/billing', '/account/claims', '/account/domain', '/account/effects', '/account/keys', '/account/notifications', '/account/visibility']
-// Second pass at a 390 px phone width, for the pages added with effects and the avatar calendar (#316, #321).
-const PHONE = ['/account/effects', '/account/avatars/schedule']
+// Second pass at a 390 px phone width over the same pages and the same rules as the desktop pass.
+const PHONE = [...PUBLIC, ...ACCOUNT]
 // /admin/effects (#319) is not scanned: admin pages need the admin TOTP session (lib/admin/session.ts), which this
 // script does not seed. Add it here once the script can seed an admin session.
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']
