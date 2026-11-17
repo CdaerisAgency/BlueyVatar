@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { migrate } from './index.js'
 
@@ -11,7 +12,7 @@ if (!url) {
   process.exit(1)
 }
 // dist/cli.js and src/cli.ts both sit two levels below tools/, so the repo root is three levels up.
-const dir = process.env.MIGRATIONS_DIR ?? new URL('../../../db/migrations', import.meta.url).pathname
+const dir = process.env.MIGRATIONS_DIR ?? fileURLToPath(new URL('../../../db/migrations', import.meta.url))
 const pool = new pg.Pool({ connectionString: url, max: 1 })
 try {
   const applied = await migrate(pool, dir, console.log)
