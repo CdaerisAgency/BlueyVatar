@@ -1,0 +1,10 @@
+{
+  "extraKnownMarketplaces": {
+    "cdaeris-plugins": {
+      "source": { "source": "github", "repo": "CdaerisAgency/claude-plugins" }
+    }
+  },
+  "enabledPlugins": {
+    "i-have-adhd@cdaeris-plugins": true
+  }
+}
