@@ -64,7 +64,7 @@ export default async function MigratePage() {
         ))}
       </ul>
       <p>BlueyVatar is not affiliated with Gravatar.</p>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd(faqs)) }} />
     </PageMain>
   )
 }

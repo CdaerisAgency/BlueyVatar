@@ -3,6 +3,7 @@ import type pg from 'pg'
 import sharp from 'sharp'
 import { SETTING_DEFS, validateSetting, type SettingKey, type SettingRow } from '@blueyvatar/core/settings'
 import { inTx, recordAction } from './moderation'
+import { isMissingTable, listSettingRows } from '../setting-rows'
 
 /** Admin-edited limits (site_settings) and the over-limit avatar (site_assets). Every write is audited in the same transaction. */
 
@@ -14,18 +15,7 @@ export const ASSET_MAX_EDGE = 1024
 /** A decoded picture larger than this many pixels is refused before it is opened (same cap as report screenshots). */
 const MAX_PIXELS = 40_000_000
 
-const isMissingTable = (err: unknown): boolean => typeof err === 'object' && err !== null && (err as { code?: unknown }).code === '42P01'
-
-/** Stored rows. An empty list when the table does not exist yet (the app can deploy before migration 0046 runs). */
-export async function listSettingRows(q: Q): Promise<SettingRow[]> {
-  try {
-    const { rows } = await q.query<SettingRow>('SELECT key, value FROM site_settings ORDER BY key')
-    return rows
-  } catch (err) {
-    if (isMissingTable(err)) return []
-    throw err
-  }
-}
+export { listSettingRows }
 
 /** Key order does not matter: jsonb does not keep it, so compare in a canonical form. */
 function canon(v: unknown): string {

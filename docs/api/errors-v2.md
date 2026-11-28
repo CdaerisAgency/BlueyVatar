@@ -21,7 +21,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | Code | Status | Meaning |
 | --- | --- | --- |
 | `invalid_identifier` | 400 | The path identifier is malformed. `/avatar/{hash}` needs a 64-hex SHA-256 or 32-hex MD5 hash. `/u/{id}` needs a handle or DID. `/profile/{id}` and `/qr/{id}` need a SHA-256 hash, handle, or DID. Emails are always invalid. |
-| `invalid_size` | 400 (404 on `/img`) | `s` is not an integer of at least 1. Values above the tier maximum are clamped, not rejected. On `/img`, a size outside 1 to 2048 returns this code with status 404. |
+| `invalid_size` | 400 (404 on `/img`) | `s` is not an integer of at least 1. Values above your plan's maximum size are clamped, not rejected. On `/img`, a size outside 1 to 2048 returns this code with status 404. |
 | `invalid_default` | 400 | `d` is neither a known style nor a parseable URL. |
 | `default_url_not_allowed` | 400 | `d` is a URL that is not HTTPS or whose host is not on the allowlist. |
 | `invalid_rating` | 400 | `r` is not `g`, `pg`, `r`, or `x`. |
@@ -41,7 +41,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `invalid_signature` | 403 | An `/img` path is unsigned, or its signature does not match the file name. Fetch the avatar again through `/avatar` or `/u`. |
 | `signature_expired` | 403 | A signed `/img` path for a restricted avatar is past its day bucket. Fetch the avatar again. |
 | `not_found` | 404 | No such image, profile, or route target. Also returned for `d=404` with no avatar, for hidden profiles, and on `/img` when the user's PDS answers 404 for the original blob. |
-| `rate_limited` | 429 | Anonymous daily limit (100 per IP) or Free keyed daily limit (1,000) reached. |
+| `rate_limited` | 429 | The anonymous daily limit per IP or the Free keyed daily limit was reached. The limits are listed on the pricing page. |
 | `upstream_error` | 502 | The image could not be fetched or processed. On `/img` this covers PDS 5xx responses, timeouts, network errors, an unusable PDS endpoint, and bytes that do not match the CID. |
 | `internal` | 500 | An unhandled server fault. |
 | `overloaded` | 503 | Image processing is at capacity: the resize queue is full or the wait ran out. Returned by `/img`, `/default`, and PNG `/qr`. Carries `retry-after` (seconds) and `cache-control: no-store`; retry after the delay. |
@@ -76,7 +76,7 @@ Sent on successful responses and on `429` responses, when the caller has a count
 | `x-rate-limit-remaining` | Requests left. Never below 0. |
 | `x-rate-limit-reset` | Unix time in seconds when the window resets. |
 
-Windows: anonymous callers get 100 per day per IP. Free keys get 1,000 per day. Plus and Business have monthly included volume of 50,000 and 1,000,000 (30-day window), with metered overage, so they are not blocked at the limit. Enterprise has no window and the three headers are omitted. A `429` also carries `retry-after`, the whole seconds (at least 1) until `x-rate-limit-reset`.
+Windows: anonymous callers get a daily limit per IP. Free keys get a daily limit. Plus and Business have a monthly included volume (30-day window), with metered overage, so they are not blocked at the limit. Enterprise has no window and the three headers are omitted. A `429` also carries `retry-after`, the whole seconds (at least 1) until `x-rate-limit-reset`.
 
 ## Other response headers
 

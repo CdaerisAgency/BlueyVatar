@@ -1,6 +1,6 @@
 import { SettingsCache } from '@blueyvatar/core/settings-cache'
 import type { SiteSettings } from '@blueyvatar/core/settings'
-import { listSettingRows } from './admin/site-settings'
+import { listSettingRows } from './setting-rows'
 import { formatVolume } from './format-volume'
 import { log } from './obs'
 import { getPool } from './pool'

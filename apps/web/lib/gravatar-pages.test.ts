@@ -29,6 +29,14 @@ describe('gravatar pages', () => {
   it('cites Gravatar docs over https', () => {
     for (const u of Object.values(GRAVATAR_DOCS)) expect(u).toMatch(/^https:\/\/docs\.gravatar\.com\//)
   })
+  it('JSON-LD answers reflect live sizes', () => {
+    const s = structuredClone(DEFAULT_SETTINGS)
+    s.maxSize = { free: 256, plus: 800, business: 1600 }
+    const ld = faqJsonLd(faqsFor(s)) as { mainEntity: { name: string; acceptedAnswer: { text: string } }[] }
+    const a = ld.mainEntity.find((e) => e.name === 'Are there size limits?')!.acceptedAnswer.text
+    expect(a).toContain('Free is capped at 256')
+    expect(a).not.toContain('512')
+  })
   it('uses live sizes in the comparison copy', () => {
     const s = structuredClone(DEFAULT_SETTINGS)
     s.maxSize = { free: 256, plus: 800, business: 1600 }
