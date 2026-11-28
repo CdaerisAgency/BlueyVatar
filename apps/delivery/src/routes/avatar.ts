@@ -29,11 +29,19 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
   /**
    * Image requests over a limit get the owner's over-limit avatar instead of a broken image.
    * Only free-tier callers reach this (anonymous, or a blocked keyed plan), so size and format
-   * follow the free rules. d= is ignored. JSON and data requests keep the 429.
+   * follow the free rules. d= is ignored, except d=404: that caller (Discourse downloads once and
+   * stores forever) must not keep the over-limit picture, so it gets the same 404 as an ordinary
+   * d=404 miss. The answer never depends on a lookup, so it reveals nothing about a hash.
+   * JSON and data requests keep the 429.
    */
   async function respondOverLimit(c: Context) {
-    const free = entitlementsFor('free', deps.settings.current())
     const q = new URL(c.req.url).searchParams
+    if ((q.get('d') ?? q.get('default')) === '404') {
+      c.header('cache-control', 'private, max-age=300')
+      c.header('x-over-limit', '1')
+      return fail(c, 404, 'not_found', 'No avatar for this identity')
+    }
+    const free = entitlementsFor('free', deps.settings.current())
     const n = parseInt(q.get('s') ?? q.get('size') ?? '', 10)
     const size = Math.min(Number.isFinite(n) && n >= 1 ? n : DEFAULT_SIZE, free.maxSize, ABSOLUTE_MAX_SIZE)
     const fmt = q.get('fmt') ?? ''

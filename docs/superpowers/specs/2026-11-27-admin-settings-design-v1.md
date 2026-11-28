@@ -87,6 +87,8 @@ For **image** requests only (`/avatar/:hash` and `/u/:id` without `json=true`): 
 
 JSON and data endpoints are unchanged: `429` with the JSON error body.
 
+Requests with `d=404` over a limit get `404` instead of the redirect (reversed 2026-11-27, see the integration guides design).
+
 ### Admin portal
 
 New page `/admin/settings` (linked in the admin nav), following the effects page pattern: `requireAdmin()`, the `limited(['adminAction.did','adminAction.ip'])` guard, and a server action per form.
