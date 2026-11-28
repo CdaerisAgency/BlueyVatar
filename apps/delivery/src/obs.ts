@@ -20,6 +20,7 @@ metrics.describe('delivery_transforms_in_flight', 'Resize workers running now')
 metrics.describe('delivery_transforms_queued', 'Resize jobs waiting for a worker slot')
 metrics.describe('delivery_transforms_shed_total', 'Resize jobs rejected with 503 because the queue was full or the wait ran out')
 metrics.describe('delivery_rate_limit_rejections_total', 'Requests rejected with 429')
+metrics.describe('settings_refresh_failures_total', 'Failed refreshes of the admin settings snapshot (the last good snapshot stays in use)')
 metrics.describe('delivery_postgres_errors_total', 'Postgres pool errors and failed readiness probes')
 metrics.describe('delivery_readyz_failures_total', 'Failed /readyz probes')
 

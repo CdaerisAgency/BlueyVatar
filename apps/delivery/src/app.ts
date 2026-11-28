@@ -1,6 +1,7 @@
 import {
   Metrics, REQUEST_ID_HEADER, requestIdFrom, statusClass, type ErrorTracker, type Logger,
 } from '@blueyvatar/core'
+import type { SiteSettings } from '@blueyvatar/core/settings'
 import { Hono, type Context } from 'hono'
 import type { UsageAlerts } from './alerts.js'
 import { createCtx } from './context.js'
@@ -21,6 +22,8 @@ import type { IndexStore } from './store.js'
 import type { UsageMeter } from './usage.js'
 
 export interface AppDeps {
+  /** Live admin settings (limits, image sizes, profile access). Backed by a SettingsCache refreshed every 60 s. */
+  settings: { current(): SiteSettings }
   index: IndexStore
   resolver: AvatarResolver
   licenses: LicenseStore

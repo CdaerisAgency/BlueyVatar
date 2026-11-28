@@ -54,6 +54,7 @@ export function createCtx(deps: AppDeps): Ctx {
       },
       deps.licenses,
       deps.limiter,
+      deps.settings.current(),
     )
     rateHeaders(c, e, metered)
     if (!e.ok && e.status === 429) metrics.inc('delivery_rate_limit_rejections_total')

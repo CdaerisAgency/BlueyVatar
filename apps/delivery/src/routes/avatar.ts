@@ -42,7 +42,7 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
 
     let p: AvatarParams
     try {
-      p = parseAvatarParams(new URL(c.req.url).searchParams, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist })
+      p = parseAvatarParams(new URL(c.req.url).searchParams, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist, settings: deps.settings.current() })
     } catch (err) {
       if (err instanceof ParamError) return fail(c, 400, err.code as ErrorCode, err.message)
       throw err
@@ -54,7 +54,7 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
     metrics.inc('delivery_resolutions_total', { route: 'avatar', result: identity ? 'found' : 'miss' })
     if (e.licenseId) {
       const used = await deps.usage.add(e.licenseId, 'origin_resolution')
-      await deps.alerts?.check(e.licenseId, e.tier, used)
+      await deps.alerts?.check(e.licenseId, e.tier, used, deps.settings.current())
     }
     // With json=true every miss answers in JSON with found: false, and every miss body is the
     // same, so a hash lookup cannot tell an unlinked hash from a hidden or restricted one.

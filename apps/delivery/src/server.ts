@@ -4,7 +4,9 @@ import type pg from 'pg'
 import { DEFAULT_ADAPTERS } from '@blueyvatar/core'
 import { emailSender, Notifier, pgNoticeDirectory } from '@blueyvatar/core/verification'
 import { ConsoleAlertSink, EmailAlertSink, MemoryAlertLedger, UsageAlerts, type AlertLedger } from './alerts.js'
+import { SettingsCache } from '@blueyvatar/core/settings-cache'
 import { createApp } from './app.js'
+import { pgSettingRows } from './site-settings.js'
 import { errors, log, metrics, resolverLog } from './obs.js'
 import { originLockWarning } from './origin.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
@@ -60,7 +62,16 @@ if (!imgSigningSecret) {
   log.warn('IMG_SIGNING_SECRET is not set; using a random per-process secret, so /img URLs break on restart')
   imgSigningSecret = randomBytes(32).toString('hex')
 }
+// Limits, image sizes and profile access come from site_settings, refreshed in the background (SETTINGS_REFRESH_MS, default 60 s).
+// With no database the cache serves the code defaults. A failed refresh keeps the last good snapshot.
+const settings = new SettingsCache(pool ? pgSettingRows(pool) : null, {
+  refreshMs: Number(process.env.SETTINGS_REFRESH_MS ?? 60000) || 60000,
+  onError: (err) => { log.warn('settings refresh failed', { err }); metrics.inc('settings_refresh_failures_total') },
+  onRejected: (keys) => log.warn('settings rows rejected; defaults kept', { keys }),
+})
+await settings.start()
 const app = createApp({
+  settings,
   index,
   resolver: new AtprotoResolver({ index, adapters: DEFAULT_ADAPTERS, log: (m, meta) => resolverLog(m, meta) }),
   licenses,
