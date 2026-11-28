@@ -1,6 +1,7 @@
 import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { migrate } from './index.js'
@@ -8,7 +9,7 @@ import { migrate } from './index.js'
 // Runs against a real Postgres when TEST_DATABASE_URL is set; each run uses a throwaway schema.
 const url = process.env.TEST_DATABASE_URL
 const schema = `t_migrate_${process.pid}_${Date.now()}`
-const repoMigrations = new URL('../../../db/migrations', import.meta.url).pathname
+const repoMigrations = fileURLToPath(new URL('../../../db/migrations', import.meta.url))
 
 describe.skipIf(!url)('migration runner', () => {
   let pool: pg.Pool
