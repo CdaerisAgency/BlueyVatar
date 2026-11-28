@@ -6,6 +6,9 @@ import { docHref, docPages, type DocPage } from '../lib/docs'
 export function DocsView({ page, hub = false }: { page: DocPage; hub?: boolean }) {
   const api = docPages().filter((p) => p.group === 'api')
   const guides = docPages().filter((p) => p.group === 'integrations')
+  // The hub goes after the page h1 and its intro paragraph, above the API sections, so headings stay in order.
+  const cut = hub ? page.html.indexOf('</p>') + 4 : 0
+  const [head, rest] = [page.html.slice(0, cut), page.html.slice(cut)]
   const side = 'inline-flex min-h-11 items-center text-bv-black no-underline hover:text-bv-blue hover:underline'
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-auto flex-col gap-8 px-4 pt-7 pb-14 sm:px-5 md:flex-row md:gap-12 md:pt-10">
@@ -49,22 +52,27 @@ export function DocsView({ page, hub = false }: { page: DocPage; hub?: boolean }
         )}
       </aside>
       <main id="main" tabIndex={-1} className="docs focus:outline-none min-w-0 max-w-[780px] flex-auto">
-        {hub && (
-          <section aria-labelledby="guide-hub" className="mb-10 border-b border-bv-line pb-8">
-            <h2 id="guide-hub" className="m-0 text-2xl font-semibold">{GUIDE_HUB_TITLE}</h2>
-            <p className="mt-2 mb-4 text-bv-ink-3">{GUIDE_HUB_LEAD}</p>
-            <ul className="m-0 grid list-none gap-0 p-0">
-              {GUIDE_HUB.map((g) => (
-                <li key={g.slug} className="flex flex-col gap-0.5 border-t border-bv-line py-1 sm:flex-row sm:items-center sm:gap-4">
-                  <Link href={docHref(`integrations-${g.slug}`)} className="inline-flex min-h-11 items-center font-semibold text-bv-orange-deep underline hover:text-bv-blue sm:w-36 sm:flex-none">{g.name}</Link>
-                  <span className="flex-auto">{g.change}</span>
-                  <span className="text-sm text-bv-ink-3">About {g.minutes} minutes</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {hub ? (
+          <>
+            <div dangerouslySetInnerHTML={{ __html: head }} />
+            <section aria-labelledby="guide-hub" className="mb-10 border-b border-bv-line pb-8">
+              <h2 id="guide-hub" className="m-0 text-2xl font-semibold">{GUIDE_HUB_TITLE}</h2>
+              <p className="mt-2 mb-4 text-bv-ink-3">{GUIDE_HUB_LEAD}</p>
+              <ul className="m-0 grid list-none gap-0 p-0">
+                {GUIDE_HUB.map((g) => (
+                  <li key={g.slug} className="flex flex-col gap-0.5 border-t border-bv-line py-1 sm:flex-row sm:items-center sm:gap-4">
+                    <Link href={docHref(`integrations-${g.slug}`)} className="inline-flex min-h-11 items-center font-semibold text-bv-orange-deep underline hover:text-bv-blue sm:w-36 sm:flex-none">{g.name}</Link>
+                    <span className="flex-auto">{g.change}</span>
+                    <span className="text-sm text-bv-ink-3">About {g.minutes} minutes</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          <div dangerouslySetInnerHTML={{ __html: rest }} />
+          </>
+        ) : (
+          <div dangerouslySetInnerHTML={{ __html: page.html }} />
         )}
-        <div dangerouslySetInnerHTML={{ __html: page.html }} />
       </main>
     </div>
   )

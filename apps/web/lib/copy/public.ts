@@ -7,7 +7,7 @@ export const GUIDE_HUB_LEAD = 'Pick your platform. Each guide is a short, copy-a
 export const GUIDE_HUB: { slug: string; name: string; change: string; minutes: number }[] = [
   { slug: 'html', name: 'Plain HTML', change: 'Use the avatar URL in an img tag', minutes: 2 },
   { slug: 'wordpress', name: 'WordPress', change: 'Install the BlueyVatar plugin', minutes: 5 },
-  { slug: 'ghost', name: 'Ghost', change: "Edit your theme's author partial", minutes: 5 },
+  { slug: 'ghost', name: 'Ghost', change: 'Add the avatar URL to your theme', minutes: 5 },
   { slug: 'discourse', name: 'Discourse', change: 'Set the hidden gravatar_base_url setting', minutes: 3 },
   { slug: 'gitlab', name: 'GitLab', change: 'Set gravatar_plain_url and gravatar_ssl_url in gitlab.rb', minutes: 5 },
   { slug: 'gitea', name: 'Gitea', change: 'Set GRAVATAR_SOURCE in app.ini', minutes: 3 },
