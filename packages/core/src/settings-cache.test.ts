@@ -12,6 +12,25 @@ describe('SettingsCache', () => {
     expect(cache.current()).toEqual(DEFAULT_SETTINGS)
   })
 
+  it('the refresh timer is unref()ed so it never holds the process open', async () => {
+    const unref = vi.fn()
+    const real = globalThis.setInterval
+    const spy = vi.spyOn(globalThis, 'setInterval').mockImplementation(((fn: () => void, ms?: number) => {
+      const handle = real(fn, ms)
+      const origUnref = handle.unref.bind(handle)
+      handle.unref = () => { unref(); return origUnref() }
+      return handle
+    }) as typeof setInterval)
+    const cache = new SettingsCache(async () => [])
+    try {
+      await cache.start()
+      expect(unref).toHaveBeenCalledTimes(1)
+    } finally {
+      cache.stop()
+      spy.mockRestore()
+    }
+  })
+
   it('start loads rows', async () => {
     const cache = new SettingsCache(async () => [{ key: 'limits.anonymousDaily', value: 500 }])
     await cache.start()
