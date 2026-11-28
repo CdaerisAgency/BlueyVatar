@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ handle: s
   const url = absoluteUrl(`/a/${encodeURIComponent(handle)}`)
   const images = [`${trimSlash(PUBLIC_DELIVERY_URL)}${p.avatar.url}`]
   return {
-    title: `${title} | BlueyVatar`,
+    title,
     description: `${title}'s avatar on BlueyVatar.`,
     alternates: { canonical: url },
     openGraph: { title, url, siteName: 'BlueyVatar', type: 'website', images: images.length ? images : [defaultOgImage()] },

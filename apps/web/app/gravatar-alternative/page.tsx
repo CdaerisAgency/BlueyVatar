@@ -6,7 +6,7 @@ import { exampleMigration, EXAMPLE_GRAVATAR_URL, FAQS, faqJsonLd, GRAVATAR_DOCS 
 
 export const metadata = pageMetadata(
   '/gravatar-alternative',
-  'A Gravatar alternative on atproto | BlueyVatar',
+  'A Gravatar alternative on atproto',
   'How BlueyVatar matches the Gravatar avatar URL shape and where it differs: atproto storage, rating mapping, and size caps by plan.',
 )
 
