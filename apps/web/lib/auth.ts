@@ -7,6 +7,7 @@ import { deviceHint } from './device'
 import { NEXT_COOKIE, loginPath, safeNext } from './next-path'
 import { PUBLIC_URL, clientMetadata } from './oauth'
 import { COOKIE_NAME, SESSION_TTL_MS, parseSession, signSession } from './session-cookie'
+import { oauthRequestLock } from './oauth-lock'
 import { LINK_SESSION_PREFIX, prefixedSessionStore } from './oauth-stores'
 import { getStore } from './store'
 
@@ -22,6 +23,7 @@ async function buildClient(sessionStore: NodeOAuthClientOptions['sessionStore'])
     keyset: [await JoseKey.fromJWK(raw)],
     stateStore: getStore().oauthState,
     sessionStore,
+    requestLock: oauthRequestLock,
     allowHttp: PUBLIC_URL.startsWith('http://localhost'),
   })
 }

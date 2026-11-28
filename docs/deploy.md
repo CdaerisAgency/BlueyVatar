@@ -30,3 +30,4 @@ This page is an index. Each topic lives in its own file under `docs/deploy/`. A 
 - [Provisioned resources](deploy/provisioned-resources-v1.md)
 - [Account data deletion and billing retention](deploy/account-data-deletion-v1.md)
 - [Avatar push permission](deploy/avatar-push-permission-v1.md)
+- [TOKEN_ENCRYPTION_KEY and sign-outs](deploy/token-encryption-key-v1.md)
