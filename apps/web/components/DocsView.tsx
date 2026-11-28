@@ -7,7 +7,8 @@ export function DocsView({ page, hub = false }: { page: DocPage; hub?: boolean }
   const api = docPages().filter((p) => p.group === 'api')
   const guides = docPages().filter((p) => p.group === 'integrations')
   // The hub goes after the page h1 and its intro paragraph, above the API sections, so headings stay in order.
-  const cut = hub ? page.html.indexOf('</p>') + 4 : 0
+  const end = page.html.indexOf('</p>')
+  const cut = hub && end >= 0 ? end + 4 : 0
   const [head, rest] = [page.html.slice(0, cut), page.html.slice(cut)]
   const side = 'inline-flex min-h-11 items-center text-bv-black no-underline hover:text-bv-blue hover:underline'
   return (
@@ -68,7 +69,7 @@ export function DocsView({ page, hub = false }: { page: DocPage; hub?: boolean }
                 ))}
               </ul>
             </section>
-          <div dangerouslySetInnerHTML={{ __html: rest }} />
+            <div dangerouslySetInnerHTML={{ __html: rest }} />
           </>
         ) : (
           <div dangerouslySetInnerHTML={{ __html: page.html }} />

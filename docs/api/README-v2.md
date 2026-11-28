@@ -1,6 +1,6 @@
 # BlueyVatar delivery API reference (v1)
 
-The delivery API serves avatars and profile JSON. The proposed delivery host is `https://img.blueyvatar.com`. This host is not final, so write it as a configurable base URL in your client and expect the docs to name the final host before launch. All paths in these pages are relative to that base URL.
+The delivery API serves avatars and profile JSON. The delivery host is `https://img.blueyvatar.com`. All paths in these pages are relative to it.
 
 | Page | Covers |
 | --- | --- |

@@ -20,8 +20,8 @@ describe('integration guides', () => {
     }
   })
 
-  it('each new guide has the five sections', () => {
-    for (const name of NEW_GUIDES) {
+  it('each guide has the five sections', () => {
+    for (const name of ALL_GUIDES) {
       const headings = [...read(name).matchAll(/^## (.+)$/gm)].map((m) => m[1])
       for (const h of ['What you change', 'Steps', 'Check it worked', 'Without a BlueyVatar avatar', 'Limits']) {
         expect(headings, `${name} needs "${h}"`).toContain(h)

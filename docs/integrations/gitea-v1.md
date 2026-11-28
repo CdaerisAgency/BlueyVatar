@@ -20,7 +20,7 @@ The Gravatar source setting in `app.ini`, or the same setting in the Admin Panel
 3. Leave federated avatar mode off. It relies on DNS discovery that BlueyVatar does not offer yet.
 4. Restart Gitea.
 
-Current Gitea sends a SHA-256 hash of the email, and it adds `s=` for the size. BlueyVatar accepts both MD5 and SHA-256, so any Gitea version works for every linked email ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)).
+Current Gitea sends SHA-256, which works for every linked email. If your Gitea version sends MD5, each person verifies their email on BlueyVatar once ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)). Gitea also adds `s=` for the size.
 
 ## Check it worked
 

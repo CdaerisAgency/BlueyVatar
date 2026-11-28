@@ -21,7 +21,7 @@ Redmine builds `<avatar_server_url>/avatar/<hash>` and adds `r`, `s` and `d` onl
 
 ## Check it worked
 
-Open a user's page or an issue they commented on. Right-click the avatar, copy the image address, and confirm it starts with `https://img.blueyvatar.com/avatar/`.
+Open a user's page or an issue they commented on, for someone who has a verified email on BlueyVatar. Right-click the avatar, copy the image address, and confirm it starts with `https://img.blueyvatar.com/avatar/`. The image should be their BlueyVatar avatar.
 
 ## Without a BlueyVatar avatar
 
