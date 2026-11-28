@@ -2,7 +2,7 @@
   "name": "@blueyvatar/hovercards",
   "version": "0.1.0",
   "private": false,
-  "description": "Embeddable BlueyVatar hovercards. Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing.",
+  "description": "Embeddable BlueyVatar hovercards. Requires a publishable key. Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing.",
   "keywords": [
     "hovercard",
     "avatar",
