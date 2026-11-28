@@ -70,7 +70,7 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
     const picked = pickCandidate(await deps.resolver.candidates(identity), 'g', false)
     // Attested claims only. The Free tier cap applies to the JSON (spec section 11.1); the
     // oldest verifications are kept. Hidden accounts stay in the list with hidden: true.
-    const cap = entitlementsFor(e.tier).maxVerifiedAccountsInJson
+    const cap = entitlementsFor(e.tier, deps.settings.current()).maxVerifiedAccountsInJson
     const verified = await deps.index.verifiedAccounts(identity.did)
     const atprotoApps = (await deps.resolver.repoApps?.(identity).catch(() => [])) ?? []
     // Gallery images are a Plus user feature (spec section 11.2). They follow the avatar rules:

@@ -75,6 +75,17 @@ describe('over-limit', () => {
     expect(res.status).toBe(404)
     expect(res.headers.get('x-over-limit')).toBe('1')
     expect(res.headers.get('retry-after')).toBeTruthy()
+    const normal = await overLimitApp({ anonymousDaily: 100 }).request('/u/nobody.test?d=404', { headers: hdr })
+    expect(normal.status).toBe(404)
+    expect(await res.text()).toBe(await normal.text())
+    expect(res.headers.get('content-type')).toBe(normal.headers.get('content-type'))
+  })
+
+  it('json over limit with d=404 still returns 429 JSON', async () => {
+    const res = await second(overLimitApp(), '?s=200&json=true&d=404')
+    expect(res.status).toBe(429)
+    expect(res.headers.get('content-type')).toContain('json')
+    expect(res.headers.get('location')).toBeNull()
   })
 
   it('over limit ignores d styles and URLs', async () => {
