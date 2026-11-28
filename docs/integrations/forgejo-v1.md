@@ -20,7 +20,7 @@ The Gravatar source setting in `app.ini`, or the same setting in the Admin Panel
 3. Leave federated avatar mode off. It relies on DNS discovery that BlueyVatar does not offer yet.
 4. Restart Forgejo.
 
-Forgejo sends an MD5 hash of the email. BlueyVatar accepts MD5 only for emails verified after migration 0006, so each person must verify their email on BlueyVatar first ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)).
+Forgejo sends an MD5 hash of the email, and it adds `s=` for the size. BlueyVatar accepts both MD5 and SHA-256, so any version works once the person has verified their email on BlueyVatar ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)).
 
 ## Check it worked
 
@@ -28,7 +28,7 @@ Open a user profile on your Forgejo for someone who has a verified email on Blue
 
 ## Without a BlueyVatar avatar
 
-Forgejo adds `d=identicon` to the request. A person with no BlueyVatar avatar, or whose email is not verified on BlueyVatar, sees a generated identicon pattern instead of a broken image.
+Forgejo adds `d=identicon` to the request it builds from `GRAVATAR_SOURCE`. A person with no BlueyVatar avatar, or whose email is not verified on BlueyVatar, sees a generated identicon pattern instead of a broken image.
 
 ## Limits
 

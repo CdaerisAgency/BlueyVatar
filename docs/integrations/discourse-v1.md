@@ -15,7 +15,7 @@ How BlueyVatar answers that request:
 
 ## Set it
 
-The setting is hidden, so it does not appear in the admin settings list. Use either of these two ways on the server. The value is a host name with no `https://` and no trailing slash, because Discourse adds the scheme and path itself. The base host is a placeholder until the final delivery host is announced.
+The setting is hidden, so it does not appear in the admin settings list. Use one of these two ways on the server. The environment variable in `app.yml` is the durable option and survives rebuilds. The console is the immediate one. The value is a host name with no `https://` and no trailing slash, because Discourse adds the scheme and path itself.
 
 ### Option 1: Rails console
 
@@ -31,7 +31,7 @@ rails c
 SiteSetting.gravatar_base_url = "img.blueyvatar.com"
 ```
 
-The change applies at once. Type `exit` to leave the console, then `exit` again to leave the container.
+The change applies at once, but a later rebuild with `DISCOURSE_GRAVATAR_BASE_URL` set overrides it, so pick one option. Type `exit` to leave the console, then `exit` again to leave the container.
 
 ### Option 2: app.yml
 
@@ -42,7 +42,7 @@ env:
   DISCOURSE_GRAVATAR_BASE_URL: img.blueyvatar.com
 ```
 
-Then rebuild so the container picks it up:
+The variable overrides a value set in the console. Rebuild so the container picks it up:
 
 ```sh
 cd /var/discourse
@@ -53,7 +53,7 @@ Two related hidden settings, `gravatar_name` and `gravatar_login_url`, exist in 
 
 ## Check it worked
 
-Ask a test user with a verified BlueyVatar email to refresh their avatar from their Discourse preferences, then open their profile. The avatar should be their BlueyVatar image. Discourse stores the image as an upload, so the image address on the page belongs to your own forum, not to `img.blueyvatar.com`.
+Once any rebuild has finished, ask a test user with a verified BlueyVatar email to refresh their avatar from their Discourse preferences, then open their profile. The avatar should be their BlueyVatar image. Discourse stores the image as an upload, so the image address on the page points at your own forum's uploads.
 
 ## Discourse stores the avatar once
 
@@ -69,4 +69,3 @@ Discourse sends `d=404` in its request. A person with no BlueyVatar avatar, or w
 - A large forum downloads every avatar from one server, so all those requests come from a single place. BlueyVatar's limits are set by its administrators and can change. Ask the owner to use the site's own limit, or contact support. See [pricing](https://blueyvatar.com/pricing).
 - This was written from the Discourse source and has not been run against a live forum. Try it on a staging forum first.
 
-Spec reference: section 3 row 8, "switch by changing a base URL".

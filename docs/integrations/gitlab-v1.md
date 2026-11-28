@@ -16,8 +16,8 @@ The Gravatar URL templates in your GitLab configuration. GitLab fills in `%{hash
    ```
 
    If you edit `gitlab.yml` instead, the keys are `gravatar.plain_url` and `gravatar.ssl_url`.
-2. Reconfigure GitLab so the change takes effect, for example `sudo gitlab-ctl reconfigure`.
-3. Keep Gravatar enabled in GitLab's settings. The URLs above replace where GitLab fetches from.
+2. Run `sudo gitlab-ctl reconfigure` so the change takes effect. If you edited `gitlab.yml` on a source install, restart GitLab instead.
+3. In Admin > Settings > General > Account and limit, make sure "Gravatar enabled" is on.
 
 Current GitLab versions send a SHA-256 hash of the email, which BlueyVatar accepts.
 

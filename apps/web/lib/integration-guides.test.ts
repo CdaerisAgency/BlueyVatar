@@ -29,7 +29,7 @@ describe('integration guides', () => {
     }
   })
 
-  it('guides use no em-dashes and no plan numbers in Limits', () => {
+  it('guides use no em-dashes and Limits has no digits', () => {
     for (const name of ALL_GUIDES) expect(read(name)).not.toContain('\u2014')
   })
 })
