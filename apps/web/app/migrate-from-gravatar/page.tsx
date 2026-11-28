@@ -12,8 +12,8 @@ export const metadata = pageMetadata(
   'Four steps: sign in, link your email, import your image, and change the base URL in your site. Includes copy-ready snippets.',
 )
 
-/** The FAQ quotes admin-editable size caps, so the page re-renders at most every five minutes. */
-export const revalidate = 300
+/** The FAQ quotes admin-editable size caps, so the page renders per request (not ISR: see app/pricing/page.tsx). */
+export const dynamic = 'force-dynamic'
 
 export default async function MigratePage() {
   const ex = exampleMigration()

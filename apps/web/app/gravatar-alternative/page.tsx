@@ -11,8 +11,8 @@ export const metadata = pageMetadata(
   'How BlueyVatar matches the Gravatar avatar URL shape and where it differs: atproto storage, rating mapping, and size caps by plan.',
 )
 
-/** Size caps are admin-editable, so the page re-renders at most every five minutes. */
-export const revalidate = 300
+/** Size caps are admin-editable, so the page renders per request (not ISR: see app/pricing/page.tsx). */
+export const dynamic = 'force-dynamic'
 
 export default async function GravatarAlternativePage() {
   const ex = exampleMigration()

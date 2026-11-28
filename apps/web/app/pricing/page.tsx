@@ -5,8 +5,11 @@ import { pageMetadata, pricingDescription } from '../../lib/site'
 
 export const metadata = pageMetadata('/pricing', 'Pricing', pricingDescription())
 
-/** Limits are admin-editable, so the page re-renders at most every five minutes. */
-export const revalidate = 300
+/**
+ * Limits are admin-editable and read from the in-process settings cache, so the page renders per request. Not ISR:
+ * `revalidate` sends stale-while-revalidate, which lets browsers serve the page and its link prefetches stale.
+ */
+export const dynamic = 'force-dynamic'
 
 export default async function PricingPage() {
   const settings = await getSiteSettings()
