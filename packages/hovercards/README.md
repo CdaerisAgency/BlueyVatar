@@ -2,9 +2,20 @@
 
 Hovercards for BlueyVatar profiles. Hover or focus an element with `data-blueyvatar` and a small card shows the person's name, role, location, and linked accounts. If the person set a background color, the card uses it, with dark or white text chosen for a 4.5 to 1 contrast ratio (the default colors apply when neither passes). Accounts the person chose to hide are never shown.
 
-Hovercards require a publishable key (`pk_...`) from a Plus, Business, or Enterprise license.
+## Quick start
 
-Status: version 0.1.0 is not published yet. Publishing to npm is a later manual step. Until then, use the script served by the web app at `/embed/hovercard.js`, which is built from this package.
+```sh
+npm install @blueyvatar/hovercards
+```
+
+```js
+import { init } from '@blueyvatar/hovercards'
+
+const stop = init({ key: 'pk_...' }) // call stop() to remove the listeners
+// then mark any element: <img data-blueyvatar="alice.example.com" alt="Alice">
+```
+
+Or `import '@blueyvatar/hovercards/auto'` to read `data-key` from the page's script tag. Hovercards require a publishable key (`pk_...`). Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing. Guides: https://blueyvatar.com/docs.
 
 ## Embed
 
@@ -18,7 +29,7 @@ Script tag (module):
 
 The value of `data-blueyvatar` is a handle, a DID, or an email hash. Optional `data-api` sets the delivery origin (default: the script's origin). The classic form `<script src="..." data-token="pk_..." defer>` still works.
 
-From npm, once published:
+From npm:
 
 ```js
 import { init } from '@blueyvatar/hovercards'
