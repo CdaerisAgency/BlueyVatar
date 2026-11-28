@@ -271,10 +271,10 @@ export default function BugReport() {
               {errFor('contact') && <p id={`${ids}-contact-err`} role="alert" className="mt-1 mb-0 text-[14px] font-semibold text-bv-orange-deep">{errFor('contact')}</p>}
             </div>
 
-            <div className="flex items-start gap-3">
-              <input id={`${ids}-handle`} type="checkbox" className="mt-1 size-5" checked={includeHandle} onChange={(e) => setIncludeHandle(e.target.checked)} />
-              <label htmlFor={`${ids}-handle`}>Include my handle in the issue. Without it the issue says only that a signed-in account sent it.</label>
-            </div>
+            <label className="flex min-h-11 items-center gap-3">
+              <input id={`${ids}-handle`} type="checkbox" className="size-5 shrink-0" checked={includeHandle} onChange={(e) => setIncludeHandle(e.target.checked)} />
+              <span>Include my handle in the issue. Without it the issue says only that a signed-in account sent it.</span>
+            </label>
 
             <fieldset className="m-0 grid gap-2 border-0 p-0">
               <legend className="mb-1 p-0 font-semibold">Screenshot <span className="font-normal text-bv-ink-3">(optional)</span></legend>
@@ -319,7 +319,7 @@ export default function BugReport() {
             </div>
 
             <details className="text-[15px]">
-              <summary className="cursor-pointer font-semibold">What is sent with this report</summary>
+              <summary className="cursor-pointer py-3 font-semibold">What is sent with this report</summary>
               <ul className="mt-2 mb-0 pl-5">
                 {summary.map((s) => <li key={s}>{s}</li>)}
               </ul>
