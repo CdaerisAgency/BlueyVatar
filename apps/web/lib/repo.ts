@@ -47,13 +47,31 @@ export class RepoError extends Error {}
 /** The stored link to the person's atproto account cannot be restored. They need to sign in again. */
 export class SessionExpiredError extends RepoError {}
 
+/**
+ * The non-secret facts about why a restore failed: the class names (atproto errors do not set `name`) and the HTTP
+ * status and OAuth error code (for example invalid_grant) when the error or its cause carries them. Never the message
+ * or description, which can hold token fragments.
+ */
+function restoreCause(err: unknown): Record<string, string | number | undefined> {
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length <= 64 ? v : undefined)
+  const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined)
+  const cls = (v: unknown): string => (typeof v === 'object' && v !== null ? (v.constructor?.name ?? 'object') : typeof v)
+  const e = (typeof err === 'object' && err !== null ? err : {}) as { status?: unknown; error?: unknown; cause?: unknown }
+  const c = (typeof e.cause === 'object' && e.cause !== null ? e.cause : {}) as { status?: unknown; error?: unknown }
+  return {
+    errorName: cls(err),
+    causeName: e.cause === undefined ? undefined : cls(e.cause),
+    status: num(e.status) ?? num(c.status),
+    error: str(e.error) ?? str(c.error),
+  }
+}
+
 /** Restores the stored OAuth session for the signed-in DID. Throws RepoError if it is gone. */
 export async function repoSession(did: string): Promise<OAuthSession> {
   try {
     return await (await oauthClient()).restore(did)
   } catch (err) {
-    // Class name only: the message can carry token fragments.
-    log.warn('oauth restore failed', { did, errorName: err instanceof Error ? err.name : typeof err })
+    log.warn('oauth restore failed', { did, ...restoreCause(err) })
     throw new SessionExpiredError(COPY.session.expired)
   }
 }

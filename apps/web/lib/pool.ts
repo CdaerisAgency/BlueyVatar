@@ -10,6 +10,20 @@ export function getPool(): pg.Pool | null {
 }
 
 /**
+ * A small separate pool for OAuth request locks (lib/oauth-lock.ts), or null without DATABASE_URL. A lock holder keeps
+ * its connection while the session store works on the main pool, so the two must never share connections.
+ */
+export function getLockPool(): pg.Pool | null {
+  if (!process.env.DATABASE_URL) return null
+  g.__bvLockPool ??= new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.OAUTH_LOCK_POOL_MAX) || 4,
+    connectionTimeoutMillis: 3000,
+  })
+  return g.__bvLockPool as pg.Pool
+}
+
+/**
  * One instance per process, kept on globalThis under `key` so dev hot reload reuses it.
  * Postgres when DATABASE_URL is set, otherwise in-memory (dev only, lost on restart).
  */

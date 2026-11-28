@@ -32,4 +32,18 @@ describe('repoSession', () => {
     expect(ctx.errorName).toBe('Error')
     expect(JSON.stringify(warn.mock.calls[0])).not.toContain('token=abc')
   })
+
+  it('logs the class name, cause class, status and OAuth code, never the message', async () => {
+    class TokenRefreshError extends Error {}
+    class OAuthResponseError extends Error {
+      status = 400
+      error = 'invalid_grant'
+      errorDescription = 'refresh token secret=zzz'
+    }
+    restore.mockRejectedValue(new TokenRefreshError('refresh token=abc', { cause: new OAuthResponseError('bad') }))
+    await repoSession('did:plc:x').catch(() => {})
+    const [, ctx] = warn.mock.calls[0] as [string, Record<string, unknown>]
+    expect(ctx).toMatchObject({ did: 'did:plc:x', errorName: 'TokenRefreshError', causeName: 'OAuthResponseError', status: 400, error: 'invalid_grant' })
+    expect(JSON.stringify(warn.mock.calls[0])).not.toMatch(/token=abc|secret=zzz/)
+  })
 })
