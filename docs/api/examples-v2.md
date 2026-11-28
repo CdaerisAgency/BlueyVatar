@@ -1,6 +1,6 @@
 # Copy-paste examples (v1)
 
-All examples use the proposed delivery host `https://img.blueyvatar.com`. Keep it in one configurable constant. The machine-readable description is at [`/openapi.json`](https://img.blueyvatar.com/openapi.json).
+All examples use the delivery host `https://img.blueyvatar.com`. Keep it in one configurable constant. The machine-readable description is at [`/openapi.json`](https://img.blueyvatar.com/openapi.json).
 
 Compute the hash on the client. See [hashing-v1.md](hashing-v1.md).
 
