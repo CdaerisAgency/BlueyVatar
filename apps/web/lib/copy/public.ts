@@ -1,4 +1,7 @@
-/** Copy for the public pages. Prices are not here. They come from ../pricing.ts. */
+import type { SiteSettings } from '@blueyvatar/core/settings'
+import { formatVolume } from '../format-volume'
+
+/** Copy for the public pages. Prices are not here. They come from ../pricing.ts. Limits come from admin settings, see planBodies(). */
 export const PUBLIC_COPY = {
   nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in' },
   hero: {
@@ -35,9 +38,9 @@ export const PUBLIC_COPY = {
     badge: 'Most popular',
     perMonth: '/mo',
     tiers: {
-      free: { body: '1,000 requests a day. Enough for a personal site or a side project.', cta: 'Get a key' },
-      plus: { body: 'Everything in Free, plus 20 avatar images, a profile gallery, a custom profile domain, up to 20 linked accounts, 50,000 requests a month, hovercards, and priority cache warming.', cta: 'Start Plus' },
-      business: { body: 'Everything in Plus, plus 1 million requests a month, custom domains, and a support contact.', cta: 'Start Business' },
+      free: { cta: 'Get a key' },
+      plus: { cta: 'Start Plus' },
+      business: { cta: 'Start Business' },
     },
   },
   // Only destinations that exist today. Add Status and Terms here when those pages ship.
@@ -70,3 +73,12 @@ export const PUBLIC_COPY = {
   notFound: { title: 'Page not found', body: 'That page does not exist.', home: 'Back to home' },
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const
+
+/** The plan card lines. The request limits are the live admin-set values. */
+export function planBodies(s: SiteSettings): { free: string; plus: string; business: string } {
+  return {
+    free: `${formatVolume(s.keyedDaily.free)} requests a day. Enough for a personal site or a side project.`,
+    plus: `Everything in Free, plus 20 avatar images, a profile gallery, a custom profile domain, up to 20 linked accounts, ${formatVolume(s.keyedMonthly.plus)} requests a month, hovercards, and priority cache warming.`,
+    business: `Everything in Plus, plus ${formatVolume(s.keyedMonthly.business)} requests a month, custom domains, and a support contact.`,
+  }
+}

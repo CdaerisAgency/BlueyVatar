@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from '@blueyvatar/core/settings'
 import { describe, expect, it } from 'vitest'
 import { alertState, checkKeyLimit, displayPrefix, generateKey, hashKey, historyPeriods, parseDomainList, validateDomain } from './keys'
 import { parseVisibilityForm } from './visibility'
@@ -52,6 +53,10 @@ describe('keys', () => {
     expect(alertState('plus', 40_000)).toBe('warn80')
     expect(alertState('plus', 50_000)).toBe('over100')
     expect(alertState('free', 5)).toBe('n/a')
+    const live = structuredClone(DEFAULT_SETTINGS)
+    live.keyedMonthly.plus = 100_000
+    expect(alertState('plus', 50_000, live)).toBe('ok')
+    expect(alertState('plus', 80_000, live)).toBe('warn80')
   })
 })
 

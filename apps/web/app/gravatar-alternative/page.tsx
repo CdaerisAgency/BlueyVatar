@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { PageMain, TableBox } from '../../components/Page'
 import { pageMetadata } from '../../lib/site'
 import { jsonLdString } from '../../lib/seo'
-import { exampleMigration, EXAMPLE_GRAVATAR_URL, FAQS, faqJsonLd, GRAVATAR_DOCS } from '../../lib/gravatar-pages'
+import { getSiteSettings } from '../../lib/site-settings'
+import { exampleMigration, EXAMPLE_GRAVATAR_URL, faqsFor, faqJsonLd, GRAVATAR_DOCS, sizeCapsText } from '../../lib/gravatar-pages'
 
 export const metadata = pageMetadata(
   '/gravatar-alternative',
@@ -10,8 +11,13 @@ export const metadata = pageMetadata(
   'How BlueyVatar matches the Gravatar avatar URL shape and where it differs: atproto storage, rating mapping, and size caps by plan.',
 )
 
-export default function GravatarAlternativePage() {
+/** Size caps are admin-editable, so the page re-renders at most every five minutes. */
+export const revalidate = 300
+
+export default async function GravatarAlternativePage() {
   const ex = exampleMigration()
+  const settings = await getSiteSettings()
+  const faqs = faqsFor(settings)
   return (
     <PageMain>
       <h1>A Gravatar alternative on atproto</h1>
@@ -55,7 +61,7 @@ export default function GravatarAlternativePage() {
           <tbody>
             <tr><td>Storage</td><td>Your atproto repository. The image and profile live in an account you own.</td></tr>
             <tr><td>Ratings</td><td>Mapped from atproto self-labels so an image rates the same in both places. The definitions are BlueyVatar&apos;s own and can differ from the ones on Gravatar&apos;s pages.</td></tr>
-            <tr><td>Size caps</td><td>Free 512, Plus 1024, Business and Enterprise 2048. Larger values are clamped and reported in the <code>x-adjusted-params</code> header.</td></tr>
+            <tr><td>Size caps</td><td>{sizeCapsText(settings)}. Larger values are clamped and reported in the <code>x-adjusted-params</code> header.</td></tr>
             <tr><td>Image count</td><td>Free 3 images, Plus 20.</td></tr>
             <tr><td>Custom default URL</td><td>HTTPS only, on the service allowlist, with a Plus key or higher.</td></tr>
             <tr><td>Email input</td><td>SHA-256 or MD5 hash only. A raw email is always rejected.</td></tr>
@@ -72,7 +78,7 @@ export default function GravatarAlternativePage() {
 
       <h2>Questions</h2>
       <ul aria-label="Frequently asked questions">
-        {FAQS.map((f) => (
+        {faqs.map((f) => (
           <li key={f.q}>
             <h3>{f.q}</h3>
             <p>{f.a}</p>
@@ -80,7 +86,7 @@ export default function GravatarAlternativePage() {
         ))}
       </ul>
       <p>Gravatar is a name that belongs to its owner. Statements about Gravatar come from its own documentation, linked above.</p>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd(faqs)) }} />
     </PageMain>
   )
 }

@@ -1,4 +1,5 @@
 /** Shared content for /gravatar-alternative and /migrate-from-gravatar (issue #181). Facts about Gravatar cite Gravatar's own documentation only. */
+import { DEFAULT_SETTINGS, type SiteSettings } from '@blueyvatar/core/settings'
 import { avatarUrl, fromGravatarUrl, DEFAULT_BASE_URL } from '@blueyvatar/avatar'
 
 /** Gravatar documentation pages cited on the site. */
@@ -19,7 +20,15 @@ export function exampleMigration() {
 
 export interface Faq { q: string; a: string }
 
-export const FAQS: readonly Faq[] = [
+/** The size caps by plan, as the live admin-set values. Enterprise is fixed. */
+export function sizeCapsText(s: SiteSettings): string {
+  const m = s.maxSize
+  return `Free ${m.free}, Plus ${m.plus}, Business ${m.business}, Enterprise 2048`
+}
+
+export function faqsFor(s: SiteSettings): readonly Faq[] {
+  const { free, plus, business } = s.maxSize
+  return [
   {
     q: 'Does my existing image URL keep working if I only change the host?',
     a: 'For the common parameters, yes. Gravatar documents an avatar URL of the form gravatar.com/avatar/HASH with size, default, rating, and force-default parameters. BlueyVatar accepts the same parameters on /avatar/{hash}. Sizes above your plan cap are clamped and reported in a response header.',
@@ -38,7 +47,7 @@ export const FAQS: readonly Faq[] = [
   },
   {
     q: 'Are there size limits?',
-    a: 'Sizes run from 1 to 2048 pixels on Business and Enterprise. Free is capped at 512 and Plus at 1024. Gravatar documents a range of 1 to 2048 pixels.',
+    a: `Sizes run from 1 to ${business} pixels on Business${business === 2048 ? ' and Enterprise' : ', and 1 to 2048 on Enterprise'}. Free is capped at ${free} and Plus at ${plus}. Gravatar documents a range of 1 to 2048 pixels.`,
   },
   {
     q: 'Do ratings map one to one?',
@@ -52,7 +61,10 @@ export const FAQS: readonly Faq[] = [
     q: 'Is BlueyVatar affiliated with Gravatar?',
     a: 'No. Gravatar is a name that belongs to its owner. This page describes how BlueyVatar works and links to Gravatar documentation for facts about Gravatar.',
   },
-]
+  ]
+}
+
+export const FAQS: readonly Faq[] = faqsFor(DEFAULT_SETTINGS)
 
 export function faqJsonLd(faqs: readonly Faq[] = FAQS): Record<string, unknown> {
   return {

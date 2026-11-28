@@ -1,12 +1,15 @@
+import type { SiteSettings } from '@blueyvatar/core/settings'
 import { COPY } from '../lib/copy'
+import { planBodies } from '../lib/copy/public'
 import { PRICING, formatPrice } from '../lib/pricing'
 import PricingButton from './PricingButton'
 import { SectionTitle } from './Type'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
-/** The price cards. Prices come from lib/pricing.ts only. */
-export function PricingSection({ headingAs = 'h2' }: { headingAs?: 'h1' | 'h2' }) {
+/** The price cards. Prices come from lib/pricing.ts only. Request limits come from the live admin settings. */
+export function PricingSection({ settings, headingAs = 'h2' }: { settings: SiteSettings; headingAs?: 'h1' | 'h2' }) {
+  const bodies = planBodies(settings)
   // Tier names sit one level below the section title so headings never skip a level.
   const Tier = headingAs === 'h1' ? 'h2' : 'h3'
   return (
@@ -32,7 +35,7 @@ export function PricingSection({ headingAs = 'h2' }: { headingAs?: 'h1' | 'h2' }
                 {formatPrice(t.amount)}
                 {t.per && <small className="font-sans text-lg font-normal text-bv-ink-3">{COPY.pricing.perMonth}</small>}
               </span>
-              <p className="m-0">{COPY.pricing.tiers[t.id].body}</p>
+              <p className="m-0">{bodies[t.id]}</p>
               <PricingButton tier={t.id} highlighted={!!t.highlighted}>
                 {COPY.pricing.tiers[t.id].cta}
               </PricingButton>

@@ -1,10 +1,11 @@
 import { COPY } from '../../../lib/copy'
 import { PageHeader, PageMain, Section } from '../../../components/Page'
 import { SignedInAs } from '../../../components/SignedInAs'
-import { ENTITLEMENTS } from '@blueyvatar/core'
+import { entitlementsFor } from '@blueyvatar/core'
 import Link from 'next/link'
 import { requireDid } from '../../../lib/auth'
 import { getDashboardStore } from '../../../lib/dashboard-store'
+import { getSiteSettings } from '../../../lib/site-settings'
 import { checkKeyLimit } from '../../../lib/keys'
 import { isExpired } from '../../../lib/key-expiry'
 import { isScope, resolveScope } from '../../../lib/orgs/scope'
@@ -30,7 +31,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
   const org = orgId ? await getOrganization(getPool()!, orgId) : null
   const keys = await store.listKeys(license.licenseId)
   const now = new Date()
-  const ent = ENTITLEMENTS[license.tier]
+  const ent = entitlementsFor(license.tier, await getSiteSettings())
   const active = keys.filter((k) => !k.revokedAt && !isExpired(k.expiresAt, now))
   const activeKeys = active.map((k) => ({ hash: k.hash, kind: k.kind }))
   const canPub = checkKeyLimit(license.tier, 'publishable', activeKeys).ok

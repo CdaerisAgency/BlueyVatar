@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { entitlementsFor, type Tier } from '@blueyvatar/core'
+import type { SiteSettings } from '@blueyvatar/core/settings'
 
 export type KeyKind = 'secret' | 'publishable'
 
@@ -111,8 +112,8 @@ export { historyPeriods, includedVolume, periodStartOf, type Included } from '@b
 export type AlertState = 'ok' | 'warn80' | 'over100' | 'n/a'
 
 /** Alert thresholds are monthly (spec section 12), so only monthly-included tiers have one. */
-export function alertState(tier: Tier | string, used: number): AlertState {
-  const inc = entitlementsFor(tier).keyedMonthly
+export function alertState(tier: Tier | string, used: number, settings?: SiteSettings): AlertState {
+  const inc = entitlementsFor(tier, settings).keyedMonthly
   if (!inc) return 'n/a'
   if (used >= inc) return 'over100'
   return used >= inc * 0.8 ? 'warn80' : 'ok'
