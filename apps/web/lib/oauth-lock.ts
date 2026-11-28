@@ -1,12 +1,22 @@
 import type { RuntimeLock } from '@atproto/oauth-client-node'
 import type pg from 'pg'
-import { log } from './obs'
 import { getLockPool } from './pool'
 
 const g = globalThis as { __bvOauthLocks?: Map<string, Promise<unknown>> }
 
-/** How long to wait for another holder of the same lock before running without it. */
-const LOCK_WAIT = '5s'
+/**
+ * How long to wait for another holder of the same lock. The OAuth client holds it for at most 30 s (its refresh
+ * timeout), so 35 s means a waiter never gives up on a live holder. Running without the lock is not an option: the
+ * client then refreshes with a token another caller just used, gets invalid_grant, and deletes the stored session.
+ */
+const LOCK_WAIT = '35s'
+
+/** The lock could not be had (pool busy or holder stuck). The session is fine, and fn was not run. */
+export class OAuthLockUnavailableError extends Error {
+  constructor(reason: 'connect' | 'lock', cause: unknown) {
+    super(`OAuth lock unavailable (${reason})`, { cause })
+  }
+}
 
 /** In-process fallback for local dev with no DATABASE_URL: one promise chain per name. */
 function inProcess<T>(name: string, fn: () => T | PromiseLike<T>): Promise<T> {
@@ -24,34 +34,48 @@ function inProcess<T>(name: string, fn: () => T | PromiseLike<T>): Promise<T> {
   return run
 }
 
-/** Takes a session level advisory lock on a client from the dedicated lock pool. Returns null if it cannot be had in time. */
-async function acquire(pool: pg.Pool, key: string): Promise<pg.PoolClient | null> {
+type Held = { client: pg.PoolClient; broken: () => boolean; detach: () => void }
+
+/** Takes a session level advisory lock on a client from the dedicated lock pool. Throws OAuthLockUnavailableError. */
+async function acquire(pool: pg.Pool, key: string): Promise<Held> {
   let client: pg.PoolClient
   try {
     client = await pool.connect()
   } catch (err) {
-    log.warn('oauth lock unavailable', { reason: 'connect', errorName: err instanceof Error ? err.constructor.name : typeof err })
-    return null
+    throw new OAuthLockUnavailableError('connect', err)
   }
+  // The pool drops its own error listener while a client is checked out. Without one, a dropped connection would
+  // crash the process.
+  let failed = false
+  const onError = (): void => {
+    failed = true
+  }
+  client.on('error', onError)
+  const held: Held = { client, broken: () => failed, detach: () => client.removeListener('error', onError) }
   try {
     await client.query(`SET lock_timeout = '${LOCK_WAIT}'`)
     await client.query('SELECT pg_advisory_lock(hashtext($1))', [key])
-    return client
+    return held
   } catch (err) {
-    log.warn('oauth lock unavailable', { reason: 'lock', errorName: err instanceof Error ? err.constructor.name : typeof err })
+    held.detach()
     client.release(true)
-    return null
+    throw new OAuthLockUnavailableError('lock', err)
   }
 }
 
-async function release(client: pg.PoolClient, key: string): Promise<void> {
-  try {
-    await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key])
-    client.release()
-  } catch {
-    // A session level lock must not stay on a pooled connection, so drop the connection.
-    client.release(true)
+async function release(held: Held, key: string): Promise<void> {
+  const { client } = held
+  let destroy = held.broken()
+  if (!destroy) {
+    try {
+      await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key])
+    } catch {
+      destroy = true
+    }
   }
+  held.detach()
+  // A session level lock must not stay on a pooled connection, so a failed or broken one is dropped, which frees it.
+  client.release(destroy)
 }
 
 /**
@@ -61,18 +85,17 @@ async function release(client: pg.PoolClient, key: string): Promise<void> {
  *
  * With a database the lock is a Postgres advisory lock named `oauth-lock:<library name>`, shared by every machine.
  * It is taken on a dedicated small pool (OAUTH_LOCK_POOL_MAX), so a holder never uses a connection the session
- * store needs. If the lock cannot be had within a few seconds, `fn` runs without it: the old unlocked behavior is
- * better than failing the request. Without a database the lock serializes within this process.
+ * store needs. If the lock cannot be had in time, this throws OAuthLockUnavailableError and does not run `fn`.
+ * Without a database the lock serializes within this process.
  */
 export const oauthRequestLock: RuntimeLock = async <T>(name: string, fn: () => T | PromiseLike<T>): Promise<T> => {
   const pool = getLockPool()
   if (!pool) return inProcess(name, fn)
   const key = `oauth-lock:${name}`
-  const client = await acquire(pool, key)
-  if (!client) return fn()
+  const held = await acquire(pool, key)
   try {
     return await fn()
   } finally {
-    await release(client, key)
+    await release(held, key)
   }
 }

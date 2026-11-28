@@ -5,7 +5,7 @@ vi.mock('./pool', () => ({ getLockPool: () => getLockPool() }))
 const warn = vi.fn()
 vi.mock('./obs', () => ({ log: { warn: (...a: unknown[]) => warn(...a) } }))
 
-import { oauthRequestLock } from './oauth-lock'
+import { OAuthLockUnavailableError, oauthRequestLock } from './oauth-lock'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -16,13 +16,17 @@ function fakePool(max: number, opts: { connectFails?: boolean; lockFails?: boole
   const held = new Map<string, Promise<void>>()
   const released: boolean[] = []
   const queries: string[] = []
+  const clients: { emit: (e: string) => void; listeners: () => number }[] = []
   const pool = {
     connect: async () => {
       if (opts.connectFails) throw new Error('timeout exceeded when trying to connect')
       while (used >= max) await new Promise<void>((r) => waiting.push(r))
       used++
       const mine: (() => void)[] = []
-      return {
+      const handlers = new Set<() => void>()
+      const client = {
+        on: (_e: string, h: () => void) => handlers.add(h),
+        removeListener: (_e: string, h: () => void) => handlers.delete(h),
         query: async (sql: string, params?: unknown[]) => {
           queries.push(sql)
           const key = String(params?.[0])
@@ -42,9 +46,11 @@ function fakePool(max: number, opts: { connectFails?: boolean; lockFails?: boole
           waiting.shift()?.()
         },
       }
+      clients.push({ emit: () => handlers.forEach((h) => h()), listeners: () => handlers.size })
+      return client
     },
   }
-  return { pool, released, queries, inUse: () => used }
+  return { pool, released, queries, clients, inUse: () => used }
 }
 
 describe('oauthRequestLock without a pool', () => {
@@ -141,18 +147,35 @@ describe('oauthRequestLock with a Postgres pool', () => {
     expect(main.inUse()).toBe(0)
   })
 
-  it('runs fn without the lock and logs when the lock pool cannot connect', async () => {
+  it('throws OAuthLockUnavailableError and does not run fn when the lock pool cannot connect', async () => {
     getLockPool.mockReturnValue(fakePool(1, { connectFails: true }).pool)
-    await expect(oauthRequestLock('did:plc:x', () => 'ran')).resolves.toBe('ran')
-    expect(warn).toHaveBeenCalledWith('oauth lock unavailable', expect.objectContaining({ reason: 'connect' }))
+    const fn = vi.fn(() => 'ran')
+    await expect(oauthRequestLock('did:plc:x', fn)).rejects.toBeInstanceOf(OAuthLockUnavailableError)
+    expect(fn).not.toHaveBeenCalled()
   })
 
-  it('runs fn without the lock, drops the connection and logs when lock_timeout fires', async () => {
+  it('throws OAuthLockUnavailableError, does not run fn and drops the connection when lock_timeout fires', async () => {
     const f = fakePool(1, { lockFails: true })
     getLockPool.mockReturnValue(f.pool)
-    await expect(oauthRequestLock('did:plc:x', () => 'ran')).resolves.toBe('ran')
-    expect(warn).toHaveBeenCalledWith('oauth lock unavailable', expect.objectContaining({ reason: 'lock' }))
+    const fn = vi.fn(() => 'ran')
+    await expect(oauthRequestLock('did:plc:x', fn)).rejects.toBeInstanceOf(OAuthLockUnavailableError)
+    expect(fn).not.toHaveBeenCalled()
     expect(f.released).toEqual([true])
+    expect(f.inUse()).toBe(0)
+  })
+
+  it('survives a client error event while fn runs and destroys that client on release', async () => {
+    const f = fakePool(1)
+    getLockPool.mockReturnValue(f.pool)
+    await expect(
+      oauthRequestLock('k', async () => {
+        expect(f.clients[0]!.listeners()).toBe(1)
+        f.clients[0]!.emit('error')
+        return 'done'
+      }),
+    ).resolves.toBe('done')
+    expect(f.released).toEqual([true])
+    expect(f.clients[0]!.listeners()).toBe(0)
     expect(f.inUse()).toBe(0)
   })
 

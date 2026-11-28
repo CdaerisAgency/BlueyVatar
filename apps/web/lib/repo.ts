@@ -3,6 +3,7 @@ import type { CropParams } from '@blueyvatar/core'
 import { oauthClient } from './auth'
 import { COPY } from './copy'
 import { log } from './obs'
+import { OAuthLockUnavailableError } from './oauth-lock'
 import { bskyAvatarBlob, readCapped } from './import'
 import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, validateImageBytes, type ImageMime, type NewImageFields } from './records'
 import { resolvePlan } from './plan'
@@ -66,11 +67,21 @@ function restoreCause(err: unknown): Record<string, string | number | undefined>
   }
 }
 
+function hasLockCause(err: unknown): boolean {
+  for (let e: unknown = err, i = 0; e && i < 5; i++, e = (e as { cause?: unknown }).cause) if (e instanceof OAuthLockUnavailableError) return true
+  return false
+}
+
 /** Restores the stored OAuth session for the signed-in DID. Throws RepoError if it is gone. */
 export async function repoSession(did: string): Promise<OAuthSession> {
   try {
     return await (await oauthClient()).restore(did)
   } catch (err) {
+    // The session is fine. Another request holds the account's lock, so ask for a retry, not a new sign-in.
+    if (hasLockCause(err)) {
+      log.warn('oauth lock unavailable', { did })
+      throw new RepoError(COPY.session.busy)
+    }
     log.warn('oauth restore failed', { did, ...restoreCause(err) })
     throw new SessionExpiredError(COPY.session.expired)
   }

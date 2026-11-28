@@ -6,6 +6,7 @@ const warn = vi.fn()
 vi.mock('./obs', () => ({ log: { warn: (...a: unknown[]) => warn(...a), info: vi.fn(), error: vi.fn() } }))
 
 import { COPY } from './copy'
+import { OAuthLockUnavailableError } from './oauth-lock'
 import { RepoError, SessionExpiredError, repoSession } from './repo'
 
 describe('repoSession', () => {
@@ -31,6 +32,15 @@ describe('repoSession', () => {
     expect(ctx.did).toBe('did:plc:x')
     expect(ctx.errorName).toBe('Error')
     expect(JSON.stringify(warn.mock.calls[0])).not.toContain('token=abc')
+  })
+
+  it('maps a lock that cannot be had to the busy message, not an expired session', async () => {
+    restore.mockRejectedValue(new Error('wrapped', { cause: new OAuthLockUnavailableError('lock', new Error('lock timeout')) }))
+    const err = await repoSession('did:plc:x').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RepoError)
+    expect(err).not.toBeInstanceOf(SessionExpiredError)
+    expect((err as Error).message).toBe(COPY.session.busy)
+    expect(warn).toHaveBeenCalledWith('oauth lock unavailable', { did: 'did:plc:x' })
   })
 
   it('logs the class name, cause class, status and OAuth code, never the message', async () => {

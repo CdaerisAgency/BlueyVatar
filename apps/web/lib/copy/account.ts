@@ -3,6 +3,7 @@ export const ACCOUNT_COPY = {
   session: {
     expired: "You are signed in to blueyvatar, but the link to your account's home server needs to be renewed. Sign in again to keep editing.",
     signInAgain: 'Sign in again',
+    busy: 'Your account is busy right now. Try again in a moment.',
   },
   keys: {
     websiteKey: 'Website key (read only, safe to put in a web page)',

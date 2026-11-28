@@ -1,4 +1,5 @@
 import pg from 'pg'
+import { log } from './obs'
 
 const g = globalThis as Record<string, unknown>
 
@@ -17,9 +18,11 @@ export function getLockPool(): pg.Pool | null {
   if (!process.env.DATABASE_URL) return null
   g.__bvLockPool ??= new pg.Pool({
     connectionString: process.env.DATABASE_URL,
-    max: Number(process.env.OAUTH_LOCK_POOL_MAX) || 4,
-    connectionTimeoutMillis: 3000,
+    max: Number(process.env.OAUTH_LOCK_POOL_MAX) || 10,
+    connectionTimeoutMillis: 10_000,
   })
+  // An idle client that loses its connection emits this. Unhandled, it would crash the process.
+  ;(g.__bvLockPool as pg.Pool).on('error', (err) => log.warn('oauth lock pool error', { errorName: err.constructor.name }))
   return g.__bvLockPool as pg.Pool
 }
 
