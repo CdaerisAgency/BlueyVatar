@@ -28,7 +28,7 @@
     "lexicons:verify": "pnpm --filter @blueyvatar/lexicon-tools verify"
   },
   "devDependencies": {
-    "@atproto/lex": "0.4.4",
+    "@atproto/lex": "0.7.0",
     "@types/node": "26.6.7",
     "typescript": "7.0.2",
     "vitest": "5.1.1"

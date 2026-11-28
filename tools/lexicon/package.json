@@ -13,7 +13,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@atproto/lexicon": "0.7.17",
-    "@atproto/syntax": "0.7.7"
+    "@atproto/lexicon": "0.7.22",
+    "@atproto/syntax": "0.7.9"
   }
 }
