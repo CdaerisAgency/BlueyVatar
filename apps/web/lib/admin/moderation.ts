@@ -3,7 +3,7 @@ import type pg from 'pg'
 export type AdminAction =
   | 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report' | 'appeal_upheld' | 'appeal_overturned'
   | 'acknowledge' | 'rating_change' | 'warn' | 'escalate' | 'reverse' | 'comment' | 'tag' | 'reveal_image' | 'divert' | 'notice_sent'
-  | 'effect_offer_create' | 'effect_offer_change' | 'effect_offer_end'
+  | 'effect_offer_create' | 'effect_offer_change' | 'effect_offer_end' | 'settings_change' | 'asset_change'
 export { DID_RE } from '@blueyvatar/core/did'
 export const MAX_REASON = 500
 
