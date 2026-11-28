@@ -54,8 +54,31 @@ describe('over-limit', () => {
     expect(res.headers.get('content-type')).toContain('json')
   })
 
-  it('over limit ignores d and redirects to the over-limit avatar', async () => {
-    for (const d of ['404', 'https://allowed.example/x.png']) {
+  it('over limit with d=404 returns 404 on /avatar, like an ordinary miss', async () => {
+    const normal = await overLimitApp({ anonymousDaily: 100 }).request(`/avatar/${emailHash('nobody@example.com')}?d=404`, { headers: hdr })
+    expect(normal.status).toBe(404)
+    const res = await second(overLimitApp(), '?s=200&d=404')
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual(await normal.json())
+    expect(res.headers.get('content-type')).toBe(normal.headers.get('content-type'))
+    expect(res.headers.get('location')).toBeNull()
+    expect(res.headers.get('cache-control')).toBe('private, max-age=300')
+    expect(res.headers.get('x-over-limit')).toBe('1')
+    expect(res.headers.get('retry-after')).toBeTruthy()
+    expect((await second(overLimitApp(), '?default=404')).status).toBe(404)
+  })
+
+  it('over limit with d=404 returns 404 on /u/<handle>', async () => {
+    const app = overLimitApp()
+    await app.request('/u/alice.test?d=404', { headers: hdr })
+    const res = await app.request('/u/alice.test?d=404', { headers: hdr })
+    expect(res.status).toBe(404)
+    expect(res.headers.get('x-over-limit')).toBe('1')
+    expect(res.headers.get('retry-after')).toBeTruthy()
+  })
+
+  it('over limit ignores d styles and URLs', async () => {
+    for (const d of ['identicon', 'https://allowed.example/x.png']) {
       const res = await second(overLimitApp(), `?s=200&d=${encodeURIComponent(d)}`)
       expect(res.status).toBe(302)
       expect(res.headers.get('location')).toBe('/default/over-limit/200.png')
