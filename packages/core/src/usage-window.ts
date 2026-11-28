@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS, type SiteSettings } from './settings.js'
 import { entitlementsFor, normalizeTier, type Tier } from './tiers.js'
 
 /** First day of the UTC month as YYYY-MM-DD, matching usage_counters.period_start. */
@@ -38,8 +39,8 @@ export interface Included {
   per: 'day' | 'month' | null
 }
 
-export function includedVolume(tier: Tier | string): Included {
-  const e = entitlementsFor(tier)
+export function includedVolume(tier: Tier | string, settings: SiteSettings = DEFAULT_SETTINGS): Included {
+  const e = entitlementsFor(tier, settings)
   if (e.keyedMonthly !== null) return { volume: e.keyedMonthly, per: 'month' }
   if (e.keyedDaily !== null) return { volume: e.keyedDaily, per: 'day' }
   return { volume: null, per: null }

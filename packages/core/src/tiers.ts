@@ -5,7 +5,9 @@
  * Plus is the single paid individual plan. It combines the old Plus plan (20 images, gallery, custom profile domain)
  * and the old Pro tier (50,000 requests a month, hovercards, priority cache warming).
  */
-export const TIERS = ['free', 'plus', 'business', 'enterprise'] as const
+import { DEFAULT_SETTINGS, type SiteSettings } from './settings.js'
+
+export const TIERS =['free', 'plus', 'business', 'enterprise'] as const
 export type Tier = (typeof TIERS)[number]
 
 /** Retired plan names that may still sit in database rows, keys, tokens, or Stripe mirrors. Each resolves to the plan named here. */
@@ -71,8 +73,26 @@ export const ENTITLEMENTS: Record<Tier, Entitlements> = {
   },
 }
 
-/** Anonymous requests per day per IP (all tiers except Enterprise contracts). */
+/**
+ * Anonymous requests per day per IP (all tiers except Enterprise contracts).
+ * @deprecated use SiteSettings.anonymousDaily
+ */
 export const ANONYMOUS_DAILY_LIMIT = 100
 
-/** Entitlements for any stored plan value, including the retired 'pro' alias. */
-export const entitlementsFor = (value: unknown): Entitlements => ENTITLEMENTS[normalizeTier(value)]
+/**
+ * Entitlements for any stored plan value, including the retired 'pro' alias. Admin settings override the editable
+ * limits for free, plus, and business. Enterprise is never editable.
+ */
+export function entitlementsFor(value: unknown, settings: SiteSettings = DEFAULT_SETTINGS): Entitlements {
+  const tier = normalizeTier(value)
+  const base = ENTITLEMENTS[tier]
+  // Enterprise is never editable. The defaults return the shared table entry (no allocation on the hot path).
+  if (tier === 'enterprise' || settings === DEFAULT_SETTINGS) return base
+  return {
+    ...base,
+    maxSize: settings.maxSize[tier],
+    keyedDaily: tier === 'free' ? settings.keyedDaily.free : base.keyedDaily,
+    keyedMonthly: tier === 'free' ? base.keyedMonthly : settings.keyedMonthly[tier],
+    hovercards: settings.profileAccess[tier],
+  }
+}
