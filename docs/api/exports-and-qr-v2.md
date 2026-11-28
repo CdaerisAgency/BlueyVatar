@@ -62,7 +62,7 @@ A heading with the display name, the handle with links to the profile page and a
 
 | Parameter | Values | Default |
 | --- | --- | --- |
-| `s` or `size` | Wanted edge in pixels. Capped by tier as for avatars (Free 512, Pro 1024, Business and Enterprise 2048). | 256 |
+| `s` or `size` | Wanted edge in pixels. Capped at your plan's maximum size, as for avatars. See the pricing page. | 256 |
 | `center` | `none`, `logo` (the BlueyVatar circle logo), or `avatar` (your current default avatar) | `none` |
 | `quiet` | Quiet zone in modules, 4 to 16 | 4 |
 | `to` | A verified platform: the code points at `/go/{handle}/{platform}` | none |

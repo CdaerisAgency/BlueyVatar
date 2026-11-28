@@ -67,7 +67,7 @@ describe('avatar routes', () => {
     expect((await app.request(`/avatar/${md5}`, { headers: { 'x-api-key': 'sk_test' } })).status).toBe(302)
     index.rules.clear()
     let last = 0
-    for (let i = 0; i < 101; i++) last = (await app.request(`/avatar/${md5}`, { headers: { 'cf-connecting-ip': '203.0.113.77' } })).status
+    for (let i = 0; i < 101; i++) last = (await app.request(`/avatar/${md5}?json=true`, { headers: { 'cf-connecting-ip': '203.0.113.77' } })).status
     expect(last).toBe(429)
   })
 

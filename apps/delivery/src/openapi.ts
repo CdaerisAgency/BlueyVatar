@@ -30,13 +30,13 @@ const keyErrors = { '401': errors['401'], '402': errors['402'], '403': errors['4
 
 const avatarOp = (summary: string, idParam: string, extra: Json[] = []): Json => ({
   summary,
-  description: 'Redirects (302) to a signed, immutable /img URL, or to the default image when nothing is visible. With json=true it answers 200 JSON instead and never redirects. Tier limits on s, d, fmt, q, and ttl are applied silently and reported in x-adjusted-params.',
+  description: 'Redirects (302) to a signed, immutable /img URL, or to the default image when nothing is visible. With json=true it answers 200 JSON instead and never redirects. Plan limits on s, d, fmt, q, and ttl are applied silently and reported in x-adjusted-params. When the request is over its limit and not json=true, it answers 302 to /default/over-limit/{size}.{format} with x-over-limit: 1 and retry-after instead of a 429.',
   tags: ['Avatars'],
   security: [{}, { apiKeyHeader: [] }, { apiKeyQuery: [] }],
   parameters: [ref(`parameters/${idParam}`), ...avatarQuery, ...extra],
   responses: {
     '200': { description: 'JSON mode (json=true).', headers: okHeaders, content: { 'application/json': { schema: ref('schemas/AvatarJson') } } },
-    '302': { description: 'Redirect to the image or default.', headers: { location: { schema: { type: 'string' } }, ...okHeaders } },
+    '302': { description: 'Redirect to the image or default. When the request is over its limit, the redirect goes to /default/over-limit/{size}.{format} and carries x-over-limit and retry-after.', headers: { location: { schema: { type: 'string' } }, ...okHeaders, 'x-over-limit': hdr('OverLimit'), 'retry-after': hdr('RetryAfter') } },
     '400': errors['400'], '401': errors['401'], '402': errors['402'], '403': errors['403'], '404': errRef('not_found, only with d=404 and no avatar.'), '429': errors['429'], '500': errors['500'],
   },
 })
@@ -83,7 +83,7 @@ export const openApiDocument = {
     '/profile/{id}': {
       get: {
         summary: 'Profile JSON, or a JSON, Markdown, or vCard export',
-        description: 'Cross-origin browser callers (hovercards) need a Plus, Business, or Enterprise key. Any origin may read the response, and the rate-limit and tier headers are exposed to scripts. Hidden profiles answer not_found, the same as unknown ones. Add .json, .md, or .vcf to the id (or send format=json, md, or vcf) to download the public fields as a file with a Content-Disposition filename. The export routes share the caching, rate limit, rating, and hidden-profile rules of the profile JSON. A handle that itself ends in .md is read as that handle first; use format=md for the Markdown export of a handle that ends in .json, .md, or .vcf. Exports list only wallets the owner chose to show, marked not verified. Available on every plan.',
+        description: 'Cross-origin browser callers (hovercards) need a key on a plan that allows cross-origin profile access. Any origin may read the response, and the rate-limit and tier headers are exposed to scripts. Hidden profiles answer not_found, the same as unknown ones. Add .json, .md, or .vcf to the id (or send format=json, md, or vcf) to download the public fields as a file with a Content-Disposition filename. The export routes share the caching, rate limit, rating, and hidden-profile rules of the profile JSON. A handle that itself ends in .md is read as that handle first; use format=md for the Markdown export of a handle that ends in .json, .md, or .vcf. Exports list only wallets the owner chose to show, marked not verified. Available on every plan.',
         tags: ['Profile'],
         security: [{}, { apiKeyHeader: [] }, { apiKeyQuery: [] }],
         parameters: [ref('parameters/ProfileId'), q('Format')],
@@ -142,6 +142,20 @@ export const openApiDocument = {
         responses: { '403': errRef('invalid_signature') },
       },
     },
+    '/default/over-limit/{file}': {
+      get: {
+        summary: 'Over-limit avatar image',
+        description: 'Unsigned and public. Image requests that go over their limit answer 302 to this route (with x-over-limit: 1 and a retry-after header) instead of a 429, so the page shows the site over-limit avatar, or a neutral silhouette when none is uploaded. The redirect ignores d, uses the requested size within the smallest plan maximum, and uses the requested format when that plan allows it, else PNG. The redirect adds ?v=<first 8 hex chars of the asset sha256> when an uploaded avatar exists, so a new upload gets a new URL and a new edge cache entry; v is not used for lookup and the route always serves the current avatar. Requests with json=true keep the 429. The file is {size}.{png|jpeg|webp}.',
+        tags: ['Images'],
+        parameters: [
+          { name: 'file', in: 'path', required: true, schema: { type: 'string', pattern: '^\\d{1,4}(-q\\d{1,3})?\\.(png|jpeg|webp)$' } },
+        ],
+        responses: {
+          '200': { description: 'Image bytes. Cache-Control public, max-age=86400.', content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } }, 'image/webp': { schema: { type: 'string', format: 'binary' } } } },
+          '400': errRef('invalid_format'),
+        },
+      },
+    },
     '/default/{style}/{file}': {
       get: {
         summary: 'Default avatar image',
@@ -176,13 +190,13 @@ export const openApiDocument = {
       Cid: { name: 'cid', in: 'path', required: true, schema: { type: 'string', pattern: '^[a-z0-9]{10,100}$' } },
       Sig: { name: 'sig', in: 'path', required: true, schema: { type: 'string' } },
       ImgFile: { name: 'file', in: 'path', required: true, schema: { type: 'string', pattern: '^\\d{1,4}(-q\\d{1,3})?\\.(png|jpeg|webp)$' } },
-      s: { name: 's', in: 'query', description: 'Square size in pixels, at least 1. Also accepted as size. Values above the tier maximum (Free 512, Plus 1024, Business and Enterprise 2048) are clamped and reported in x-adjusted-params.', schema: { type: 'integer', minimum: 1 } },
-      d: { name: 'd', in: 'query', description: 'Fallback when no avatar is visible: a style, or an HTTPS URL on the service allowlist (Plus and higher; other tiers get the style default). Also accepted as default. Ignored when json=true.', schema: { oneOf: [{ type: 'string', enum: [...DEFAULT_STYLES] }, { type: 'string', format: 'uri' }] } },
+      s: { name: 's', in: 'query', description: 'Square size in pixels, at least 1. Also accepted as size. Values above the maximum for the plan are clamped and reported in x-adjusted-params.', schema: { type: 'integer', minimum: 1 } },
+      d: { name: 'd', in: 'query', description: 'Fallback when no avatar is visible: a style, or an HTTPS URL on the service allowlist (only on plans that allow it; other plans get the style default). Also accepted as default. Ignored when json=true, and ignored when the request is over its limit.', schema: { oneOf: [{ type: 'string', enum: [...DEFAULT_STYLES] }, { type: 'string', format: 'uri' }] } },
       f: { name: 'f', in: 'query', description: 'y forces the default image. Also accepted as forcedefault.', schema: { type: 'string', enum: ['y'] } },
       r: { name: 'r', in: 'query', description: 'Maximum content rating. Also accepted as rating.', schema: { type: 'string', enum: ['g', 'pg', 'r', 'x'], default: 'g' } },
-      fmt: { name: 'fmt', in: 'query', description: 'Output format. Free tier is PNG only and reports fmt in x-adjusted-params.', schema: { type: 'string', enum: ['png', 'jpeg', 'webp'], default: 'png' } },
-      q: { name: 'q', in: 'query', description: 'Lossy quality. No effect on PNG. Free tier ignores it. Snaps to the cached qualities 60 and 85.', schema: { type: 'integer', minimum: 1, maximum: 100, default: 85 } },
-      ttl: { name: 'ttl', in: 'query', description: 'Browser cache lifetime, 1h to 28d. Plus and higher only; other tiers get 24h.', schema: { type: 'string', pattern: '^[0-9]+[hd]$', default: '24h' } },
+      fmt: { name: 'fmt', in: 'query', description: 'Output format. Formats the plan does not allow fall back to PNG and are reported in x-adjusted-params.', schema: { type: 'string', enum: ['png', 'jpeg', 'webp'], default: 'png' } },
+      q: { name: 'q', in: 'query', description: 'Lossy quality. No effect on PNG. Plans without lossy formats ignore it. Snaps to the cached qualities 60 and 85.', schema: { type: 'integer', minimum: 1, maximum: 100, default: 85 } },
+      ttl: { name: 'ttl', in: 'query', description: 'Browser cache lifetime, 1h to 28d. Only on plans that allow it; other plans get 24h.', schema: { type: 'string', pattern: '^[0-9]+[hd]$', default: '24h' } },
       json: { name: 'json', in: 'query', description: 'The exact value true returns JSON metadata instead of a redirect.', schema: { type: 'string', enum: ['true'] } },
       name: { name: 'name', in: 'query', description: 'With d=initials on /avatar/{hash}, the name to draw initials from.', schema: { type: 'string', maxLength: 100 } },
       Format: { name: 'format', in: 'query', description: 'json, md, or vcf: the same file as the suffix. Any other value is ignored.', schema: { type: 'string', enum: ['json', 'md', 'vcf'] } },
@@ -194,6 +208,7 @@ export const openApiDocument = {
       RateLimitLimit: { description: 'Requests allowed in the current window. Omitted for Enterprise.', schema: { type: 'integer' } },
       RateLimitRemaining: { description: 'Requests left. Never below 0.', schema: { type: 'integer', minimum: 0 } },
       RateLimitReset: { description: 'Unix time in seconds when the window resets.', schema: { type: 'integer' } },
+      OverLimit: { description: 'Present with value 1 when the request went over its limit and the redirect points at the over-limit avatar.', schema: { type: 'string', const: '1' } },
       RetryAfter: { description: 'Whole seconds (at least 1) until the window resets.', schema: { type: 'integer', minimum: 1 } },
       Tier: { description: 'Tier that served the request.', schema: { type: 'string', enum: ['free', 'plus', 'business', 'enterprise'] } },
       UsageCost: { description: 'Metered units for a keyed request. Absent for anonymous requests.', schema: { type: 'string', const: '1' } },
@@ -268,8 +283,8 @@ export const openApiDocument = {
           languages: { type: 'array', maxItems: 10, description: 'BCP 47 tags in display order. At most one has primary true.', items: { type: 'object', required: ['tag', 'primary'], properties: { tag: { type: 'string' }, primary: { type: 'boolean' } } } },
           socialLinks: { type: 'array', maxItems: 10, description: 'https links the owner lists, in display order. Self-declared.', items: { type: 'object', required: ['label', 'url'], properties: { label: { type: 'string' }, url: { type: 'string' } } } },
           wallets: { type: 'array', maxItems: 10, description: 'Only wallets the owner chose to show. Self-declared, never verified.', items: { type: 'object', required: ['chain', 'address', 'label', 'verified'], properties: { chain: { type: 'string' }, address: { type: 'string' }, label: { type: ['string', 'null'] }, verified: { type: 'boolean', enum: [false] } } } },
-          gallery: { type: 'array', maxItems: 12, description: 'Empty unless the owner is on Plus.', items: { type: 'object', required: ['url', 'caption'], properties: { url: { type: 'string' }, caption: { type: ['string', 'null'] } } } },
-          verifiedAccounts: { type: 'array', description: 'Free keys see at most 4.', items: { type: 'object' } },
+          gallery: { type: 'array', maxItems: 12, description: 'Empty unless the owner plan includes galleries.', items: { type: 'object', required: ['url', 'caption'], properties: { url: { type: 'string' }, caption: { type: ['string', 'null'] } } } },
+          verifiedAccounts: { type: 'array', description: 'The number shown depends on the plan.', items: { type: 'object' } },
           profileUrl: { type: ['string', 'null'] },
         },
       },

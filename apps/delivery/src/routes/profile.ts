@@ -25,10 +25,11 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
   app.get('/profile/:id', async (c) => {
     const e = await entitle(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
-    // Cross-origin browser callers are hovercards embedded on other sites (Plus, Business, and Enterprise).
+    // Cross-origin browser callers are hovercards embedded on other sites; which plans may do this is an admin setting.
     // Same-origin pages and server-to-server calls without an Origin header are not gated.
-    if (isCrossOrigin(c) && !entitlementsFor(e.tier).hovercards) {
-      return fail(c, 403, 'tier_required', 'Hovercards require a Plus, Business, or Enterprise key')
+    const settings = deps.settings.current()
+    if (isCrossOrigin(c) && !(e.keyKind === null ? settings.profileAccess.anonymous : entitlementsFor(e.tier, settings).hovercards)) {
+      return fail(c, 403, 'tier_required', 'Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing')
     }
     // Exports use a suffix (/profile/alice.test.vcf) or ?format=vcf. A suffix is only an export when
     // the rest parses as an identifier. ".md" is also a real top-level domain, so a handle that ends

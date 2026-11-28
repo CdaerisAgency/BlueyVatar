@@ -1,4 +1,5 @@
 import { emailHash, imagePath, imageSig, type Candidate, type ImageFormat } from '@blueyvatar/core'
+import { DEFAULT_SETTINGS } from '@blueyvatar/core/settings'
 import { createApp, type AppDeps } from '../app.js'
 import { MemoryLicenseStore, MemoryRateLimiter } from '../licenses.js'
 import type { AvatarResolver, Identity } from '../resolver.js'
@@ -35,6 +36,7 @@ export function lic(
 /** Deps for an app with nothing in it: no identities, no keys, silent logger. Override what a test needs. */
 export function baseDeps(over: Partial<AppDeps> = {}): AppDeps {
   return {
+    settings: { current: () => DEFAULT_SETTINGS },
     index: new MemoryIndexStore(),
     resolver: {
       resolveIdentity: async () => null, candidates: async () => [], galleryItems: async () => [],
@@ -44,6 +46,7 @@ export function baseDeps(over: Partial<AppDeps> = {}): AppDeps {
     limiter: new MemoryRateLimiter(),
     usage: new MemoryUsageMeter(),
     resize: async () => new Uint8Array(),
+    overLimitAsset: { get: async () => null },
     defaultUrlAllowlist: [],
     trustCloudflare: false,
     imgSigningSecret: 's',
@@ -64,6 +67,7 @@ export function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', di
   }
   const usage = new MemoryUsageMeter()
   const deps: AppDeps = {
+    settings: { current: () => DEFAULT_SETTINGS },
     index, resolver, usage,
     licenses: new MemoryLicenseStore([
       lic('pk_test', 'publishable', 'L1', 'plus', { domains: ['*.example.com'] }),
@@ -77,6 +81,7 @@ export function setup(candidates: Candidate[] = [{ source: 'adapter:bluesky', di
     ]),
     limiter: new MemoryRateLimiter(),
     resize: async () => new Uint8Array([9, 9]),
+    overLimitAsset: { get: async () => null },
     profileBaseUrl: 'https://bv.test/',
     defaultUrlAllowlist: ['example.com'],
     trustCloudflare: true,

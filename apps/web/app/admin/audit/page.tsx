@@ -1,5 +1,6 @@
 import { requireAdmin } from '../../../lib/admin/guard'
 import { listActions } from '../../../lib/admin/moderation'
+import { auditSummary } from '../../../lib/admin/settings-form'
 import { AdminPage, fmt } from '../AdminBits'
 
 export default async function AuditPage() {
@@ -13,7 +14,7 @@ export default async function AuditPage() {
             <li key={a.id}>
               {fmt(a.created_at)} <strong>{a.action}</strong> by {a.actor}
               {a.target_did && <> on <a href={`/admin/account?did=${encodeURIComponent(a.target_did)}`}><code>{a.target_did}</code></a></>}
-              {a.target_cid && <> <code>{a.target_cid}</code></>}{a.report_id && <> (report #{a.report_id})</>}{a.case_id && <> (<a href={`/admin/cases/${a.case_id}`}>case #{a.case_id}</a>)</>}{a.policy && <>, policy {a.policy}</>}{a.notice_template && <>, notice {a.notice_template}: {a.notice_result}</>}: {a.reason}
+              {a.target_cid && <> <code>{a.target_cid}</code></>}{a.report_id && <> (report #{a.report_id})</>}{a.case_id && <> (<a href={`/admin/cases/${a.case_id}`}>case #{a.case_id}</a>)</>}{a.policy && <>, policy {a.policy}</>}{auditSummary(a.detail) && <>, {auditSummary(a.detail)}</>}{a.notice_template && <>, notice {a.notice_template}: {a.notice_result}</>}: {a.reason}
             </li>
           ))}
         </ul>

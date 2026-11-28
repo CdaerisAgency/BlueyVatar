@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from '@blueyvatar/core/settings'
 import { describe, expect, it } from 'vitest'
 import jsQRImport from 'jsqr'
 import sharp from 'sharp'
@@ -47,6 +48,7 @@ function setup(opts: { candidates?: Candidate[]; own?: Record<string, unknown>; 
   }
   index.emails.set(emailHash('alice@example.com'), DID)
   const deps: AppDeps = {
+    settings: { current: () => DEFAULT_SETTINGS },
     index, resolver, usage: new MemoryUsageMeter(),
     licenses: new MemoryLicenseStore([
       lic('sk_biz', 'secret', 'L3', 'business'),

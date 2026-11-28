@@ -1,6 +1,7 @@
 import {
   Metrics, REQUEST_ID_HEADER, requestIdFrom, statusClass, type ErrorTracker, type Logger,
 } from '@blueyvatar/core'
+import type { SiteSettings } from '@blueyvatar/core/settings'
 import { Hono, type Context } from 'hono'
 import type { UsageAlerts } from './alerts.js'
 import { createCtx } from './context.js'
@@ -11,6 +12,7 @@ import type { Resizer } from './resize.js'
 import type { AvatarResolver } from './resolver.js'
 import { mountAvatar } from './routes/avatar.js'
 import { mountDefault } from './routes/default.js'
+import { mountOverLimit } from './routes/over-limit.js'
 import { mountGo } from './routes/go.js'
 import { mountImg } from './routes/img.js'
 import { mountProfile } from './routes/profile.js'
@@ -21,6 +23,8 @@ import type { IndexStore } from './store.js'
 import type { UsageMeter } from './usage.js'
 
 export interface AppDeps {
+  /** Live admin settings (limits, image sizes, profile access). Backed by a SettingsCache refreshed every 60 s. */
+  settings: { current(): SiteSettings }
   index: IndexStore
   resolver: AvatarResolver
   licenses: LicenseStore
@@ -29,6 +33,8 @@ export interface AppDeps {
   /** Fires usage alerts at 80 and 100 percent of included volume. */
   alerts?: UsageAlerts
   resize: Resizer
+  /** The owner's uploaded over-limit avatar (site_assets), or null when none is set. */
+  overLimitAsset: { get(): Promise<{ bytes: Buffer; mime: string; sha256: string } | null> }
   defaultUrlAllowlist: readonly string[]
   /** Origin of the profile pages the QR code points to. Defaults to https://blueyvatar.com. */
   profileBaseUrl?: string
@@ -113,6 +119,7 @@ export function createApp(deps: AppDeps) {
   mountQr(app, ctx)
   mountGo(app, ctx)
   mountImg(app, ctx)
+  mountOverLimit(app, ctx)
   mountDefault(app, ctx)
 
   return app

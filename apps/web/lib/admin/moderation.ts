@@ -3,7 +3,7 @@ import type pg from 'pg'
 export type AdminAction =
   | 'block_image' | 'unblock_image' | 'takedown' | 'suspend' | 'unsuspend' | 'dismiss_report' | 'appeal_upheld' | 'appeal_overturned'
   | 'acknowledge' | 'rating_change' | 'warn' | 'escalate' | 'reverse' | 'comment' | 'tag' | 'reveal_image' | 'divert' | 'notice_sent'
-  | 'effect_offer_create' | 'effect_offer_change' | 'effect_offer_end'
+  | 'effect_offer_create' | 'effect_offer_change' | 'effect_offer_end' | 'settings_change' | 'asset_change'
 export { DID_RE } from '@blueyvatar/core/did'
 export const MAX_REASON = 500
 
@@ -64,12 +64,12 @@ export async function blockAll(c: Q, did: string, reason: string, by: string, ki
 
 export type ActionRow = {
   id: number; actor: string; action: string; target_did: string | null; target_cid: string | null; report_id: number | null; reason: string | null; created_at: Date
-  case_id: number | null; policy: string | null; notice_template: string | null; notice_result: string | null
+  case_id: number | null; policy: string | null; notice_template: string | null; notice_result: string | null; detail: unknown
 }
 
 export async function listActions(pool: pg.Pool, opts: { did?: string; limit?: number; caseId?: number } = {}): Promise<ActionRow[]> {
   const { rows } = await pool.query<ActionRow>(
-    `SELECT id::int AS id, actor, action, target_did, target_cid, report_id::int AS report_id, reason, created_at, case_id::int AS case_id, policy, notice_template, notice_result
+    `SELECT id::int AS id, actor, action, target_did, target_cid, report_id::int AS report_id, reason, created_at, case_id::int AS case_id, policy, notice_template, notice_result, detail
        FROM admin_actions WHERE ($1::text IS NULL OR target_did = $1) AND ($3::bigint IS NULL OR case_id = $3) ORDER BY created_at DESC, id DESC LIMIT $2`,
     [opts.did ?? null, opts.limit ?? 100, opts.caseId ?? null],
   )

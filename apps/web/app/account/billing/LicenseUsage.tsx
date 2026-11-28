@@ -1,6 +1,7 @@
-import { ENTITLEMENTS, historyDays, type Tier } from '@blueyvatar/core'
+import { entitlementsFor, historyDays, type Tier } from '@blueyvatar/core'
 import { Section, TableBox } from '../../../components/Page'
 import { getDashboardStore } from '../../../lib/dashboard-store'
+import { getSiteSettings } from '../../../lib/site-settings'
 import { alertState, historyPeriods, includedVolume, periodStartOf } from '../../../lib/keys'
 
 const n = (v: number | null) => (v === null ? 'Custom' : v.toLocaleString('en-US'))
@@ -9,6 +10,7 @@ const ALERT_TEXT = { ok: 'Below 80 percent of included volume.', warn80: 'At or 
 /** The License section, plan limits, usage history, and alert status. Shared by the personal and organization billing views. */
 export async function LicenseUsage({ license }: { license: { licenseId: string; tier: Tier; status: string; term: string } }) {
   const store = getDashboardStore()
+  const settings = await getSiteSettings()
   const now = new Date()
   const period = periodStartOf(now)
   const periods = historyPeriods(license.tier, now)
@@ -16,10 +18,10 @@ export async function LicenseUsage({ license }: { license: { licenseId: string; 
   const days = historyDays(license.tier, now)
   const daily = await store.usageDaily(license.licenseId, days)
   const sent = await store.alertsSent(license.licenseId, period)
-  const ent = ENTITLEMENTS[license.tier]
-  const inc = includedVolume(license.tier)
+  const ent = entitlementsFor(license.tier, settings)
+  const inc = includedVolume(license.tier, settings)
   const used = usage.get(`${period}|origin_resolution`) ?? 0
-  const state = alertState(license.tier, used)
+  const state = alertState(license.tier, used, settings)
   return (
     <>
       <Section title="License">

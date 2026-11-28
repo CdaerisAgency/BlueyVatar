@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from '@blueyvatar/core/settings'
 import { readFileSync } from 'node:fs'
 import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -211,10 +212,10 @@ describe.skipIf(!url)('postgres stores', () => {
     expect((await licenses.findKey(raw))?.license).toMatchObject({ tier: 'business', status: 'past_due' })
     const info = { headerKey: undefined, tokenParam: raw, origin: undefined, referer: undefined, clientIp: '1.1.1.1' }
     const limiter = new PgRateLimiter(pool)
-    expect(await checkEntitlement(info, licenses, limiter)).toMatchObject({ ok: true, tier: 'business' })
+    expect(await checkEntitlement(info, licenses, limiter, DEFAULT_SETTINGS)).toMatchObject({ ok: true, tier: 'business' })
     await pool.query(`UPDATE licenses SET grace_ends_at = now() - interval '1 second' WHERE license_id = 'lic_pd'`)
     expect((await licenses.findKey(raw))?.license.tier).toBe('free')
-    expect(await checkEntitlement(info, licenses, limiter)).toMatchObject({ ok: true, tier: 'free' })
+    expect(await checkEntitlement(info, licenses, limiter, DEFAULT_SETTINGS)).toMatchObject({ ok: true, tier: 'free' })
   })
 
   it('counts rate windows and resets expired ones', async () => {

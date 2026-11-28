@@ -1,4 +1,5 @@
 import { isRating, type Rating } from './ratings.js'
+import type { SiteSettings } from './settings.js'
 import { entitlementsFor, type OutputFormat, type Tier } from './tiers.js'
 
 /** Query parameters from spec section 7. */
@@ -53,10 +54,12 @@ export interface ParseOptions {
   tier: Tier
   /** Hostnames allowed for d=<url>. */
   defaultUrlAllowlist: readonly string[]
+  /** Admin-set limits. Omitted means the built-in defaults. */
+  settings?: SiteSettings
 }
 
 export function parseAvatarParams(q: URLSearchParams, opts: ParseOptions): AvatarParams {
-  const ent = entitlementsFor(opts.tier)
+  const ent = entitlementsFor(opts.tier, opts.settings)
   const adjusted: string[] = []
 
   let size = DEFAULT_SIZE

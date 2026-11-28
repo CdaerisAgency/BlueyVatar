@@ -3,7 +3,8 @@ import { PageMain } from '../../components/Page'
 import { pageMetadata } from '../../lib/site'
 import { jsonLdString } from '../../lib/seo'
 import { imgSnippet, markdownSnippet } from '../../lib/avatar-snippets'
-import { exampleMigration, EXAMPLE_GRAVATAR_URL, FAQS, faqJsonLd, GRAVATAR_DOCS } from '../../lib/gravatar-pages'
+import { getSiteSettings } from '../../lib/site-settings'
+import { exampleMigration, EXAMPLE_GRAVATAR_URL, faqsFor, faqJsonLd, GRAVATAR_DOCS } from '../../lib/gravatar-pages'
 
 export const metadata = pageMetadata(
   '/migrate-from-gravatar',
@@ -11,8 +12,12 @@ export const metadata = pageMetadata(
   'Four steps: sign in, link your email, import your image, and change the base URL in your site. Includes copy-ready snippets.',
 )
 
-export default function MigratePage() {
+/** The FAQ quotes admin-editable size caps, so the page renders per request (not ISR: see app/pricing/page.tsx). */
+export const dynamic = 'force-dynamic'
+
+export default async function MigratePage() {
   const ex = exampleMigration()
+  const faqs = faqsFor(await getSiteSettings())
   return (
     <PageMain>
       <h1>Migrate from Gravatar to BlueyVatar</h1>
@@ -51,7 +56,7 @@ export default function MigratePage() {
 
       <h2>Questions</h2>
       <ul aria-label="Frequently asked questions">
-        {FAQS.map((f) => (
+        {faqs.map((f) => (
           <li key={f.q}>
             <h3>{f.q}</h3>
             <p>{f.a}</p>
@@ -59,7 +64,7 @@ export default function MigratePage() {
         ))}
       </ul>
       <p>BlueyVatar is not affiliated with Gravatar.</p>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(faqJsonLd(faqs)) }} />
     </PageMain>
   )
 }

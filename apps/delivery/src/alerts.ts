@@ -1,4 +1,5 @@
 import { entitlementsFor, type Tier } from '@blueyvatar/core'
+import { DEFAULT_SETTINGS, type SiteSettings } from '@blueyvatar/core/settings'
 import { usageNotice, type Notifier } from '@blueyvatar/core/verification'
 import { periodStart } from './usage.js'
 import { errors, log } from './obs.js'
@@ -89,8 +90,8 @@ export class UsageAlerts {
   constructor(private sink: AlertSink, private ledger: AlertLedger, private now: () => Date = () => new Date()) {}
 
   /** Call after an origin resolution raised a license's counter to `used`. Never throws. */
-  async check(licenseId: string, tier: Tier, used: number): Promise<void> {
-    const included = entitlementsFor(tier).keyedMonthly
+  async check(licenseId: string, tier: Tier, used: number, settings: SiteSettings = DEFAULT_SETTINGS): Promise<void> {
+    const included = entitlementsFor(tier, settings).keyedMonthly
     const period = periodStart(this.now())
     try {
       for (const threshold of reachedThresholds(used, included)) {

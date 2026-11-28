@@ -1,5 +1,5 @@
 import type { Hono, Context } from 'hono'
-import { ParamError, isMd5Hex, isSha256Hex, parseAvatarParams, parseIdentifier, pickCandidate, type AvatarParams } from '@blueyvatar/core'
+import { ABSOLUTE_MAX_SIZE, DEFAULT_SIZE, ParamError, entitlementsFor, isMd5Hex, isSha256Hex, parseAvatarParams, parseIdentifier, pickCandidate, type AvatarParams } from '@blueyvatar/core'
 import type { Ctx } from '../context.js'
 import type { ErrorCode } from '../errors.js'
 import { fail } from '../http.js'
@@ -27,6 +27,25 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
   }
 
   /**
+   * Image requests over a limit get the owner's over-limit avatar instead of a broken image.
+   * Only free-tier callers reach this (anonymous, or a blocked keyed plan), so size and format
+   * follow the free rules. d= is ignored. JSON and data requests keep the 429.
+   */
+  async function respondOverLimit(c: Context) {
+    const free = entitlementsFor('free', deps.settings.current())
+    const q = new URL(c.req.url).searchParams
+    const n = parseInt(q.get('s') ?? q.get('size') ?? '', 10)
+    const size = Math.min(Number.isFinite(n) && n >= 1 ? n : DEFAULT_SIZE, free.maxSize, ABSOLUTE_MAX_SIZE)
+    const fmt = q.get('fmt') ?? ''
+    const format = (free.formats as readonly string[]).includes(fmt) ? fmt : 'png'
+    // The sha of the current upload versions the URL, so a new upload is a new edge cache entry. No upload (silhouette) means no v.
+    const asset = await deps.overLimitAsset.get()
+    c.header('cache-control', 'private, max-age=300')
+    c.header('x-over-limit', '1')
+    return c.redirect(`/default/over-limit/${size}.${format}${asset ? `?v=${asset.sha256.slice(0, 8)}` : ''}`, 302)
+  }
+
+  /**
    * `lookup` receives a gate that does the database-only checks (repo active, visibility rules).
    * Hash lookups must call it before any network identity resolution, so that unlinked,
    * opted-out, and restricted hashes all take the same cheap path and return the same default.
@@ -38,11 +57,12 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
     initials = '',
   ) {
     const e = await entitle(c)
+    if (!e.ok && e.overLimit && c.req.query('json') !== 'true') return await respondOverLimit(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
 
     let p: AvatarParams
     try {
-      p = parseAvatarParams(new URL(c.req.url).searchParams, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist })
+      p = parseAvatarParams(new URL(c.req.url).searchParams, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist, settings: deps.settings.current() })
     } catch (err) {
       if (err instanceof ParamError) return fail(c, 400, err.code as ErrorCode, err.message)
       throw err
@@ -54,7 +74,7 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
     metrics.inc('delivery_resolutions_total', { route: 'avatar', result: identity ? 'found' : 'miss' })
     if (e.licenseId) {
       const used = await deps.usage.add(e.licenseId, 'origin_resolution')
-      await deps.alerts?.check(e.licenseId, e.tier, used)
+      await deps.alerts?.check(e.licenseId, e.tier, used, deps.settings.current())
     }
     // With json=true every miss answers in JSON with found: false, and every miss body is the
     // same, so a hash lookup cannot tell an unlinked hash from a hidden or restricted one.

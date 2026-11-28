@@ -78,7 +78,7 @@ export function mountQr(app: Hono, ctx: Ctx): void {
     let p: AvatarParams
     try {
       const sp = new URL(c.req.url).searchParams
-      p = parseAvatarParams(sp, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist })
+      p = parseAvatarParams(sp, { tier: e.tier, defaultUrlAllowlist: deps.defaultUrlAllowlist, settings: deps.settings.current() })
       if (sp.get('s') === null && sp.get('size') === null) p.size = QR_DEFAULT_SIZE
     } catch (err) {
       if (err instanceof ParamError) return fail(c, 400, err.code as ErrorCode, err.message)
