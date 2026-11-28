@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
-import { emailHash } from '@blueyvatar/core'
+import { Metrics, emailHash } from '@blueyvatar/core'
 import { DEFAULT_SETTINGS, type SiteSettings } from '@blueyvatar/core/settings'
 import { createApp } from '../app.js'
-import { setup } from '../test/harness.js'
+import { MemoryLicenseStore } from '../licenses.js'
+import { pgOverLimitAsset } from '../over-limit-asset.js'
+import { lic, setup } from '../test/harness.js'
 
 const HASH = emailHash('alice@example.com')
 const hdr = { 'cf-connecting-ip': '203.0.113.50' }
@@ -16,11 +18,12 @@ async function realResize(job: { input: Uint8Array; size: number; format: 'png' 
   return new Uint8Array(await sharp(job.input).resize(job.size, job.size).toFormat(job.format).toBuffer())
 }
 
-function overLimitApp(over: Partial<SiteSettings> = {}, asset: Buffer | null = null) {
+function overLimitApp(over: Partial<SiteSettings> = {}, asset: Buffer | null = null, sha = 'x') {
   const { deps } = setup()
+  deps.licenses = new MemoryLicenseStore([lic('sk_free', 'secret', 'LF', 'free'), lic('sk_old', 'secret', 'LO', 'plus', { expiresAt: new Date(Date.now() - 1000) })])
   deps.settings = { current: () => ({ ...DEFAULT_SETTINGS, anonymousDaily: 1, ...over }) }
   deps.resize = realResize
-  deps.overLimitAsset = { get: async () => (asset ? { bytes: asset, mime: 'image/png', sha256: 'x' } : null) }
+  deps.overLimitAsset = { get: async () => (asset ? { bytes: asset, mime: 'image/png', sha256: sha } : null) }
   return createApp(deps)
 }
 
@@ -84,5 +87,99 @@ describe('over-limit', () => {
   it('rejects bad file names', async () => {
     const res = await overLimitApp().request('/default/over-limit/abc.gif')
     expect(res.status).toBe(400)
+  })
+})
+
+describe('over-limit scope', () => {
+  it('unknown and expired keys stay 401 on image requests', async () => {
+    const app = overLimitApp()
+    expect((await app.request(`/avatar/${HASH}`, { headers: { ...hdr, 'x-api-key': 'sk_nope' } })).status).toBe(401)
+    expect((await app.request(`/avatar/${HASH}`, { headers: { ...hdr, 'x-api-key': 'sk_old' } })).status).toBe(401)
+  })
+
+  it('a keyed blocked-volume request redirects, png when the format is not allowed', async () => {
+    const app = overLimitApp({ keyedDaily: { free: 1 } })
+    const h = { 'x-api-key': 'sk_free' }
+    await app.request(`/avatar/${HASH}?fmt=webp`, { headers: h })
+    const res = await app.request(`/avatar/${HASH}?fmt=webp&s=100`, { headers: h })
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/default/over-limit/100.png')
+    expect(res.headers.get('x-over-limit')).toBe('1')
+  })
+
+  it('/u/<handle> over limit redirects', async () => {
+    const app = overLimitApp()
+    await app.request('/u/alice.test', { headers: hdr })
+    const res = await app.request('/u/alice.test?s=50', { headers: hdr })
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/default/over-limit/50.png')
+  })
+
+  it('counts the rate limit rejection on the redirect path', async () => {
+    const { deps } = setup()
+    deps.settings = { current: () => ({ ...DEFAULT_SETTINGS, anonymousDaily: 1 }) }
+    deps.metrics = new Metrics()
+    const app = createApp(deps)
+    await second(app, '')
+    expect(deps.metrics.counter('delivery_rate_limit_rejections_total')).toBe(1)
+  })
+})
+
+describe('over-limit URL versioning', () => {
+  const SHA = 'abcdef0123456789'
+  it('redirect carries v with the first 8 chars of the asset sha', async () => {
+    const res = await second(overLimitApp({}, await png(10), SHA), '?s=64')
+    expect(res.headers.get('location')).toBe('/default/over-limit/64.png?v=abcdef01')
+    expect(res.headers.get('cache-control')).toBe('private, max-age=300')
+  })
+
+  it('silhouette redirect has no v', async () => {
+    const res = await second(overLimitApp(), '?s=64')
+    expect(res.headers.get('location')).toBe('/default/over-limit/64.png')
+  })
+
+  it('the route ignores v and serves the current asset', async () => {
+    const res = await overLimitApp({}, await png(300), SHA).request('/default/over-limit/32.png?v=deadbeef')
+    expect(res.status).toBe(200)
+  })
+
+  it('a changed asset gives a new v after the TTL', async () => {
+    let now = 1_000_000
+    const spy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      let row = { image: Buffer.from('a'), mime: 'image/png', sha256: '11111111aaaa' }
+      let queries = 0
+      const pool = { query: async () => { queries++; return { rows: [row] } } } as never
+      const store = pgOverLimitAsset(pool, 60_000)
+      expect((await store.get())?.sha256).toBe('11111111aaaa')
+      row = { ...row, sha256: '22222222bbbb' }
+      now += 30_000
+      expect((await store.get())?.sha256).toBe('11111111aaaa')
+      expect(queries).toBe(1)
+      now += 31_000
+      expect((await store.get())?.sha256).toBe('22222222bbbb')
+      expect(queries).toBe(2)
+    } finally { spy.mockRestore() }
+  })
+
+  it('a database error is cached briefly and the last good value is kept', async () => {
+    let now = 1_000_000
+    const spy = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      let fail = false
+      let queries = 0
+      const pool = { query: async () => { queries++; if (fail) throw new Error('down'); return { rows: [{ image: Buffer.from('a'), mime: 'image/png', sha256: '33333333cccc' }] } } } as never
+      const store = pgOverLimitAsset(pool, 60_000)
+      await store.get()
+      fail = true
+      now += 61_000
+      expect((await store.get())?.sha256).toBe('33333333cccc')
+      expect(queries).toBe(2)
+      await store.get()
+      expect(queries).toBe(2)
+      now += 11_000
+      await store.get()
+      expect(queries).toBe(3)
+    } finally { spy.mockRestore() }
   })
 })

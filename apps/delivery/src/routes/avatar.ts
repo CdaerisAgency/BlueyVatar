@@ -31,16 +31,18 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
    * Only free-tier callers reach this (anonymous, or a blocked keyed plan), so size and format
    * follow the free rules. d= is ignored. JSON and data requests keep the 429.
    */
-  function respondOverLimit(c: Context) {
+  async function respondOverLimit(c: Context) {
     const free = entitlementsFor('free', deps.settings.current())
     const q = new URL(c.req.url).searchParams
     const n = parseInt(q.get('s') ?? q.get('size') ?? '', 10)
     const size = Math.min(Number.isFinite(n) && n >= 1 ? n : DEFAULT_SIZE, free.maxSize, ABSOLUTE_MAX_SIZE)
     const fmt = q.get('fmt') ?? ''
     const format = (free.formats as readonly string[]).includes(fmt) ? fmt : 'png'
+    // The sha of the current upload versions the URL, so a new upload is a new edge cache entry. No upload (silhouette) means no v.
+    const asset = await deps.overLimitAsset.get()
     c.header('cache-control', 'private, max-age=300')
     c.header('x-over-limit', '1')
-    return c.redirect(`/default/over-limit/${size}.${format}`, 302)
+    return c.redirect(`/default/over-limit/${size}.${format}${asset ? `?v=${asset.sha256.slice(0, 8)}` : ''}`, 302)
   }
 
   /**
@@ -55,7 +57,7 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
     initials = '',
   ) {
     const e = await entitle(c)
-    if (!e.ok && e.overLimit && c.req.query('json') !== 'true') return respondOverLimit(c)
+    if (!e.ok && e.overLimit && c.req.query('json') !== 'true') return await respondOverLimit(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
 
     let p: AvatarParams

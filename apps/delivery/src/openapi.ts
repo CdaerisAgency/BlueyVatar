@@ -36,7 +36,7 @@ const avatarOp = (summary: string, idParam: string, extra: Json[] = []): Json =>
   parameters: [ref(`parameters/${idParam}`), ...avatarQuery, ...extra],
   responses: {
     '200': { description: 'JSON mode (json=true).', headers: okHeaders, content: { 'application/json': { schema: ref('schemas/AvatarJson') } } },
-    '302': { description: 'Redirect to the image or default.', headers: { location: { schema: { type: 'string' } }, ...okHeaders } },
+    '302': { description: 'Redirect to the image or default. When the request is over its limit, the redirect goes to /default/over-limit/{size}.{format} and carries x-over-limit and retry-after.', headers: { location: { schema: { type: 'string' } }, ...okHeaders, 'x-over-limit': hdr('OverLimit'), 'retry-after': hdr('RetryAfter') } },
     '400': errors['400'], '401': errors['401'], '402': errors['402'], '403': errors['403'], '404': errRef('not_found, only with d=404 and no avatar.'), '429': errors['429'], '500': errors['500'],
   },
 })
@@ -145,10 +145,10 @@ export const openApiDocument = {
     '/default/over-limit/{file}': {
       get: {
         summary: 'Over-limit avatar image',
-        description: 'Unsigned and public. Image requests that go over their limit answer 302 to this route (with x-over-limit: 1 and a retry-after header) instead of a 429, so the page shows the site over-limit avatar, or a neutral silhouette when none is uploaded. The redirect ignores d, uses the requested size within the free-plan maximum, and uses the requested format when the free plan allows it, else PNG. Requests with json=true keep the 429. The file is {size}.{png|jpeg|webp}.',
+        description: 'Unsigned and public. Image requests that go over their limit answer 302 to this route (with x-over-limit: 1 and a retry-after header) instead of a 429, so the page shows the site over-limit avatar, or a neutral silhouette when none is uploaded. The redirect ignores d, uses the requested size within the smallest plan maximum, and uses the requested format when that plan allows it, else PNG. The redirect adds ?v=<first 8 hex chars of the asset sha256> when an uploaded avatar exists, so a new upload gets a new URL and a new edge cache entry; v is not used for lookup and the route always serves the current avatar. Requests with json=true keep the 429. The file is {size}.{png|jpeg|webp}.',
         tags: ['Images'],
         parameters: [
-          { name: 'file', in: 'path', required: true, schema: { type: 'string', pattern: '^\d{1,4}\.(png|jpeg|webp)$' } },
+          { name: 'file', in: 'path', required: true, schema: { type: 'string', pattern: '^\\d{1,4}(-q\\d{1,3})?\\.(png|jpeg|webp)$' } },
         ],
         responses: {
           '200': { description: 'Image bytes. Cache-Control public, max-age=86400.', content: { 'image/png': { schema: { type: 'string', format: 'binary' } } } },
@@ -208,6 +208,7 @@ export const openApiDocument = {
       RateLimitLimit: { description: 'Requests allowed in the current window. Omitted for Enterprise.', schema: { type: 'integer' } },
       RateLimitRemaining: { description: 'Requests left. Never below 0.', schema: { type: 'integer', minimum: 0 } },
       RateLimitReset: { description: 'Unix time in seconds when the window resets.', schema: { type: 'integer' } },
+      OverLimit: { description: 'Present with value 1 when the request went over its limit and the redirect points at the over-limit avatar.', schema: { type: 'string', const: '1' } },
       RetryAfter: { description: 'Whole seconds (at least 1) until the window resets.', schema: { type: 'integer', minimum: 1 } },
       Tier: { description: 'Tier that served the request.', schema: { type: 'string', enum: ['free', 'plus', 'business', 'enterprise'] } },
       UsageCost: { description: 'Metered units for a keyed request. Absent for anonymous requests.', schema: { type: 'string', const: '1' } },
