@@ -76,5 +76,5 @@ export function buildCard(p: CardProfile, api: string, web: string): Card {
   }
 }
 
-/** Delivery profile URL. The token is the publishable key and is required (Business and Enterprise, spec section 11.1). */
+/** Delivery profile URL. The token is the publishable key and is required. Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing */
 export const profileEndpoint = (api: string, id: string, token: string): string => `${api}/profile/${encodeURIComponent(id)}?token=${encodeURIComponent(token)}`
