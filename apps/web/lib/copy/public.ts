@@ -1,6 +1,20 @@
 import type { SiteSettings } from '@blueyvatar/core/settings'
 import { formatVolume } from '../format-volume'
 
+/** "Show avatars on your site" hub at the top of /docs. Slugs match INTEGRATIONS in scripts/build-docs.mjs. */
+export const GUIDE_HUB_TITLE = 'Show avatars on your site'
+export const GUIDE_HUB_LEAD = 'Pick your platform. Each guide is a short, copy-and-paste setup.'
+export const GUIDE_HUB: { slug: string; name: string; change: string; minutes: number }[] = [
+  { slug: 'html', name: 'Plain HTML', change: 'Use the avatar URL in an img tag', minutes: 2 },
+  { slug: 'wordpress', name: 'WordPress', change: 'Install the BlueyVatar plugin', minutes: 5 },
+  { slug: 'ghost', name: 'Ghost', change: "Edit your theme's author partial", minutes: 5 },
+  { slug: 'discourse', name: 'Discourse', change: 'Set the hidden gravatar_base_url setting', minutes: 3 },
+  { slug: 'gitlab', name: 'GitLab', change: 'Set gravatar_plain_url and gravatar_ssl_url in gitlab.rb', minutes: 5 },
+  { slug: 'gitea', name: 'Gitea', change: 'Set GRAVATAR_SOURCE in app.ini', minutes: 3 },
+  { slug: 'forgejo', name: 'Forgejo', change: 'Set GRAVATAR_SOURCE in app.ini', minutes: 3 },
+  { slug: 'redmine', name: 'Redmine', change: 'Set avatar_server_url in configuration.yml', minutes: 3 },
+]
+
 /** Copy for the public pages. Prices are not here. They come from ../pricing.ts. Limits come from admin settings, see planBodies(). */
 export const PUBLIC_COPY = {
   nav: { skip: 'Skip to main content', how: 'How it works', developers: 'Developers', docs: 'Docs', pricing: 'Pricing', integrations: 'Integrations', signIn: 'Sign in' },

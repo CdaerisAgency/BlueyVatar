@@ -19,7 +19,7 @@ describe('rendered docs', () => {
   it('has a guide for every docs/integrations markdown file, with the required embed advice', () => {
     const files = readdirSync(new URL('../../../docs/integrations/', import.meta.url)).filter((f) => /-v\d+\.md$/.test(f))
     const guides = docPages().filter((p) => p.group === 'integrations')
-    expect(guides.map((g) => g.slug).sort()).toEqual(['integrations-discourse', 'integrations-ghost', 'integrations-html', 'integrations-wordpress'])
+    expect(guides.map((g) => g.slug).sort()).toEqual(['discourse', 'forgejo', 'ghost', 'gitea', 'gitlab', 'html', 'redmine', 'wordpress'].map((n) => 'integrations-' + n))
     expect(guides).toHaveLength(files.length)
     for (const slug of ['integrations-html', 'integrations-ghost']) {
       const html = docPage(slug)!.html
