@@ -26,3 +26,26 @@ export function purgerFromEnv(env: Record<string, string | undefined> = process.
     }
   }
 }
+
+/**
+ * Purges the cached over-limit avatar images (`/default/over-limit/` on the delivery host) from Cloudflare after an upload or removal.
+ * Same settings as purgerFromEnv. Returns false when they are missing or the call failed. Never throws.
+ */
+export function overLimitPurgerFromEnv(env: Record<string, string | undefined> = process.env, doFetch: typeof fetch = fetch): () => Promise<boolean> {
+  return async () => {
+    const { CF_ZONE_ID: zone, CF_API_TOKEN: token, PUBLIC_DELIVERY_URL: base } = env
+    if (!zone || !token || !base) return false
+    const host = base.replace(/\/$/, '').replace(/^https?:\/\//, '')
+    try {
+      const res = await doFetch(`https://api.cloudflare.com/client/v4/zones/${zone}/purge_cache`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ prefixes: [`${host}/default/over-limit/`] }),
+      })
+      return res.ok
+    } catch (err) {
+      console.error('admin over-limit purge failed', err instanceof Error ? err.name : 'unknown')
+      return false
+    }
+  }
+}
