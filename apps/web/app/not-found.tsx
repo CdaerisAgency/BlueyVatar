@@ -2,6 +2,8 @@ import { ButtonLink } from '../components/Button'
 import { PageMain } from '../components/Page'
 import { COPY } from '../lib/copy'
 
+export const metadata = { title: 'Page not found' }
+
 export default function NotFound() {
   return (
     <PageMain narrow>

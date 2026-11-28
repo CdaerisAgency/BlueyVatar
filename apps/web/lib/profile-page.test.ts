@@ -7,7 +7,7 @@ const base: PublicProfile = { did: 'did:plc:a', handle: 'alice.test', displayNam
 describe('profile page model', () => {
   it('builds Open Graph and Twitter metadata with the avatar on the public delivery origin', () => {
     const m = profileMetadata(base, 'alice.test', 'https://img.example/')
-    expect(m.title).toBe('Alice | BlueyVatar')
+    expect(m.title).toBe('Alice')
     expect(m.openGraph.title).toBe('Alice')
     expect(m.openGraph.images).toEqual(['https://img.example/img/x/y/256.png'])
     expect(m.twitter.images).toEqual(m.openGraph.images)
@@ -15,17 +15,17 @@ describe('profile page model', () => {
   })
   it('falls back to the default image and text when there is no description or avatar', () => {
     const m = profileMetadata({ ...base, displayName: null, description: null, avatar: null, jobTitle: 'Dev', company: 'Acme', location: 'Oslo' }, 'alice.test', 'https://i.test')
-    expect(m.title).toBe('alice.test | BlueyVatar')
+    expect(m.title).toBe('alice.test')
     expect(m.description).toBe('Dev, Acme | Oslo')
     expect(m.openGraph.images).toEqual(['https://blueyvatar.com/logo.jpg'])
   })
   it('always has a non-empty title, even when the display name or handle is blank', () => {
     const t = (over: Partial<PublicProfile>, handle = 'url.test') => profileMetadata({ ...base, ...over }, handle, 'https://i.test').title
-    expect(t({ displayName: '' })).toBe('alice.test | BlueyVatar')
-    expect(t({ displayName: '   ' })).toBe('alice.test | BlueyVatar')
-    expect(t({ displayName: '', handle: '' })).toBe('url.test | BlueyVatar')
-    expect(t({ displayName: null, handle: null })).toBe('url.test | BlueyVatar')
-    expect(t({ displayName: null, handle: null }, '')).toBe('Profile | BlueyVatar')
+    expect(t({ displayName: '' })).toBe('alice.test')
+    expect(t({ displayName: '   ' })).toBe('alice.test')
+    expect(t({ displayName: '', handle: '' })).toBe('url.test')
+    expect(t({ displayName: null, handle: null })).toBe('url.test')
+    expect(t({ displayName: null, handle: null }, '')).toBe('Profile')
   })
   it('re-checks links and interests', () => {
     expect(pageLinks({ ...base, links: [{ label: 'A', url: 'https://a.test/' }, { label: 'B', url: 'javascript:1' }] })).toEqual([{ label: 'A', url: 'https://a.test/' }])
