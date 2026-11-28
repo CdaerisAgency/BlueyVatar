@@ -14,7 +14,7 @@
   "dependencies": {
     "@blueyvatar/core": "workspace:*",
     "@blueyvatar/delivery": "workspace:*",
-    "@hono/node-server": "2.1.6",
+    "@hono/node-server": "2.1.11",
     "pg": "8.23.1",
     "sharp": "0.35.5"
   }
