@@ -2,17 +2,50 @@
   "name": "@blueyvatar/hovercards",
   "version": "0.1.0",
   "private": false,
-  "description": "Embeddable BlueyVatar hovercards. Requires a publishable key. Cross-origin profile access depends on your plan.",
+  "description": "Embeddable BlueyVatar hovercards. Requires a publishable key. Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing.",
+  "keywords": [
+    "hovercard",
+    "avatar",
+    "blueyvatar",
+    "atproto",
+    "profile",
+    "embed"
+  ],
   "license": "AGPL-3.0-only",
+  "homepage": "https://blueyvatar.com/docs",
+  "bugs": {
+    "url": "https://github.com/CdaerisAgency/BlueyVatar/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CdaerisAgency/BlueyVatar.git",
+    "directory": "packages/hovercards"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./auto": { "types": "./dist/auto.d.ts", "default": "./dist/auto.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./auto": {
+      "types": "./dist/auto.d.ts",
+      "default": "./dist/auto.js"
+    }
   },
-  "sideEffects": ["./dist/auto.js"],
-  "files": ["dist", "README.md"],
+  "sideEffects": [
+    "./dist/auto.js"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

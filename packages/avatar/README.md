@@ -2,13 +2,21 @@
 
 Avatar URL builder, email hashing, a Gravatar migration helper, and an optional React component for BlueyVatar. It has no server dependencies and runs in browsers and Node 18 or newer.
 
-Status: version 0.1.0 is not published yet. Publishing is a manual, tag-triggered step (see docs/deploy.md, "Publish the npm packages").
-
-## Install
+## Quick start
 
 ```sh
 npm install @blueyvatar/avatar
 ```
+
+```js
+import { avatarUrl, emailHash } from '@blueyvatar/avatar'
+
+const hash = await emailHash('ada@example.com')
+const url = avatarUrl({ hash, size: 128 }) // https://img.blueyvatar.com/...
+document.querySelector('img').src = url
+```
+
+In React, use `import { Avatar } from '@blueyvatar/avatar/react'` (see below). Cross-origin profile access depends on your plan, see https://blueyvatar.com/pricing. Guides for adding avatars to your site: https://blueyvatar.com/docs.
 
 ## Usage
 
@@ -48,7 +56,7 @@ const url = avatarUrl(options) // notes lists the differences
 
 ## Size and tiers
 
-The package is a few kilobytes with no runtime dependencies. Server tiers still apply to the URLs it builds: the Free tier serves PNG only and caps size at 512, custom `default` URLs need Plus or higher, and a publishable key is needed for tier features. The server clamps or ignores values and reports them in `x-adjusted-params`.
+The package is a few kilobytes with no runtime dependencies. Server tiers still apply to the URLs it builds: some formats, sizes, and custom `default` URLs depend on your plan (see https://blueyvatar.com/pricing), and a publishable key is needed for plan features. The server clamps or ignores values and reports them in `x-adjusted-params`.
 
 ## Versioning policy
 
