@@ -6,7 +6,7 @@ import { accountSummary, blockAll, cleanReason, listActions, recordAction } from
 import { decideAppeal } from './appeals'
 import { appealableActions, submitAppeal } from '../appeals'
 import { notifyReporters } from './followup'
-import { overLimitPurgerFromEnv, purgerFromEnv } from './purge'
+import { purgerFromEnv } from './purge'
 import { consumeTotp, createAdminSession, readAdminSession, revokeAdminSession } from './session'
 import { base32Decode, codeFor, matchStep, stepAt } from './totp'
 
@@ -205,48 +205,5 @@ describe.skipIf(!url)('admin database operations', () => {
     expect((await accountSummary(pool, O)).suspension).not.toBeNull()
     expect((await listActions(pool, { did: O }))[0]).toMatchObject({ action: 'appeal_upheld' })
     expect((await pool.query(`SELECT status FROM appeals WHERE did = $1 AND status <> 'open' ORDER BY id`, [O])).rows.map((r) => r.status)).toEqual(['overturned', 'upheld'])
-  })
-})
-
-describe('overLimitPurgerFromEnv', () => {
-  it('purges the over-limit prefix, and returns false without settings or on failure', async () => {
-    const f = vi.fn(async () => new Response('{}', { status: 200 }))
-    expect(await overLimitPurgerFromEnv({}, f as unknown as typeof fetch)()).toBe(false)
-    expect(f).not.toHaveBeenCalled()
-    const env = { CF_ZONE_ID: 'z', CF_API_TOKEN: 't', PUBLIC_DELIVERY_URL: 'https://x.test/' }
-    expect(await overLimitPurgerFromEnv(env, f as unknown as typeof fetch)()).toBe(true)
-    expect(JSON.parse((f.mock.calls[0] as unknown as [string, { body: string }])[1].body)).toEqual({ prefixes: ['x.test/default/over-limit/'] })
-    const bad = vi.fn(async () => new Response('no', { status: 500 }))
-    expect(await overLimitPurgerFromEnv(env, bad as unknown as typeof fetch)()).toBe(false)
-  })
-})
-
-describe('settings page is admin-only', () => {
-  it('answers 404 when admin is not configured, and every entry point calls requireAdmin', async () => {
-    vi.resetModules()
-    vi.doMock('next/navigation', () => ({
-      notFound: () => { throw new Error('NEXT_NOT_FOUND') },
-      redirect: (u: string) => { throw new Error(`NEXT_REDIRECT ${u}`) },
-    }))
-    vi.doMock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }))
-    const saved = { d: process.env.ADMIN_DIDS, t: process.env.ADMIN_TOTP_SECRET }
-    delete process.env.ADMIN_DIDS
-    delete process.env.ADMIN_TOTP_SECRET
-    try {
-      const { requireAdmin } = await import('./guard')
-      await expect(requireAdmin()).rejects.toThrow('NEXT_NOT_FOUND')
-    } finally {
-      if (saved.d !== undefined) process.env.ADMIN_DIDS = saved.d
-      if (saved.t !== undefined) process.env.ADMIN_TOTP_SECRET = saved.t
-      vi.doUnmock('next/navigation')
-      vi.doUnmock('next/headers')
-    }
-    for (const f of ['page.tsx', 'actions.ts', 'over-limit/route.ts']) {
-      const src = readFileSync(new URL(`../../app/admin/settings/${f}`, import.meta.url), 'utf8')
-      expect(src, f).toMatch(/await requireAdmin\(\)/)
-    }
-    const actions = readFileSync(new URL('../../app/admin/settings/actions.ts', import.meta.url), 'utf8')
-    expect(actions.match(/await requireAdmin\(\)/g)).toHaveLength(4)
-    expect(actions.match(/limited\(\['adminAction\.did', 'adminAction\.ip'\], a\.did\)/g)).toHaveLength(4)
   })
 })

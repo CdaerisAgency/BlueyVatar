@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '@blueyvatar/core/settings'
-import { auditSummary, crossPlanWarnings, formChanges, parseIntField } from './settings-form'
+import { auditSummary, crossPlanWarnings, formChanges, friendlyErrors, parseIntField, submittedValues } from './settings-form'
 
 describe('settings form helpers', () => {
   it('parses grouped digits and refuses junk', () => {
@@ -44,5 +44,22 @@ describe('settings form helpers', () => {
     expect(auditSummary({ name: 'over_limit_avatar', before: null, after: 'a'.repeat(64) })).toBe('over_limit_avatar: none → aaaaaaaa')
     expect(auditSummary(null)).toBeNull()
     expect(auditSummary({ foo: 1 })).toBeNull()
+  })
+})
+
+describe('friendlyErrors and submittedValues', () => {
+  it('uses the field label and grouped numbers', () => {
+    const e = friendlyErrors({ 'limits.anonymousDaily': 'limits.anonymousDaily must be a whole number', 'embeds.profileAccess': 'x' })
+    expect(e['limits.anonymousDaily']).toBe('Anonymous requests per day (per IP): enter a whole number from 50 to 1,000,000.')
+    expect(e['embeds.profileAccess']).toMatch(/^Who may use profile embeds/)
+  })
+  it('keeps what was typed', () => {
+    const f = new FormData()
+    f.set('limits.anonymousDaily', '1e3')
+    f.set('embeds.profileAccess.plus', 'on')
+    const v = submittedValues(f)
+    expect(v['limits.anonymousDaily']).toBe('1e3')
+    expect(v['embeds.profileAccess.plus']).toBe('on')
+    expect(v['embeds.profileAccess.free']).toBe('')
   })
 })

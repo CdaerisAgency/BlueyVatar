@@ -19,8 +19,9 @@ export const ADMIN_SETTINGS_COPY = {
     reset: 'Reset to the default.',
     unknownSetting: 'Unknown setting.',
     noFile: 'Choose an image to upload.',
-    uploaded: 'Over-limit avatar uploaded.',
-    removed: 'Over-limit avatar removed.',
-    purgeMissing: ' The cache purge did not run, so the old picture can stay for up to 24 hours.',
+    uploaded: 'Saved. Visitors over a limit see the new picture within about 5 minutes.',
+    removed: 'Removed. Visitors over a limit see the built-in picture within about 5 minutes.',
+    badInt: (label: string, min: string, max: string) => `${label}: enter a whole number from ${min} to ${max}.`,
+    badField: (label: string) => `${label}: check this value.`,
   },
 } as const

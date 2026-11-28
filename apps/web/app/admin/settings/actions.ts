@@ -3,23 +3,21 @@
 import { redirect } from 'next/navigation'
 import { SETTING_DEFS, type SettingKey } from '@blueyvatar/core/settings'
 import { requireAdmin } from '../../../lib/admin/guard'
-import { overLimitPurgerFromEnv } from '../../../lib/admin/purge'
 import { ASSET_MAX_BYTES, putOverLimitAsset, removeOverLimitAsset, resetSetting, saveSettings } from '../../../lib/admin/site-settings'
 import { ADMIN_SETTINGS_COPY as COPY } from '../../../lib/copy/admin'
-import { formChanges } from '../../../lib/admin/settings-form'
+import { formChanges, friendlyErrors, submittedValues, type SaveState } from '../../../lib/admin/settings-form'
 import { limited } from '../../../lib/rate-guard'
 
 const PATH = '/admin/settings'
-const to = (msg: string, errors?: Record<string, string>): never =>
-  redirect(`${PATH}?msg=${encodeURIComponent(msg)}${errors ? `&err=${encodeURIComponent(JSON.stringify(errors))}` : ''}`)
+const to = (msg: string): never => redirect(`${PATH}?msg=${encodeURIComponent(msg)}`)
 
-/** Saves every number and the four access boxes in one go. If any value is invalid nothing is saved and the fields are marked. */
-export async function saveSettingsAction(form: FormData): Promise<void> {
+/** Saves every number and the four access boxes in one go. If any value is invalid nothing is saved; the fields are marked and keep what was typed. */
+export async function saveSettingsAction(_prev: SaveState, form: FormData): Promise<SaveState> {
   const a = await requireAdmin()
   const wait = await limited(['adminAction.did', 'adminAction.ip'], a.did)
   if (wait) return to(wait)
   const out = await saveSettings(a.pool, a.did, formChanges(form))
-  if (!out.ok) return to(COPY.msg.notSaved, out.errors)
+  if (!out.ok) return { errors: friendlyErrors(out.errors), values: submittedValues(form) }
   return to(COPY.msg.saved(out.changed.length))
 }
 
@@ -34,8 +32,6 @@ export async function resetSettingAction(form: FormData): Promise<void> {
   return to(COPY.msg.reset)
 }
 
-const purgeNote = async (): Promise<string> => ((await overLimitPurgerFromEnv()()) ? '' : COPY.msg.purgeMissing)
-
 export async function uploadOverLimitAction(form: FormData): Promise<void> {
   const a = await requireAdmin()
   const wait = await limited(['adminAction.did', 'adminAction.ip'], a.did)
@@ -45,7 +41,7 @@ export async function uploadOverLimitAction(form: FormData): Promise<void> {
   if (file.size > ASSET_MAX_BYTES) return to('The image must be 2 MB or smaller.')
   const out = await putOverLimitAsset(a.pool, a.did, Buffer.from(await file.arrayBuffer()))
   if (!out.ok) return to(out.error)
-  return to(COPY.msg.uploaded + (await purgeNote()))
+  return to(COPY.msg.uploaded)
 }
 
 export async function removeOverLimitAction(): Promise<void> {
@@ -53,5 +49,5 @@ export async function removeOverLimitAction(): Promise<void> {
   const wait = await limited(['adminAction.did', 'adminAction.ip'], a.did)
   if (wait) return to(wait)
   await removeOverLimitAsset(a.pool, a.did)
-  return to(COPY.msg.removed + (await purgeNote()))
+  return to(COPY.msg.removed)
 }
