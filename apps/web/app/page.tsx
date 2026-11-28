@@ -9,7 +9,12 @@ import { pageMetadata } from '../lib/site'
 
 const inner = 'mx-auto w-full max-w-[1180px] px-4 sm:px-5'
 
-export const metadata = pageMetadata('/', 'BlueyVatar | Avatars and profiles in your atproto repository', 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.')
+const homeTitle = 'BlueyVatar | Avatars and profiles in your atproto repository'
+// The root title template would add a second brand suffix, so the home title is absolute.
+export const metadata = {
+  ...pageMetadata('/', homeTitle, 'Avatars and profiles that live in your atproto repository. Free for people, with a simple API for apps.'),
+  title: { absolute: homeTitle },
+}
 
 /** No cookie read here: the call to action asks /api/viewer after load, so this page is static and never carries a signed-in copy. */
 export default function Home() {
@@ -67,7 +72,7 @@ export default function Home() {
             <p className="max-w-[480px] text-bv-line">{COPY.dev.body}</p>
             <Link
               href="/docs"
-              className="font-semibold text-bv-cream underline decoration-bv-orange decoration-2 underline-offset-[6px] hover:text-bv-cream hover:decoration-4 focus-visible:outline-bv-cream"
+              className="inline-flex min-h-11 items-center font-semibold text-bv-cream underline decoration-bv-orange decoration-2 underline-offset-[6px] hover:text-bv-cream hover:decoration-4 focus-visible:outline-bv-cream"
             >
               {COPY.dev.link}
             </Link>

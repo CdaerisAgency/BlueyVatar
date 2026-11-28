@@ -1,6 +1,6 @@
 import { PageMain } from '../../components/Page'
 import { pageMetadata } from '../../lib/site'
-export const metadata = pageMetadata('/accessibility', 'Accessibility | BlueyVatar', 'Our accessibility commitment, the standard we test against, and how to report a barrier.')
+export const metadata = pageMetadata('/accessibility', 'Accessibility', 'Our accessibility commitment, the standard we test against, and how to report a barrier.')
 
 export default function AccessibilityPage() {
   return (

@@ -6,7 +6,7 @@ import { pageMetadata } from '../../lib/site'
 export const dynamic = 'force-static'
 
 export const metadata = {
-  ...pageMetadata('/changelog', 'Changelog | BlueyVatar', 'New features, changes, and fixes to BlueyVatar, newest first.'),
+  ...pageMetadata('/changelog', 'Changelog', 'New features, changes, and fixes to BlueyVatar, newest first.'),
 }
 
 /** Text with each email address split around its "@" so the Cloudflare proxy leaves it alone (see emailParts). */
