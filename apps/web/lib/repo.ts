@@ -1,6 +1,9 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import type { CropParams } from '@blueyvatar/core'
 import { oauthClient } from './auth'
+import { COPY } from './copy'
+import { log } from './obs'
+import { OAuthLockUnavailableError } from './oauth-lock'
 import { bskyAvatarBlob, readCapped } from './import'
 import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, validateImageBytes, type ImageMime, type NewImageFields } from './records'
 import { resolvePlan } from './plan'
@@ -42,22 +45,60 @@ export type ProfileRecord = {
 export type StoredImage = { uri: string; cid: string; rkey: string; value: ImageRecord }
 
 export class RepoError extends Error {}
+/** The stored link to the person's atproto account cannot be restored. They need to sign in again. */
+export class SessionExpiredError extends RepoError {}
+
+/**
+ * The non-secret facts about why a restore failed: the class names (atproto errors do not set `name`) and the HTTP
+ * status and OAuth error code (for example invalid_grant) when the error or its cause carries them. Never the message
+ * or description, which can hold token fragments.
+ */
+function restoreCause(err: unknown): Record<string, string | number | undefined> {
+  const str = (v: unknown): string | undefined => (typeof v === 'string' && v.length <= 64 ? v : undefined)
+  const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined)
+  const cls = (v: unknown): string => (typeof v === 'object' && v !== null ? (v.constructor?.name ?? 'object') : typeof v)
+  const e = (typeof err === 'object' && err !== null ? err : {}) as { status?: unknown; error?: unknown; cause?: unknown }
+  const c = (typeof e.cause === 'object' && e.cause !== null ? e.cause : {}) as { status?: unknown; error?: unknown }
+  return {
+    errorName: cls(err),
+    causeName: e.cause === undefined ? undefined : cls(e.cause),
+    status: num(e.status) ?? num(c.status),
+    error: str(e.error) ?? str(c.error),
+  }
+}
+
+function hasLockCause(err: unknown): boolean {
+  for (let e: unknown = err, i = 0; e && i < 5; i++, e = (e as { cause?: unknown }).cause) if (e instanceof OAuthLockUnavailableError) return true
+  return false
+}
 
 /** Restores the stored OAuth session for the signed-in DID. Throws RepoError if it is gone. */
 export async function repoSession(did: string): Promise<OAuthSession> {
   try {
     return await (await oauthClient()).restore(did)
-  } catch {
-    throw new RepoError("Your session with your Bluesky account's home server expired. Sign in again.")
+  } catch (err) {
+    // The session is fine. Another request holds the account's lock, so ask for a retry, not a new sign-in.
+    if (hasLockCause(err)) {
+      log.warn('oauth lock unavailable', { did })
+      throw new RepoError(COPY.session.busy)
+    }
+    log.warn('oauth restore failed', { did, ...restoreCause(err) })
+    throw new SessionExpiredError(COPY.session.expired)
   }
 }
 
 export async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsid: string, opts: { params?: Record<string, string>; body?: unknown } = {}): Promise<T> {
   const qs = opts.params ? `?${new URLSearchParams(opts.params)}` : ''
-  const res = await session.fetchHandler(`/xrpc/${nsid}${qs}`, {
-    method,
-    ...(opts.body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(opts.body) } : {}),
-  })
+  const res = await session
+    .fetchHandler(`/xrpc/${nsid}${qs}`, {
+      method,
+      ...(opts.body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(opts.body) } : {}),
+    })
+    .catch((err: unknown) => {
+      // The client takes the account's lock on every request. The session is fine, so ask for a retry.
+      if (hasLockCause(err)) throw new RepoError(COPY.session.busy)
+      throw err
+    })
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
     throw new RepoError(err.error ?? `Your Bluesky account's home server returned an error (${res.status})`)
