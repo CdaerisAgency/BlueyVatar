@@ -17,7 +17,7 @@ The `avatar_server_url` value in `config/configuration.yml`.
 2. Restart Redmine so it reads the file.
 3. In Administration > Settings > Display, make sure Gravatar is enabled.
 
-Redmine builds `<avatar_server_url>/avatar/<hash>` and adds `r`, `s` and `d` only when it sets them. Each person must have a verified email on BlueyVatar for their avatar to show. BlueyVatar accepts SHA-256 always, and MD5 only for emails verified after migration 0006 ([hashing-v1.md](../api/hashing-v1.md#md5-for-legacy-clients)).
+Redmine builds `<avatar_server_url>/avatar/<hash>` and adds `r`, `s` and `d` only when it sets them. Redmine sends SHA-256, which BlueyVatar accepts for every linked email.
 
 ## Check it worked
 
@@ -25,7 +25,7 @@ Open a user's page or an issue they commented on. Right-click the avatar, copy t
 
 ## Without a BlueyVatar avatar
 
-Redmine chooses the default image. Visitors without a BlueyVatar avatar see whatever Redmine requests in `d=`, or BlueyVatar's default if Redmine sends none. Copy the image address of any avatar to see the `d=` value your Redmine uses.
+Redmine chooses the default image. Visitors without a BlueyVatar avatar see whatever Redmine requests in `d=`. Copy the image address of any avatar to see the `d=` value your Redmine uses.
 
 ## Limits
 

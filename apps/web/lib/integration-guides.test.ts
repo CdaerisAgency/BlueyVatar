@@ -29,7 +29,13 @@ describe('integration guides', () => {
     }
   })
 
-  it('guides use no em-dashes and Limits has no digits', () => {
-    for (const name of ALL_GUIDES) expect(read(name)).not.toContain('\u2014')
+  it('guides use no em-dashes and the Limits section has no digits', () => {
+    for (const name of ALL_GUIDES) {
+      const text = read(name)
+      expect(text).not.toContain('\u2014')
+      const limits = /^## Limits\s*$([\s\S]*?)(?=^## |(?![\s\S]))/m.exec(text)?.[1] ?? ''
+      expect(limits.length, name + ' has a Limits section').toBeGreaterThan(0)
+      expect(limits, name).not.toMatch(/\d/)
+    }
   })
 })
