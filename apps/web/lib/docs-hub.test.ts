@@ -34,17 +34,25 @@ describe('guide hub', () => {
     }
   })
 
-  it('on the /docs index the hub heading comes after the h1 and before the API sections', () => {
+  it('on the /docs index the hub heading comes after the h1 and before the API page list', () => {
     const out = renderToStaticMarkup(createElement(DocsView, { page: docPage('')!, hub: true }))
     const h1 = out.indexOf('<h1')
     const hub = out.indexOf('id="guide-hub"')
     expect(h1).toBeGreaterThan(-1)
     expect(hub).toBeGreaterThan(h1)
     expect(out.match(/<h1/g)).toHaveLength(1)
-    const firstApiHeading = out.indexOf('<h2', out.indexOf('</section>'))
-    expect(firstApiHeading).toBeGreaterThan(hub)
+    const apiPages = out.indexOf('<table', out.indexOf('</section>'))
+    expect(apiPages).toBeGreaterThan(hub)
   })
   it('other doc pages render no hub', () => {
     expect(renderToStaticMarkup(createElement(DocsView, { page: docPage('examples')! }))).not.toContain('guide-hub')
+  })
+
+  it('the /docs index has exactly one list of guide links, the hub', () => {
+    expect(docPage('')!.html).not.toContain('/docs/integrations-')
+    const out = renderToStaticMarkup(createElement(DocsView, { page: docPage('')!, hub: true }))
+    const main = out.slice(out.indexOf('<main'))
+    expect(main.split("href=\"/docs/integrations-").length - 1).toBe(GUIDE_HUB.length)
+    expect(main.match(/aria-labelledby="guide-hub"/g)).toHaveLength(1)
   })
 })

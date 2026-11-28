@@ -28,7 +28,7 @@ describe('rendered docs', () => {
     }
     expect(docPage('integrations-html')!.html).toContain('SHA-256')
     expect(docPage('integrations-html')!.html).toContain('href="/docs/hashing"')
-    expect(docPage('')!.html).toContain('href="/docs/integrations-wordpress"')
+    expect(docPage('')!.html).not.toContain('integrations-')
   })
 
   it('rewrites cross-page .md links to /docs routes', () => {
