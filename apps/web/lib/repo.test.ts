@@ -7,7 +7,7 @@ vi.mock('./obs', () => ({ log: { warn: (...a: unknown[]) => warn(...a), info: vi
 
 import { COPY } from './copy'
 import { OAuthLockUnavailableError } from './oauth-lock'
-import { RepoError, SessionExpiredError, repoSession } from './repo'
+import { RepoError, SessionExpiredError, repoSession, xrpc } from './repo'
 
 describe('repoSession', () => {
   beforeEach(() => {
@@ -55,5 +55,12 @@ describe('repoSession', () => {
     const [, ctx] = warn.mock.calls[0] as [string, Record<string, unknown>]
     expect(ctx).toMatchObject({ did: 'did:plc:x', errorName: 'TokenRefreshError', causeName: 'OAuthResponseError', status: 400, error: 'invalid_grant' })
     expect(JSON.stringify(warn.mock.calls[0])).not.toMatch(/token=abc|secret=zzz/)
+  })
+
+  it('maps a lock failure inside an authenticated request to the busy message', async () => {
+    const session = { fetchHandler: vi.fn().mockRejectedValue(new Error('x', { cause: new OAuthLockUnavailableError('connect', new Error('t')) })) }
+    const err = await xrpc(session as never, 'GET', 'com.atproto.repo.listRecords').catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RepoError)
+    expect((err as Error).message).toBe(COPY.session.busy)
   })
 })

@@ -89,10 +89,16 @@ export async function repoSession(did: string): Promise<OAuthSession> {
 
 export async function xrpc<T>(session: OAuthSession, method: 'GET' | 'POST', nsid: string, opts: { params?: Record<string, string>; body?: unknown } = {}): Promise<T> {
   const qs = opts.params ? `?${new URLSearchParams(opts.params)}` : ''
-  const res = await session.fetchHandler(`/xrpc/${nsid}${qs}`, {
-    method,
-    ...(opts.body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(opts.body) } : {}),
-  })
+  const res = await session
+    .fetchHandler(`/xrpc/${nsid}${qs}`, {
+      method,
+      ...(opts.body !== undefined ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(opts.body) } : {}),
+    })
+    .catch((err: unknown) => {
+      // The client takes the account's lock on every request. The session is fine, so ask for a retry.
+      if (hasLockCause(err)) throw new RepoError(COPY.session.busy)
+      throw err
+    })
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
     throw new RepoError(err.error ?? `Your Bluesky account's home server returned an error (${res.status})`)

@@ -16,13 +16,16 @@ export function getPool(): pg.Pool | null {
  */
 export function getLockPool(): pg.Pool | null {
   if (!process.env.DATABASE_URL) return null
-  g.__bvLockPool ??= new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: Number(process.env.OAUTH_LOCK_POOL_MAX) || 10,
-    connectionTimeoutMillis: 10_000,
-  })
-  // An idle client that loses its connection emits this. Unhandled, it would crash the process.
-  ;(g.__bvLockPool as pg.Pool).on('error', (err) => log.warn('oauth lock pool error', { errorName: err.constructor.name }))
+  if (!g.__bvLockPool) {
+    const pool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: Number(process.env.OAUTH_LOCK_POOL_MAX) || 10,
+      connectionTimeoutMillis: 10_000,
+    })
+    // An idle client that loses its connection emits this. Unhandled, it would crash the process.
+    pool.on('error', (err) => log.warn('oauth lock pool error', { errorName: err.constructor.name }))
+    g.__bvLockPool = pool
+  }
   return g.__bvLockPool as pg.Pool
 }
 
