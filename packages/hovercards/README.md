@@ -2,7 +2,7 @@
 
 Hovercards for BlueyVatar profiles. Hover or focus an element with `data-blueyvatar` and a small card shows the person's name, role, location, and linked accounts. If the person set a background color, the card uses it, with dark or white text chosen for a 4.5 to 1 contrast ratio (the default colors apply when neither passes). Accounts the person chose to hide are never shown.
 
-Hovercards require a publishable key (`pk_...`) from a Plus, Business, or Enterprise license.
+Hovercards require a publishable key (`pk_...`). Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing
 
 Status: version 0.1.0 is not published yet. Publishing to npm is a later manual step. Until then, use the script served by the web app at `/embed/hovercard.js`, which is built from this package.
 

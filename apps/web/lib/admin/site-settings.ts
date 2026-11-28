@@ -48,6 +48,8 @@ export async function saveSettings(pool: pg.Pool, actor: string, changes: { key:
   if (valid.size === 0) return { ok: true, changed: [] }
 
   return inTx(pool, async (c) => {
+    // FOR UPDATE locks nothing when a key has no row yet, so serialize saves first; `before` is then read under the lock.
+    await c.query("SELECT pg_advisory_xact_lock(hashtext('site_settings'))")
     const { rows } = await c.query<SettingRow>('SELECT key, value FROM site_settings WHERE key = ANY($1::text[]) FOR UPDATE', [[...valid.keys()]])
     const stored = new Map(rows.map((r) => [r.key, r.value]))
     const changed: SettingKey[] = []
@@ -66,12 +68,12 @@ export async function saveSettings(pool: pg.Pool, actor: string, changes: { key:
   })
 }
 
-/** Deletes the row so the code default applies again. Audited even if there was no row (before is then the default). */
+/** Deletes the row so the code default applies again. A no-op (no audit row) when there is no row to delete. */
 export async function resetSetting(pool: pg.Pool, actor: string, key: SettingKey): Promise<void> {
   await inTx(pool, async (c) => {
     const { rows } = await c.query<{ value: unknown }>('DELETE FROM site_settings WHERE key = $1 RETURNING value', [key])
-    const before = rows.length > 0 ? rows[0]!.value : defaultFor(key)
-    await recordAction(c, actor, 'settings_change', { detail: { key, before, after: 'default' } })
+    if (rows.length === 0) return
+    await recordAction(c, actor, 'settings_change', { detail: { key, before: rows[0]!.value, after: 'default' } })
   })
 }
 
