@@ -29,6 +29,27 @@ describe('GET /go/:handle/:platform', () => {
     }
   })
 
+  it('answers a hidden verifiedAccounts section like an unknown platform (issue #291)', async () => {
+    const { app, index, deps } = setup()
+    index.accounts.set(DID, [acct('github', 'https://github.com/alice')])
+    const base = deps.resolver.getRecord
+    deps.resolver = { ...deps.resolver, getRecord: async (i, c, r) => (c === 'com.blueyvatar.profile' ? { hiddenSections: ['verifiedAccounts'] } : base(i, c, r)) }
+    const hidden = await app.request('/go/alice.test/github')
+    const unknown = await app.request('/go/alice.test/mastodon')
+    expect(hidden.status).toBe(unknown.status)
+    expect(hidden.headers.get('location')).toBe('https://bv.test/p/alice.test')
+    expect(hidden.headers.get('location')).toBe(unknown.headers.get('location'))
+    expect(hidden.headers.get('cache-control')).toBe(unknown.headers.get('cache-control'))
+  })
+
+  it('treats accounts as hidden when the profile record cannot be read', async () => {
+    const { app, index, deps } = setup()
+    index.accounts.set(DID, [acct('github', 'https://github.com/alice')])
+    const base = deps.resolver.getRecord
+    deps.resolver = { ...deps.resolver, getRecord: async (i, c, r) => { if (c === 'com.blueyvatar.profile') throw new Error('pds down'); return base(i, c, r) } }
+    expect((await app.request('/go/alice.test/github')).headers.get('location')).toBe('https://bv.test/p/alice.test')
+  })
+
   it('returns 404 for unknown handles and hidden profiles alike', async () => {
     const { app, index } = setup()
     expect((await app.request('/go/nobody.test/github')).status).toBe(404)

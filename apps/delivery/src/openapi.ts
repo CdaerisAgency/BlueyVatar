@@ -265,7 +265,8 @@ export const openApiDocument = {
       },
       Profile: {
         type: 'object',
-        required: ['did', 'handle', 'displayName', 'description', 'links', 'avatar', 'gallery', 'verifiedAccounts', 'profileUrl'],
+        description: 'Sections the owner hid (links, socialLinks, languages, wallets, interests, gallery, verifiedAccounts) are omitted from the object, not sent as empty lists. Treat a missing key as not shown.',
+        required: ['did', 'handle', 'displayName', 'description', 'avatar', 'profileUrl'],
         properties: {
           did: { type: 'string' },
           handle: { type: ['string', 'null'] },

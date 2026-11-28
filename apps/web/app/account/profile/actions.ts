@@ -1,5 +1,7 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
+import { repoHandle } from '../../../lib/claims-repo'
 import { currentDid } from '../../../lib/auth'
 import { RepoError, getProfile, putProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { reportError } from '../../../lib/obs'
@@ -19,6 +21,9 @@ export async function saveProfile(_prev: ProfileFormState, form: FormData): Prom
       const kept: ProfileRecord = { ...(existing?.value ?? { createdAt: new Date().toISOString() }) }
       for (const k of [...PROFILE_FIELDS, ...PROFILE_LIST_FIELDS, 'hiddenSections']) delete kept[k as keyof ProfileRecord]
       await putProfile(session, { ...kept, ...fields }, existing?.cid)
+      // Drop the cached public page so a hidden or restored section changes right away.
+      const handle = await repoHandle(session).catch(() => null)
+      if (handle) revalidatePath(`/p/${handle}`)
     },
     report: (err) => reportError('profile save failed', err),
     messageFor: (err) => (err instanceof RepoError ? err.message : 'Something went wrong. Try again.'),

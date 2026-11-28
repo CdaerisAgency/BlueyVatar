@@ -19,7 +19,7 @@ export const ACCOUNT_COPY = {
   },
   sections: {
     title: 'Show on my public profile',
-    help: 'Uncheck a section to hide it. A hidden section is removed from your public page, your profile JSON, and your Markdown, vCard, and JSON downloads. This includes your own view of your public page. Turn it back on here at any time.',
+    help: 'Uncheck a section to hide it. A hidden section is removed from your public page, your profile JSON, and your Markdown, vCard, and JSON downloads, including your own view of your public page. Hidden sections disappear from your public profile right away and from other sites within about 5 minutes. Turn a section back on here at any time.',
     show: {
       links: 'Show my links on my public profile',
       languages: 'Show my languages on my public profile',

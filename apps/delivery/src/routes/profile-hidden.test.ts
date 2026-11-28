@@ -19,7 +19,7 @@ const KEYS: Record<Section, string[]> = {
   links: ['links', 'socialLinks'], languages: ['languages'], wallets: ['wallets'], interests: ['interests'], gallery: ['gallery'], verifiedAccounts: ['verifiedAccounts'],
 }
 
-function build(hidden: unknown) {
+function build(hidden: unknown, failRead = false) {
   const { deps, index } = setup()
   const base = deps.resolver.getRecord
   deps.resolver = {
@@ -27,6 +27,7 @@ function build(hidden: unknown) {
     galleryItems: async () => [{ cid: 'bafygalmarker', rating: 'g' as const, caption: null }],
     getRecord: async (i, collection, rkey) => {
       if (collection === 'com.blueyvatar.profile') {
+        if (failRead) throw new Error('pds down')
         return {
           languages: [{ tag: 'pt-BR', primary: true }],
           socialLinks: [{ label: 'Social', url: 'https://social-link.example/me' }],
@@ -99,6 +100,33 @@ describe('hidden sections', () => {
     expect(body).not.toHaveProperty('interests')
     expect(body).toHaveProperty('languages')
     expect(body).toHaveProperty('links')
+  })
+
+  it('applies to ?format= exports like the suffix form', async () => {
+    const app = build(SECTIONS)
+    for (const f of ['json', 'md', 'vcf']) {
+      const out = (await get(app, `?format=${f}`)).replace(/\\/g, '')
+      for (const s of SECTIONS) for (const m of MARK[s]) expect(out, `${s} in ?format=${f}`).not.toContain(m)
+    }
+  })
+
+  it('fails closed with no-store when the profile record cannot be read', async () => {
+    const app = build(undefined, true)
+    for (const suffix of ['', '.json', '.md', '.vcf', '?format=md']) {
+      const res = await app.request(`/profile/alice.test${suffix}`)
+      expect(res.status).toBe(200)
+      expect(res.headers.get('cache-control')).toBe('no-store')
+      const out = (await res.text()).replace(/\\/g, '')
+      for (const s of SECTIONS) for (const m of MARK[s]) expect(out, `${s} in ${suffix || 'json'}`).not.toContain(m)
+    }
+    const body = JSON.parse(await get(app, ''))
+    for (const s of SECTIONS) for (const k of KEYS[s]) expect(body).not.toHaveProperty(k)
+  })
+
+  it('keeps the QR code for a platform identical, so it reveals nothing', async () => {
+    const shown = await (await build(undefined).request('/qr/alice.test.svg?to=github')).text()
+    const hidden = await (await build(['verifiedAccounts']).request('/qr/alice.test.svg?to=github')).text()
+    expect(hidden).toBe(shown)
   })
 
   it('treats a non-array hiddenSections value as unset', async () => {
