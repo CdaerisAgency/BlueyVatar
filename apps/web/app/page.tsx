@@ -67,7 +67,7 @@ export default function Home() {
             <p className="max-w-[480px] text-bv-line">{COPY.dev.body}</p>
             <Link
               href="/docs"
-              className="font-semibold text-bv-cream underline decoration-bv-orange decoration-2 underline-offset-[6px] hover:text-bv-cream hover:decoration-4 focus-visible:outline-bv-cream"
+              className="inline-flex min-h-11 items-center font-semibold text-bv-cream underline decoration-bv-orange decoration-2 underline-offset-[6px] hover:text-bv-cream hover:decoration-4 focus-visible:outline-bv-cream"
             >
               {COPY.dev.link}
             </Link>
