@@ -18,10 +18,20 @@ export function useViewer(): ClientViewer {
   const [v, setV] = useState<ClientViewer>({ signedIn: false })
   useEffect(() => {
     let live = true
-    inflight = null
-    void load().then((r) => live && setV(r))
+    const refresh = () => {
+      inflight = null
+      void load().then((r) => live && setV(r))
+    }
+    refresh()
+    // A page restored from the Back/forward cache does not run this effect again, so ask again, or the header keeps
+    // showing the state from before the person left (for example, signed in after signing out).
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) refresh()
+    }
+    window.addEventListener('pageshow', onShow)
     return () => {
       live = false
+      window.removeEventListener('pageshow', onShow)
     }
   }, [])
   return v

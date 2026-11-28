@@ -10,8 +10,14 @@ describe('GET /api/viewer', () => {
   it('returns signed out, uncached', async () => {
     cur.mockResolvedValue(null)
     const res = await GET()
-    expect(res.headers.get('cache-control')).toBe('no-store')
+    expect(res.headers.get('cache-control')).toContain('no-store')
     expect(await res.json()).toEqual({ signedIn: false })
+  })
+  it('/api/viewer response is private and not stored', async () => {
+    cur.mockResolvedValue({ did: 'did:plc:x', handle: 'ann.bsky.social' })
+    const cc = (await GET()).headers.get('cache-control') ?? ''
+    expect(cc).toContain('private')
+    expect(cc).toContain('no-store')
   })
   it('returns the handle and initial when signed in', async () => {
     cur.mockResolvedValue({ did: 'did:plc:x', handle: 'ann.bsky.social' })
