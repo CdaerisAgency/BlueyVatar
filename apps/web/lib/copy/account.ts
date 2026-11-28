@@ -17,6 +17,18 @@ export const ACCOUNT_COPY = {
     savedSuffix: 'saved',
     help: 'Pick the zone that matches your clock. Zones that always share the same time are listed once.',
   },
+  sections: {
+    title: 'Show on my public profile',
+    help: 'Uncheck a section to hide it. A hidden section is removed from your public page, your profile JSON, and your Markdown, vCard, and JSON downloads. This includes your own view of your public page. Turn it back on here at any time.',
+    show: {
+      links: 'Show my links on my public profile',
+      languages: 'Show my languages on my public profile',
+      wallets: 'Show my wallets on my public profile (each wallet also needs its own show setting)',
+      interests: 'Show my interests on my public profile',
+      gallery: 'Show my gallery on my public profile',
+      verifiedAccounts: 'Show my linked accounts on my public profile',
+    },
+  },
   share: {
     title: 'Share your profile',
     intro: 'These files and the QR code show what visitors can see on your public profile. Wallets appear only when you chose to show them, and they are marked not verified.',

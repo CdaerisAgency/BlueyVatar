@@ -6,6 +6,7 @@ import { requireDid } from '../../../lib/auth'
 import { loginPath } from '../../../lib/next-path'
 import { RepoError, SessionExpiredError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { ProfileForm } from './ProfileForm'
+import { SECTION_IDS } from '../../../lib/profile-limits'
 import { ProfileShare } from '../../../components/ProfileShare'
 import { repoHandle } from '../../../lib/claims-repo'
 import { siteUrl } from '../../../lib/site'
@@ -52,6 +53,7 @@ export default async function ProfilePage() {
             languages: (p.languages ?? []).map((l) => ({ tag: l.tag, primary: l.primary === true })),
             socialLinks: (p.socialLinks ?? []).map((l) => ({ label: l.label ?? '', url: l.url })),
             wallets: (p.wallets ?? []).map((w) => ({ chain: w.chain, address: w.address, label: w.label ?? '', visible: w.visible === true })),
+            hiddenSections: SECTION_IDS.filter((s) => (p.hiddenSections ?? []).includes(s)),
           }}
         />
       )}

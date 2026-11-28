@@ -22,6 +22,7 @@
           "languages": { "type": "array", "maxLength": 10, "description": "Languages the person speaks, in display order. At most one entry has primary true.", "items": { "type": "ref", "ref": "#language" } },
           "socialLinks": { "type": "array", "maxLength": 10, "description": "Other accounts and sites the person owns, in display order. https only. Self-declared, not verified.", "items": { "type": "ref", "ref": "#socialLink" } },
           "wallets": { "type": "array", "maxLength": 10, "description": "Self-declared wallet addresses. Never verified. An entry shows publicly only when visible is true.", "items": { "type": "ref", "ref": "#wallet" } },
+          "hiddenSections": { "type": "array", "maxLength": 6, "description": "Sections kept off the public profile and every export. Known values: links, languages, wallets, interests, gallery, verifiedAccounts. Readers ignore other values. Absent means every section shows.", "items": { "type": "string", "maxLength": 32, "knownValues": ["links", "languages", "wallets", "interests", "gallery", "verifiedAccounts"] } },
           "createdAt": { "type": "string", "format": "datetime" }
         }
       }

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { interestStats, runProfileSave, type SaveDeps } from './profile-form'
+import { HIDDEN_SECTIONS } from '@blueyvatar/core/profile-sections'
+import { SECTION_IDS } from './profile-limits'
 import { INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, validateProfileAll } from './records'
 
 const form = (o: Record<string, string>) => {
@@ -51,6 +53,26 @@ describe('profile form keeps input', () => {
     const r = await runProfileSave('did:plc:a', form({ ...typed, backgroundColor: '#112233', clearBackgroundColor: 'on' }), d)
     expect(r.saved).toBe('Profile saved.')
     expect(d.save).toHaveBeenCalledWith('did:plc:a', expect.not.objectContaining({ backgroundColor: expect.anything() }))
+  })
+})
+
+describe('section visibility toggles (issue #291)', () => {
+  it('saves unchecked sections as hiddenSections and leaves the field out when all are shown', async () => {
+    const d = deps()
+    await runProfileSave('did:plc:a', form({ ...typed, sectionsPresent: '1', 'showSection.links': 'on', 'showSection.languages': 'on' }), d)
+    expect(d.save).toHaveBeenCalledWith('did:plc:a', expect.objectContaining({ hiddenSections: ['wallets', 'interests', 'gallery', 'verifiedAccounts'] }))
+    const all = deps()
+    const on = Object.fromEntries(SECTION_IDS.map((s) => [`showSection.${s}`, 'on']))
+    await runProfileSave('did:plc:a', form({ ...typed, sectionsPresent: '1', ...on }), all)
+    expect(all.save).toHaveBeenCalledWith('did:plc:a', expect.not.objectContaining({ hiddenSections: expect.anything() }))
+  })
+  it('hides nothing when the form has no section controls', async () => {
+    const d = deps()
+    await runProfileSave('did:plc:a', form(typed), d)
+    expect(d.save).toHaveBeenCalledWith('did:plc:a', expect.not.objectContaining({ hiddenSections: expect.anything() }))
+  })
+  it('keeps the web list in step with the core list', () => {
+    expect([...SECTION_IDS]).toEqual([...HIDDEN_SECTIONS])
   })
 })
 

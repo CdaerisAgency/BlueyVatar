@@ -9,7 +9,7 @@ The delivery API serves avatars and profile JSON. The delivery host is `https://
 | [format-quality-v1.md](format-quality-v1.md) | The `fmt` and `q` parameters, tier limits, image path format, the square-only size decision, and how the crop and the original size work |
 | [cache-ttl-v1.md](cache-ttl-v1.md) | The `ttl` parameter, tier limits, and CDN interaction |
 | [gravatar-differences-v1.md](gravatar-differences-v1.md) | Where the API matches Gravatar and where it departs on purpose |
-| [exports-and-qr-v2.md](exports-and-qr-v2.md) | Profile downloads (JSON, Markdown, vCard) and QR codes with a logo or avatar in the center |
+| [exports-and-qr-v3.md](exports-and-qr-v3.md) | Profile downloads (JSON, Markdown, vCard) and QR codes with a logo or avatar in the center |
 | [usage-v2.md](usage-v2.md) | `GET /usage`: current period, per-meter counts, and history for a server key |
 | [examples-v2.md](examples-v2.md) | Copy-paste examples in curl, JavaScript, and an HTML `<img>` tag |
 | [errors-v2.md](errors-v2.md) | Error codes, rate limit headers, and other response headers |

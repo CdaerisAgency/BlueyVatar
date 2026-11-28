@@ -1,6 +1,7 @@
 import {
   normalizeBackgroundColor, EXPORT_CONTENT_TYPES, EXPORT_FORMATS, buildExport, exportFileName, toExportProfile, type ExportFormat, GALLERY_MAX, isPlusDid, ratingAllowed, entitlementsFor, profileExtras, resolveProfileLinks, parseIdentifier, pickCandidate,
 } from '@blueyvatar/core'
+import { applyHiddenSections, parseHiddenSections } from '@blueyvatar/core/profile-sections'
 import type { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { gateProfile, type Ctx } from '../context.js'
@@ -83,7 +84,7 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
           .map((g) => ({ url: signedPath(c, e, vis, identity.did, g.cid, 512, 'png'), caption: g.caption }))
       : []
     c.header('cache-control', 'private, max-age=300')
-    const body = {
+    const full = {
       did: identity.did,
       handle: identity.handle,
       displayName: bsky?.displayName ?? null,
@@ -115,12 +116,16 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
       atprotoApps,
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
     }
+    // Sections the owner hid are removed from every output, including the owner's own view (issue #291).
+    const hidden = parseHiddenSections(own?.hiddenSections)
+    const body = applyHiddenSections(full, hidden)
     if (!format) return c.json(body)
     // Exports carry the public fields of that same object: no DID, plan, email data, or hidden wallets.
     const file = toExportProfile({
       profile: body,
       deliveryOrigin: (deps.publicUrl ?? new URL(c.req.url).origin).replace(/\/+$/, ''),
       profileBaseUrl: profileBase,
+      hiddenSections: hidden,
     })
     c.header('content-type', EXPORT_CONTENT_TYPES[format])
     c.header('content-disposition', `attachment; filename="${exportFileName(identity.handle, format)}"`)

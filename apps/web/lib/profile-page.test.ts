@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { GALLERY_MAX } from '@blueyvatar/core'
-import { AVATAR_SIZES, avatarWebpSrcSet, pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLinks, profileMetadata, type PublicProfile } from './profile-page'
+import { applyHiddenSections } from '@blueyvatar/core/profile-sections'
+import { AVATAR_SIZES, avatarWebpSrcSet, pageAllLinks, pageAtprotoApps, pageColors, pageGallery, pageInterests, pageLanguages, pageLinks, pageWallets, profileMetadata, type PublicProfile } from './profile-page'
 
 const base: PublicProfile = { did: 'did:plc:a', handle: 'alice.test', displayName: 'Alice', description: 'Hi there', avatar: { url: '/img/x/y/256.png' }, jobTitle: null, company: null, location: null, pronouns: null }
 
@@ -87,5 +88,35 @@ describe('avatarWebpSrcSet', () => {
   })
   it('sizes match the 258 px picture box', () => {
     expect(AVATAR_SIZES).toContain('258px')
+  })
+})
+
+describe('hidden sections on the page (issue #291)', () => {
+  const full = {
+    ...base,
+    links: [{ label: 'Site', url: 'https://a.test/' }],
+    socialLinks: [{ label: 'Me', url: 'https://s.test/' }],
+    languages: [{ tag: 'en', primary: true }],
+    wallets: [{ chain: 'btc', address: 'bc1qaaa', label: null }],
+    interests: ['chess'],
+    gallery: [{ url: '/img/a/b/512.png', caption: null }],
+  }
+  const view = (hidden: unknown) => applyHiddenSections({ ...full, hiddenSections: hidden }) as unknown as PublicProfile
+  it('shows everything when hiddenSections is absent', () => {
+    const p = view(undefined)
+    expect(pageAllLinks(p)).toHaveLength(2)
+    expect(pageLanguages(p)).toHaveLength(1)
+    expect(pageWallets(p)).toHaveLength(1)
+    expect(pageInterests(p)).toEqual(['chess'])
+    expect(pageGallery(p, true)).toHaveLength(1)
+  })
+  it('renders nothing for a hidden section and ignores unknown values', () => {
+    const p = view(['links', 'languages', 'wallets', 'interests', 'gallery', 'bogus'])
+    expect(pageAllLinks(p)).toEqual([])
+    expect(pageLanguages(p)).toEqual([])
+    expect(pageWallets(p)).toEqual([])
+    expect(pageInterests(p)).toEqual([])
+    expect(pageGallery(p, true)).toEqual([])
+    expect(pageInterests(view(['bogus']))).toEqual(['chess'])
   })
 })

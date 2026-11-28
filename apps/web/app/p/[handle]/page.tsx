@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { applyHiddenSections } from '@blueyvatar/core/profile-sections'
 import type { Metadata } from 'next'
 import AvatarRing from '../../../components/AvatarRing'
 import { siteUrl } from '../../../lib/site'
@@ -20,7 +21,8 @@ const PUBLIC_DELIVERY_URL = process.env.PUBLIC_DELIVERY_URL || DELIVERY_URL
 
 const load = cache(async (handle: string): Promise<PublicProfile | null> => {
   const res = await fetch(`${DELIVERY_URL}/profile/${encodeURIComponent(handle)}`, { next: { revalidate: 300 } })
-  return res.ok ? ((await res.json()) as PublicProfile) : null
+  // The delivery JSON already leaves hidden sections out; this removes them again so the page cannot show one (issue #291).
+  return res.ok ? (applyHiddenSections(await res.json()) as unknown as PublicProfile) : null
 })
 
 /** A verified custom domain wins as the canonical host. A lookup failure falls back to the site URL. */
