@@ -5,13 +5,13 @@ import { docHref, docPages, type DocPage } from '../lib/docs'
 export function DocsView({ page }: { page: DocPage }) {
   const api = docPages().filter((p) => p.group === 'api')
   const guides = docPages().filter((p) => p.group === 'integrations')
-  const side = 'text-bv-black no-underline hover:text-bv-blue hover:underline'
+  const side = 'inline-flex min-h-11 items-center text-bv-black no-underline hover:text-bv-blue hover:underline'
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-auto flex-col gap-8 px-4 pt-7 pb-14 sm:px-5 md:flex-row md:gap-12 md:pt-10">
       <aside className="md:sticky md:top-6 md:w-60 md:flex-none md:self-start">
         <nav aria-label="Docs" className="text-[15px]">
           <p className="mb-2 font-semibold">API docs</p>
-          <ul className="m-0 grid list-none gap-1.5 p-0">
+          <ul className="m-0 grid list-none gap-0 p-0">
             {api.map((p) => (
               <li key={p.slug}>
                 <Link href={docHref(p.slug)} className={side} aria-current={p.slug === page.slug ? 'page' : undefined}>
@@ -24,7 +24,7 @@ export function DocsView({ page }: { page: DocPage }) {
             </li>
           </ul>
           <p className="mt-5 mb-2 font-semibold">Integration guides</p>
-          <ul className="m-0 grid list-none gap-1.5 p-0">
+          <ul className="m-0 grid list-none gap-0 p-0">
             {guides.map((p) => (
               <li key={p.slug}>
                 <Link href={docHref(p.slug)} className={side} aria-current={p.slug === page.slug ? 'page' : undefined}>
@@ -37,10 +37,10 @@ export function DocsView({ page }: { page: DocPage }) {
         {page.headings.length > 0 && (
           <nav aria-label="On this page" className="mt-6 text-sm">
             <p className="mb-2 font-semibold">On this page</p>
-            <ul className="m-0 grid list-none gap-1 p-0">
+            <ul className="m-0 grid list-none gap-0 p-0">
               {page.headings.map((h) => (
                 <li key={h.id}>
-                  <a href={`#${h.id}`} className="text-bv-ink-3 no-underline hover:text-bv-blue hover:underline">{h.text}</a>
+                  <a href={`#${h.id}`} className="inline-flex min-h-11 items-center text-bv-ink-3 no-underline hover:text-bv-blue hover:underline">{h.text}</a>
                 </li>
               ))}
             </ul>

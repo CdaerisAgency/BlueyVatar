@@ -319,7 +319,7 @@ export default function BugReport() {
             </div>
 
             <details className="text-[15px]">
-              <summary className="cursor-pointer font-semibold">What is sent with this report</summary>
+              <summary className="cursor-pointer py-2.5 font-semibold">What is sent with this report</summary>
               <ul className="mt-2 mb-0 pl-5">
                 {summary.map((s) => <li key={s}>{s}</li>)}
               </ul>

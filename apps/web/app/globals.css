@@ -281,6 +281,12 @@
   border-radius: 12px;
 }
 
+.docs-table td > a:only-child {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+}
+
 .docs h1,
 .docs h2,
 .docs h3 {

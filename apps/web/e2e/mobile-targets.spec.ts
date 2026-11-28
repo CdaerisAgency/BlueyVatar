@@ -37,14 +37,11 @@ async function smallTargets(page: Page, scope = 'body'): Promise<string[]> {
 test.describe('touch targets at 390x844', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  // The home page and the docs index have their own content links (page body, docs lists) that belong to
-  // other pages; for those only the shared header and footer are checked. The rest are checked whole.
-  const chromeOnly = new Set(['/', '/docs'])
   for (const path of ['/', '/pricing', '/docs', `/p/${SEEDED.handle}`]) {
     test(`${path} has no small targets`, async ({ page }) => {
       await page.goto(path)
       await page.locator('footer a').first().waitFor()
-      expect(await smallTargets(page, chromeOnly.has(path) ? 'header, footer' : 'body')).toEqual([])
+      expect(await smallTargets(page)).toEqual([])
     })
   }
 
@@ -57,6 +54,17 @@ test.describe('touch targets at 390x844', () => {
   test.describe('signed in', () => {
     test.beforeEach(async ({ context }) => {
       await signIn(context)
+    })
+    test('/account share section download links have no small targets', async ({ page }) => {
+      await page.goto('/account')
+      await expect(page.getByRole('heading', { name: 'Download your QR code' })).toBeVisible()
+      expect(await smallTargets(page)).toEqual([])
+    })
+    test('bug report toggles have no small targets with the dialog open', async ({ page }) => {
+      await page.goto('/account/notifications')
+      await page.getByRole('button', { name: /report a bug|unsent report/i }).click()
+      await expect(page.getByText('What is sent with this report')).toBeVisible()
+      expect(await smallTargets(page, 'dialog')).toEqual([])
     })
     for (const path of ['/account/notifications', '/account/visibility', '/account/settings/danger']) {
       test(`${path} has no small targets`, async ({ page }) => {
