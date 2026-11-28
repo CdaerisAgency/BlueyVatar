@@ -13,7 +13,7 @@ const description = 'Avatars and profiles that live in your atproto repository.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
-  title: 'BlueyVatar',
+  title: { default: 'BlueyVatar', template: '%s | BlueyVatar' },
   description,
   // Public pages set their own canonical URL; this covers the rest, resolved against metadataBase.
   alternates: { canonical: './' },

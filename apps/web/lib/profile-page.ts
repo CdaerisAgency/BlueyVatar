@@ -159,7 +159,7 @@ export function profileMetadata(p: PublicProfile, handle: string, imageBase: str
   // Profiles without an avatar fall back to the site's default image.
   const images = p.avatar ? [`${trimSlash(imageBase)}${p.avatar.url}`] : [defaultOgImage(siteBase)]
   return {
-    title: `${title} | BlueyVatar`,
+    title,
     description,
     ...(canonical ? { alternates: { canonical } } : {}),
     openGraph: { title, description, type: 'profile' as const, siteName: 'BlueyVatar', ...(canonical ? { url: canonical } : {}), images },
