@@ -7,7 +7,7 @@
  */
 import { DEFAULT_SETTINGS, type SiteSettings } from './settings.js'
 
-export const TIERS =['free', 'plus', 'business', 'enterprise'] as const
+export const TIERS = ['free', 'plus', 'business', 'enterprise'] as const
 export type Tier = (typeof TIERS)[number]
 
 /** Retired plan names that may still sit in database rows, keys, tokens, or Stripe mirrors. Each resolves to the plan named here. */

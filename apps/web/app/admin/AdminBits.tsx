@@ -13,7 +13,7 @@ export function AdminNav({ did }: { did?: string }) {
       {QUEUES.filter((q) => q.name !== 'child_safety' || !did || canViewChildSafety(did)).map((q) => <a key={q.name} href={`/admin/queue/${q.name}`} className="inline-flex min-h-11 items-center">{q.label}</a>)}
       <a href="/admin/effects" className="inline-flex min-h-11 items-center">Free effects</a>
       <a href="/admin/settings" className="inline-flex min-h-11 items-center">Settings</a>
-      <a href="/admin/audit"className="inline-flex min-h-11 items-center">Audit log</a>
+      <a href="/admin/audit" className="inline-flex min-h-11 items-center">Audit log</a>
       <form action={adminLogout} className="ml-auto"><Button type="submit">End admin session</Button></form>
     </nav>
   )

@@ -34,7 +34,7 @@ Branch on `code` and the HTTP status. `code` is stable. `message` is for people 
 | `key_expired` | 401 | The key's expiration time has passed. Keys made with the Forever lifetime never expire. Create a new key on the API keys page. |
 | `license_inactive` | 402 | The key's license is not active. The message names its status. |
 | `origin_not_allowed` | 403 | A website key was used from an origin or referer not on its domain list, or with none. |
-| `tier_required` | 403 | The route needs a higher tier. QR codes (`/qr`) and the profile exports are available on every plan, and cross-origin `/profile` (hovercards) requires Plus or higher. |
+| `tier_required` | 403 | The route needs a higher tier. QR codes (`/qr`) and the profile exports are available on every plan, and cross-origin `/profile` (hovercards) depends on your plan; see https://blueyvatar.com/pricing. |
 | `origin_forbidden` | 403 | The request did not come through the CDN. Raised only where the origin lock is enabled. |
 | `secret_key_required` | 403 | `GET /usage` was called with a website key. Use a server key in the `x-api-key` header. See [usage-v2.md](usage-v2.md). |
 | `access_denied` | 403 | The profile exists but its visibility rules exclude this caller (keyed-only or domain allowlist). |

@@ -42,6 +42,12 @@ describe('over-limit', () => {
     expect(res.headers.get('retry-after')).toBeTruthy()
   })
 
+  it('clamps the size to the free max size setting', async () => {
+    const res = await overLimitApp({ maxSize: { free: 128, plus: 1024, business: 2048 } }, await png(512)).request('/default/over-limit/1000.png')
+    expect(res.status).toBe(200)
+    expect((await sharp(Buffer.from(await res.arrayBuffer())).metadata()).width).toBe(128)
+  })
+
   it('json over limit stays 429', async () => {
     const res = await second(overLimitApp(), '?s=200&json=true')
     expect(res.status).toBe(429)

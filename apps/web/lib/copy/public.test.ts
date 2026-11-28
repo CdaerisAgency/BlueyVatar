@@ -19,4 +19,16 @@ describe('plan copy', () => {
     expect(b.business).toContain('2.5 million requests a month')
     expect(b.free).toContain('2,000 requests a day')
   })
+  it('lists hovercards only where profile access is on', () => {
+    const d = planBodies(DEFAULT_SETTINGS)
+    expect(d.free).not.toContain('hovercards')
+    expect(d.plus).toContain('hovercards')
+    const s = structuredClone(DEFAULT_SETTINGS)
+    s.profileAccess.free = true
+    s.profileAccess.plus = false
+    const b = planBodies(s)
+    expect(b.free).toContain('hovercards')
+    expect(b.plus).not.toContain('hovercards')
+    expect(b.plus).toContain('priority cache warming')
+  })
 })

@@ -25,7 +25,7 @@ export function mountUsage(app: Hono, ctx: Ctx): void {
     const snap = await deps.usage.read(e.licenseId, [period, ...months], days)
     const m = (p: string, meter: string) => snap.monthly.get(`${p}|${meter}`) ?? 0
     const meters = (p: string) => ({ origin_resolution: m(p, 'origin_resolution'), profile_json: m(p, 'profile_json'), transform: m(p, 'transform') })
-    const inc = includedVolume(e.tier)
+    const inc = includedVolume(e.tier, deps.settings.current())
     return c.json({
       tier: e.tier,
       period: { start: period, end: periodEndOf(period) },

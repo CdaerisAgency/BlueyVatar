@@ -151,7 +151,7 @@ export const openApiDocument = {
           { name: 'file', in: 'path', required: true, schema: { type: 'string', pattern: '^\\d{1,4}(-q\\d{1,3})?\\.(png|jpeg|webp)$' } },
         ],
         responses: {
-          '200': { description: 'Image bytes. Cache-Control public, max-age=86400.', content: { 'image/png': { schema: { type: 'string', format: 'binary' } } } },
+          '200': { description: 'Image bytes. Cache-Control public, max-age=86400.', content: { 'image/png': { schema: { type: 'string', format: 'binary' } }, 'image/jpeg': { schema: { type: 'string', format: 'binary' } }, 'image/webp': { schema: { type: 'string', format: 'binary' } } } },
           '400': errRef('invalid_format'),
         },
       },

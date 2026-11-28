@@ -67,6 +67,13 @@ describe('delivery reads live settings', () => {
     expect((await res.json()).error.message).toBe('Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing')
   })
 
+  it('/usage reports the live included volume', async () => {
+    const { app: a } = app({ keyedMonthly: { plus: 123_456, business: DEFAULT_SETTINGS.keyedMonthly.business } })
+    const res = await a.request('/usage', { headers: { 'x-api-key': 'sk_plus' } })
+    expect(res.status).toBe(200)
+    expect((await res.json()).included.volume).toBe(123_456)
+  })
+
   it('alerts use the live included volume', async () => {
     const sent: UsageAlert[] = []
     const alerts = new UsageAlerts({ send: async (x) => { sent.push(x) } }, new MemoryAlertLedger(), () => new Date('2026-11-15T00:00:00Z'))

@@ -74,11 +74,28 @@ export const PUBLIC_COPY = {
   error: { title: 'Something went wrong', body: 'Try again, or come back in a moment.', retry: 'Try again' },
 } as const
 
-/** The plan card lines. The request limits are the live admin-set values. */
+/** The plan card lines. The request limits and profile access are the live admin-set values. */
 export function planBodies(s: SiteSettings): { free: string; plus: string; business: string } {
+  const cards = 'hovercards'
+  const plusItems = [
+    '20 avatar images',
+    'a profile gallery',
+    'a custom profile domain',
+    'up to 20 linked accounts',
+    `${formatVolume(s.keyedMonthly.plus)} requests a month`,
+    ...(s.profileAccess.plus ? [cards] : []),
+    'priority cache warming',
+  ]
+  const businessItems = [
+    `${formatVolume(s.keyedMonthly.business)} requests a month`,
+    ...(s.profileAccess.business ? [cards] : []),
+    'custom domains',
+    'a support contact',
+  ]
+  const list = (items: string[]) => `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`
   return {
-    free: `${formatVolume(s.keyedDaily.free)} requests a day. Enough for a personal site or a side project.`,
-    plus: `Everything in Free, plus 20 avatar images, a profile gallery, a custom profile domain, up to 20 linked accounts, ${formatVolume(s.keyedMonthly.plus)} requests a month, hovercards, and priority cache warming.`,
-    business: `Everything in Plus, plus ${formatVolume(s.keyedMonthly.business)} requests a month, custom domains, and a support contact.`,
+    free: `${formatVolume(s.keyedDaily.free)} requests a day. Enough for a personal site or a side project.${s.profileAccess.free ? ' Includes hovercards.' : ''}`,
+    plus: `Everything in Free, plus ${list(plusItems)}.`,
+    business: `Everything in Plus, plus ${list(businessItems)}.`,
   }
 }
