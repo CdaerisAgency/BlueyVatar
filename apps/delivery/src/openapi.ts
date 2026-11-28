@@ -30,7 +30,7 @@ const keyErrors = { '401': errors['401'], '402': errors['402'], '403': errors['4
 
 const avatarOp = (summary: string, idParam: string, extra: Json[] = []): Json => ({
   summary,
-  description: 'Redirects (302) to a signed, immutable /img URL, or to the default image when nothing is visible. With json=true it answers 200 JSON instead and never redirects. Plan limits on s, d, fmt, q, and ttl are applied silently and reported in x-adjusted-params. When the request is over its limit and not json=true, it answers 302 to /default/over-limit/{size}.{format} with x-over-limit: 1 and retry-after instead of a 429.',
+  description: 'Redirects (302) to a signed, immutable /img URL, or to the default image when nothing is visible. With json=true it answers 200 JSON instead and never redirects. Plan limits on s, d, fmt, q, and ttl are applied silently and reported in x-adjusted-params. When the request is over its limit and not json=true, it answers 302 to /default/over-limit/{size}.{format} with x-over-limit: 1 and retry-after instead of a 429. The exception is d=404: that request gets a plain 404 (same body as an ordinary d=404 miss, plus x-over-limit and retry-after), so a client that stores the first answer forever never keeps the over-limit picture.',
   tags: ['Avatars'],
   security: [{}, { apiKeyHeader: [] }, { apiKeyQuery: [] }],
   parameters: [ref(`parameters/${idParam}`), ...avatarQuery, ...extra],
@@ -191,7 +191,7 @@ export const openApiDocument = {
       Sig: { name: 'sig', in: 'path', required: true, schema: { type: 'string' } },
       ImgFile: { name: 'file', in: 'path', required: true, schema: { type: 'string', pattern: '^\\d{1,4}(-q\\d{1,3})?\\.(png|jpeg|webp)$' } },
       s: { name: 's', in: 'query', description: 'Square size in pixels, at least 1. Also accepted as size. Values above the maximum for the plan are clamped and reported in x-adjusted-params.', schema: { type: 'integer', minimum: 1 } },
-      d: { name: 'd', in: 'query', description: 'Fallback when no avatar is visible: a style, or an HTTPS URL on the service allowlist (only on plans that allow it; other plans get the style default). Also accepted as default. Ignored when json=true, and ignored when the request is over its limit.', schema: { oneOf: [{ type: 'string', enum: [...DEFAULT_STYLES] }, { type: 'string', format: 'uri' }] } },
+      d: { name: 'd', in: 'query', description: 'Fallback when no avatar is visible: a style, or an HTTPS URL on the service allowlist (only on plans that allow it; other plans get the style default). Also accepted as default. Ignored when json=true, and ignored when the request is over its limit, except d=404, which stays a 404.', schema: { oneOf: [{ type: 'string', enum: [...DEFAULT_STYLES] }, { type: 'string', format: 'uri' }] } },
       f: { name: 'f', in: 'query', description: 'y forces the default image. Also accepted as forcedefault.', schema: { type: 'string', enum: ['y'] } },
       r: { name: 'r', in: 'query', description: 'Maximum content rating. Also accepted as rating.', schema: { type: 'string', enum: ['g', 'pg', 'r', 'x'], default: 'g' } },
       fmt: { name: 'fmt', in: 'query', description: 'Output format. Formats the plan does not allow fall back to PNG and are reported in x-adjusted-params.', schema: { type: 'string', enum: ['png', 'jpeg', 'webp'], default: 'png' } },
