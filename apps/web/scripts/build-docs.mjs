@@ -9,7 +9,7 @@ const dir = `${root}docs/api/`
 const integrationsDir = `${root}docs/integrations/`
 const out = fileURLToPath(new URL('../lib/docs.generated.ts', import.meta.url))
 
-const INTEGRATIONS = ['html', 'wordpress', 'ghost', 'discourse']
+const INTEGRATIONS = ['html', 'wordpress', 'ghost', 'discourse', 'gitlab', 'gitea', 'forgejo', 'redmine']
 const ORDER = ['README', 'examples', 'hashing', 'json-mode', 'format-quality', 'cache-ttl', 'exports-and-qr', 'usage', 'gravatar-differences', 'errors']
 const slugOf = (file) => file.replace(/-v\d+\.md$/, '')
 const urlOf = (slug) => (slug === 'README' ? '/docs' : `/docs/${slug}`)

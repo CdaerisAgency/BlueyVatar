@@ -49,7 +49,7 @@ export const openApiDocument = {
     description: 'Avatars and profile JSON served from atproto repositories. The API never accepts a raw email address: send the SHA-256 (or legacy MD5) hash. Human docs: https://blueyvatar.com/docs.',
     license: { name: 'AGPL-3.0-only', identifier: 'AGPL-3.0-only' },
   },
-  servers: [{ url: 'https://img.blueyvatar.com', description: 'Proposed delivery host. Use a configurable base URL.' }],
+  servers: [{ url: 'https://img.blueyvatar.com', description: 'Delivery host. Use a configurable base URL.' }],
   tags: [
     { name: 'Avatars', description: 'Avatar delivery (spec section 7).' },
     { name: 'Profile', description: 'Profile JSON, QR codes, and platform redirects.' },

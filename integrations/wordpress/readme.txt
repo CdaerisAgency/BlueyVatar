@@ -18,7 +18,7 @@ BlueyVatar Avatars changes the avatar URL that WordPress builds so it points at 
 * Adds `referrerpolicy="no-referrer"` to avatar images.
 * Leaves a URL alone when WordPress gives the plugin only a Gravatar hash, because a SHA-256 hash cannot be made from a hash.
 
-The default delivery host is https://img.blueyvatar.com. That host is not final. Change it in the settings if you self-host.
+The default delivery host is https://img.blueyvatar.com. Change it in the settings if you self-host.
 
 This plugin is not affiliated with Gravatar or Automattic.
 

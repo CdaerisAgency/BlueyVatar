@@ -10,7 +10,7 @@ The plugin in `integrations/wordpress/` points WordPress avatars at a BlueyVatar
 
 | Field | Default | Notes |
 | --- | --- | --- |
-| Delivery base URL | `https://img.blueyvatar.com` | HTTPS only. The default host is not final. Self-hosters enter their own. |
+| Delivery base URL | `https://img.blueyvatar.com` | HTTPS only. Self-hosters enter their own. |
 | Default style | `identicon` | Replaces the default chosen in the Avatars list above it. |
 | Maximum rating | `g` | `g`, `pg`, `r`, or `x`. |
 

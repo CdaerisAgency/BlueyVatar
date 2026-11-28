@@ -23,7 +23,7 @@ avatarUrl({ did: 'did:plc:abc123' })
 profileUrl({ id: 'alice.example.com', key: 'pk_...' }) // profile JSON endpoint
 ```
 
-Options: `hash` (SHA-256 or MD5 hex), `handle`, `did` (exactly one), `size` (1 to 2048), `default` (a style or an HTTPS URL), `forceDefault`, `rating` (`g`, `pg`, `r`, `x`), `format` (`png`, `jpeg`, `webp`), `quality` (1 to 100), `key`, `name`, `baseUrl` (default `https://img.blueyvatar.com`, which is not final). Raw email addresses are never sent: hash them first.
+Options: `hash` (SHA-256 or MD5 hex), `handle`, `did` (exactly one), `size` (1 to 2048), `default` (a style or an HTTPS URL), `forceDefault`, `rating` (`g`, `pg`, `r`, `x`), `format` (`png`, `jpeg`, `webp`), `quality` (1 to 100), `key`, `name`, `baseUrl` (default `https://img.blueyvatar.com`). Raw email addresses are never sent: hash them first.
 
 ### React
 

@@ -1,6 +1,6 @@
 # BlueyVatar delivery API reference (v1)
 
-The delivery API serves avatars and profile JSON. The proposed delivery host is `https://img.blueyvatar.com`. This host is not final, so write it as a configurable base URL in your client and expect the docs to name the final host before launch. All paths in these pages are relative to that base URL.
+The delivery API serves avatars and profile JSON. The delivery host is `https://img.blueyvatar.com`. All paths in these pages are relative to it.
 
 | Page | Covers |
 | --- | --- |
@@ -13,15 +13,6 @@ The delivery API serves avatars and profile JSON. The proposed delivery host is 
 | [usage-v2.md](usage-v2.md) | `GET /usage`: current period, per-meter counts, and history for a server key |
 | [examples-v2.md](examples-v2.md) | Copy-paste examples in curl, JavaScript, and an HTML `<img>` tag |
 | [errors-v2.md](errors-v2.md) | Error codes, rate limit headers, and other response headers |
-
-## Integration guides
-
-| Guide | Covers |
-| --- | --- |
-| [html-v1.md](../integrations/html-v1.md) | Plain HTML: hash route, `d=` fallback, no-referrer |
-| [wordpress-v1.md](../integrations/wordpress-v1.md) | The WordPress plugin, its license, and submission steps |
-| [ghost-v1.md](../integrations/ghost-v1.md) | Ghost themes and code injection |
-| [discourse-v1.md](../integrations/discourse-v1.md) | Discourse's `gravatar_base_url` setting |
 
 The OpenAPI 3.1 description is served at `/openapi.json` on the delivery host and lives in `apps/delivery/src/openapi.ts`.
 
