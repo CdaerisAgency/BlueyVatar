@@ -8,7 +8,7 @@
 import { buildCard, cleanId, profileEndpoint, type Card } from './model.js'
 
 export interface HovercardOptions {
-  /** Publishable key (pk_...) from a Plus, Business, or Enterprise license. */
+  /** Publishable key (pk_...). Cross-origin profile access depends on your plan. See https://blueyvatar.com/pricing */
   key: string
   /** Delivery origin. Defaults to `web`. */
   api?: string | undefined

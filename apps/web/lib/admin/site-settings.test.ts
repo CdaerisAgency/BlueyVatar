@@ -53,6 +53,28 @@ describe('site settings store (no database)', () => {
     expect(calls).toEqual([])
   })
 
+  it('saveSettings takes the advisory lock before reading the current values', async () => {
+    const { pool, calls } = fakePool()
+    await saveSettings(pool, 'did:plc:admin', [{ key: 'limits.anonymousDaily', value: 500 }])
+    const lock = calls.findIndex((c) => c.sql.includes('pg_advisory_xact_lock'))
+    const read = calls.findIndex((c) => c.sql.includes('FROM site_settings') && c.sql.includes('FOR UPDATE'))
+    expect(lock).toBeGreaterThan(0)
+    expect(read).toBeGreaterThan(lock)
+  })
+
+  it('resetSetting is a no-op when no row exists', async () => {
+    const { pool, calls } = fakePool()
+    await resetSetting(pool, 'did:plc:admin', 'limits.anonymousDaily')
+    expect(calls.some((c) => c.sql.includes('DELETE FROM site_settings'))).toBe(true)
+    expect(calls.some((c) => c.sql.includes('admin_actions'))).toBe(false)
+  })
+
+  it('resetSetting audits the old value when a row was deleted', async () => {
+    const { pool, calls } = fakePool((sql) => (sql.startsWith('DELETE FROM site_settings') ? { rows: [{ value: 500 }] } : { rows: [] }))
+    await resetSetting(pool, 'did:plc:admin', 'limits.anonymousDaily')
+    expect(calls.some((c) => c.sql.includes('INSERT INTO admin_actions'))).toBe(true)
+  })
+
   it('rejects non-image and oversize input; stores a square PNG', async () => {
     const bad = fakePool()
     expect(await putOverLimitAsset(bad.pool, 'a', Buffer.from('not an image'))).toEqual({ ok: false, error: expect.any(String) })
