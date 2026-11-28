@@ -1,5 +1,5 @@
 import type { Hono, Context } from 'hono'
-import { ParamError, isMd5Hex, isSha256Hex, parseAvatarParams, parseIdentifier, pickCandidate, type AvatarParams } from '@blueyvatar/core'
+import { ABSOLUTE_MAX_SIZE, DEFAULT_SIZE, ParamError, entitlementsFor, isMd5Hex, isSha256Hex, parseAvatarParams, parseIdentifier, pickCandidate, type AvatarParams } from '@blueyvatar/core'
 import type { Ctx } from '../context.js'
 import type { ErrorCode } from '../errors.js'
 import { fail } from '../http.js'
@@ -27,6 +27,23 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
   }
 
   /**
+   * Image requests over a limit get the owner's over-limit avatar instead of a broken image.
+   * Only free-tier callers reach this (anonymous, or a blocked keyed plan), so size and format
+   * follow the free rules. d= is ignored. JSON and data requests keep the 429.
+   */
+  function respondOverLimit(c: Context) {
+    const free = entitlementsFor('free', deps.settings.current())
+    const q = new URL(c.req.url).searchParams
+    const n = parseInt(q.get('s') ?? q.get('size') ?? '', 10)
+    const size = Math.min(Number.isFinite(n) && n >= 1 ? n : DEFAULT_SIZE, free.maxSize, ABSOLUTE_MAX_SIZE)
+    const fmt = q.get('fmt') ?? ''
+    const format = (free.formats as readonly string[]).includes(fmt) ? fmt : 'png'
+    c.header('cache-control', 'private, max-age=300')
+    c.header('x-over-limit', '1')
+    return c.redirect(`/default/over-limit/${size}.${format}`, 302)
+  }
+
+  /**
    * `lookup` receives a gate that does the database-only checks (repo active, visibility rules).
    * Hash lookups must call it before any network identity resolution, so that unlinked,
    * opted-out, and restricted hashes all take the same cheap path and return the same default.
@@ -38,6 +55,7 @@ export function mountAvatar(app: Hono, ctx: Ctx): void {
     initials = '',
   ) {
     const e = await entitle(c)
+    if (!e.ok && e.overLimit && c.req.query('json') !== 'true') return respondOverLimit(c)
     if (!e.ok) return fail(c, e.status, e.code, e.message)
 
     let p: AvatarParams

@@ -7,6 +7,7 @@ import { ConsoleAlertSink, EmailAlertSink, MemoryAlertLedger, UsageAlerts, type 
 import { SettingsCache } from '@blueyvatar/core/settings-cache'
 import { createApp } from './app.js'
 import { pgSettingRows } from './site-settings.js'
+import { pgOverLimitAsset } from './over-limit-asset.js'
 import { errors, log, metrics, resolverLog } from './obs.js'
 import { originLockWarning } from './origin.js'
 import { MemoryLicenseStore, MemoryRateLimiter, type LicenseStore, type RateLimiter } from './licenses.js'
@@ -72,6 +73,7 @@ const settings = new SettingsCache(pool ? pgSettingRows(pool) : null, {
 await settings.start()
 const app = createApp({
   settings,
+  overLimitAsset: pool ? pgOverLimitAsset(pool) : { get: async () => null },
   index,
   resolver: new AtprotoResolver({ index, adapters: DEFAULT_ADAPTERS, log: (m, meta) => resolverLog(m, meta) }),
   licenses,

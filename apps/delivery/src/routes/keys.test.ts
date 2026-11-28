@@ -23,7 +23,7 @@ describe('keys and rate limits', () => {
   it('enforces the anonymous daily limit per client IP', async () => {
     const { app } = setup()
     let last = 0
-    for (let i = 0; i < 101; i++) last = (await app.request('/u/alice.test', { headers: { 'cf-connecting-ip': '203.0.113.9' } })).status
+    for (let i = 0; i < 101; i++) last = (await app.request('/u/alice.test?json=true', { headers: { 'cf-connecting-ip': '203.0.113.9' } })).status
     expect(last).toBe(429)
     expect((await app.request('/u/alice.test', { headers: { 'cf-connecting-ip': '203.0.113.10' } })).status).toBe(302)
   })

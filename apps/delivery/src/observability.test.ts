@@ -80,7 +80,7 @@ describe('metrics endpoint and counters', () => {
     const { app, metrics } = build()
     let limited = 0
     for (let i = 0; i < 400; i++) {
-      const r = await app.request('/avatar/' + 'a'.repeat(64), { headers: { 'x-forwarded-for': '1.1.1.1' } })
+      const r = await app.request('/avatar/' + 'a'.repeat(64) + '?json=true', { headers: { 'x-forwarded-for': '1.1.1.1' } })
       if (r.status === 429) limited++
     }
     expect(limited).toBeGreaterThan(0)

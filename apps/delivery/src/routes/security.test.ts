@@ -9,7 +9,7 @@ describe('security and errors', () => {
     const { app } = setup()
     const h = emailHash('alice@example.com')
     let res: Response | undefined
-    for (let i = 0; i < 101; i++) res = await app.request(`/avatar/${h}`, { headers: { 'cf-connecting-ip': '203.0.113.88' } })
+    for (let i = 0; i < 101; i++) res = await app.request(`/avatar/${h}?json=true`, { headers: { 'cf-connecting-ip': '203.0.113.88' } })
     expect(res!.status).toBe(429)
     const wait = Number(res!.headers.get('retry-after'))
     expect(wait).toBeGreaterThanOrEqual(1)
