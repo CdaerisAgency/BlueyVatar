@@ -1,0 +1,2 @@
+### Added
+- Hide parts of your public profile. On the Profile page in your account, a "Show on my public profile" checkbox for each section (links, languages, wallets, interests, gallery, and linked accounts) removes that section from your public page, your profile JSON, and your JSON, Markdown, and vCard downloads. A hidden section is left out completely, including when you view your own public page. New profiles show every section.

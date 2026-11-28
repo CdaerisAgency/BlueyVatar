@@ -5,7 +5,7 @@
 import {
   MAX_INTERESTS, MAX_INTEREST_CHARS, INTERESTS_BOX_MAX_LENGTH, MAX_LANGUAGES, MAX_SOCIAL_LINKS, MAX_SOCIAL_LABEL_GRAPHEMES, MAX_SOCIAL_URL_LENGTH,
   MAX_WALLETS, MAX_WALLET_CHAIN_GRAPHEMES, MAX_WALLET_ADDRESS_GRAPHEMES, MAX_WALLET_LABEL_GRAPHEMES,
-  type ProfileField, type ProfileErrors, type LanguageRow, type SocialLinkRow, type WalletRow,
+  SECTION_IDS, type SectionId, type ProfileField, type ProfileErrors, type LanguageRow, type SocialLinkRow, type WalletRow,
 } from './profile-limits'
 import { MAX_BLOB_BYTES, MAX_BLOB_MESSAGE, MAX_LONG_EDGE } from './upload-limits'
 import { ENTITLEMENTS, RATINGS, isPlusDid, normalizeBackgroundColor, normalizeLanguageTag, parseCrop, type CropParams, type Rating } from '@blueyvatar/core'
@@ -230,6 +230,7 @@ export type ProfileInput = {
   languages?: LanguageRow[]
   socialLinks?: SocialLinkRow[]
   wallets?: WalletRow[]
+  hiddenSections?: SectionId[]
 }
 
 export type ProfileFields = {
@@ -244,6 +245,7 @@ export type ProfileFields = {
   languages?: { tag: string; primary?: boolean }[]
   socialLinks?: { label?: string; url: string }[]
   wallets?: { chain: string; address: string; label?: string; visible: boolean }[]
+  hiddenSections?: SectionId[]
 }
 
 /**
@@ -310,6 +312,7 @@ export function validateProfileAll(input: ProfileInput): { ok: true; value: Prof
     else out.backgroundColor = normalized
   }
   checkRows(input, out, errors)
+  if (input.hiddenSections?.length) out.hiddenSections = SECTION_IDS.filter((s) => input.hiddenSections!.includes(s))
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, value: out }
 }
 

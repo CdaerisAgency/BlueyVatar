@@ -1,6 +1,7 @@
 import {
   normalizeBackgroundColor, EXPORT_CONTENT_TYPES, EXPORT_FORMATS, buildExport, exportFileName, toExportProfile, type ExportFormat, GALLERY_MAX, isPlusDid, ratingAllowed, entitlementsFor, profileExtras, resolveProfileLinks, parseIdentifier, pickCandidate,
 } from '@blueyvatar/core'
+import { applyHiddenSections, HIDDEN_SECTIONS, parseHiddenSections } from '@blueyvatar/core/profile-sections'
 import type { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { gateProfile, type Ctx } from '../context.js'
@@ -12,7 +13,7 @@ const EXPORT_SUFFIX = new RegExp(`\\.(${EXPORT_FORMATS.join('|')})$`, 'i')
 const isExportFormat = (v: string): v is ExportFormat => (EXPORT_FORMATS as readonly string[]).includes(v)
 
 export function mountProfile(app: Hono, ctx: Ctx): void {
-  const { deps, metrics, profileBase, entitle, isCrossOrigin, signedPath, findIdentity } = ctx
+  const { deps, logger, metrics, profileBase, entitle, isCrossOrigin, signedPath, findIdentity } = ctx
 
   // Hovercards on other sites read profile JSON from the browser. No cookies are
   // used, so any origin may read it; publishable keys still enforce their domains.
@@ -63,9 +64,14 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
     // Same condition as the profile_json meter, so the keyed-call count has one source of truth. Never blocks the response.
     if (e.licenseId) await deps.usage.addProfileCall(identity.did).catch(() => undefined)
 
+    let ownReadFailed = false
     const [bsky, own] = await Promise.all([
       deps.resolver.getRecord(identity, 'app.bsky.actor.profile', 'self').catch(() => null),
-      deps.resolver.getRecord(identity, 'com.blueyvatar.profile', 'self').catch(() => null),
+      deps.resolver.getRecord(identity, 'com.blueyvatar.profile', 'self').catch((err) => {
+        ownReadFailed = true
+        logger.warn('profile record read failed; hiding every hideable section', { did: identity.did, err })
+        return null
+      }),
     ])
     const picked = pickCandidate(await deps.resolver.candidates(identity), 'g', false)
     // Attested claims only. The Free tier cap applies to the JSON (spec section 11.1); the
@@ -82,8 +88,9 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
           .slice(0, GALLERY_MAX)
           .map((g) => ({ url: signedPath(c, e, vis, identity.did, g.cid, 512, 'png'), caption: g.caption }))
       : []
-    c.header('cache-control', 'private, max-age=300')
-    const body = {
+    // Fail closed: without the record the hidden list is unknown, so nothing hideable goes out and the response is never cached.
+    c.header('cache-control', ownReadFailed ? 'no-store' : 'private, max-age=300')
+    const full = {
       did: identity.did,
       handle: identity.handle,
       displayName: bsky?.displayName ?? null,
@@ -115,12 +122,16 @@ export function mountProfile(app: Hono, ctx: Ctx): void {
       atprotoApps,
       profileUrl: identity.handle ? `/p/${identity.handle}` : null,
     }
+    // Sections the owner hid are removed from every output, including the owner's own view (issue #291).
+    const hidden = ownReadFailed ? [...HIDDEN_SECTIONS] : parseHiddenSections(own?.hiddenSections)
+    const body = applyHiddenSections(full, hidden)
     if (!format) return c.json(body)
     // Exports carry the public fields of that same object: no DID, plan, email data, or hidden wallets.
     const file = toExportProfile({
       profile: body,
       deliveryOrigin: (deps.publicUrl ?? new URL(c.req.url).origin).replace(/\/+$/, ''),
       profileBaseUrl: profileBase,
+      hiddenSections: hidden,
     })
     c.header('content-type', EXPORT_CONTENT_TYPES[format])
     c.header('content-disposition', `attachment; filename="${exportFileName(identity.handle, format)}"`)

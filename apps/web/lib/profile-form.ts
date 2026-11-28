@@ -1,4 +1,5 @@
 import { validateProfileAll, type ProfileFields } from './records'
+import { SECTION_IDS } from './profile-limits'
 import type { LanguageRow, ProfileFormState, ProfileTextField, ProfileValues, RowList, SocialLinkRow, WalletRow } from './profile-limits'
 
 export { interestStats, type ProfileFormState, type ProfileValues } from './profile-limits'
@@ -7,6 +8,9 @@ export const PROFILE_FIELDS: readonly ProfileTextField[] = ['jobTitle', 'company
 
 /** Record keys that hold row lists. A save replaces them, so a cleared list is removed. */
 export const PROFILE_LIST_FIELDS: readonly RowList[] = ['languages', 'socialLinks', 'wallets']
+
+/** Marker input: the section checkboxes were on the form, so unchecked means hidden. */
+const SECTIONS_MARKER = 'sectionsPresent'
 
 /** Row indexes present in the form for one list, in numeric order. Field names look like `wallets.2.address`. */
 function rowIndexes(form: FormData, list: RowList): number[] {
@@ -30,6 +34,7 @@ export function readProfileForm(form: FormData): ProfileValues {
     label: str(form, `wallets.${i}.label`),
     visible: form.get(`wallets.${i}.visible`) === 'on',
   }))
+  values.hiddenSections = form.get(SECTIONS_MARKER) === '1' ? SECTION_IDS.filter((s) => form.get(`showSection.${s}`) !== 'on') : []
   values.clearBackgroundColor = form.get('clearBackgroundColor') === 'on'
   return values
 }

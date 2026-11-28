@@ -10,6 +10,7 @@
  * vCard rules come from RFC 6350 (vCard 4.0) and RFC 9554. Section numbers are cited next to each
  * property in `buildVcard`. This file has no node: imports so it stays bundle-safe.
  */
+import { applyHiddenSections, parseHiddenSections, type HiddenSection } from './profile-sections.js'
 import { sanitizeProfileLinks, type ProfileLink } from './links.js'
 import { cleanWallet, sanitizeLanguages, type ProfileLanguage, type ProfileWallet } from './profile-extras.js'
 
@@ -46,6 +47,23 @@ export interface ExportProfile {
   verifiedAccounts: ExportVerifiedAccount[]
   /** Only wallets the owner chose to show. Always marked not verified. */
   wallets: ProfileWallet[]
+  /** Sections the owner hid. The JSON export leaves their keys out; Markdown and vCard skip them. */
+  hiddenSections?: HiddenSection[]
+}
+
+/** The profile with the arrays of every hidden section emptied, for the Markdown and vCard builders. */
+function withoutHidden(p: ExportProfile): ExportProfile {
+  const h = parseHiddenSections(p.hiddenSections)
+  if (!h.length) return p
+  return {
+    ...p,
+    interests: h.includes('interests') ? [] : p.interests,
+    languages: h.includes('languages') ? [] : p.languages,
+    links: h.includes('links') ? [] : p.links,
+    socialLinks: h.includes('links') ? [] : p.socialLinks,
+    verifiedAccounts: h.includes('verifiedAccounts') ? [] : p.verifiedAccounts,
+    wallets: h.includes('wallets') ? [] : p.wallets,
+  }
 }
 
 // ---------- input ----------
@@ -83,11 +101,15 @@ export interface ExportSource {
   deliveryOrigin: string
   /** Origin of the profile pages, such as https://blueyvatar.com. */
   profileBaseUrl: string
+  /** Sections to leave out. Defaults to the `hiddenSections` value inside `profile`. */
+  hiddenSections?: unknown
 }
 
 /** Copy the public fields out of the profile JSON. Everything else in it is dropped. */
 export function toExportProfile(src: ExportSource): ExportProfile {
-  const p = (src.profile && typeof src.profile === 'object' ? src.profile : {}) as Record<string, unknown>
+  const raw = (src.profile && typeof src.profile === 'object' ? src.profile : {}) as Record<string, unknown>
+  const hiddenSections = parseHiddenSections(src.hiddenSections !== undefined ? src.hiddenSections : raw.hiddenSections)
+  const p = applyHiddenSections(raw, hiddenSections)
   const handle = text(p.handle)
   let avatarUrl: string | null = null
   const av = p.avatar
@@ -143,13 +165,15 @@ export function toExportProfile(src: ExportSource): ExportProfile {
     socialLinks: sanitizeProfileLinks(p.socialLinks),
     verifiedAccounts: verified,
     wallets,
+    ...(hiddenSections.length ? { hiddenSections } : {}),
   }
 }
 
 // ---------- JSON ----------
 
 export function buildJsonExport(p: ExportProfile): string {
-  return JSON.stringify(p, null, 2) + '\n'
+  // A hidden section is absent from the file, not an empty list (issue #291).
+  return JSON.stringify(applyHiddenSections(p), null, 2) + '\n'
 }
 
 // ---------- Markdown ----------
@@ -188,7 +212,8 @@ function languageName(tag: string): string {
   }
 }
 
-export function buildMarkdown(p: ExportProfile): string {
+export function buildMarkdown(profile: ExportProfile): string {
+  const p = withoutHidden(profile)
   const out: string[] = []
   const name = p.displayName ?? p.handle ?? 'Profile'
   out.push(`# ${mdLine(name)}`, '')
@@ -284,7 +309,8 @@ export function vcardParamValue(s: string): string {
  * Build a vCard 4.0 file. Section numbers refer to RFC 6350 unless the line says RFC 9554.
  * Properties without an own line below are not emitted.
  */
-export function buildVcard(p: ExportProfile): string {
+export function buildVcard(profile: ExportProfile): string {
+  const p = withoutHidden(profile)
   const lines: string[] = []
   const add = (l: string) => lines.push(vcardFold(l))
   add('BEGIN:VCARD') // 6.1.1

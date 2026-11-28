@@ -54,4 +54,4 @@ The `/profile/{id}` document includes `avatar`, `{ "url": string, "source": stri
 
 The `/profile/{id}` document includes `gallery`, an array of `{ "url": string, "caption": string or null }` with at most 12 entries. It is `[]` unless the profile owner is on the Plus plan. Each `url` is a signed `/img` path (512 pixel PNG) and follows the same visibility, rating, and blocklist rules as the avatar. Gallery images are never returned by the avatar routes.
 
-`/profile/{id}` can also return the public fields as a JSON, Markdown, or vCard file. See [exports-and-qr-v2.md](exports-and-qr-v2.md).
+`/profile/{id}` can also return the public fields as a JSON, Markdown, or vCard file. See [exports-and-qr-v3.md](exports-and-qr-v3.md).

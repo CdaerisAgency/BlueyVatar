@@ -39,6 +39,7 @@ export type ProfileRecord = {
   languages?: { tag: string; primary?: boolean }[]
   socialLinks?: { label?: string; url: string }[]
   wallets?: { chain: string; address: string; label?: string; visible?: boolean }[]
+  hiddenSections?: string[]
   createdAt: string
   [k: string]: unknown
 }

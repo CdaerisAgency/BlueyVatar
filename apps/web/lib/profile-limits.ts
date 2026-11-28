@@ -21,6 +21,10 @@ export type SocialLinkRow = { label: string; url: string }
 export type WalletRow = { chain: string; address: string; label: string; visible: boolean }
 export type RowList = 'languages' | 'socialLinks' | 'wallets'
 
+/** Sections the owner can hide. Mirrors HIDDEN_SECTIONS in packages/core/src/profile-sections.ts (a test keeps the two in step). */
+export const SECTION_IDS = ['links', 'languages', 'wallets', 'interests', 'gallery', 'verifiedAccounts'] as const
+export type SectionId = (typeof SECTION_IDS)[number]
+
 export type ProfileField = 'jobTitle' | 'company' | 'location' | 'pronouns' | 'pronunciation' | 'timezone' | 'interests' | 'backgroundColor' | RowList
 /** Row problems use keys like `wallets.2.address`. List-level problems use the list name. */
 export type ProfileErrorKey = ProfileField | `${RowList}.${number}.${string}`
@@ -32,6 +36,8 @@ export type ProfileValues = Record<ProfileTextField, string> & {
   languages: LanguageRow[]
   socialLinks: SocialLinkRow[]
   wallets: WalletRow[]
+  /** Sections the owner hid. Everything else shows. */
+  hiddenSections: SectionId[]
 }
 
 /** Element id for a field or row key, safe for fragment links. */

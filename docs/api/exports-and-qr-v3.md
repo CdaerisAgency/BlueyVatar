@@ -1,4 +1,4 @@
-# Profile exports and QR codes (v2)
+# Profile exports and QR codes (v3)
 
 Part of issue #242. Both features are available to every plan and every caller. They follow the same caching, rate limit, rating, and hidden-profile rules as the routes they extend.
 
@@ -19,6 +19,23 @@ The existing `/profile/{id}` URL is unchanged. A handle can end in `.md`, becaus
 ### What an export contains
 
 Display name, handle, profile page URL, description, avatar URL (a signed image URL, not image bytes), location, job title, company, pronouns, interests, languages, links (from your atproto profile and your own social links), linked accounts you have not hidden, and only the wallets you chose to show. Each wallet is marked not verified. Exports are built from the public profile JSON, so they never include hidden wallets, email links or hashes, your DID, your plan, or anything that only you can see.
+
+### Hidden sections
+
+The owner can hide whole sections of the profile on the Profile page of their account. The choice is stored in the `hiddenSections` field of the `com.blueyvatar.profile` record. Known values:
+
+| Value | Keys removed from the profile JSON |
+| --- | --- |
+| `links` | `links` and `socialLinks` |
+| `languages` | `languages` |
+| `wallets` | `wallets` (all of them, whatever each wallet's own `visible` setting is) |
+| `interests` | `interests` |
+| `gallery` | `gallery` |
+| `verifiedAccounts` | `verifiedAccounts` |
+
+A hidden section is absent from the profile JSON. The key is not present, and it is not an empty list. The same section is absent from the profile page and from the JSON, Markdown, and vCard exports. It stays hidden when the owner views their own public page. The `hiddenSections` field itself is never part of the response. When the field is absent from the record, every section shows. Values that are not in the table are ignored. A client that reads the profile JSON should treat a missing key as "not shown" and not as an error.
+
+Each wallet keeps its own `visible` setting. A wallet shows only when its `visible` is true and `wallets` is not in `hiddenSections`.
 
 ### vCard properties
 

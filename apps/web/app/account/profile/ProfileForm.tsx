@@ -5,7 +5,7 @@ import { FormNotices, useFocusResult } from '../../../components/FormNotices'
 import { COPY } from '../../../lib/copy'
 import { TIMEZONE_ENTRIES, entryForZone, isListedZone, zoneLabel } from '../../../lib/timezones'
 import {
-  INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, MAX_INTEREST_CHARS, interestStats, fieldId,
+  INTERESTS_BOX_MAX_LENGTH, MAX_INTERESTS, MAX_INTEREST_CHARS, SECTION_IDS, interestStats, fieldId,
   MAX_LANGUAGES, MAX_LANGUAGE_TAG_LENGTH, MAX_SOCIAL_LINKS, MAX_SOCIAL_LABEL_GRAPHEMES, MAX_SOCIAL_URL_LENGTH,
   MAX_WALLETS, MAX_WALLET_CHAIN_GRAPHEMES, MAX_WALLET_ADDRESS_GRAPHEMES, MAX_WALLET_LABEL_GRAPHEMES,
   type LanguageRow, type ProfileErrorKey, type ProfileFormState, type ProfileTextField, type ProfileValues, type SocialLinkRow, type WalletRow,
@@ -206,6 +206,16 @@ export function ProfileForm({ initial, hasColor }: { initial: ProfileValues; has
         <input type="checkbox" name="clearBackgroundColor" checked={useDefault} onChange={(e) => setUseDefault(e.target.checked)} /> Use the default colors (clears the background color)
       </label>
       </div>
+      <fieldset id="profile-sections" className="bv-setting">
+        <legend>{COPY.sections.title}</legend>
+        <p>{COPY.sections.help}</p>
+        <input type="hidden" name="sectionsPresent" value="1" />
+        {SECTION_IDS.map((s) => (
+          <label key={s} className="flex min-h-11 items-center gap-2">
+            <input type="checkbox" name={`showSection.${s}`} defaultChecked={!v.hiddenSections.includes(s)} /> {COPY.sections.show[s]}
+          </label>
+        ))}
+      </fieldset>
       <Button type="submit" variant="primary" disabled={pending}>
         Save profile
       </Button>

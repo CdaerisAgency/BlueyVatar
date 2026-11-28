@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import robots from '../app/robots'
+import { applyHiddenSections } from '@blueyvatar/core/profile-sections'
 import { pageMetadata, pricingDescription, ROBOTS_ALLOW, ROBOTS_DISALLOW, siteUrl, STATIC_PAGES } from './site'
 import { PRICING } from './pricing'
 import { jsonLdString, personJsonLd, profileCanonical, sitemapIndexXml, urlsetXml } from './seo'
@@ -70,6 +71,13 @@ describe('personJsonLd', () => {
     verifiedAccounts: [{ platform: 'github', uri: 'https://github.com/alice', hidden: false }, { platform: 'mastodon', uri: 'https://m.test/@a', hidden: true }],
   }
   const ld = personJsonLd(p, 'https://blueyvatar.com/p/alice.test', 'https://img.test/')
+  it('leaves hidden verifiedAccounts and links out of sameAs (issue #291)', () => {
+    const shown = applyHiddenSections({ ...p, hiddenSections: ['verifiedAccounts'] }) as unknown as PublicProfile
+    expect(personJsonLd(shown, 'https://blueyvatar.com/p/alice.test', 'https://img.test/').sameAs).toEqual(['https://alice.test/'])
+    const none = applyHiddenSections({ ...p, hiddenSections: ['verifiedAccounts', 'links'] }) as unknown as PublicProfile
+    expect(personJsonLd(none, 'https://blueyvatar.com/p/alice.test', 'https://img.test/')).not.toHaveProperty('sameAs')
+    expect((none.verifiedAccounts ?? []).length).toBe(0)
+  })
   it('maps public fields', () => {
     expect(ld).toMatchObject({
       '@type': 'Person', name: 'Alice', alternateName: 'alice.test', url: 'https://blueyvatar.com/p/alice.test', jobTitle: 'Dev',
