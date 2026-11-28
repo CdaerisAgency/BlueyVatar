@@ -18,6 +18,14 @@ describe('settings catalog', () => {
     expect(entitlementsFor('pro')).toEqual(ENTITLEMENTS.plus)
   })
 
+  it('a structurally equal copy of the defaults still matches today\'s tiers', () => {
+    const copy = structuredClone(DEFAULT_SETTINGS)
+    expect(copy).not.toBe(DEFAULT_SETTINGS)
+    for (const tier of ['free', 'plus', 'business', 'enterprise'] as const) {
+      expect(entitlementsFor(tier, copy)).toEqual(ENTITLEMENTS[tier])
+    }
+  })
+
   it('applies an in-range row', () => {
     const r = parseSettings([{ key: 'limits.anonymousDaily', value: 5000 }])
     expect(r.settings.anonymousDaily).toBe(5000)

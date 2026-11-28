@@ -43,7 +43,8 @@ function stores(): Stores {
   if (!(flushMs > 0)) return { pool, index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter: pgLimiter, usage: pgUsage, ledger: new PgAlertLedger(pool) }
   const limiter = new BatchedRateLimiter(pgLimiter, { flushMs, onError })
   const usage = new BatchedUsageMeter(pgUsage, { flushMs, onError })
-  const shutdown = () => { void Promise.all([limiter.close(), usage.close()]).finally(() => process.exit(0)) }
+  // settings is declared below; the handler only runs after startup, so it is initialized by then.
+  const shutdown = () => { settings.stop(); void Promise.all([limiter.close(), usage.close()]).finally(() => process.exit(0)) }
   process.once('SIGTERM', shutdown)
   process.once('SIGINT', shutdown)
   return { pool, index: new PgIndexStore(pool), licenses: new PgLicenseStore(pool), limiter, usage, ledger: new PgAlertLedger(pool) }
