@@ -1,6 +1,8 @@
 import type { OAuthSession } from '@atproto/oauth-client-node'
 import type { CropParams } from '@blueyvatar/core'
 import { oauthClient } from './auth'
+import { COPY } from './copy'
+import { log } from './obs'
 import { bskyAvatarBlob, readCapped } from './import'
 import { IMAGE_COLLECTION, MAX_BLOB_BYTES, PROFILE_COLLECTION, canAddImage, labelValues, limitMessage, validateImageBytes, type ImageMime, type NewImageFields } from './records'
 import { resolvePlan } from './plan'
@@ -42,13 +44,17 @@ export type ProfileRecord = {
 export type StoredImage = { uri: string; cid: string; rkey: string; value: ImageRecord }
 
 export class RepoError extends Error {}
+/** The stored link to the person's atproto account cannot be restored. They need to sign in again. */
+export class SessionExpiredError extends RepoError {}
 
 /** Restores the stored OAuth session for the signed-in DID. Throws RepoError if it is gone. */
 export async function repoSession(did: string): Promise<OAuthSession> {
   try {
     return await (await oauthClient()).restore(did)
-  } catch {
-    throw new RepoError("Your session with your Bluesky account's home server expired. Sign in again.")
+  } catch (err) {
+    // Class name only: the message can carry token fragments.
+    log.warn('oauth restore failed', { did, errorName: err instanceof Error ? err.name : typeof err })
+    throw new SessionExpiredError(COPY.session.expired)
   }
 }
 

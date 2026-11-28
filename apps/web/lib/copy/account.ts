@@ -1,5 +1,9 @@
 /** Copy for the account pages. Prices are not here. They come from ../pricing.ts. */
 export const ACCOUNT_COPY = {
+  session: {
+    expired: "You are signed in to blueyvatar, but the link to your account's home server needs to be renewed. Sign in again to keep editing.",
+    signInAgain: 'Sign in again',
+  },
   keys: {
     websiteKey: 'Website key (read only, safe to put in a web page)',
     serverKey: 'Server key (read only, keeps usage and stays private)',

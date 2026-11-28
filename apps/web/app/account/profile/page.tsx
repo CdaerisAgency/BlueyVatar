@@ -3,7 +3,8 @@ import { PageHeader, PageMain } from '../../../components/Page'
 import Link from 'next/link'
 import { COPY } from '../../../lib/copy'
 import { requireDid } from '../../../lib/auth'
-import { RepoError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
+import { loginPath } from '../../../lib/next-path'
+import { RepoError, SessionExpiredError, getProfile, repoSession, type ProfileRecord } from '../../../lib/repo'
 import { ProfileForm } from './ProfileForm'
 import { ProfileShare } from '../../../components/ProfileShare'
 import { repoHandle } from '../../../lib/claims-repo'
@@ -17,12 +18,14 @@ export default async function ProfilePage() {
   const did = await requireDid('/account/profile')
   let p: Partial<ProfileRecord> = {}
   let loadError: string | null = null
+  let expired = false
   let handle: string | null = null
   try {
     const session = await repoSession(did)
     p = (await getProfile(session))?.value ?? {}
     handle = await repoHandle(session).catch(() => null)
   } catch (err) {
+    expired = err instanceof SessionExpiredError
     loadError = err instanceof RepoError ? err.message : 'Could not read your repository.'
   }
   const color = normalizeBackgroundColor(p.backgroundColor)
@@ -32,6 +35,7 @@ export default async function ProfilePage() {
       <p>These fields are saved in your repository as com.blueyvatar.profile and are public. Display name and bio stay in your atproto profile.</p>
       <p><Link href="/account#share">{COPY.share.pointer}</Link></p>
       {loadError && <p role="alert" id="profile-load-error">{loadError}</p>}
+      {expired && <p><Link href={loginPath('/account/profile')} className="inline-flex min-h-11 items-center">{COPY.session.signInAgain}</Link></p>}
       {loadError === null && (
         <ProfileForm
           hasColor={Boolean(color)}
