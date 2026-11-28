@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { Lexicons, jsonToLex } from '@atproto/lexicon'
 import { describe, expect, it } from 'vitest'
 import {
@@ -12,7 +13,7 @@ import {
 } from './publish.js'
 import { authorityDomain, isUnderAuthority, lexiconDnsName, loadLexiconFiles, validateLexicons, type LoadedLexicon } from './validate.js'
 
-const repoLexicons = new URL('../../../lexicons', import.meta.url).pathname
+const repoLexicons = fileURLToPath(new URL('../../../lexicons', import.meta.url))
 const files = loadLexiconFiles(repoLexicons)
 const DID = 'did:plc:abcdefghijklmnopqrstuvwx'
 
