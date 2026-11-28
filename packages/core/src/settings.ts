@@ -55,13 +55,22 @@ export const SETTING_DEFS: readonly SettingDef[] = [
   },
 ]
 
-export const DEFAULT_SETTINGS: SiteSettings = {
+function deepFreeze<T>(o: T): T {
+  if (o && typeof o === 'object' && !Object.isFrozen(o)) {
+    Object.freeze(o)
+    for (const v of Object.values(o)) deepFreeze(v)
+  }
+  return o
+}
+
+/** Deep-frozen: every snapshot handed out is immutable. Clone with structuredClone to get a mutable copy. */
+export const DEFAULT_SETTINGS: SiteSettings = deepFreeze({
   anonymousDaily: 100,
   keyedDaily: { free: 1_000 },
   keyedMonthly: { plus: 50_000, business: 1_000_000 },
   maxSize: { free: 512, plus: 1024, business: 2048 },
   profileAccess: { anonymous: false, free: false, plus: true, business: true },
-}
+})
 
 export type SettingRow = { key: string; value: unknown }
 
@@ -121,5 +130,5 @@ export function parseSettings(rows: SettingRow[]): { settings: SiteSettings; rej
     if (r.ok) apply(settings, r.key, r.value)
     else rejected.push(row.key)
   }
-  return { settings, rejected }
+  return { settings: deepFreeze(settings), rejected }
 }

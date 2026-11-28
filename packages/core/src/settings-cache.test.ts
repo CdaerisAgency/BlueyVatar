@@ -106,4 +106,46 @@ describe('SettingsCache', () => {
     expect(cache.current().anonymousDaily).toBe(DEFAULT_SETTINGS.anonymousDaily)
     cache.stop()
   })
+
+  it('snapshots are immutable and defaults stay intact', async () => {
+    const before = structuredClone(DEFAULT_SETTINGS)
+    const cache = new SettingsCache(async () => [{ key: 'sizes.free.maxSize', value: 256 }])
+    expect(() => { cache.current().maxSize.free = 9999 }).toThrow(TypeError)
+    expect(DEFAULT_SETTINGS).toEqual(before)
+    await cache.start()
+    expect(() => { cache.current().maxSize.free = 9999 }).toThrow(TypeError)
+    expect(cache.current().maxSize.free).toBe(256)
+    expect(DEFAULT_SETTINGS).toEqual(before)
+    cache.stop()
+  })
+
+  it('a throwing onError or onRejected cannot reject refresh', async () => {
+    const bad = new SettingsCache(async () => { throw new Error('x') }, { onError: () => { throw new Error('cb') } })
+    await expect(bad.refresh()).resolves.toBeUndefined()
+    const bad2 = new SettingsCache(async () => [{ key: 'nope', value: 1 }], { onRejected: () => { throw new Error('cb') } })
+    await expect(bad2.refresh()).resolves.toBeUndefined()
+  })
+
+  it('double start() keeps one timer', async () => {
+    vi.useFakeTimers()
+    const cache = new SettingsCache(async () => [], { refreshMs: 1000 })
+    await cache.start()
+    await cache.start()
+    expect(vi.getTimerCount()).toBe(1)
+    cache.stop()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('refreshes every 60000 ms by default', async () => {
+    vi.useFakeTimers()
+    const load = vi.fn(async (): Promise<SettingRow[]> => [])
+    const cache = new SettingsCache(load)
+    await cache.start()
+    expect(load).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(59_999)
+    expect(load).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(load).toHaveBeenCalledTimes(2)
+    cache.stop()
+  })
 })

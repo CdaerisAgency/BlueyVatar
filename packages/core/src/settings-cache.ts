@@ -44,9 +44,9 @@ export class SettingsCache {
       try {
         const { settings, rejected } = parseSettings(await load())
         this.snapshot = settings
-        if (rejected.length > 0) this.opts.onRejected?.(rejected)
+        if (rejected.length > 0) this.safely(() => this.opts.onRejected?.(rejected))
       } catch (err) {
-        this.opts.onError?.(err)
+        this.safely(() => this.opts.onError?.(err))
       } finally {
         this.inflight = null
       }
@@ -54,6 +54,12 @@ export class SettingsCache {
     return this.inflight
   }
 
+  /** A throwing callback must never reject refresh() or surface as an unhandled rejection. */
+  private safely(fn: () => void): void {
+    try { fn() } catch { /* ignored */ }
+  }
+
+  /** Deep-frozen snapshot: callers cannot mutate it or the shared defaults. */
   current(): SiteSettings {
     return this.snapshot
   }
